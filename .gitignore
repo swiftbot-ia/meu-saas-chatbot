@@ -30,8 +30,13 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# local env files - NUNCA COMMITAR
+.env
+.env*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # vercel
 .vercel
@@ -39,3 +44,78 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+```
+
+---
+
+## ✅ O QUE ESTÁ SENDO IGNORADO (E DEVE SER)
+
+### **Arquivos de Ambiente (CRÍTICO - NUNCA COMMITAR):**
+```
+.env
+.env*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+```
+
+### **Dependências (Muito pesado):**
+```
+/node_modules
+```
+
+### **Builds e Cache:**
+```
+/.next/
+/out/
+/build
+*.tsbuildinfo
+```
+
+### **Logs e Debug:**
+```
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+```
+
+### **IDE e OS:**
+```
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+```
+
+---
+
+## ✅ O QUE DEVE SER COMMITADO
+
+Estes arquivos/pastas **DEVEM** estar no GitHub:
+```
+✅ /app/                  (TODO o código da aplicação)
+✅ /lib/                  (supabase.js, super-account.js, etc)
+✅ /utils/                (utilitários)
+✅ /components/           (se existir)
+✅ /public/               (imagens, favicon, etc)
+✅ package.json           ⚠️ CRÍTICO
+✅ package-lock.json      ⚠️ CRÍTICO
+✅ next.config.js         ⚠️ CRÍTICO
+✅ tailwind.config.js
+✅ postcss.config.js
+✅ jsconfig.json ou tsconfig.json
+✅ .gitignore
+✅ README.md
+✅ .env.example           (modelo SEM valores sensíveis)
