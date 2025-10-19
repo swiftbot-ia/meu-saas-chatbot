@@ -20,7 +20,6 @@ export async function POST(request) {
       .from('whatsapp_connections')
       .select('user_id, phone_number_id, api_credentials, waba_id')
       .eq('phone_number_id', phoneNumber)
-      .single() phoneNumber)
       .single()
 
     if (connectionError || !connectionData) {

@@ -1,5 +1,7 @@
+// app/faq/page.js
 'use client'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
 
 export default function FAQ() {
@@ -107,36 +109,36 @@ export default function FAQ() {
             
             {/* Navigation Menu */}
             <nav className="hidden md:flex items-center space-x-8">
-              <a 
-                href="/" 
-                className="text-gray-300 hover:text-[#04F5A0] transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"
-              >
-                Início
-              </a>
-              <a 
-                href="/#tecnologia" 
-                className="text-gray-300 hover:text-[#04F5A0] transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"
-              >
-                Tecnologia
-              </a>
-              <a 
-                href="/#solucoes" 
-                className="text-gray-300 hover:text-[#04F5A0] transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"
-              >
-                Soluções
-              </a>
-              <a 
+              <Link 
+  href="/" 
+  className="text-gray-300 hover:text-[#04F5A0] transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"
+>
+  Início
+</Link>
+<Link 
+  href="/#tecnologia" 
+  className="text-gray-300 hover:text-[#04F5A0] transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"
+>
+  Tecnologia
+</Link>
+<Link 
+  href="/#solucoes" 
+  className="text-gray-300 hover:text-[#04F5A0] transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"
+>
+  Soluções
+</Link>
+              <Link 
                 href="/precos" 
                 className="text-gray-300 hover:text-[#04F5A0] transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"
               >
                 Preços
-              </a>
-              <a 
+              </Link>
+              <Link 
                 href="/faq" 
                 className="text-[#04F5A0] drop-shadow-[0_0_8px_rgba(4,245,160,0.8)] font-medium"
               >
                 FAQ
-              </a>
+              </Link>
             </nav>
 
             {/* Header Buttons */}
