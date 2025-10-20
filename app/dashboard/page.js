@@ -604,9 +604,60 @@ export default function Dashboard() {
     }
   }
   
+  // ====================================================================
+  // 👑 MODIFICAÇÃO CRÍTICA: SUPER ACCOUNT BYPASS
+  // ====================================================================
   const checkSubscriptionStatus = async () => {
     if (!user) return
+    
     try {
+      // 👑 VERIFICAR SUPER ACCOUNT PRIMEIRO
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('is_super_account')
+        .eq('user_id', user.id)
+        .single()
+
+      if (profile?.is_super_account) {
+        console.log('👑 Super Account detectada - Bypass ativado')
+        
+        // Definir subscription fake com privilégios totais
+        setSubscription({
+          status: 'active',
+          connections_purchased: 999,
+          trial_end_date: null,
+          next_billing_date: null,
+          pagarme_subscription_id: 'super_account_bypass'
+        })
+        
+        // Criar 7 conexões automaticamente se não existirem
+        const { data: existingConnections } = await supabase
+          .from('user_connections')
+          .select('*')
+          .eq('user_id', user.id)
+
+        if (!existingConnections || existingConnections.length === 0) {
+          const connectionsToCreate = Array.from({ length: 7 }, (_, i) => ({
+            user_id: user.id,
+            connection_number: i + 1,
+            instance_name: `swiftbot_${user.id.substring(0, 8)}_${i + 1}`,
+            status: 'disconnected'
+          }))
+
+          await supabase
+            .from('user_connections')
+            .insert(connectionsToCreate)
+          
+          console.log('✅ 7 conexões criadas automaticamente para super account')
+          
+          // Recarregar conexões
+          await loadUserConnections()
+        }
+        
+        return // ⚠️ IMPORTANTE: Para aqui e não executa o resto
+      }
+
+      // 🔄 CÓDIGO ORIGINAL CONTINUA AQUI (para contas normais)
       // 1. Buscar status local
       const { data, error } = await supabase
         .from('user_subscriptions')
@@ -1074,7 +1125,7 @@ export default function Dashboard() {
                 </h3>
                 <p className="text-gray-300">
                   {subscriptionStatus === 'active' ?
-                    `${subscription.connections_purchased} conexão(ões) • Próxima cobrança: ${new Date(subscription.next_billing_date).toLocaleDateString()}` :
+                    `${subscription.connections_purchased} conexão(ões) • ${subscription.pagarme_subscription_id === 'super_account_bypass' ? '👑 Super Account' : `Próxima cobrança: ${new Date(subscription.next_billing_date).toLocaleDateString()}`}` :
                     subscriptionStatus === 'trial' ?
                     `Trial expira em: ${new Date(subscription.trial_end_date).toLocaleDateString()}` :
                     'Renove seu plano para continuar usando o SwiftBot'
@@ -1118,14 +1169,14 @@ export default function Dashboard() {
                         + Nova Conexão
                     </button>
                     )}
-                     {subscription?.status === 'active' && connections.length >= subscription?.connections_purchased && (
+                     {subscription?.status === 'active' && connections.length >= subscription?.connections_purchased && subscription?.connections_purchased < 999 && (
                     <button onClick={handleUpgradeConnections} className="bg-orange-500 hover:bg-orange-400 text-black px-4 py-2 rounded-xl font-bold transition-all duration-300 text-sm relative z-50">
                         + Fazer Upgrade
                     </button>
                     )}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {Array.from({length: subscription?.connections_purchased || 1}).map((_, index) => {
+                    {Array.from({length: Math.min(subscription?.connections_purchased || 1, 7)}).map((_, index) => {
                         const connection = connections.find(c => c.connection_number === index + 1);
                         return (
                             <ConnectionCard 
@@ -1590,10 +1641,16 @@ export default function Dashboard() {
               </div>
             )}
             
-            {/* Step 2: Dados do Cartão COM CPF E ENDEREÇO */}
+            {/* Restante do modal continua igual... */}
             {checkoutStep === 'payment' && (
               <div className="relative z-10">
                 <div className="text-center mb-6">
+                  <button
+                    onClick={() => setCheckoutStep('plan')}
+                    className="absolute top-0 left-0 text-gray-400 hover:text-white"
+                  >
+                    ← Voltar
+                  </button>
                   <div className="w-16 h-16 bg-[#04F5A0] rounded-2xl flex items-center justify-center mx-auto mb-4">
                     <span className="text-2xl">💳</span>
                   </div>
@@ -1676,7 +1733,7 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* ✅ CAMPO: CPF */}
+                    {/* Campo CPF */}
                     <div>
                       <label htmlFor="cpf" className="block text-sm font-medium text-gray-300 mb-2">
                         CPF <span className="text-red-400">*</span>
@@ -1699,7 +1756,7 @@ export default function Dashboard() {
                       />
                     </div>
 
-                    {/* ✅ CAMPOS DE ENDEREÇO */}
+                    {/* Campos de Endereço */}
                     <div className="bg-black/20 backdrop-blur-sm rounded-xl p-4 border border-white/10">
                       <h4 className="text-sm font-medium text-gray-300 mb-4">🏠 Endereço de Cobrança</h4>
                       
@@ -1813,18 +1870,18 @@ export default function Dashboard() {
                         </div>
                       </div>
 
-                       <div>
-                          <label htmlFor="complementary" className="block text-sm font-medium text-gray-300 mb-2">
-                            Complemento
-                          </label>
-                          <input
-                            type="text"
-                            id="complementary"
-                            name="complementary"
-                            placeholder="Apto 101, Bloco B"
-                            className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300"
-                          />
-                        </div>
+                      <div>
+                        <label htmlFor="complementary" className="block text-sm font-medium text-gray-300 mb-2">
+                          Complemento
+                        </label>
+                        <input
+                          type="text"
+                          id="complementary"
+                          name="complementary"
+                          placeholder="Apto 101, Bloco B"
+                          className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300"
+                        />
+                      </div>
                     </div>
 
                   </div>
