@@ -16,12 +16,11 @@ export async function POST(request) {
 
     // 1. Buscar user_id através do número na tabela whatsapp_connections
     // 🎯 ADICIONANDO api_credentials e waba_id na consulta
-const { data: connectionData, error: connectionError } = await supabase
-  .from('whatsapp_connections')
-  .select('user_id, phone_number_id, api_credentials, waba_id')
-  .eq('phone_number_id', phoneNumber)
-  .single()
-
+    const { data: connectionData, error: connectionError } = await supabase
+      .from('whatsapp_connections')
+      .select('user_id, phone_number_id, api_credentials, waba_id')
+      .eq('phone_number_id', phoneNumber)
+      .single()
 
     if (connectionError || !connectionData) {
       console.log('Conexão não encontrada:', connectionError)

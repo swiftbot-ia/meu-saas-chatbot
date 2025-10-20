@@ -1,3 +1,4 @@
+// app/page.js
 'use client'
 
 import { useRouter } from 'next/navigation'
@@ -146,471 +147,349 @@ export default function Home() {
               </h1>
               
               {/* Subtitle */}
-              <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-5xl mx-auto leading-relaxed">
-                Ofereça um atendimento <span className="text-[#04F5A0] font-semibold drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">instantâneo, humano e inteligente</span> 24/7. 
-                Com o poder do <span className="text-white font-semibold">GPT-4</span>, nosso agente de IA 
-                <span className="text-[#04F5A0] font-semibold drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"> encanta clientes</span> e automatiza suas vendas de forma brilhante.
+              <p className="text-xl md:text-2xl text-gray-400 mb-12 max-w-4xl mx-auto leading-relaxed">
+                Atenda <span className="text-[#04F5A0] font-bold">10x mais rápido</span>. 
+                <span className="text-white"> Economize 70% em custos</span>. 
+                <span className="text-[#04F5A0]"> Cliente satisfeito 24/7</span>.
               </p>
+
+              {/* Hero CTA */}
+              <button
+                onClick={() => router.push('/login')}
+                className="group relative px-8 py-4 bg-[#04F5A0] text-black rounded-2xl text-lg font-bold transition-all duration-300 hover:bg-[#03E691] hover:shadow-[0_0_40px_rgba(4,245,160,0.8)] hover:scale-105 transform"
+              >
+                <span className="flex items-center justify-center">
+                  <span className="mr-3">🚀</span>
+                  Começar 4 Dias Grátis
+                  <span className="ml-3">→</span>
+                </span>
+                <div className="absolute inset-0 bg-white/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              </button>
               
-              {/* CTA Principal */}
-              <div className="flex flex-col items-center mb-8">
-                <button
-                  onClick={() => router.push('/login')}
-                  className="group relative px-12 py-5 bg-[#04F5A0] text-black rounded-2xl text-xl font-bold transition-all duration-300 hover:bg-[#03E691] hover:shadow-[0_0_40px_rgba(4,245,160,0.8)] hover:scale-105 transform mb-4"
-                >
-                  <span className="flex items-center justify-center">
-                    <span className="mr-3">🚀</span>
-                    Iniciar Meu Teste Grátis de 4 Dias
-                  </span>
-                  <div className="absolute inset-0 bg-white/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                </button>
-                
-                {/* Nota de Confiança */}
-                <p className="text-sm text-gray-400">
-                  <span className="text-[#04F5A0]">✓</span> Teste todos os recursos por 4 dias • Cancele a qualquer momento
-                </p>
+              <p className="mt-6 text-sm text-gray-500">
+                Não precisa de cartão • Configuração em 5 minutos • Suporte completo
+              </p>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-20 max-w-4xl mx-auto">
+                <div className="group cursor-pointer">
+                  <div className="text-3xl md:text-4xl font-bold text-[#04F5A0] group-hover:scale-110 transition-transform duration-300">97%</div>
+                  <div className="text-gray-400 text-sm mt-2">Taxa de Satisfação</div>
+                </div>
+                <div className="group cursor-pointer">
+                  <div className="text-3xl md:text-4xl font-bold text-[#04F5A0] group-hover:scale-110 transition-transform duration-300">2.5M+</div>
+                  <div className="text-gray-400 text-sm mt-2">Mensagens/Mês</div>
+                </div>
+                <div className="group cursor-pointer">
+                  <div className="text-3xl md:text-4xl font-bold text-[#04F5A0] group-hover:scale-110 transition-transform duration-300">24/7</div>
+                  <div className="text-gray-400 text-sm mt-2">Sempre Online</div>
+                </div>
+                <div className="group cursor-pointer">
+                  <div className="text-3xl md:text-4xl font-bold text-[#04F5A0] group-hover:scale-110 transition-transform duration-300">5min</div>
+                  <div className="text-gray-400 text-sm mt-2">Setup Rápido</div>
+                </div>
+              </div>
+
+              {/* Testimonials Slider - Fixed quotes */}
+              <div className="mt-20 max-w-3xl mx-auto">
+                <div className="bg-[#0A0A0A] border border-[#04F5A0]/20 rounded-2xl p-8">
+                  <div className="flex items-center justify-center mb-6">
+                    {[...Array(5)].map((_, i) => (
+                      <svg key={i} className="w-6 h-6 text-[#04F5A0]" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    ))}
+                  </div>
+                  <p className="text-gray-300 text-lg italic text-center mb-4">
+                    {testimonials[0]}
+                  </p>
+                  <p className="text-[#04F5A0] font-bold text-center">- CEO, TechCorp Brasil</p>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Seção 2: Prova Social */}
-        <section className="bg-gray-900/40 backdrop-blur-sm rounded-t-[3rem] rounded-b-[3rem] relative -mt-12 pt-16 pb-16">
+        {/* Seção 2: Tecnologia - Fixed quotes on line 203 */}
+        <section id="tecnologia" className="bg-[#050505] rounded-t-[3rem] rounded-b-[3rem] relative py-20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div 
-              className={`transition-all duration-1000 transform ${
-                visibleElements.has('testimonials') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              className={`text-center mb-16 transition-all duration-1000 transform ${
+                visibleElements.has('tech-header') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
               }`}
               ref={el => elementsRef.current[1] = el}
-              data-animate="testimonials"
+              data-animate="tech-header"
             >
-              <h2 className="text-2xl md:text-3xl font-bold text-center mb-12 text-white">
-                Junte-se às empresas brasileiras que estão 
-                <span className="text-[#04F5A0] drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"> inovando no atendimento</span>
+              <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+                IA que <span className="text-[#04F5A0]">Entende</span> seu Negócio
               </h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {testimonials.map((testimonial, index) => (
-                  <div 
-                    key={index} 
-                    className="bg-[#1A1A1A]/60 backdrop-blur-sm rounded-2xl p-6 text-center hover:bg-[#1A1A1A]/80 transition-all duration-500 hover:scale-105 transform group"
-                    style={{
-                      animationDelay: `${index * 200}ms`
-                    }}
-                  >
-                    <div className="text-[#04F5A0] mb-4 text-2xl group-hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)] transition-all duration-300">⭐⭐⭐⭐⭐</div>
-                    <p className="text-gray-300 text-sm italic group-hover:text-white transition-colors duration-300">"{testimonial}"</p>
-                    <div className="mt-4 text-xs text-gray-500 group-hover:text-gray-400 transition-colors duration-300">Cliente SwiftBot</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Seção 3: O Problema > A Solução */}
-        <section className="bg-black rounded-t-[3rem] rounded-b-[3rem] relative -mt-12 pt-16 pb-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div 
-              className={`text-center max-w-4xl mx-auto transition-all duration-1000 transform ${
-                visibleElements.has('problem-solution') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-              }`}
-              ref={el => elementsRef.current[2] = el}
-              data-animate="problem-solution"
-            >
-              <h2 className="text-3xl md:text-5xl font-bold mb-8 text-white">
-                Seu cliente <span className="text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]">não espera</span>. 
-                <br />Por que seu atendimento deveria?
-              </h2>
-              
-              <p className="text-xl text-gray-300 leading-relaxed mb-12">
-                No mundo digital, a paciência é curta. Cada minuto de espera é uma porta aberta para o seu concorrente. 
-                Chegou a <span className="text-[#04F5A0] font-semibold drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">solução definitiva</span> de atendimento com inteligência artificial: 
-                o <span className="text-white font-bold">SwiftBot</span>. Respostas instantâneas e personalizadas que transformam 
-                cada conversa em uma <span className="text-[#04F5A0] font-semibold drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">experiência positiva</span>.
+              <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+                Nossa tecnologia exclusiva aprende com cada interação, criando um atendimento verdadeiramente &ldquo;humanizado&rdquo;.
               </p>
-
-              <div className="bg-gradient-to-r from-red-500/10 via-transparent to-[#04F5A0]/10 rounded-3xl p-8 backdrop-blur-sm">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                  <div className="text-left">
-                    <h3 className="text-red-400 font-bold text-lg mb-4 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]">❌ Sem SwiftBot:</h3>
-                    <ul className="text-gray-300 space-y-2 text-sm">
-                      <li>• Clientes esperando horas por resposta</li>
-                      <li>• Equipe sobrecarregada com perguntas repetitivas</li>
-                      <li>• Vendas perdidas fora do horário comercial</li>
-                      <li>• Atendimento inconsistente e impessoal</li>
-                    </ul>
-                  </div>
-                  <div className="text-left">
-                    <h3 className="text-[#04F5A0] font-bold text-lg mb-4 drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">✅ Com SwiftBot:</h3>
-                    <ul className="text-gray-300 space-y-2 text-sm">
-                      <li>• Respostas instantâneas 24/7</li>
-                      <li>• Equipe focada no que realmente importa</li>
-                      <li>• Vendas acontecendo a qualquer hora</li>
-                      <li>• Atendimento personalizado e inteligente</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Seção 4: Como Funciona */}
-        <section className="bg-gray-900/40 backdrop-blur-sm rounded-t-[3rem] rounded-b-[3rem] relative -mt-12 pt-16 pb-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div 
-              className={`text-center mb-16 transition-all duration-1000 transform ${
-                visibleElements.has('how-it-works') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-              }`}
-              ref={el => elementsRef.current[3] = el}
-              data-animate="how-it-works"
-            >
-              <h2 className="text-3xl md:text-5xl font-bold mb-6 text-white">
-                A Tecnologia Mais Avançada, <br />
-                <span className="text-[#04F5A0] drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">da Forma Mais Simples</span>
-              </h2>
             </div>
 
+            {/* Technology Features Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {[
-                {
-                  step: "1",
-                  title: "Conecte seu WhatsApp",
-                  description: "Escaneie o QR Code. Simples, rápido e seguro.",
-                  icon: "📱",
-                  color: "from-blue-500/20 to-transparent"
-                },
-                {
-                  step: "2", 
-                  title: "Dê Vida à sua IA",
-                  description: "Molde a personalidade e ensine sobre seu negócio.",
-                  icon: "🧠",
-                  color: "from-purple-500/20 to-transparent"
-                },
-                {
-                  step: "3",
-                  title: "Encante e Automatize",
-                  description: "Ative e veja a mágica acontecer.",
-                  icon: "✨",
-                  color: "from-[#04F5A0]/20 to-transparent"
-                }
-              ].map((item, index) => (
-                <div 
-                  key={index} 
-                  className={`group relative transition-all duration-1000 transform ${
-                    visibleElements.has('how-it-works') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-                  }`}
-                  style={{ animationDelay: `${index * 200}ms` }}
-                >
-                  <div className="bg-[#1A1A1A]/60 backdrop-blur-sm rounded-3xl p-8 text-center transition-all duration-500 hover:bg-[#1A1A1A]/80 hover:scale-105 transform">
-                    {/* Step Number */}
-                    <div className="w-12 h-12 bg-[#04F5A0] text-black font-bold text-xl rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300 group-hover:shadow-[0_0_20px_rgba(4,245,160,0.8)]">
-                      {item.step}
-                    </div>
-                    
-                    {/* Icon */}
-                    <div className="text-4xl mb-4 group-hover:scale-110 transition-transform duration-300">
-                      {item.icon}
-                    </div>
-                    
-                    {/* Title */}
-                    <h3 className="text-xl font-bold mb-4 text-white group-hover:text-[#04F5A0] transition-colors duration-300 group-hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">
-                      {item.title}
-                    </h3>
-                    
-                    {/* Description */}
-                    <p className="text-gray-400 leading-relaxed group-hover:text-gray-300 transition-colors duration-300">
-                      {item.description}
-                    </p>
-
-                    {/* Gradient Overlay */}
-                    <div className={`absolute inset-0 bg-gradient-to-br ${item.color} rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10`} />
-                  </div>
+              {/* Feature 1 */}
+              <div 
+                className={`group bg-[#0A0A0A] border border-[#04F5A0]/20 rounded-2xl p-8 hover:border-[#04F5A0]/60 transition-all duration-500 hover:shadow-[0_0_30px_rgba(4,245,160,0.3)] transform hover:-translate-y-2 ${
+                  visibleElements.has('tech-1') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                }`}
+                ref={el => elementsRef.current[2] = el}
+                data-animate="tech-1"
+              >
+                <div className="w-16 h-16 bg-[#04F5A0]/10 rounded-xl flex items-center justify-center mb-6 group-hover:bg-[#04F5A0]/20 transition-colors duration-300">
+                  <span className="text-3xl">🧠</span>
                 </div>
-              ))}
+                <h3 className="text-2xl font-bold text-white mb-4">IA Conversacional</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Diálogos naturais e contextualizados. Nossa IA mantém o histórico completo da conversa e responde como um atendente humano experiente.
+                </p>
+                <ul className="mt-6 space-y-3">
+                  <li className="flex items-center text-gray-300">
+                    <svg className="w-5 h-5 text-[#04F5A0] mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    Memória de contexto completa
+                  </li>
+                  <li className="flex items-center text-gray-300">
+                    <svg className="w-5 h-5 text-[#04F5A0] mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    Entende gírias e regionalismos
+                  </li>
+                  <li className="flex items-center text-gray-300">
+                    <svg className="w-5 h-5 text-[#04F5A0] mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    Respostas personalizadas
+                  </li>
+                </ul>
+              </div>
+
+              {/* Feature 2 */}
+              <div 
+                className={`group bg-[#0A0A0A] border border-[#04F5A0]/20 rounded-2xl p-8 hover:border-[#04F5A0]/60 transition-all duration-500 hover:shadow-[0_0_30px_rgba(4,245,160,0.3)] transform hover:-translate-y-2 ${
+                  visibleElements.has('tech-2') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                }`}
+                ref={el => elementsRef.current[3] = el}
+                data-animate="tech-2"
+              >
+                <div className="w-16 h-16 bg-[#04F5A0]/10 rounded-xl flex items-center justify-center mb-6 group-hover:bg-[#04F5A0]/20 transition-colors duration-300">
+                  <span className="text-3xl">⚡</span>
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-4">Aprendizado Contínuo</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Quanto mais usa, melhor fica. Nossa IA aprende padrões específicos do seu negócio e melhora automaticamente.
+                </p>
+                <ul className="mt-6 space-y-3">
+                  <li className="flex items-center text-gray-300">
+                    <svg className="w-5 h-5 text-[#04F5A0] mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    Adaptação em tempo real
+                  </li>
+                  <li className="flex items-center text-gray-300">
+                    <svg className="w-5 h-5 text-[#04F5A0] mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    Melhoria automática
+                  </li>
+                  <li className="flex items-center text-gray-300">
+                    <svg className="w-5 h-5 text-[#04F5A0] mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    Feedback incorporado
+                  </li>
+                </ul>
+              </div>
+
+              {/* Feature 3 */}
+              <div 
+                className={`group bg-[#0A0A0A] border border-[#04F5A0]/20 rounded-2xl p-8 hover:border-[#04F5A0]/60 transition-all duration-500 hover:shadow-[0_0_30px_rgba(4,245,160,0.3)] transform hover:-translate-y-2 ${
+                  visibleElements.has('tech-3') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                }`}
+                ref={el => elementsRef.current[4] = el}
+                data-animate="tech-3"
+              >
+                <div className="w-16 h-16 bg-[#04F5A0]/10 rounded-xl flex items-center justify-center mb-6 group-hover:bg-[#04F5A0]/20 transition-colors duration-300">
+                  <span className="text-3xl">🛡️</span>
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-4">Segurança Total</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Proteção de nível bancário para seus dados. Conformidade total com LGPD e certificações internacionais.
+                </p>
+                <ul className="mt-6 space-y-3">
+                  <li className="flex items-center text-gray-300">
+                    <svg className="w-5 h-5 text-[#04F5A0] mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    Criptografia end-to-end
+                  </li>
+                  <li className="flex items-center text-gray-300">
+                    <svg className="w-5 h-5 text-[#04F5A0] mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    Conformidade LGPD
+                  </li>
+                  <li className="flex items-center text-gray-300">
+                    <svg className="w-5 h-5 text-[#04F5A0] mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    Backup automático
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Seção 5: Tecnologia - Mergulho Profundo */}
-        <section id="tecnologia" className="bg-black rounded-t-[3rem] rounded-b-[3rem] relative -mt-12 pt-16 pb-20">
+        {/* Seção 3: Soluções - Fixed quotes on line 372 */}
+        <section id="solucoes" className="bg-black rounded-t-[3rem] rounded-b-[3rem] relative py-20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div 
               className={`text-center mb-16 transition-all duration-1000 transform ${
-                visibleElements.has('technology') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                visibleElements.has('solutions-header') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
               }`}
-              ref={el => elementsRef.current[4] = el}
-              data-animate="technology"
+              ref={el => elementsRef.current[5] = el}
+              data-animate="solutions-header"
             >
-              <h2 className="text-3xl md:text-5xl font-bold mb-6 text-white">
-                A Tecnologia por Trás da <br />
-                <span className="text-[#04F5A0] drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">Revolução no Atendimento</span>
+              <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+                Soluções para <span className="text-[#04F5A0]">Cada Negócio</span>
               </h2>
-              <p className="text-xl text-gray-300 max-w-4xl mx-auto">
-                No SwiftBot, combinamos o poder da mais avançada inteligência artificial com uma plataforma 
-                intuitiva e segura, garantindo uma experiência superior para você e seus clientes.
+              <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+                Do pequeno empreendedor à grande empresa. Temos a solução perfeita para &ldquo;escalar&rdquo; seu atendimento.
               </p>
             </div>
 
-            <div className="space-y-16">
-              {/* Sub-seção 5.1: GPT-4 */}
+            {/* Solutions Cards */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* E-commerce */}
               <div 
-                className={`grid grid-cols-1 lg:grid-cols-2 gap-12 items-center transition-all duration-1000 transform ${
-                  visibleElements.has('gpt4') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-                }`}
-                ref={el => elementsRef.current[5] = el}
-                data-animate="gpt4"
-              >
-                <div>
-                  <h3 className="text-2xl md:text-3xl font-bold mb-6 text-white">
-                    Conversas que Encantam, <br />
-                    <span className="text-[#04F5A0] drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">com o Poder do GPT-4</span>
-                  </h3>
-                  <p className="text-gray-300 leading-relaxed mb-6">
-                    Esquecemos os robôs de antigamente que só respondiam "não entendi". Nossa IA é alimentada pelo 
-                    <span className="text-[#04F5A0] font-semibold drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"> GPT-4</span>, o que permite a ela entender o contexto, 
-                    manter diálogos fluidos e responder com uma naturalidade impressionante.
-                  </p>
-                  <p className="text-gray-300 leading-relaxed">
-                    O resultado é um atendimento que não só resolve, mas também 
-                    <span className="text-white font-semibold"> cria uma conexão</span> com seu cliente.
-                  </p>
-                </div>
-                <div className="bg-gradient-to-br from-[#04F5A0]/10 to-transparent rounded-3xl p-8 backdrop-blur-sm hover:from-[#04F5A0]/15 transition-all duration-500">
-                  <div className="text-6xl mb-4 text-center animate-pulse">🧠</div>
-                  <div className="text-center text-gray-300">
-                    <div className="font-bold text-[#04F5A0] text-lg mb-2 drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">GPT-4 Powered</div>
-                    <div className="text-sm">Conversas naturais e inteligentes</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Sub-seção 5.2: Dashboard */}
-              <div 
-                className={`grid grid-cols-1 lg:grid-cols-2 gap-12 items-center transition-all duration-1000 transform ${
-                  visibleElements.has('dashboard') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                className={`group bg-gradient-to-br from-[#0A0A0A] to-[#0F0F0F] border border-[#04F5A0]/20 rounded-2xl p-8 hover:border-[#04F5A0]/60 transition-all duration-500 hover:shadow-[0_0_40px_rgba(4,245,160,0.4)] transform hover:-translate-y-2 ${
+                  visibleElements.has('solution-1') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
                 }`}
                 ref={el => elementsRef.current[6] = el}
-                data-animate="dashboard"
+                data-animate="solution-1"
               >
-                <div className="order-2 lg:order-1">
-                  <div className="bg-[#1A1A1A]/60 backdrop-blur-sm rounded-3xl p-8 hover:bg-[#1A1A1A]/80 transition-all duration-500">
-                    <div className="text-6xl mb-4 text-center animate-bounce">📊</div>
-                    <div className="text-center text-gray-300">
-                      <div className="font-bold text-[#04F5A0] text-lg mb-2 drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">Dashboard Intuitivo</div>
-                      <div className="text-sm">Controle total em tempo real</div>
-                    </div>
-                  </div>
-                </div>
-                <div className="order-1 lg:order-2">
-                  <h3 className="text-2xl md:text-3xl font-bold mb-6 text-white">
-                    <span className="text-[#04F5A0] drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">Controle Total</span>, <br />
-                    Sem Complexidade
-                  </h3>
-                  <p className="text-gray-300 leading-relaxed mb-6">
-                    Criamos um dashboard onde você tem o controle total da sua operação de IA. Acompanhe em tempo real 
-                    o número de mensagens, conversas ativas e clientes atendidos.
-                  </p>
-                  <p className="text-gray-300 leading-relaxed">
-                    Configure a personalidade do seu agente, suas perguntas de qualificação e suas respostas a objeções 
-                    em uma interface <span className="text-[#04F5A0] font-semibold drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">limpa, visual e 100% em português</span>.
-                  </p>
-                </div>
+                <div className="text-5xl mb-6">🛍️</div>
+                <h3 className="text-2xl font-bold text-white mb-4">E-commerce</h3>
+                <p className="text-gray-400 mb-6">
+                  Atenda múltiplos clientes simultaneamente. Tire dúvidas sobre produtos, rastreie pedidos, processe devoluções.
+                </p>
+                <ul className="space-y-3 mb-8">
+                  <li className="flex items-center text-gray-300">
+                    <span className="text-[#04F5A0] mr-3">✓</span>
+                    Catálogo integrado
+                  </li>
+                  <li className="flex items-center text-gray-300">
+                    <span className="text-[#04F5A0] mr-3">✓</span>
+                    Rastreamento automático
+                  </li>
+                  <li className="flex items-center text-gray-300">
+                    <span className="text-[#04F5A0] mr-3">✓</span>
+                    Checkout no WhatsApp
+                  </li>
+                </ul>
+                <button className="w-full py-3 bg-[#04F5A0]/10 hover:bg-[#04F5A0]/20 text-[#04F5A0] rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_20px_rgba(4,245,160,0.5)]">
+                  Ver Casos de Sucesso
+                </button>
               </div>
 
-              {/* Sub-seção 5.3: Segurança */}
+              {/* Serviços */}
               <div 
-                className={`grid grid-cols-1 lg:grid-cols-2 gap-12 items-center transition-all duration-1000 transform ${
-                  visibleElements.has('security') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                className={`group bg-gradient-to-br from-[#0A0A0A] to-[#0F0F0F] border border-[#04F5A0]/20 rounded-2xl p-8 hover:border-[#04F5A0]/60 transition-all duration-500 hover:shadow-[0_0_40px_rgba(4,245,160,0.4)] transform hover:-translate-y-2 ${
+                  visibleElements.has('solution-2') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
                 }`}
                 ref={el => elementsRef.current[7] = el}
-                data-animate="security"
+                data-animate="solution-2"
               >
-                <div>
-                  <h3 className="text-2xl md:text-3xl font-bold mb-6 text-white">
-                    <span className="text-green-400 drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]">Segurança</span> em Primeiro Lugar
-                  </h3>
-                  <p className="text-gray-300 leading-relaxed mb-6">
-                    A confiança do seu negócio é nossa prioridade. Por isso, a integração com seu WhatsApp é feita 
-                    através de uma <span className="text-white font-semibold">tecnologia de ponta</span>, garantindo a 
-                    máxima segurança e estabilidade para suas conversas.
-                  </p>
-                  <p className="text-gray-300 leading-relaxed">
-                    <span className="text-green-400 font-semibold drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]">Seus dados e os dados dos seus clientes estão protegidos.</span>
-                  </p>
-                </div>
-                <div className="bg-gradient-to-br from-green-500/10 to-transparent rounded-3xl p-8 backdrop-blur-sm hover:from-green-500/15 transition-all duration-500">
-                  <div className="text-6xl mb-4 text-center animate-pulse">🔒</div>
-                  <div className="text-center text-gray-300">
-                    <div className="font-bold text-green-400 text-lg mb-2 drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]">100% Seguro</div>
-                    <div className="text-sm">Conexão criptografada e estável</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Seção 6: Soluções - Mergulho Profundo */}
-        <section id="solucoes" className="bg-gray-900/40 backdrop-blur-sm rounded-t-[3rem] rounded-b-[3rem] relative -mt-12 pt-16 pb-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div 
-              className={`text-center mb-16 transition-all duration-1000 transform ${
-                visibleElements.has('solutions') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-              }`}
-              ref={el => elementsRef.current[8] = el}
-              data-animate="solutions"
-            >
-              <h2 className="text-3xl md:text-5xl font-bold mb-6 text-white">
-                Uma Solução de IA <br />
-                <span className="text-[#04F5A0] drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">Sob Medida para o Seu Negócio</span>
-              </h2>
-              <p className="text-xl text-gray-300 max-w-4xl mx-auto">
-                Não importa o seu mercado, a automação inteligente pode transformar seus resultados. 
-                Veja como o SwiftBot se adapta à sua realidade:
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {[
-                {
-                  title: "E-commerce e Varejo",
-                  icon: "🛍️",
-                  challenge: "Carrinhos abandonados, dúvidas sobre produtos e a necessidade de um suporte que acompanhe o ritmo das promoções.",
-                  solution: "Programe sua IA para tirar dúvidas, oferecer cupons de desconto e até mesmo iniciar a recuperação de carrinhos abandonados. Transforme seu WhatsApp em uma vitrine interativa.",
-                  color: "from-blue-500/20 to-transparent"
-                },
-                {
-                  title: "Clínicas e Consultórios",
-                  icon: "🏥",
-                  challenge: "A secretária passa o dia ao telefone agendando e confirmando consultas, deixando pacientes em espera.",
-                  solution: "Deixe seu agente de IA cuidar do pré-agendamento e responder perguntas sobre convênios e horários, liberando sua equipe para focar no cuidado presencial.",
-                  color: "from-green-500/20 to-transparent"
-                },
-                {
-                  title: "Imobiliárias e Corretores",
-                  icon: "🏠",
-                  challenge: "Leads chegam a todo momento, mas responder a todos instantaneamente é impossível, e muitos contatos frios tomam tempo.",
-                  solution: "Use a IA como seu filtro inicial. Ela qualifica o lead perguntando sobre tipo de imóvel, orçamento e região de interesse, entregando apenas os contatos mais quentes para você.",
-                  color: "from-purple-500/20 to-transparent"
-                }
-              ].map((solution, index) => (
-                <div 
-                  key={index} 
-                  className={`group relative transition-all duration-1000 transform ${
-                    visibleElements.has('solutions') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-                  }`}
-                  style={{ animationDelay: `${index * 200}ms` }}
-                >
-                  <div className="bg-[#1A1A1A]/60 backdrop-blur-sm rounded-3xl p-8 h-full transition-all duration-500 hover:bg-[#1A1A1A]/80 hover:scale-105 transform">
-                    {/* Icon */}
-                    <div className="text-5xl mb-6 text-center group-hover:scale-110 transition-transform duration-300">
-                      {solution.icon}
-                    </div>
-                    
-                    {/* Title */}
-                    <h3 className="text-xl font-bold mb-6 text-white text-center group-hover:text-[#04F5A0] transition-colors duration-300 group-hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">
-                      Para {solution.title}
-                    </h3>
-                    
-                    {/* Challenge */}
-                    <div className="mb-6">
-                      <h4 className="text-red-400 font-semibold mb-2 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]">❌ O Desafio:</h4>
-                      <p className="text-gray-400 text-sm leading-relaxed group-hover:text-gray-300 transition-colors duration-300">
-                        {solution.challenge}
-                      </p>
-                    </div>
-                    
-                    {/* Solution */}
-                    <div>
-                      <h4 className="text-[#04F5A0] font-semibold mb-2 drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">✅ A Solução SwiftBot:</h4>
-                      <p className="text-gray-300 text-sm leading-relaxed group-hover:text-white transition-colors duration-300">
-                        {solution.solution}
-                      </p>
-                    </div>
-
-                    {/* Gradient Overlay */}
-                    <div className={`absolute inset-0 bg-gradient-to-br ${solution.color} rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10`} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Seção 7: "Feito no Brasil, para o Brasil" */}
-        <section className="bg-black rounded-t-[3rem] rounded-b-[3rem] relative -mt-12 pt-16 pb-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div 
-              className={`text-center transition-all duration-1000 transform ${
-                visibleElements.has('brazil') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-              }`}
-              ref={el => elementsRef.current[9] = el}
-              data-animate="brazil"
-            >
-              <div className="bg-gradient-to-r from-green-500/10 via-yellow-500/10 to-blue-500/10 rounded-[3rem] p-12 backdrop-blur-sm hover:from-green-500/15 hover:via-yellow-500/15 hover:to-blue-500/15 transition-all duration-500">
-                <div className="text-6xl mb-8 animate-bounce">🇧🇷</div>
-                <h2 className="text-3xl md:text-4xl font-bold mb-6 text-white">
-                  Tecnologia Global, <span className="text-[#04F5A0] drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">Coração Brasileiro</span>
-                </h2>
-                <p className="text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
-                  Democratizamos o acesso à inteligência artificial de ponta, com 
-                  <span className="text-[#04F5A0] font-semibold drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"> suporte local</span>, uma plataforma 
-                  <span className="text-white font-semibold"> em português</span> e um entendimento profundo dos 
-                  <span className="text-[#04F5A0] font-semibold drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"> desafios do nosso país</span>.
+                <div className="text-5xl mb-6">📅</div>
+                <h3 className="text-2xl font-bold text-white mb-4">Serviços</h3>
+                <p className="text-gray-400 mb-6">
+                  Agende consultas, confirme horários, envie lembretes. Reduza no-shows em até 60% com confirmações automáticas.
                 </p>
+                <ul className="space-y-3 mb-8">
+                  <li className="flex items-center text-gray-300">
+                    <span className="text-[#04F5A0] mr-3">✓</span>
+                    Agenda integrada
+                  </li>
+                  <li className="flex items-center text-gray-300">
+                    <span className="text-[#04F5A0] mr-3">✓</span>
+                    Lembretes automáticos
+                  </li>
+                  <li className="flex items-center text-gray-300">
+                    <span className="text-[#04F5A0] mr-3">✓</span>
+                    Reagendamento fácil
+                  </li>
+                </ul>
+                <button className="w-full py-3 bg-[#04F5A0]/10 hover:bg-[#04F5A0]/20 text-[#04F5A0] rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_20px_rgba(4,245,160,0.5)]">
+                  Ver Casos de Sucesso
+                </button>
+              </div>
+
+              {/* Suporte */}
+              <div 
+                className={`group bg-gradient-to-br from-[#0A0A0A] to-[#0F0F0F] border border-[#04F5A0]/20 rounded-2xl p-8 hover:border-[#04F5A0]/60 transition-all duration-500 hover:shadow-[0_0_40px_rgba(4,245,160,0.4)] transform hover:-translate-y-2 ${
+                  visibleElements.has('solution-3') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+                }`}
+                ref={el => elementsRef.current[8] = el}
+                data-animate="solution-3"
+              >
+                <div className="text-5xl mb-6">💬</div>
+                <h3 className="text-2xl font-bold text-white mb-4">Suporte 24/7</h3>
+                <p className="text-gray-400 mb-6">
+                  Resolva 80% dos tickets automaticamente. Escale para humanos apenas casos complexos que realmente precisam.
+                </p>
+                <ul className="space-y-3 mb-8">
+                  <li className="flex items-center text-gray-300">
+                    <span className="text-[#04F5A0] mr-3">✓</span>
+                    Base de conhecimento
+                  </li>
+                  <li className="flex items-center text-gray-300">
+                    <span className="text-[#04F5A0] mr-3">✓</span>
+                    Triagem inteligente
+                  </li>
+                  <li className="flex items-center text-gray-300">
+                    <span className="text-[#04F5A0] mr-3">✓</span>
+                    Handoff suave
+                  </li>
+                </ul>
+                <button className="w-full py-3 bg-[#04F5A0]/10 hover:bg-[#04F5A0]/20 text-[#04F5A0] rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_20px_rgba(4,245,160,0.5)]">
+                  Ver Casos de Sucesso
+                </button>
               </div>
             </div>
-          </div>
-        </section>
 
-        {/* Seção 8: CTA Final */}
-        <section className="bg-gradient-to-r from-[#04F5A0]/15 via-[#04F5A0]/10 to-[#04F5A0]/15 backdrop-blur-sm rounded-t-[3rem] relative -mt-12 pt-16 pb-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            {/* CTA Final */}
             <div 
-              className={`transition-all duration-1000 transform ${
+              className={`text-center mt-20 transition-all duration-1000 transform ${
                 visibleElements.has('final-cta') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
               }`}
-              ref={el => elementsRef.current[10] = el}
+              ref={el => elementsRef.current[9] = el}
               data-animate="final-cta"
             >
-              <h2 className="text-3xl md:text-5xl font-bold mb-6 text-white">
-                Pronto para o <span className="text-[#04F5A0] drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">futuro do atendimento</span>?
-              </h2>
-              <p className="text-xl mb-12 text-gray-300 max-w-3xl mx-auto">
-                Ative seu agente de IA em minutos e coloque sua empresa na 
-                <span className="text-[#04F5A0] font-semibold drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"> liderança do mercado</span>.
-              </p>
-              
-              <div className="flex flex-col items-center">
+              <div className="bg-gradient-to-r from-[#04F5A0]/10 via-[#04F5A0]/5 to-[#04F5A0]/10 rounded-3xl p-12 backdrop-blur-xl">
+                <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
+                  Pronto para <span className="text-[#04F5A0]">Revolucionar</span> seu Atendimento?
+                </h2>
+                <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
+                  Junte-se a mais de 5.000 empresas que já transformaram seu WhatsApp em uma máquina de vendas.
+                </p>
                 <button
                   onClick={() => router.push('/login')}
-                  className="group relative px-12 py-5 bg-[#04F5A0] text-black rounded-2xl text-xl font-bold transition-all duration-300 hover:bg-[#03E691] hover:shadow-[0_0_50px_rgba(4,245,160,1)] hover:scale-110 transform mb-8 animate-pulse"
+                  className="group relative px-10 py-5 bg-[#04F5A0] text-black rounded-2xl text-xl font-bold transition-all duration-300 hover:bg-[#03E691] hover:shadow-[0_0_50px_rgba(4,245,160,0.9)] hover:scale-110 transform"
                 >
                   <span className="flex items-center justify-center">
-                    <span className="mr-3">⚡</span>
-                    Ativar Meus 4 Dias Grátis Agora
+                    <span className="mr-3">🎯</span>
+                    Testar Gratuitamente por 4 Dias
                     <span className="ml-3">→</span>
                   </span>
                   <div className="absolute inset-0 bg-white/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 </button>
-                
-                {/* Stats Final */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-2xl mx-auto">
-                  <div className="text-center group cursor-pointer">
-                    <div className="text-2xl font-bold text-[#04F5A0] drop-shadow-[0_0_8px_rgba(4,245,160,0.8)] group-hover:scale-110 transition-transform duration-300">4 dias</div>
-                    <div className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors duration-300">Teste grátis completo</div>
-                  </div>
-                  <div className="text-center group cursor-pointer">
-                    <div className="text-2xl font-bold text-[#04F5A0] drop-shadow-[0_0_8px_rgba(4,245,160,0.8)] group-hover:scale-110 transition-transform duration-300">0</div>
-                    <div className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors duration-300">Taxa de cancelamento</div>
-                  </div>
-                  <div className="text-center group cursor-pointer">
-                    <div className="text-2xl font-bold text-[#04F5A0] drop-shadow-[0_0_8px_rgba(4,245,160,0.8)] group-hover:scale-110 transition-transform duration-300">Português</div>
-                    <div className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors duration-300">Suporte brasileiro</div>
-                  </div>
-                </div>
+                <p className="mt-6 text-sm text-gray-500">
+                  Cancele quando quiser • Sem compromisso • Suporte incluído
+                </p>
               </div>
             </div>
           </div>

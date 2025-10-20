@@ -1,6 +1,8 @@
+// app/precos/page.js
 'use client'
 import { useRouter } from 'next/navigation'
-import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 export default function Pricing() {
   const router = useRouter()
@@ -50,15 +52,9 @@ export default function Pricing() {
     handleSliderChange(e)
   }
 
-  // Corrigido para receber o 'e' do evento do document
-  const handleMouseMove = (e) => {
+  // Wrap handleMouseMove in useCallback to prevent dependency warnings
+  const handleMouseMove = useCallback((e) => {
     if (isDragging) {
-      // Como o evento é no 'document', não temos 'e.currentTarget'
-      // A lógica de handleSliderChange precisa ser adaptada ou o elemento de referência precisa ser passado
-      // Para manter a simplicidade e corrigir a sintaxe, vamos assumir que a lógica de arrastar global
-      // não precisa do 'currentTarget' e que a posição do mouse (clientX) é suficiente.
-      // No entanto, a implementação original do slider depende do 'currentTarget'.
-      // A melhor abordagem é referenciar o slider.
       const sliderElement = document.querySelector('[data-slider="true"]')
       if (sliderElement) {
         const syntheticEvent = {
@@ -68,11 +64,12 @@ export default function Pricing() {
         handleSliderChange(syntheticEvent)
       }
     }
-  }
+  }, [isDragging])
 
-  const handleMouseUp = () => {
+  // Wrap handleMouseUp in useCallback to prevent dependency warnings
+  const handleMouseUp = useCallback(() => {
     setIsDragging(false)
-  }
+  }, [])
 
   const handleTouchStart = (e) => {
     setIsDragging(true)
@@ -113,7 +110,7 @@ export default function Pricing() {
         document.removeEventListener('mouseup', handleMouseUp)
       }
     }
-  }, [isDragging, handleMouseMove, handleMouseUp]) // Adicionando dependências para o linter do React
+  }, [isDragging, handleMouseMove, handleMouseUp])
 
   // Lógica de preços
   const pricingData = {
@@ -180,55 +177,40 @@ export default function Pricing() {
               </span>
             </div>
             
-            {/* Navigation Menu */}
+            {/* Navigation Menu - Fixed with Link components */}
             <nav className="hidden md:flex items-center space-x-8">
-              <a 
-                href="/" 
-                className="text-gray-300 hover:text-[#04F5A0] transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"
-              >
+              <Link href="/" className="text-gray-300 hover:text-[#04F5A0] transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">
                 Início
-              </a>
-              <a 
-                href="/#tecnologia" 
-                className="text-gray-300 hover:text-[#04F5A0] transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"
-              >
+              </Link>
+              <Link href="/" className="text-gray-300 hover:text-[#04F5A0] transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">
                 Tecnologia
-              </a>
-              <a 
-                href="/#solucoes" 
-                className="text-gray-300 hover:text-[#04F5A0] transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"
-              >
+              </Link>
+              <Link href="/" className="text-gray-300 hover:text-[#04F5A0] transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">
                 Soluções
-              </a>
-              <a 
-                href="/precos" 
-                className="text-[#04F5A0] drop-shadow-[0_0_8px_rgba(4,245,160,0.8)] font-medium"
-              >
+              </Link>
+              <Link href="/precos" className="text-[#04F5A0] font-bold">
                 Preços
-              </a>
-              <a 
-                href="/faq" 
-                className="text-gray-300 hover:text-[#04F5A0] transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"
-              >
+              </Link>
+              <Link href="/faq" className="text-gray-300 hover:text-[#04F5A0] transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">
                 FAQ
-              </a>
+              </Link>
             </nav>
 
             {/* Header Buttons */}
-            <div className="hidden md:flex items-center space-x-4">
-               <button
-                 onClick={() => router.push('/login')}
-                 className="text-gray-300 hover:text-[#04F5A0] transition-all duration-300 font-medium hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"
-               >
-                 Login
-               </button>
-               <button
-                 onClick={() => router.push('/login')}
-                 className="group relative px-6 py-2 bg-[#04F5A0] text-black rounded-xl font-bold transition-all duration-300 hover:bg-[#03E691] hover:shadow-[0_0_25px_rgba(4,245,160,0.6)] hover:scale-105 transform"
-               >
-                 Testar 4 Dias Grátis
-                 <div className="absolute inset-0 bg-white/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-               </button>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => router.push('/login')}
+                className="text-gray-300 hover:text-[#04F5A0] transition-all duration-300 font-medium hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"
+              >
+                Login
+              </button>
+              <button
+                onClick={() => router.push('/login')}
+                className="group relative px-6 py-2 bg-[#04F5A0] text-black rounded-xl font-bold transition-all duration-300 hover:bg-[#03E691] hover:shadow-[0_0_25px_rgba(4,245,160,0.6)] hover:scale-105 transform"
+              >
+                Começar Grátis
+                <div className="absolute inset-0 bg-white/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              </button>
             </div>
           </div>
         </div>
@@ -236,323 +218,242 @@ export default function Pricing() {
 
       {/* Main Content */}
       <main className="relative z-10">
-        {/* Hero Section */}
-        <section className="bg-black rounded-b-[3rem] relative">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-            <div 
-              className={`text-center transition-all duration-1000 transform ${
-                visibleElements.has('hero') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-              }`}
-              ref={el => elementsRef.current[0] = el}
-              data-animate="hero"
-            >
-              {/* Animated Logo */}
-              <div className="mb-8 flex justify-center">
-                <div className="relative">
-                  <div className="w-20 h-20 bg-[#04F5A0] rounded-2xl flex items-center justify-center animate-pulse">
-                    <div className="w-10 h-10 bg-black rounded-sm" 
-                         style={{
-                           clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)'
-                         }}
-                    />
-                  </div>
-                  <div className="absolute inset-0 bg-[#04F5A0] rounded-2xl animate-ping opacity-20" />
-                  <div className="absolute inset-0 bg-[#04F5A0]/30 rounded-2xl blur-xl animate-pulse" />
-                </div>
-              </div>
-
-              {/* Main Title */}
-              <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-white via-[#04F5A0] to-white bg-clip-text text-transparent animate-gradient leading-tight">
-                Um preço flexível, que cresce com você
-              </h1>
-              
-              {/* Subtitle */}
-              <p className="text-xl md:text-2xl text-gray-300 mb-12 max-w-4xl mx-auto leading-relaxed">
-                Sem planos complicados. Escolha o número de conexões que precisa e veja a 
-                <span className="text-[#04F5A0] font-semibold drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"> economia aumentar</span>. 
-                Comece com <span className="text-white font-semibold">4 dias de teste grátis</span>.
-              </p>
-
-              {/* Toggle de Faturamento */}
-              <div className="flex justify-center mb-12">
-                <div className="bg-[#1A1A1A]/60 backdrop-blur-sm rounded-2xl p-2 flex items-center space-x-2">
-                  <button
-                    onClick={() => setBillingPeriod('monthly')}
-                    className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
-                      billingPeriod === 'monthly'
-                        ? 'bg-[#04F5A0] text-black shadow-[0_0_20px_rgba(4,245,160,0.6)]'
-                        : 'text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    MENSAL
-                  </button>
-                  <button
-                    onClick={() => setBillingPeriod('annual')}
-                    className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center ${
-                      billingPeriod === 'annual'
-                        ? 'bg-[#04F5A0] text-black shadow-[0_0_20px_rgba(4,245,160,0.6)]'
-                        : 'text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    ANUAL
-                    <span className="ml-2 px-2 py-1 bg-orange-500 text-white text-xs rounded-full animate-pulse">
-                      ECONOMIZE ATÉ 30%!
-                    </span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Calculator Section */}
-        <section className="bg-gray-900/40 backdrop-blur-sm rounded-t-[3rem] rounded-b-[3rem] relative -mt-12 pt-16 pb-20">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            {/* Calculator Card */}
-            <div 
-              className={`transition-all duration-1000 transform ${
-                visibleElements.has('calculator') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-              }`}
-              ref={el => elementsRef.current[1] = el}
-              data-animate="calculator"
-            >
-              {/* Altura fixa para evitar movimento */}
-              <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl p-6 md:p-8 overflow-hidden min-h-[500px]">
-                {/* Animated Background Effects */}
-                <div className="absolute inset-0 opacity-40">
-                  <div className="absolute top-0 left-0 w-64 h-64 bg-purple-500/40 rounded-full blur-3xl animate-pulse"></div>
-                  <div className="absolute top-1/2 right-0 w-72 h-72 bg-pink-500/35 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
-                  <div className="absolute bottom-0 left-1/3 w-68 h-68 bg-violet-500/40 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
-                  <div className="absolute top-1/4 left-1/2 w-56 h-56 bg-indigo-500/30 rounded-full blur-3xl animate-pulse" style={{animationDelay: '3s'}}></div>
-                </div>
-                
-                {/* Glass Effect Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm"></div>
-                
-                {/* Content */}
-                <div className="relative z-10">
-                  {/* Plan Name */}
-                  <div className="text-center mb-6">
-                    <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
-                      Plano <span className="text-[#04F5A0] drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">SwiftBot</span>
-                    </h2>
-                    <p className="text-gray-400">Selecione o número de conexões:</p>
-                  </div>
-
-                  {/* Super Desconto Label - posição absoluta para não mover layout */}
-                  <div className="relative h-12 mb-4">
-                    {selectedConnections >= 5 && (
-                      <div className="absolute inset-0 flex justify-center items-center">
-                        <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-orange-500/20 to-yellow-500/20 rounded-xl backdrop-blur-sm animate-pulse">
-                          <span className="text-orange-400 font-bold text-sm">✨ SUPER DESCONTO ✨</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Slider Section */}
-                  <div className="mb-8">
-                    {/* Modern AI Slider Container */}
-                    <div className="relative mb-6">
-                      {/* Slider Track - ALTURA REDUZIDA */}
-                      <div 
-                        data-slider="true"
-                        className="relative h-8 bg-gradient-to-r from-[#04F5A0]/10 via-[#04F5A0]/20 to-orange-500/20 rounded-lg cursor-pointer select-none"
-                        onMouseDown={handleMouseDown}
-                        onTouchStart={handleTouchStart}
-                        onTouchMove={handleTouchMove}
-                        onTouchEnd={handleTouchEnd}
-                      >
-                        {/* Glowing Progress Track */}
-                        <div 
-                          className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#04F5A0]/40 to-orange-500/40 rounded-lg transition-all duration-300"
-                          style={{ width: `${((selectedConnections - 1) / 6) * 100}%`, pointerEvents: 'none' }}
-                        />
-                        
-                        {/* Connection Points */}
-                        <div className="absolute inset-0 flex items-center justify-around px-1" style={{ pointerEvents: 'none' }}>
-                          {[1, 2, 3, 4, 5, 6, 7].map((num) => (
-                            <div key={num} className="flex flex-col items-center" style={{ pointerEvents: 'auto' }}>
-                              {/* Point Circle */}
-                              <div
-                                className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer ${
-                                  selectedConnections === num
-                                    ? num >= 5
-                                      ? 'bg-gradient-to-r from-orange-500 to-yellow-500 shadow-[0_0_15px_rgba(251,146,60,0.8)] scale-110'
-                                      : 'bg-[#04F5A0] shadow-[0_0_15px_rgba(4,245,160,0.8)] scale-110'
-                                    : selectedConnections > num 
-                                      ? num >= 5
-                                        ? 'bg-gradient-to-r from-orange-500/50 to-yellow-500/50'
-                                        : 'bg-[#04F5A0]/50'
-                                      : 'bg-gray-600/50 hover:bg-gray-500/70'
-                                }`}
-                                onClick={() => setSelectedConnections(num)}
-                              >
-                                <span className={`font-bold text-xs md:text-sm ${
-                                  selectedConnections >= num ? 'text-black' : 'text-gray-300'
-                                }`}>
-                                  {num}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                       <div className="flex justify-between mt-3 px-1 text-gray-400 text-xs font-medium">
-                          <span>1 conexão</span>
-                          <span>7 conexões</span>
-                       </div>
-                    </div>
-                  </div>
-
-                  {/* Price Display */}
-                  <div className="text-center mb-8">
-                    <div className="mb-4">
-                      <span className="text-4xl md:text-5xl font-bold text-white">
-                        R$ {formatPrice(getCurrentPricing().price)}
-                      </span>
-                      <span className="text-xl text-gray-400 ml-2">/mês</span>
-                    </div>
-                    <p className="text-gray-400">
-                      Cobrado {billingPeriod === 'monthly' ? 'mensalmente' : 'anualmente'}
-                    </p>
-                    
-                    {/* Savings Display */}
-                    {getCurrentPricing().savings && (
-                      <div className="mt-4">
-                        <div className={`inline-flex items-center px-4 py-2 rounded-xl backdrop-blur-sm ${
-                          getCurrentPricing().isSuper 
-                            ? 'bg-gradient-to-r from-orange-500/20 to-yellow-500/20' 
-                            : 'bg-[#04F5A0]/20'
-                        }`}>
-                          <span className={`font-bold text-sm ${
-                            getCurrentPricing().isSuper ? 'text-orange-400' : 'text-[#04F5A0]'
-                          }`}>
-                            ✨ {getCurrentPricing().isSuper ? 'Super desconto de' : 'Você economiza'} {getCurrentPricing().savings}% por conexão!
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* CTA Button */}
-                  <div className="text-center">
-                    <button
-                      onClick={() => router.push('/login')}
-                      className="group relative px-10 py-4 bg-[#04F5A0] text-black rounded-xl text-lg font-bold transition-all duration-300 hover:bg-[#03E691] hover:shadow-[0_0_30px_rgba(4,245,160,0.8)] hover:scale-105 transform"
-                    >
-                      <span className="flex items-center justify-center">
-                        <span className="mr-2">🚀</span>
-                        Começar Teste Grátis de 4 Dias
-                      </span>
-                      <div className="absolute inset-0 bg-white/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Features Section */}
         <section className="bg-black py-20">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            {/* Header Section */}
             <div 
-              className={`transition-all duration-1000 transform ${
-                visibleElements.has('features') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              className={`text-center mb-16 transition-all duration-1000 transform ${
+                visibleElements.has('pricing-header') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              }`}
+              ref={el => elementsRef.current[0] = el}
+              data-animate="pricing-header"
+            >
+              <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
+                Preços <span className="text-[#04F5A0]">Transparentes</span>
+              </h1>
+              <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+                Escolha o plano ideal para seu negócio. Sem surpresas, sem taxas escondidas.
+              </p>
+            </div>
+
+            {/* Billing Period Toggle */}
+            <div 
+              className={`flex justify-center mb-12 transition-all duration-1000 transform ${
+                visibleElements.has('billing-toggle') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              }`}
+              ref={el => elementsRef.current[1] = el}
+              data-animate="billing-toggle"
+            >
+              <div className="bg-[#0A0A0A] border border-[#04F5A0]/20 rounded-2xl p-2 flex">
+                <button
+                  onClick={() => setBillingPeriod('monthly')}
+                  className={`px-8 py-3 rounded-xl font-bold transition-all duration-300 ${
+                    billingPeriod === 'monthly' 
+                      ? 'bg-[#04F5A0] text-black shadow-[0_0_20px_rgba(4,245,160,0.6)]' 
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Mensal
+                </button>
+                <button
+                  onClick={() => setBillingPeriod('annual')}
+                  className={`px-8 py-3 rounded-xl font-bold transition-all duration-300 flex items-center ${
+                    billingPeriod === 'annual' 
+                      ? 'bg-[#04F5A0] text-black shadow-[0_0_20px_rgba(4,245,160,0.6)]' 
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Anual
+                  {billingPeriod === 'annual' && (
+                    <span className="ml-2 bg-black/30 text-[#04F5A0] px-2 py-1 rounded-lg text-xs font-bold">
+                      -10%
+                    </span>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Connections Slider */}
+            <div 
+              className={`bg-[#0A0A0A] border border-[#04F5A0]/20 rounded-3xl p-8 mb-12 transition-all duration-1000 transform ${
+                visibleElements.has('slider') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
               }`}
               ref={el => elementsRef.current[2] = el}
-              data-animate="features"
+              data-animate="slider"
             >
-              <div className="text-center mb-12">
-                <h3 className="text-3xl md:text-4xl font-bold text-white mb-4">
-                  Todos os recursos, <span className="text-[#04F5A0] drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">em qualquer escala</span>
+              <div className="text-center mb-8">
+                <h3 className="text-2xl font-bold text-white mb-2">
+                  Quantas conexões você precisa?
                 </h3>
-                <p className="text-lg text-gray-300 max-w-3xl mx-auto">
-                  Seu sucesso não deve ser limitado. Por isso, todos os nossos recursos premium estão inclusos, 
-                  não importa quantas conexões você escolha.
+                <p className="text-gray-400">
+                  Cada conexão permite atender múltiplos clientes simultaneamente
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {[
-                  { icon: "🧠", title: "Inteligência Artificial GPT-4", description: "para conversas naturais" },
-                  { icon: "📊", title: "Dashboard de Análise", description: "em tempo real" },
-                  { icon: "🎭", title: "Configuração de Personalidade", description: "do agente" },
-                  { icon: "❓", title: "Perguntas de Qualificação", description: "para vender no automático" },
-                  { icon: "🛡️", title: "Módulo de Tratamento", description: "de Objeções" },
-                  { icon: "🔒", title: "Conexão Segura", description: "e Estável" }
-                ].map((feature, index) => (
-                  <div 
-                    key={index}
-                    className="group bg-[#1A1A1A]/60 backdrop-blur-sm rounded-2xl p-6 hover:bg-[#1A1A1A]/80 transition-all duration-500 hover:scale-105 transform"
-                    style={{ animationDelay: `${index * 100}ms` }}
-                  >
-                    <div className="flex items-center">
-                      <div className="text-2xl mr-4 group-hover:scale-110 transition-transform duration-300">
-                        {feature.icon}
-                      </div>
-                      <div>
-                        <h4 className="text-white font-semibold group-hover:text-[#04F5A0] transition-colors duration-300">
-                          ✅ {feature.title}
-                        </h4>
-                        <p className="text-gray-400 group-hover:text-gray-300 transition-colors duration-300">
-                          {feature.description}
-                        </p>
-                      </div>
-                    </div>
+              {/* Connection Number Display */}
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center justify-center">
+                  <div className="text-6xl font-bold text-[#04F5A0] animate-pulse">
+                    {selectedConnections}
                   </div>
-                ))}
-                
-                {/* Suporte Técnico - item especial */}
-                <div className="md:col-span-2">
-                  <div className="group bg-gradient-to-r from-[#04F5A0]/10 to-transparent rounded-2xl p-6 hover:from-[#04F5A0]/20 transition-all duration-500 hover:scale-105 transform">
-                    <div className="flex items-center justify-center">
-                      <div className="text-2xl mr-4 group-hover:scale-110 transition-transform duration-300">💬</div>
-                      <div className="text-center">
-                        <h4 className="text-white font-semibold text-lg group-hover:text-[#04F5A0] transition-colors duration-300">
-                          ✅ Suporte Técnico via chat
-                        </h4>
-                        <p className="text-gray-400 group-hover:text-gray-300 transition-colors duration-300">
-                          Nossa equipe brasileira está sempre pronta para ajudar
-                        </p>
-                      </div>
+                  <div className="ml-4 text-left">
+                    <div className="text-xl text-white">
+                      {selectedConnections === 1 ? 'Conexão' : 'Conexões'}
+                    </div>
+                    <div className="text-sm text-gray-400">
+                      WhatsApp Business
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Link para FAQ */}
-              <div className="text-center mt-12">
-                <a 
-                  href="/faq"
-                  className="inline-flex items-center text-[#04F5A0] hover:text-[#03E691] transition-colors duration-300 font-semibold hover:drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]"
+              {/* Slider */}
+              <div className="relative mb-8">
+                <div 
+                  className="relative h-16 bg-[#1A1A1A] rounded-2xl cursor-pointer select-none"
+                  data-slider="true"
+                  onMouseDown={handleMouseDown}
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
                 >
-                  Ainda com dúvidas sobre os planos? Veja nossas Perguntas Frequentes
-                  <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-300" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </a>
+                  {/* Track */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-[#04F5A0]/20 to-[#04F5A0]/40 rounded-2xl" />
+                  
+                  {/* Fill */}
+                  <div 
+                    className="absolute left-0 top-0 h-full bg-gradient-to-r from-[#04F5A0] to-[#03E691] rounded-2xl transition-all duration-300"
+                    style={{ width: `${((selectedConnections - 1) / 6) * 100}%` }}
+                  />
+                  
+                  {/* Thumb */}
+                  <div 
+                    className="absolute top-1/2 -translate-y-1/2 w-8 h-8 bg-white rounded-full shadow-[0_0_20px_rgba(4,245,160,0.8)] transition-all duration-300 hover:scale-110"
+                    style={{ left: `calc(${((selectedConnections - 1) / 6) * 100}% - 16px)` }}
+                  >
+                    <div className="absolute inset-0 bg-[#04F5A0] rounded-full opacity-30 animate-ping" />
+                  </div>
+
+                  {/* Numbers */}
+                  <div className="absolute inset-0 flex justify-between items-center px-4 pointer-events-none">
+                    {[1, 2, 3, 4, 5, 6, 7].map((num) => (
+                      <div 
+                        key={num}
+                        className={`text-sm font-bold transition-all duration-300 ${
+                          num <= selectedConnections 
+                            ? 'text-black drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]' 
+                            : 'text-gray-500'
+                        }`}
+                      >
+                        {num}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Features for selected connections */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div className="bg-[#1A1A1A] rounded-xl p-4 text-center">
+                  <div className="text-[#04F5A0] text-2xl font-bold mb-2">
+                    ~{selectedConnections * 50}
+                  </div>
+                  <div className="text-gray-400 text-sm">
+                    Clientes simultâneos
+                  </div>
+                </div>
+                <div className="bg-[#1A1A1A] rounded-xl p-4 text-center">
+                  <div className="text-[#04F5A0] text-2xl font-bold mb-2">
+                    {selectedConnections * 100}k+
+                  </div>
+                  <div className="text-gray-400 text-sm">
+                    Mensagens/mês
+                  </div>
+                </div>
+                <div className="bg-[#1A1A1A] rounded-xl p-4 text-center">
+                  <div className="text-[#04F5A0] text-2xl font-bold mb-2">
+                    24/7
+                  </div>
+                  <div className="text-gray-400 text-sm">
+                    Suporte prioritário
+                  </div>
+                </div>
+              </div>
+
+              {/* Price Display */}
+              <div className="text-center">
+                <div className="mb-4">
+                  {getCurrentPricing().savings && (
+                    <div className="inline-block bg-gradient-to-r from-[#04F5A0]/20 to-[#04F5A0]/10 px-4 py-2 rounded-full mb-4">
+                      <span className="text-[#04F5A0] font-bold">
+                        🎉 Economia de {getCurrentPricing().savings}%
+                        {getCurrentPricing().isSuper && ' - Super Oferta!'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex items-center justify-center mb-8">
+                  <span className="text-gray-400 text-2xl mr-2">R$</span>
+                  <span className="text-6xl font-bold text-white">
+                    {formatPrice(getCurrentPricing().price)}
+                  </span>
+                  <span className="text-gray-400 text-2xl ml-2">/{billingPeriod === 'monthly' ? 'mês' : 'ano'}</span>
+                </div>
+
+                {billingPeriod === 'annual' && (
+                  <p className="text-sm text-gray-400 mb-6">
+                    Equivalente a R$ {formatPrice(Math.round(getCurrentPricing().price / 12))}/mês
+                  </p>
+                )}
               </div>
             </div>
-          </div>
-        </section>
 
-        {/* CTA Final */}
-        <section className="bg-gradient-to-r from-[#04F5A0]/15 via-[#04F5A0]/10 to-[#04F5A0]/15 backdrop-blur-sm rounded-t-[3rem] relative -mt-12 pt-16 pb-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            {/* Features List */}
             <div 
-              className={`transition-all duration-1000 transform ${
-                visibleElements.has('final-cta') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+              className={`bg-[#0A0A0A] border border-[#04F5A0]/20 rounded-3xl p-8 mb-12 transition-all duration-1000 transform ${
+                visibleElements.has('features') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
               }`}
               ref={el => elementsRef.current[3] = el}
-              data-animate="final-cta"
+              data-animate="features"
             >
-              <h2 className="text-3xl md:text-4xl font-bold mb-6 text-white">
-                Escolha o plano ideal e <span className="text-[#04F5A0] drop-shadow-[0_0_8px_rgba(4,245,160,0.8)]">comece agora</span>
-              </h2>
-              <p className="text-xl mb-8 text-gray-300 max-w-3xl mx-auto">
-                Não importa o tamanho do seu negócio, temos a solução perfeita para você crescer.
+              <h3 className="text-2xl font-bold text-white text-center mb-8">
+                Tudo que está <span className="text-[#04F5A0]">Incluído</span>
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                  'IA Conversacional Avançada',
+                  'Integração WhatsApp Business',
+                  'Dashboard Completo',
+                  'Análise de Sentimento',
+                  'Respostas Personalizadas',
+                  'Histórico de Conversas',
+                  'Exportação de Dados',
+                  'API Completa',
+                  'Suporte 24/7',
+                  'Treinamento Personalizado',
+                  'Backup Automático',
+                  'Conformidade LGPD'
+                ].map((feature, index) => (
+                  <div key={index} className="flex items-center group">
+                    <div className="w-8 h-8 bg-[#04F5A0]/10 rounded-lg flex items-center justify-center mr-4 group-hover:bg-[#04F5A0]/20 transition-colors duration-300">
+                      <svg className="w-5 h-5 text-[#04F5A0]" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <span className="text-gray-300 group-hover:text-white transition-colors duration-300">
+                      {feature}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="text-center">
+              <p className="text-gray-400 mb-6">
+                🎯 <span className="text-white font-bold">4 dias grátis</span> para testar • Cancele quando quiser
               </p>
               
               <button
@@ -562,7 +463,7 @@ export default function Pricing() {
                 <span className="flex items-center justify-center">
                   <span className="mr-3">⚡</span>
                   Ativar Meus 4 Dias Grátis Agora
-                  <span className="ml-3"></span>
+                  <span className="ml-3">→</span>
                 </span>
                 <div className="absolute inset-0 bg-white/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </button>

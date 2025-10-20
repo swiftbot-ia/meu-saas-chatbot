@@ -1,121 +1,72 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
+# Dependências
+node_modules/
 /.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+.pnp.js
 
-# testing
-/coverage
+# Build do Next.js
+.next/
+out/
+build/
+dist/
 
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# local env files - NUNCA COMMITAR
+# Arquivos de ambiente (IMPORTANTE - nunca commitar chaves secretas)
 .env
 .env*.local
-.env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-# vercel
-.vercel
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# IDE
-.vscode/
-.idea/
+# Arquivos do sistema operacional
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 *.swp
 *.swo
 *~
 
-# OS
-.DS_Store
-Thumbs.db
-```
-
----
-
-## ✅ O QUE ESTÁ SENDO IGNORADO (E DEVE SER)
-
-### **Arquivos de Ambiente (CRÍTICO - NUNCA COMMITAR):**
-```
-.env
-.env*.local
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-```
-
-### **Dependências (Muito pesado):**
-```
-/node_modules
-```
-
-### **Builds e Cache:**
-```
-/.next/
-/out/
-/build
-*.tsbuildinfo
-```
-
-### **Logs e Debug:**
-```
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-```
-
-### **IDE e OS:**
-```
+# IDEs e Editores
 .vscode/
 .idea/
-.DS_Store
-Thumbs.db
-```
+*.sublime-project
+*.sublime-workspace
+*.iml
 
----
+# Testing
+coverage/
+.nyc_output/
+*.lcov
 
-## ✅ O QUE DEVE SER COMMITADO
+# Cache
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
 
-Estes arquivos/pastas **DEVEM** estar no GitHub:
-```
-✅ /app/                  (TODO o código da aplicação)
-✅ /lib/                  (supabase.js, super-account.js, etc)
-✅ /utils/                (utilitários)
-✅ /components/           (se existir)
-✅ /public/               (imagens, favicon, etc)
-✅ package.json           ⚠️ CRÍTICO
-✅ package-lock.json      ⚠️ CRÍTICO
-✅ next.config.js         ⚠️ CRÍTICO
-✅ tailwind.config.js
-✅ postcss.config.js
-✅ jsconfig.json ou tsconfig.json
-✅ .gitignore
-✅ README.md
-✅ .env.example           (modelo SEM valores sensíveis)
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Arquivos temporários
+*.tmp
+*.temp
+build-error.log
+clean-next.sh
+
+# Arquivos pessoais
+TODO.md
+NOTES.md
