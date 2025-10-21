@@ -277,7 +277,7 @@ export default function AccountProfile() {
   }
 
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden">
+    <div className="min-h-screen bg-black relative">
       {/* Background Effects */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute inset-0" 
@@ -297,7 +297,7 @@ export default function AccountProfile() {
       />
 
       {/* Header */}
-      <header className="relative z-10 bg-black/30 backdrop-blur-xl border-b border-white/10">
+      <header className="sticky top-0 z-50 bg-black/30 backdrop-blur-xl border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <button

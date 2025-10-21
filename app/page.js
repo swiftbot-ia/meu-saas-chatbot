@@ -44,7 +44,7 @@ export default function Home() {
   ]
 
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden">
+    <div className="min-h-screen bg-black relative">
       {/* Enhanced Background Pattern Grid */}
       <div className="fixed inset-0 opacity-10">
         <div className="absolute inset-0" 
@@ -59,7 +59,7 @@ export default function Home() {
       </div>
 
       {/* Header */}
-      <header className="relative z-20 bg-black/60 backdrop-blur-xl border-b border-[#04F5A0]/10">
+      <header className="sticky top-0 z-20 bg-black/60 backdrop-blur-xl border-b border-[#04F5A0]/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center group cursor-pointer">

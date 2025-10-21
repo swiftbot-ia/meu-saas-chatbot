@@ -19,7 +19,7 @@ const AccountDropdown = ({ user, userProfile, onLogout }) => {
       {/* Avatar/Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-3 bg-black/30 backdrop-blur-xl hover:bg-black/40 rounded-xl px-3 py-2 transition-all duration-300 border border-white/10 hover:border-[#04F5A0]/30 relative overflow-hidden z-50"
+        className="flex items-center space-x-3 bg-black/30 backdrop-blur-xl hover:bg-black/40 rounded-xl px-3 py-2 transition-all duration-300 border border-white/10 hover:border-[#04F5A0]/30 relative overflow-hidden z-[210]"
       >
         {/* Animated Background Effect */}
         <div className="absolute inset-0 opacity-30 pointer-events-none z-0">
@@ -70,12 +70,12 @@ const AccountDropdown = ({ user, userProfile, onLogout }) => {
         <>
           {/* Overlay */}
           <div 
-            className="fixed inset-0 z-[70]" 
+            className="fixed inset-0 z-[220]" 
             onClick={() => setIsOpen(false)}
           />
           
           {/* Menu */}
-          <div className="absolute right-0 mt-2 w-64 bg-black/30 backdrop-blur-xl rounded-2xl shadow-xl border border-white/10 z-[80] overflow-hidden">
+          <div className="absolute right-0 mt-2 w-64 bg-black/40 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 z-[230] overflow-hidden">
             {/* Header do Menu */}
             <div className="p-4 border-b border-white/10">
               <div className="flex items-center space-x-3">
@@ -123,18 +123,6 @@ const AccountDropdown = ({ user, userProfile, onLogout }) => {
                 </svg>
                 Gerenciar Assinatura
               </button>
-              <button
-                onClick={() => {
-                  setIsOpen(false)
-                  router.push('/account/security')
-                }}
-                className="w-full flex items-center px-4 py-3 text-gray-300 hover:bg-white/5 hover:text-[#04F5A0] transition-all duration-200"
-              >
-                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-                Segurança
-              </button>
               <div className="border-t border-white/10 mt-2 pt-2">
                 <button
                   onClick={() => {
@@ -157,76 +145,253 @@ const AccountDropdown = ({ user, userProfile, onLogout }) => {
   )
 }
 
-const ConnectionCard = ({ connectionIndex, connection, isActive, onSelect, onConnect, onConfigure }) => {
-    
-    const getStatusText = () => {
-        if (!connection) return '🔴 Inativa';
-        switch (connection.status) {
-            case 'connected': return '🟢 Conectado';
-            case 'pending_qr': return '🟡 Aguardando QR';
-            case 'error': return '🔴 Erro';
-            default: return '🔴 Desconectado';
-        }
-    };
+// ====================================================================
+// 🆕 MODAL DE QR CODE GRANDE
+// ====================================================================
+const QRCodeModal = ({ qrCode, onClose }) => {
+  if (!qrCode) return null;
 
-    return (
-        <div 
-            onClick={() => onSelect(connectionIndex)}
-            className={`rounded-2xl p-4 cursor-pointer transition-all duration-300 group relative overflow-hidden ${
-                isActive 
-                    ? 'bg-black/30 backdrop-blur-xl border border-[#04F5A0]/30' 
-                    : 'bg-black/20 backdrop-blur-xl border border-white/10 hover:border-[#04F5A0]/20'
-            }`}
-        >
-            {/* Animated Background Effects */}
-            <div className="absolute inset-0 opacity-40 pointer-events-none z-0">
-                <div className="absolute top-0 left-0 w-20 h-20 bg-purple-500/30 rounded-full blur-xl animate-pulse"></div>
-                <div className="absolute bottom-0 right-0 w-16 h-16 bg-pink-500/25 rounded-full blur-lg animate-pulse" style={{animationDelay: '1s'}}></div>
-                {isActive && (
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-[#04F5A0]/20 rounded-full blur-md animate-pulse" style={{animationDelay: '0.5s'}}></div>
-                )}
-            </div>
-            
-            {/* Glass Effect Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-            
-            {/* Content */}
-            <div className="relative z-20">
-                <div className="flex justify-between items-start mb-2">
-                    <h4 className={`font-bold ${isActive ? 'text-[#04F5A0]' : 'text-white'}`}>
-                        Conexão {connectionIndex + 1}
-                    </h4>
-                    {isActive && <div className="w-2.5 h-2.5 bg-[#04F5A0] rounded-full shadow-[0_0_8px_rgba(4,245,160,0.8)] animate-pulse"></div>}
-                </div>
-                
-                <div className="text-sm text-gray-400 mb-4">{getStatusText()}</div>
-
-                {connection ? (
-                     <div className="flex space-x-2 relative z-30">
-                         <button 
-                             onClick={(e) => { e.stopPropagation(); onConfigure(connection); }} 
-                             className="text-xs bg-blue-600/60 backdrop-blur-sm hover:bg-blue-600/80 text-white font-medium py-1 px-2 rounded-md transition-all w-full border border-blue-500/30 relative z-40"
-                         >
-                             Agente
-                         </button>
-                         <button 
-                             onClick={(e) => { e.stopPropagation(); onConnect(connection); }} 
-                             className="text-xs bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white font-medium py-1 px-2 rounded-md transition-all w-full border border-white/20 relative z-40"
-                         >
-                             {connection.status === 'connected' ? 'Status' : 'Conectar'}
-                         </button>
-                     </div>
-                ) : (
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); onConnect(null, connectionIndex); }} 
-                        className="w-full text-center text-sm text-orange-400 font-semibold group-hover:text-orange-300 relative z-40"
-                    >
-                        Ativar
-                    </button>
-                )}
-            </div>
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center">
+      {/* Backdrop com blur */}
+      <div 
+        className="absolute inset-0 bg-black/80 backdrop-blur-md"
+        onClick={onClose}
+      />
+      
+      {/* Modal */}
+      <div className="relative bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl p-8 max-w-md w-full mx-4 shadow-[0_0_50px_rgba(4,245,160,0.2)]">
+        {/* Animated Background Effects */}
+        <div className="absolute inset-0 opacity-30 pointer-events-none">
+          <div className="absolute top-0 left-0 w-32 h-32 bg-[#04F5A0]/30 rounded-full blur-2xl animate-pulse"></div>
+          <div className="absolute bottom-0 right-0 w-40 h-40 bg-green-500/25 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
         </div>
-    );
+        
+        {/* Glass Effect Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none rounded-3xl"></div>
+        
+        {/* Botão X */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full transition-all duration-300 border border-white/20"
+        >
+          <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        
+        {/* Conteúdo */}
+        <div className="relative z-10 text-center">
+          <h3 className="text-2xl font-bold text-white mb-2">
+            📱 Conectar WhatsApp
+          </h3>
+          <p className="text-gray-400 mb-6">
+            Escaneie o QR Code com seu WhatsApp
+          </p>
+          
+          {/* QR Code */}
+          <div className="bg-white rounded-2xl p-4 mb-4 inline-block">
+            <img
+              src={qrCode}
+              alt="QR Code WhatsApp"
+              className="w-64 h-64"
+            />
+          </div>
+          
+          {/* Instruções */}
+          <div className="bg-[#04F5A0]/10 border border-[#04F5A0]/30 rounded-xl p-4 backdrop-blur-sm">
+            <p className="text-sm text-gray-300 mb-2 font-medium">
+              📲 Como conectar:
+            </p>
+            <ol className="text-xs text-gray-400 space-y-1 text-left">
+              <li>1. Abra o WhatsApp no seu celular</li>
+              <li>2. Toque em Menu (⋮) ou Configurações</li>
+              <li>3. Toque em "Aparelhos conectados"</li>
+              <li>4. Toque em "Conectar um aparelho"</li>
+              <li>5. Aponte a câmera para este QR Code</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ====================================================================
+// 🆕 DROPDOWN DE CONEXÕES
+// ====================================================================
+const ConnectionsDropdown = ({ connections, activeConnection, subscription, onSelect, onConnect, onConfigure, onUpgrade, onAddNew }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const getStatusText = (connection) => {
+    if (!connection) return '🔴 Inativa';
+    switch (connection.status) {
+      case 'connected': return '🟢 Conectado';
+      case 'pending_qr': return '🟡 Aguardando QR';
+      case 'error': return '🔴 Erro';
+      default: return '🔴 Desconectado';
+    }
+  };
+
+  const connectedCount = connections.filter(c => c.status === 'connected').length;
+  const totalSlots = subscription?.connections_purchased || 1;
+
+return (
+    <div className="relative z-[240]">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 hover:border-[#04F5A0]/30 transition-all duration-300 group relative w-full"
+      >  
+        {/* Animated Background Effects */}
+        <div className="absolute inset-0 opacity-40 pointer-events-none">
+          <div className="absolute top-0 left-0 w-20 h-20 bg-purple-500/30 rounded-full blur-xl animate-pulse"></div>
+          <div className="absolute bottom-0 right-0 w-16 h-16 bg-pink-500/25 rounded-full blur-lg animate-pulse" style={{animationDelay: '1s'}}></div>
+        </div>
+        
+        {/* Glass Effect Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
+        
+        {/* Content */}
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <span className="text-2xl">📱</span>
+            <div className="text-left">
+              <h3 className="text-lg font-semibold text-white group-hover:text-[#04F5A0] transition-colors duration-300">
+                Suas Conexões
+              </h3>
+              <p className="text-sm text-gray-400">
+                {connectedCount} de {totalSlots} ativas
+              </p>
+            </div>
+          </div>
+          <svg
+            className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
+
+      {/* Dropdown - AGORA COM Z-INDEX ALTO E SEM OVERFLOW */}
+      {isOpen && (
+        <>
+          <div 
+            className="fixed inset-0 z-[250]" 
+            onClick={() => setIsOpen(false)}
+          />
+          
+          <div className="absolute top-full mt-2 left-0 right-0 bg-black/40 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 z-[260] max-h-[400px] overflow-y-auto">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-sm font-semibold text-white">
+                  {connectedCount}/{totalSlots} Conexões Ativas
+                </h4>
+                {subscription?.status === 'active' && connections.length < totalSlots && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsOpen(false);
+                      onAddNew();
+                    }}
+                    className="text-xs bg-[#04F5A0] hover:bg-[#03E691] text-black px-3 py-1.5 rounded-lg font-bold transition-all duration-300"
+                  >
+                    + Nova
+                  </button>
+                )}
+                {subscription?.status === 'active' && connections.length >= totalSlots && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsOpen(false);
+                      onUpgrade();
+                    }}
+                    className="text-xs bg-orange-500 hover:bg-orange-400 text-black px-3 py-1.5 rounded-lg font-bold transition-all duration-300"
+                  >
+                    + Upgrade
+                  </button>
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                {Array.from({length: totalSlots}).map((_, index) => {
+                  const connection = connections.find(c => c.connection_number === index + 1);
+                  const isActive = activeConnection?.connection_number === index + 1;
+                  
+                  return (
+                    <div
+                      key={index}
+                      onClick={() => {
+                        if (connection) {
+                          onSelect(index);
+                          setIsOpen(false);
+                        }
+                      }}
+                      className={`p-3 rounded-xl cursor-pointer transition-all duration-300 ${
+                        isActive 
+                          ? 'bg-[#04F5A0]/10 border border-[#04F5A0]/30' 
+                          : 'bg-white/5 border border-white/10 hover:border-[#04F5A0]/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <span className={`text-sm font-bold ${isActive ? 'text-[#04F5A0]' : 'text-white'}`}>
+                            Conexão {index + 1}
+                          </span>
+                          {isActive && <div className="w-2 h-2 bg-[#04F5A0] rounded-full animate-pulse"></div>}
+                        </div>
+                        <span className="text-xs text-gray-400">
+                          {getStatusText(connection)}
+                        </span>
+                      </div>
+                      
+                      {connection ? (
+                        <div className="flex space-x-2">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onConfigure(connection);
+                              setIsOpen(false);
+                            }}
+                            className="flex-1 text-xs bg-blue-600/60 hover:bg-blue-600/80 text-white font-medium py-1.5 px-2 rounded-lg transition-all border border-blue-500/30"
+                          >
+                            Agente
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onConnect(connection);
+                              setIsOpen(false);
+                            }}
+                            className="flex-1 text-xs bg-white/10 hover:bg-white/20 text-white font-medium py-1.5 px-2 rounded-lg transition-all border border-white/20"
+                          >
+                            {connection.status === 'connected' ? 'Status' : 'Conectar'}
+                          </button>
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onConnect(null, index);
+                            setIsOpen(false);
+                          }}
+                          className="w-full text-center text-xs text-orange-400 font-semibold hover:text-orange-300"
+                        >
+                          Ativar Conexão
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 };
 
 export default function Dashboard() {
@@ -245,9 +410,12 @@ export default function Dashboard() {
   const [connecting, setConnecting] = useState(false)
   const [agentConfigured, setAgentConfigured] = useState(false)
   
+  // 🆕 Estado para controlar o modal do QR Code
+  const [showQRModal, setShowQRModal] = useState(false)
+  
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   
-  // 💳 Novos estados para checkout
+  // 💳 Estados para checkout
   const [subscription, setSubscription] = useState(null)
   const [showCheckoutModal, setShowCheckoutModal] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
@@ -255,7 +423,7 @@ export default function Dashboard() {
     connections: 1,
     billingPeriod: 'annual'
   })
-  const [checkoutStep, setCheckoutStep] = useState('plan') // plan, payment, processing
+  const [checkoutStep, setCheckoutStep] = useState('plan')
   
   // 📊 Estados para as estatísticas
   const [stats, setStats] = useState({
@@ -315,10 +483,6 @@ export default function Dashboard() {
     }
   }, [activeConnection, whatsappStatus])
 
-  // ====================================================================
-  // ✅ Lógica do Pagar.me (mantida igual)
-  // ====================================================================
-  
   // Carregar script do Pagar.me apenas quando necessário
   useEffect(() => {
     if (checkoutStep === 'payment' && showCheckoutModal) {
@@ -327,7 +491,6 @@ export default function Dashboard() {
   }, [checkoutStep, showCheckoutModal])
 
   const loadPagarmeScript = () => {
-    // Remove script anterior se existir
     const existingScript = document.querySelector('script[src*="checkout.js"]')
     if (existingScript) {
       document.head.removeChild(existingScript)
@@ -346,7 +509,6 @@ export default function Dashboard() {
     document.head.appendChild(script)
   }
 
-  // ✅ Validação de CPF
   const validateCPF = (cpf) => {
     cpf = cpf.replace(/[^\d]/g, '')
     if (cpf.length !== 11) return false
@@ -371,7 +533,6 @@ export default function Dashboard() {
     return true
   }
 
-  // ✅ FUNÇÃO PARA BUSCAR ENDEREÇO POR CEP
   const fetchAddressByCEP = async (cep) => {
     try {
       const cleanCEP = cep.replace(/\D/g, '')
@@ -394,7 +555,6 @@ export default function Dashboard() {
     }
   }
 
-  // ✅ Processar formulário com validações CRÍTICAS + ENDEREÇO
   const handleTokenizedSubmit = async (e) => {
     e.preventDefault()
     setCheckoutLoading(true)
@@ -403,7 +563,6 @@ export default function Dashboard() {
     let subscriptionCreated = null
 
     try {
-      // Capturar dados do formulário
       const formData = new FormData(e.target)
       const cardData = {
         card_number: formData.get('card_number').replace(/\s/g, ''),
@@ -411,10 +570,9 @@ export default function Dashboard() {
         card_expiration_month: formData.get('card_expiration_month'),
         card_expiration_year: formData.get('card_expiration_year'),
         card_cvv: formData.get('card_cvv'),
-        cpf: formData.get('cpf').replace(/[^\d]/g, '') // ✅ CPF
+        cpf: formData.get('cpf').replace(/[^\d]/g, '')
       }
 
-      // ✅ NOVO: CAPTURAR DADOS DE ENDEREÇO
       const addressData = {
         zipcode: formData.get('zipcode').replace(/[^\d]/g, ''),
         state: formData.get('state'),
@@ -425,35 +583,16 @@ export default function Dashboard() {
         complementary: formData.get('complementary') || ''
       }
 
-      // ✅ VALIDAR CPF
       if (!validateCPF(cardData.cpf)) {
         throw new Error('CPF inválido. Por favor, verifique e tente novamente.')
       }
 
-      // ✅ VALIDAR ENDEREÇO
       if (!addressData.zipcode || !addressData.state || !addressData.city || 
           !addressData.neighborhood || !addressData.street || !addressData.street_number) {
         throw new Error('Todos os campos de endereço são obrigatórios.')
       }
 
-      console.log('🔍 Dados capturados:', {
-        cardData: {
-          card_number: cardData.card_number.substring(0, 4) + '****',
-          card_holder_name: cardData.card_holder_name,
-          cpf: cardData.cpf.substring(0, 3) + '***' + cardData.cpf.substring(9)
-        },
-        addressData: {
-          zipcode: addressData.zipcode.substring(0, 5) + '-***',
-          city: addressData.city,
-          state: addressData.state,
-          street: addressData.street.substring(0, 10) + '...',
-          street_number: addressData.street_number
-        }
-      })
-
-      // Lógica de upgrade ou nova assinatura
       const isUpgrade = subscription && selectedPlan.connections > subscription.connections_purchased;
-
       const apiEndpoint = isUpgrade ? '/api/checkout/upgrade-subscription' : '/api/checkout/create-subscription';
 
       const payload = {
@@ -466,8 +605,6 @@ export default function Dashboard() {
           ...(isUpgrade && { subscriptionId: subscription.pagarme_subscription_id })
       };
 
-
-      // ✅ ENVIAR PARA API COM ENDEREÇO
       const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -475,16 +612,13 @@ export default function Dashboard() {
       })
 
       const data = await response.json()
-      console.log('📤 Resposta da API:', data)
 
-      // ✅ CRÍTICO: SÓ ATIVAR TRIAL/PLANO SE PAGAMENTO OK
       if (data.success) {
         subscriptionCreated = data.subscription
         setSubscription(data.subscription)
         setShowCheckoutModal(false)
         setCheckoutStep('plan')
         
-        // Mensagem baseada se foi trial ou pagamento
         const message = data.is_trial 
           ? `🎉 Trial de ${data.trial_days} dia${data.trial_days > 1 ? 's' : ''} ativado com sucesso!`
           : isUpgrade
@@ -493,7 +627,6 @@ export default function Dashboard() {
           
         alert(message)
         
-        // Recarrega conexões para refletir o upgrade
         await loadUserConnections();
 
       } else {
@@ -501,7 +634,6 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('❌ Erro completo:', error)
-      
       alert('❌ Erro ao processar pagamento: ' + error.message)
       setCheckoutStep('payment')
     }
@@ -509,10 +641,7 @@ export default function Dashboard() {
     setCheckoutLoading(false)
   }
   
-  // ====================================================================
   // Funções de Gerenciamento de Conexão
-  // ====================================================================
-
   const loadUserConnections = async () => {
     if (!user) return;
     try {
@@ -526,7 +655,6 @@ export default function Dashboard() {
         
         setConnections(data || []);
         if (data && data.length > 0) {
-            // Se já existe uma conexão ativa, a mantém. Senão, define a primeira.
             const currentActive = data.find(c => c.id === activeConnection?.id);
             if (!currentActive) {
                 setActiveConnection(data[0]);
@@ -549,9 +677,7 @@ export default function Dashboard() {
   };
 
   const handleAddConnection = () => {
-    // Lógica para upgrade ou adicionar nova conexão
     if (connections.length < subscription?.connections_purchased) {
-        // Futuramente, criar uma nova conexão no banco de dados aqui.
         alert('Funcionalidade para adicionar nova conexão em breve. Por enquanto, configure as existentes.');
     } else {
         handleUpgradeConnections();
@@ -563,25 +689,16 @@ export default function Dashboard() {
         alert("Você precisa de um plano ativo para fazer upgrade.");
         return;
     }
-    // Prepara o modal para o upgrade
     setSelectedPlan({
         ...selectedPlan,
         connections: subscription.connections_purchased + 1
     });
-    setCheckoutStep('plan'); // Começa da seleção para confirmar o upgrade
+    setCheckoutStep('plan');
     setShowCheckoutModal(true);
   };
   
-  // ====================================================================
-  // Funções do Componente (Modificadas)
-  // ====================================================================
   const checkUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-  
-    // 🔍 DEBUG CRÍTICO
-    console.log('🔍 USER ID REAL:', user?.id)
-    console.log('🔍 USER COMPLETO:', user)
-  
     if (!user) {
       router.push('/login')
     } else {
@@ -604,61 +721,38 @@ export default function Dashboard() {
     }
   }
   
-  // ====================================================================
-  // 👑 MODIFICAÇÃO CRÍTICA: SUPER ACCOUNT BYPASS
-  // ====================================================================
   const checkSubscriptionStatus = async () => {
     if (!user) return
-    
     try {
-      // 👑 VERIFICAR SUPER ACCOUNT PRIMEIRO
+      // 🆕 SUPER ACCOUNT CHECK - PRIORIDADE MÁXIMA
       const { data: profile } = await supabase
         .from('user_profiles')
         .select('is_super_account')
         .eq('user_id', user.id)
         .single()
-
+      
       if (profile?.is_super_account) {
-        console.log('👑 Super Account detectada - Bypass ativado')
+        console.log('👑 SUPER ACCOUNT DETECTADA - Bypass total')
         
-        // Definir subscription fake com privilégios totais
-        setSubscription({
+        // Criar subscription fake para super account
+        const fakeSubscription = {
+          id: 'super-account-fake-id',
+          user_id: user.id,
           status: 'active',
-          connections_purchased: 999,
-          trial_end_date: null,
-          next_billing_date: null,
-          pagarme_subscription_id: 'super_account_bypass'
-        })
-        
-        // Criar 7 conexões automaticamente se não existirem
-        const { data: existingConnections } = await supabase
-          .from('user_connections')
-          .select('*')
-          .eq('user_id', user.id)
-
-        if (!existingConnections || existingConnections.length === 0) {
-          const connectionsToCreate = Array.from({ length: 7 }, (_, i) => ({
-            user_id: user.id,
-            connection_number: i + 1,
-            instance_name: `swiftbot_${user.id.substring(0, 8)}_${i + 1}`,
-            status: 'disconnected'
-          }))
-
-          await supabase
-            .from('user_connections')
-            .insert(connectionsToCreate)
-          
-          console.log('✅ 7 conexões criadas automaticamente para super account')
-          
-          // Recarregar conexões
-          await loadUserConnections()
+          connections_purchased: 7,
+          billing_period: 'annual',
+          trial_end_date: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
+          next_billing_date: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
+          pagarme_subscription_id: 'super_account_bypass',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         }
         
-        return // ⚠️ IMPORTANTE: Para aqui e não executa o resto
+        setSubscription(fakeSubscription)
+        return
       }
-
-      // 🔄 CÓDIGO ORIGINAL CONTINUA AQUI (para contas normais)
-      // 1. Buscar status local
+      
+      // Continua com a lógica normal para usuários não-super
       const { data, error } = await supabase
         .from('user_subscriptions')
         .select('*')
@@ -670,8 +764,6 @@ export default function Dashboard() {
       if (data && !error) {
         setSubscription(data)
         
-        // 2. Sincronizar com Pagar.me se necessário
-        // Sincroniza se: está em trial expirado OU não foi atualizado nas últimas 24h
         const lastUpdate = new Date(data.updated_at)
         const now = new Date()
         const hoursSinceUpdate = (now - lastUpdate) / (1000 * 60 * 60)
@@ -682,7 +774,6 @@ export default function Dashboard() {
         )
         
         if (shouldSync && data.pagarme_subscription_id) {
-          console.log('🔄 Sincronizando status com Pagar.me...')
           try {
             const syncResponse = await fetch('/api/subscription/sync-status', {
               method: 'POST',
@@ -693,13 +784,10 @@ export default function Dashboard() {
             const syncResult = await syncResponse.json()
             
             if (syncResult.success && syncResult.updated) {
-              console.log('✅ Status sincronizado! Novo status:', syncResult.new_status)
-              // Recarregar dados atualizados
               setTimeout(() => checkSubscriptionStatus(), 1000)
             }
           } catch (syncError) {
             console.error('⚠️ Erro na sincronização:', syncError)
-            // Continua com dados locais se sincronização falhar
           }
         }
       } else {
@@ -725,7 +813,7 @@ export default function Dashboard() {
       
       if (result.success) {
         alert('✅ Status sincronizado com sucesso!')
-        checkSubscriptionStatus() // Recarregar dados
+        checkSubscriptionStatus()
       } else {
         alert('❌ Erro na sincronização: ' + result.error)
       }
@@ -751,7 +839,6 @@ export default function Dashboard() {
       const isConfigured = !!data && !error;
       setAgentConfigured(isConfigured);
       
-      // Atualiza o estado da conexão específica
       setConnections(prev => prev.map(c => 
         c.id === connection.id ? { ...c, agentConfigured: isConfigured } : c
       ));
@@ -778,7 +865,7 @@ export default function Dashboard() {
       
       if (data.success && data.stats) {
         setConnectionStats(prev => ({...prev, [connection.id]: data.stats}));
-        setStats(data.stats); // Mantém o estado de stats para a UI atual
+        setStats(data.stats);
         setLastStatsUpdate(Date.now());
       }
     } catch (error) {
@@ -802,9 +889,9 @@ export default function Dashboard() {
       if (data.connected) {
           setConnecting(false);
           setQrCode(null);
+          setShowQRModal(false); // 🆕 Fecha o modal se conectou
       }
 
-      // Atualiza o estado da conexão específica
       setConnections(prev => prev.map(c => 
           c.id === connection.id ? { ...c, status: newStatus, qrCode: null } : c
       ));
@@ -821,13 +908,11 @@ export default function Dashboard() {
   const connectWhatsApp = async (connection) => {
     const targetConnection = connection || activeConnection;
     
-    // Verificar se tem assinatura ativa ou trial válido
     if (!subscription || (subscription.status !== 'active' && subscription.status !== 'trial')) {
       setShowCheckoutModal(true)
       return
     }
     
-    // Se trial expirado, mostrar checkout sem trial
     if (subscription.status === 'trial' && new Date() > new Date(subscription.trial_end_date)) {
       setShowCheckoutModal(true)
       return
@@ -836,7 +921,6 @@ export default function Dashboard() {
     if (targetConnection) {
         await proceedWithWhatsAppConnection(targetConnection);
     } else {
-        // Se não houver conexão, pode ser um slot vazio para ativar.
         alert("Selecione ou ative uma conexão primeiro.");
     }
   }
@@ -855,6 +939,7 @@ export default function Dashboard() {
       if (data.success) {
         if (data.qrCode) {
           setQrCode(data.qrCode)
+          setShowQRModal(true) // 🆕 Abre o modal com QR grande
           setWhatsappStatus('pending_qr')
 
           setConnections(prev => prev.map(c =>
@@ -873,6 +958,7 @@ export default function Dashboard() {
               setWhatsappStatus('connected');
               setConnecting(false);
               setQrCode(null);
+              setShowQRModal(false); // 🆕 Fecha o modal quando conectar
               clearInterval(checkInterval);
               
               setConnections(prev => prev.map(c =>
@@ -885,11 +971,11 @@ export default function Dashboard() {
           
           setTimeout(() => {
             clearInterval(checkInterval)
-            // Re-verifica o status após o timeout
             const currentConn = connections.find(c => c.id === connection.id);
             if (currentConn && currentConn.status !== 'connected') {
                 setConnecting(false);
                 setQrCode(null);
+                setShowQRModal(false); // 🆕 Fecha o modal no timeout
                 setWhatsappStatus('disconnected');
                 setConnections(prev => prev.map(c => 
                     c.id === connection.id ? { ...c, status: 'disconnected', qrCode: null } : c
@@ -936,21 +1022,12 @@ export default function Dashboard() {
   const getSubscriptionStatus = () => {
     if (!subscription) return 'none'
     
-    // 🔍 DEBUG - ADICIONE ISSO TEMPORARIAMENTE
-    console.log('🔍 DEBUG SUBSCRIPTION:', {
-      status: subscription.status,
-      trial_end_date: subscription.trial_end_date,
-      current_date: new Date().toISOString(),
-      is_trial_expired: subscription.status === 'trial' && new Date() > new Date(subscription.trial_end_date)
-    })
-    
     if (subscription.status === 'trial' && new Date() > new Date(subscription.trial_end_date)) {
       return 'expired'
     }
     return subscription.status
   }
 
-  // FUNÇÕES CORRIGIDAS COM PRICING TABLES LOCAIS
   const calculateAnnualDiscount = () => {
     const pricing = {
       monthly: { 1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875 },
@@ -973,19 +1050,15 @@ export default function Dashboard() {
     return (annualMonthlyPrice || 0) * 12
   }
   
-  // Verificar se o usuário já usou trial antes
   const hasUsedTrial = () => {
     if (!subscription) return false
     
-    // Se tem uma subscription (mesmo cancelada/expirada), já usou trial
     return subscription.status === 'canceled' || 
            subscription.status === 'expired' || 
            (subscription.status === 'trial' && new Date() > new Date(subscription.trial_end_date))
   }
   
-  // Verificar se deve mostrar trial ou pagamento direto
   const shouldShowTrial = () => {
-    // Não mostra trial se for upgrade
     if (subscription && selectedPlan.connections > subscription.connections_purchased) {
         return false;
     }
@@ -1033,9 +1106,9 @@ export default function Dashboard() {
   const subscriptionStatus = getSubscriptionStatus()
   
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden">
+    <div className="min-h-screen bg-black relative">
       {/* Background Effects */}
-      <div className="absolute inset-0 opacity-10 pointer-events-none">
+      <div className="fixed inset-0 opacity-10 pointer-events-none">
         <div className="absolute inset-0"
              style={{
                backgroundImage: `radial-gradient(circle at 1px 1px, rgba(4, 245, 160, 0.15) 1px, transparent 0)`,
@@ -1046,14 +1119,25 @@ export default function Dashboard() {
       
       {/* Dynamic Gradient */}
       <div
-        className="absolute inset-0 opacity-20 pointer-events-none"
+        className="fixed inset-0 opacity-20 pointer-events-none"
         style={{
           background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(4, 245, 160, 0.08), transparent 40%)`
         }}
       />
       
-      {/* Header */}
-      <header className="relative z-30 bg-black/30 backdrop-blur-xl border-b border-white/10">
+      {/* 🆕 Modal do QR Code */}
+      {showQRModal && (
+        <QRCodeModal 
+          qrCode={qrCode} 
+          onClose={() => {
+            setShowQRModal(false);
+            setConnecting(false);
+          }} 
+        />
+      )}
+      
+      {/* Header - STICKY COM POSITION FIXED */}
+      <header className="sticky top-0 z-[200] bg-black/40 backdrop-blur-2xl border-b border-white/10 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center group">
@@ -1090,42 +1174,46 @@ export default function Dashboard() {
         {/* Banner de Status da Assinatura */}
         {subscription && (
           <div className={`mb-8 p-6 rounded-3xl relative overflow-hidden ${
+            subscription.pagarme_subscription_id === 'super_account_bypass' ? 'bg-black/30 backdrop-blur-xl border border-purple-500/30' :
             subscriptionStatus === 'active' ? 'bg-black/30 backdrop-blur-xl border border-[#04F5A0]/30' :
             subscriptionStatus === 'trial' ? 'bg-black/30 backdrop-blur-xl border border-blue-500/30' :
             'bg-black/30 backdrop-blur-xl border border-red-500/30'
           }`}>
-            {/* Animated Background Effects */}
             <div className="absolute inset-0 opacity-40 pointer-events-none">
               <div className={`absolute top-0 left-0 w-32 h-32 rounded-full blur-2xl animate-pulse ${
+                subscription.pagarme_subscription_id === 'super_account_bypass' ? 'bg-purple-500/40' :
                 subscriptionStatus === 'active' ? 'bg-[#04F5A0]/40' :
                 subscriptionStatus === 'trial' ? 'bg-blue-500/40' :
                 'bg-red-500/40'
               }`}></div>
               <div className={`absolute bottom-0 right-0 w-24 h-24 rounded-full blur-xl animate-pulse ${
+                subscription.pagarme_subscription_id === 'super_account_bypass' ? 'bg-purple-500/30' :
                 subscriptionStatus === 'active' ? 'bg-[#04F5A0]/30' :
                 subscriptionStatus === 'trial' ? 'bg-blue-500/30' :
                 'bg-red-500/30'
               }`} style={{animationDelay: '1s'}}></div>
             </div>
             
-            {/* Glass Effect Overlay */}
             <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
             
-            {/* Content */}
             <div className="relative z-20 flex items-center justify-between">
               <div>
                 <h3 className={`text-lg font-semibold mb-2 ${
+                  subscription.pagarme_subscription_id === 'super_account_bypass' ? 'text-purple-400' :
                   subscriptionStatus === 'active' ? 'text-[#04F5A0]' :
                   subscriptionStatus === 'trial' ? 'text-blue-400' :
                   'text-red-400'
                 }`}>
-                  {subscriptionStatus === 'active' ? '💎 Plano Ativo' :
+                  {subscription.pagarme_subscription_id === 'super_account_bypass' ? '👑 Super Account' :
+                   subscriptionStatus === 'active' ? '💎 Plano Ativo' :
                    subscriptionStatus === 'trial' ? '🔥 Trial Ativo' :
                    '⚠️ Plano Expirado'}
                 </h3>
                 <p className="text-gray-300">
-                  {subscriptionStatus === 'active' ?
-                    `${subscription.connections_purchased} conexão(ões) • ${subscription.pagarme_subscription_id === 'super_account_bypass' ? '👑 Super Account' : `Próxima cobrança: ${new Date(subscription.next_billing_date).toLocaleDateString()}`}` :
+                  {subscription.pagarme_subscription_id === 'super_account_bypass' ?
+                    `${subscription.connections_purchased} conexão(ões) • Acesso supremo ilimitado` :
+                    subscriptionStatus === 'active' ?
+                    `${subscription.connections_purchased} conexão(ões) • Próxima cobrança: ${new Date(subscription.next_billing_date).toLocaleDateString()}` :
                     subscriptionStatus === 'trial' ?
                     `Trial expira em: ${new Date(subscription.trial_end_date).toLocaleDateString()}` :
                     'Renove seu plano para continuar usando o SwiftBot'
@@ -1139,146 +1227,49 @@ export default function Dashboard() {
                 >
                   Renovar Plano
                 </button>
-              ) : (
+              ) : subscription.pagarme_subscription_id !== 'super_account_bypass' ? (
                 <button onClick={syncSubscriptionStatus} title="Sincronizar status da assinatura" className="bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white p-2 rounded-full transition-all duration-300 relative z-50">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h5M20 20v-5h-5M4 4l16 16"></path></svg>
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
         )}
-
-        {/* Seletor de Conexões */}
-        <div className="mb-8 bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-6 relative overflow-hidden">
-            {/* Animated Background Effects */}
-            <div className="absolute inset-0 opacity-40 pointer-events-none">
-                <div className="absolute top-0 left-0 w-40 h-40 bg-purple-500/30 rounded-full blur-3xl animate-pulse"></div>
-                <div className="absolute top-1/2 right-0 w-32 h-32 bg-pink-500/25 rounded-full blur-2xl animate-pulse" style={{animationDelay: '1s'}}></div>
-                <div className="absolute bottom-0 left-1/3 w-28 h-28 bg-violet-500/20 rounded-full blur-xl animate-pulse" style={{animationDelay: '2s'}}></div>
-            </div>
-            
-            {/* Glass Effect Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-            
-            {/* Content */}
-            <div className="relative z-20">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-semibold text-white">Suas Conexões WhatsApp</h3>
-                    {subscription?.status === 'active' && connections.length < subscription?.connections_purchased && (
-                    <button onClick={handleAddConnection} className="bg-[#04F5A0] hover:bg-[#03E691] text-black px-4 py-2 rounded-xl font-bold transition-all duration-300 text-sm relative z-50">
-                        + Nova Conexão
-                    </button>
-                    )}
-                     {subscription?.status === 'active' && connections.length >= subscription?.connections_purchased && subscription?.connections_purchased < 999 && (
-                    <button onClick={handleUpgradeConnections} className="bg-orange-500 hover:bg-orange-400 text-black px-4 py-2 rounded-xl font-bold transition-all duration-300 text-sm relative z-50">
-                        + Fazer Upgrade
-                    </button>
-                    )}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {Array.from({length: Math.min(subscription?.connections_purchased || 1, 7)}).map((_, index) => {
-                        const connection = connections.find(c => c.connection_number === index + 1);
-                        return (
-                            <ConnectionCard 
-                                key={index} 
-                                connectionIndex={index}
-                                connection={connection}
-                                isActive={activeConnection?.connection_number === index + 1}
-                                onSelect={() => handleConnectionSelect(index)}
-                                onConnect={(conn) => connectWhatsApp(conn || connection)}
-                                onConfigure={(conn) => router.push(`/agent-config?connectionId=${(conn || activeConnection).id}`)}
-                            />
-                        );
-                    })}
-                </div>
-            </div>
-        </div>
         
-        {/* Seção de Estatísticas */}
-        <div className="mb-8 bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-6 relative overflow-hidden">
-          {/* Animated Background Effects */}
-          <div className="absolute inset-0 opacity-40 pointer-events-none">
-            <div className="absolute top-0 right-0 w-36 h-36 bg-blue-500/30 rounded-full blur-3xl animate-pulse"></div>
-            <div className="absolute bottom-0 left-0 w-28 h-28 bg-[#04F5A0]/25 rounded-full blur-2xl animate-pulse" style={{animationDelay: '1.5s'}}></div>
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-purple-500/20 rounded-full blur-xl animate-pulse" style={{animationDelay: '0.5s'}}></div>
-          </div>
+        {/* Cards do Dashboard - AGORA EM GRID COM DROPDOWN INTEGRADO */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 relative z-20">
           
-          {/* Glass Effect Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-          
-          {/* Content */}
-          <div className="relative z-20">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-white flex items-center">
-                📊 Estatísticas da Conexão {activeConnection?.connection_number || ''}
-                {statsLoading && (
-                  <div className="ml-2 animate-spin rounded-full h-5 w-5 border-b-2 border-[#04F5A0]"></div>
-                )}
-              </h3>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {[
-                { value: stats.mensagensHoje, label: 'Mensagens Hoje', color: 'text-blue-400', bg: 'bg-blue-500/10' },
-                { value: stats.conversasAtivas, label: 'Conversas Ativas', color: 'text-[#04F5A0]', bg: 'bg-[#04F5A0]/10' },
-                { value: `${stats.taxaResposta}%`, label: 'Taxa de Resposta', color: 'text-purple-400', bg: 'bg-purple-500/10' },
-                { value: stats.clientesAtendidos, label: 'Clientes Atendidos', color: 'text-orange-400', bg: 'bg-orange-500/10' }
-              ].map((stat, index) => (
-                <div key={index} className={`${stat.bg} backdrop-blur-sm border border-white/10 rounded-2xl p-6 text-center hover:border-[#04F5A0]/30 transition-all duration-300 group relative overflow-hidden`}>
-                  {/* Individual Animated Background Effects */}
-                  <div className="absolute inset-0 opacity-30 pointer-events-none">
-                    <div className={`absolute top-0 right-0 w-12 h-12 ${stat.bg.replace('/10', '/20')} rounded-full blur-lg animate-pulse`}></div>
-                    <div className={`absolute bottom-0 left-0 w-8 h-8 ${stat.bg.replace('/10', '/15')} rounded-full blur-md animate-pulse`} style={{animationDelay: '0.7s'}}></div>
-                  </div>
-                  
-                  {/* Content */}
-                  <div className="relative z-10">
-                    <div className={`text-3xl font-bold ${stat.color} mb-2 group-hover:scale-110 transition-transform duration-300`}>
-                      {(statsLoading || !activeConnection) ? '...' : stat.value}
-                    </div>
-                    <div className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors duration-300">
-                      {stat.label}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            {whatsappStatus !== 'connected' && (
-              <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl backdrop-blur-sm">
-                <p className="text-sm text-yellow-400 text-center">
-                  💡 Conecte a conexão selecionada para ver estatísticas em tempo real
-                </p>
-              </div>
-            )}
-            {lastStatsUpdate && (
-              <div className="mt-3 text-xs text-gray-500 text-center">
-                Última atualização: {new Date(lastStatsUpdate).toLocaleTimeString()}
-              </div>
-            )}
-          </div>
-        </div>
-        
-        {/* Cards do Dashboard */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          
-          {/* Card WhatsApp */}
-          <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-6 transition-all duration-500 group lg:col-span-1 relative overflow-hidden">
-            {/* Animated Background Effects */}
-            <div className="absolute inset-0 opacity-40 pointer-events-none">
+{/* Card WhatsApp (Conexão Ativa) - COM DROPDOWN INTEGRADO */}
+          <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-2xl p-6 transition-all duration-500 group relative overflow-visible">
+            <div className="absolute inset-0 opacity-40 pointer-events-none rounded-2xl">
               <div className="absolute top-0 left-0 w-28 h-28 bg-green-500/30 rounded-full blur-2xl animate-pulse"></div>
               <div className="absolute bottom-0 right-0 w-20 h-20 bg-[#04F5A0]/25 rounded-full blur-xl animate-pulse" style={{animationDelay: '1s'}}></div>
             </div>
             
-            {/* Glass Effect Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none rounded-2xl"></div>
             
-            {/* Content */}
             <div className="relative z-20">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white group-hover:text-[#04F5A0] transition-colors duration-300">Conexão Ativa: {activeConnection?.connection_number || 'N/A'}</h3>
+                <h3 className="text-lg font-semibold text-white group-hover:text-[#04F5A0] transition-colors duration-300">
+                  Conexão Ativa
+                </h3>
                 <span className="text-2xl group-hover:scale-110 transition-transform duration-300">📱</span>
               </div>
+              
+              {/* 🆕 DROPDOWN DE CONEXÕES INTEGRADO */}
+              <div className="mb-4">
+                <ConnectionsDropdown
+                  connections={connections}
+                  activeConnection={activeConnection}
+                  subscription={subscription}
+                  onSelect={handleConnectionSelect}
+                  onConnect={connectWhatsApp}
+                  onConfigure={(conn) => router.push(`/agent-config?connectionId=${conn.id}`)}
+                  onUpgrade={handleUpgradeConnections}
+                  onAddNew={handleAddConnection}
+                />
+              </div>
+              
               <div className="mb-4">
                 {!activeConnection ? (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white/10 text-gray-400 border border-white/20">
@@ -1294,27 +1285,6 @@ export default function Dashboard() {
                   </span>
                 )}
               </div>
-              
-              {qrCode && (
-                <div className="mb-4 p-4 bg-black/20 backdrop-blur-sm rounded-2xl text-center border border-white/10 relative overflow-hidden">
-                  {/* QR Code Background Effect */}
-                  <div className="absolute inset-0 opacity-30 pointer-events-none">
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-[#04F5A0]/20 rounded-full blur-md animate-pulse"></div>
-                  </div>
-                  
-                  <div className="relative z-10">
-                    <p className="text-sm text-gray-300 mb-3">Escaneie o QR Code com seu WhatsApp:</p>
-                    <img
-                      src={qrCode}
-                      alt="QR Code WhatsApp"
-                      className="mx-auto max-w-48 max-h-48 border border-[#04F5A0]/30 rounded-xl"
-                    />
-                    <p className="text-xs text-gray-500 mt-2">
-                      Abra o WhatsApp → Menu → Aparelhos conectados → Conectar um aparelho
-                    </p>
-                  </div>
-                </div>
-              )}
               
               {whatsappStatus === 'connected' ? (
                 <div className="text-center">
@@ -1348,24 +1318,21 @@ export default function Dashboard() {
           </div>
           
           {/* Card Agente IA */}
-          <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-6 transition-all duration-500 group relative overflow-hidden">
-            {/* Animated Background Effects */}
+          <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-2xl p-6 transition-all duration-500 group relative overflow-hidden">
             <div className="absolute inset-0 opacity-40 pointer-events-none">
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/30 rounded-full blur-3xl animate-pulse"></div>
               <div className="absolute bottom-0 left-0 w-24 h-24 bg-purple-500/25 rounded-full blur-xl animate-pulse" style={{animationDelay: '1.2s'}}></div>
             </div>
             
-            {/* Glass Effect Overlay */}
             <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
             
-            {/* Content */}
             <div className="relative z-20">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white group-hover:text-[#04F5A0] transition-colors duration-300">Agente IA (Conexão {activeConnection?.connection_number || 'N/A'})</h3>
+                <h3 className="text-lg font-semibold text-white group-hover:text-[#04F5A0] transition-colors duration-300">Agente IA</h3>
                 <span className="text-2xl group-hover:scale-110 transition-transform duration-300">🤖</span>
               </div>
               <p className="text-gray-400 mb-4 group-hover:text-gray-300 transition-colors duration-300">
-                Configure a personalidade do bot para a conexão ativa.
+                Configure a personalidade do bot
               </p>
               <div className="mb-4">
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium backdrop-blur-sm border ${
@@ -1393,17 +1360,14 @@ export default function Dashboard() {
           </div>
 
           {/* Card Chat */}
-          <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-6 transition-all duration-500 group relative overflow-hidden">
-            {/* Animated Background Effects */}
+          <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-2xl p-6 transition-all duration-500 group relative overflow-hidden">
             <div className="absolute inset-0 opacity-40 pointer-events-none">
               <div className="absolute top-0 left-0 w-28 h-28 bg-purple-500/30 rounded-full blur-2xl animate-pulse"></div>
               <div className="absolute bottom-0 right-0 w-20 h-20 bg-pink-500/25 rounded-full blur-xl animate-pulse" style={{animationDelay: '0.8s'}}></div>
             </div>
             
-            {/* Glass Effect Overlay */}
             <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
             
-            {/* Content */}
             <div className="relative z-20">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-white group-hover:text-[#04F5A0] transition-colors duration-300">Bate-Papo</h3>
@@ -1423,6 +1387,66 @@ export default function Dashboard() {
             </div>
           </div>
           
+        </div>
+        
+        {/* Seção de Estatísticas */}
+        <div className="mb-8 bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-6 relative overflow-hidden">
+          <div className="absolute inset-0 opacity-40 pointer-events-none">
+            <div className="absolute top-0 right-0 w-36 h-36 bg-blue-500/30 rounded-full blur-3xl animate-pulse"></div>
+            <div className="absolute bottom-0 left-0 w-28 h-28 bg-[#04F5A0]/25 rounded-full blur-2xl animate-pulse" style={{animationDelay: '1.5s'}}></div>
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-purple-500/20 rounded-full blur-xl animate-pulse" style={{animationDelay: '0.5s'}}></div>
+          </div>
+          
+          <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
+          
+          <div className="relative z-20">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-white flex items-center">
+                📊 Estatísticas da Conexão {activeConnection?.connection_number || ''}
+                {statsLoading && (
+                  <div className="ml-2 animate-spin rounded-full h-5 w-5 border-b-2 border-[#04F5A0]"></div>
+                )}
+              </h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {[
+                { value: stats.mensagensHoje, label: 'Mensagens Hoje', color: 'text-blue-400', bg: 'bg-blue-500/10' },
+                { value: stats.conversasAtivas, label: 'Conversas Ativas', color: 'text-[#04F5A0]', bg: 'bg-[#04F5A0]/10' },
+                { value: `${stats.taxaResposta}%`, label: 'Taxa de Resposta', color: 'text-purple-400', bg: 'bg-purple-500/10' },
+                { value: stats.clientesAtendidos, label: 'Clientes Atendidos', color: 'text-orange-400', bg: 'bg-orange-500/10' }
+              ].map((stat, index) => (
+                <div key={index} className={`${stat.bg} backdrop-blur-sm border border-white/10 rounded-2xl p-6 text-center hover:border-[#04F5A0]/30 transition-all duration-300 group relative overflow-hidden`}>
+                  <div className="absolute inset-0 opacity-30 pointer-events-none">
+                    <div className={`absolute top-0 right-0 w-12 h-12 ${stat.bg.replace('/10', '/20')} rounded-full blur-lg animate-pulse`}></div>
+                    <div className={`absolute bottom-0 left-0 w-8 h-8 ${stat.bg.replace('/10', '/15')} rounded-full blur-md animate-pulse`} style={{animationDelay: '0.7s'}}></div>
+                  </div>
+                  
+                  <div className="relative z-10">
+                    <div className={`text-3xl font-bold ${stat.color} mb-2 group-hover:scale-110 transition-transform duration-300`}>
+                      {(statsLoading || !activeConnection) ? '...' : stat.value}
+                    </div>
+                    <div className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors duration-300">
+                      {stat.label}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {whatsappStatus !== 'connected' && (
+              <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl backdrop-blur-sm">
+                <p className="text-sm text-yellow-400 text-center">
+                  💡 Conecte a conexão selecionada para ver estatísticas em tempo real
+                </p>
+              </div>
+            )}
+            {lastStatsUpdate && (
+              <div className="mt-3 text-xs text-gray-500 text-center">
+                Última atualização: {new Date(lastStatsUpdate).toLocaleTimeString()}
+              </div>
+            )}
+          </div>
         </div>
       </main>
       
@@ -1447,14 +1471,12 @@ export default function Dashboard() {
           
           <div className="relative bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-8 max-w-lg lg:max-w-xl w-full mx-4 max-h-[90vh] overflow-y-auto shadow-[0_0_50px_rgba(4,245,160,0.15)] z-[70]">
             
-            {/* Animated Background Effects */}
             <div className="absolute inset-0 opacity-40 pointer-events-none">
               <div className="absolute top-0 left-0 w-48 h-48 bg-purple-500/40 rounded-full blur-3xl animate-pulse"></div>
               <div className="absolute top-1/2 right-0 w-56 h-56 bg-pink-500/35 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
               <div className="absolute bottom-0 left-1/3 w-52 h-52 bg-violet-500/40 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
             </div>
             
-            {/* Glass Effect Overlay */}
             <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
             
             {/* Step 1: Seleção de Plano */}
@@ -1641,16 +1663,10 @@ export default function Dashboard() {
               </div>
             )}
             
-            {/* Restante do modal continua igual... */}
+            {/* Step 2: Dados do Cartão COM CPF E ENDEREÇO */}
             {checkoutStep === 'payment' && (
               <div className="relative z-10">
                 <div className="text-center mb-6">
-                  <button
-                    onClick={() => setCheckoutStep('plan')}
-                    className="absolute top-0 left-0 text-gray-400 hover:text-white"
-                  >
-                    ← Voltar
-                  </button>
                   <div className="w-16 h-16 bg-[#04F5A0] rounded-2xl flex items-center justify-center mx-auto mb-4">
                     <span className="text-2xl">💳</span>
                   </div>
@@ -1658,7 +1674,6 @@ export default function Dashboard() {
                   <p className="text-gray-400">Checkout seguro e criptografado</p>
                 </div>
                 
-                {/* DESTAQUE DO VALOR FINAL */}
                 <div className="bg-gradient-to-r from-[#04F5A0]/10 to-orange-500/10 border border-[#04F5A0]/30 rounded-xl p-4 mb-6 backdrop-blur-sm">
                   <div className="flex justify-between items-center">
                     <div>
@@ -1709,7 +1724,6 @@ export default function Dashboard() {
                 
                 <form onSubmit={handleTokenizedSubmit}>
                   <div className="space-y-4 mb-6">
-                    {/* Campos do Cartão */}
                     <div>
                       <label htmlFor="card_holder_name" className="block text-sm font-medium text-gray-300 mb-2">Nome no Cartão</label>
                       <input type="text" id="card_holder_name" name="card_holder_name" required className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300" />
@@ -1733,7 +1747,6 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* Campo CPF */}
                     <div>
                       <label htmlFor="cpf" className="block text-sm font-medium text-gray-300 mb-2">
                         CPF <span className="text-red-400">*</span>
@@ -1756,7 +1769,6 @@ export default function Dashboard() {
                       />
                     </div>
 
-                    {/* Campos de Endereço */}
                     <div className="bg-black/20 backdrop-blur-sm rounded-xl p-4 border border-white/10">
                       <h4 className="text-sm font-medium text-gray-300 mb-4">🏠 Endereço de Cobrança</h4>
                       
