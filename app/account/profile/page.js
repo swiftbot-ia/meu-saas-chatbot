@@ -12,6 +12,9 @@ export default function AccountProfile() {
   const [pendingChanges, setPendingChanges] = useState(null)
   const [errors, setErrors] = useState({})
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+  const [emailEditMode, setEmailEditMode] = useState(false)
+  const [originalEmail, setOriginalEmail] = useState('')
+  const [showEmailChangeSuccess, setShowEmailChangeSuccess] = useState(false)
   
   // Form states
   const [formData, setFormData] = useState({
@@ -38,6 +41,29 @@ export default function AccountProfile() {
 
   useEffect(() => {
     checkUser()
+    
+    // Listener para detectar mudanças de autenticação (quando usuário confirma email)
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔔 Auth event:', event, 'Email:', session?.user?.email)
+      
+      if (event === 'USER_UPDATED' || event === 'SIGNED_IN') {
+        console.log('📧 Email pode ter mudado, atualizando...')
+        
+        // Atualizar email no formulário
+        if (session?.user?.email) {
+          setOriginalEmail(session.user.email)
+          setFormData(prev => ({
+            ...prev,
+            email: session.user.email
+          }))
+          console.log('✅ Email atualizado para:', session.user.email)
+        }
+      }
+    })
+
+    return () => {
+      authListener?.subscription?.unsubscribe()
+    }
   }, [])
 
   const checkUser = async () => {
@@ -46,7 +72,9 @@ export default function AccountProfile() {
     if (!user) {
       router.push('/login')
     } else {
+      console.log('👤 Usuário carregado - Email atual:', user.email)
       setUser(user)
+      setOriginalEmail(user.email)
       await loadUserProfile(user.id)
     }
     setLoading(false)
@@ -54,6 +82,11 @@ export default function AccountProfile() {
 
   const loadUserProfile = async (userId) => {
     try {
+      // Buscar usuário atual para pegar email
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      
+      console.log('📧 loadUserProfile - Email do usuário:', currentUser?.email)
+      
       const { data: profile, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -66,20 +99,21 @@ export default function AccountProfile() {
           full_name: profile.full_name || '',
           company_name: profile.company_name || '',
           phone: profile.phone ? formatPhone(profile.phone) : '',
-          email: user?.email || '',
+          email: currentUser?.email || '',
           avatar_url: profile.avatar_url || '',
           current_password: '',
           new_password: '',
           confirm_password: ''
         })
+        console.log('✅ FormData preenchido com email:', currentUser?.email)
       } else {
         // Criar perfil se não existir
         const newProfile = {
           user_id: userId,
-          full_name: user?.user_metadata?.full_name || '',
+          full_name: currentUser?.user_metadata?.full_name || '',
           company_name: '',
           phone: '',
-          avatar_url: user?.user_metadata?.avatar_url || '',
+          avatar_url: currentUser?.user_metadata?.avatar_url || '',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }
@@ -95,7 +129,7 @@ export default function AccountProfile() {
           full_name: newProfile.full_name,
           company_name: newProfile.company_name,
           phone: newProfile.phone,
-          email: user?.email || '',
+          email: currentUser?.email || '',
           avatar_url: newProfile.avatar_url,
           current_password: '',
           new_password: '',
@@ -128,10 +162,12 @@ export default function AccountProfile() {
       newErrors.full_name = 'Nome completo é obrigatório'
     }
     
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email é obrigatório'
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email inválido'
+    if (emailEditMode) {
+      if (!formData.email.trim()) {
+        newErrors.email = 'Email é obrigatório'
+      } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+        newErrors.email = 'Email inválido'
+      }
     }
 
     if (!formData.phone.trim()) {
@@ -160,7 +196,8 @@ export default function AccountProfile() {
     if (!validateForm()) return
     
     // Se há mudança sensível, pedir confirmação de senha
-    const sensitiveChanges = formData.email !== user.email || formData.new_password
+    const emailChanged = emailEditMode && formData.email !== originalEmail
+    const sensitiveChanges = emailChanged || formData.new_password
     
     if (sensitiveChanges) {
       setPendingChanges(formData)
@@ -219,12 +256,28 @@ export default function AccountProfile() {
 
       if (profileError) throw profileError
 
-      // Atualizar email se mudou
-      if (data.email !== user.email) {
-        const { error: emailError } = await supabase.auth.updateUser({
+      // Atualizar email se mudou e está em modo de edição
+      let emailWasChanged = false
+      if (emailEditMode && data.email !== originalEmail) {
+        console.log('🔄 Tentando atualizar email de:', originalEmail, 'para:', data.email)
+        
+        const { data: updateData, error: emailError } = await supabase.auth.updateUser({
           email: data.email
         })
-        if (emailError) throw emailError
+        
+        if (emailError) {
+          console.error('❌ Erro ao atualizar email:', emailError)
+          alert(`❌ Erro ao atualizar email: ${emailError.message}`)
+          throw emailError
+        }
+        
+        console.log('✅ RESPOSTA COMPLETA do updateUser:', JSON.stringify(updateData, null, 2))
+        console.log('📧 Email atual do user:', updateData?.user?.email)
+        console.log('📧 Novo email pendente:', updateData?.user?.new_email)
+        console.log('📧 Email confirmado em:', updateData?.user?.email_confirmed_at)
+        console.log('📧 Metadados do user:', updateData?.user?.user_metadata)
+        
+        emailWasChanged = true
       }
 
       // Atualizar senha se fornecida
@@ -235,10 +288,34 @@ export default function AccountProfile() {
         if (passwordError) throw passwordError
       }
 
-      alert('✅ Perfil atualizado com sucesso!')
+      // Mensagem de sucesso diferenciada
+      if (emailWasChanged) {
+        alert(`✅ Solicitação de mudança de email enviada!
+
+📧 Um email de confirmação foi enviado para: ${data.email}
+
+⚠️ Você precisa:
+1. Abrir o email em: ${data.email}
+2. Clicar no link de confirmação
+3. Aguardar alguns segundos
+4. Recarregar esta página (F5)
+
+O email só será atualizado após você confirmar no link.`)
+      } else {
+        alert('✅ Perfil atualizado com sucesso!')
+      }
+      
+      // Desativar modo de edição de email
+      setEmailEditMode(false)
       
       // Recarregar dados
       await loadUserProfile(user.id)
+      
+      // Atualizar originalEmail com o email atual do usuário (que pode ter mudado após confirmação)
+      const { data: { user: updatedUser } } = await supabase.auth.getUser()
+      if (updatedUser?.email) {
+        setOriginalEmail(updatedUser.email)
+      }
       
       // Limpar campos de senha
       setFormData(prev => ({
@@ -254,6 +331,12 @@ export default function AccountProfile() {
     }
 
     setSaving(false)
+  }
+
+  const handleCancelEmailEdit = () => {
+    setEmailEditMode(false)
+    setFormData({...formData, email: originalEmail})
+    setErrors({...errors, email: ''})
   }
 
   if (loading) {
@@ -478,23 +561,39 @@ export default function AccountProfile() {
                       <label className="block text-sm font-medium text-gray-300 mb-2">
                         📧 Email *
                       </label>
-                      <input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({...formData, email: e.target.value})}
-                        className="w-full bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
-                      />
-                      {errors.email && <p className="mt-1 text-red-400 text-sm">{errors.email}</p>}
-                      {formData.email !== user?.email && !errors.email && (
-                        <div className="mt-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg backdrop-blur-sm">
-                          <p className="text-yellow-400 text-sm flex items-center">
-                            <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                            </svg>
-                            Alterar o email exigirá confirmação de senha
-                          </p>
+                      <div className="flex gap-3 items-start">
+                        <div className="flex-1">
+                          <input
+                            type="email"
+                            value={formData.email}
+                            onChange={(e) => setFormData({...formData, email: e.target.value})}
+                            disabled={!emailEditMode}
+                            className={`w-full bg-black/30 backdrop-blur-sm border rounded-xl px-4 py-3 text-white placeholder-gray-500 transition-all duration-300 ${
+                              emailEditMode 
+                                ? 'border-white/20 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none' 
+                                : 'border-white/10 opacity-60 cursor-not-allowed'
+                            }`}
+                          />
+                          {errors.email && <p className="mt-1 text-red-400 text-sm">{errors.email}</p>}
+                          {emailEditMode && formData.email !== originalEmail && !errors.email && (
+                            <div className="mt-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg backdrop-blur-sm">
+                              <p className="text-yellow-400 text-sm flex items-center">
+                                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                                Alterar o email exigirá confirmação de senha
+                              </p>
+                            </div>
+                          )}
                         </div>
-                      )}
+                        <button
+                          type="button"
+                          onClick={() => emailEditMode ? handleCancelEmailEdit() : setEmailEditMode(true)}
+                          className="bg-black/30 backdrop-blur-xl hover:bg-black/40 text-white px-4 py-3 rounded-xl transition-all duration-300 border border-white/10 hover:border-[#04F5A0]/30 whitespace-nowrap"
+                        >
+                          {emailEditMode ? '❌ Cancelar' : '✏️ Editar Email'}
+                        </button>
+                      </div>
                     </div>
 
                     {/* Alterar Senha */}

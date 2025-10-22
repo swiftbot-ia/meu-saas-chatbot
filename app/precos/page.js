@@ -124,13 +124,13 @@ export default function Pricing() {
       7: { price: 875, savings: 24, isSuper: true }
     },
     annual: {
-      1: { price: 150, savings: null },
-      2: { price: 275, savings: 8 },
-      3: { price: 400, savings: 11 },
-      4: { price: 525, savings: 12 },
-      5: { price: 525, savings: 30, isSuper: true },
-      6: { price: 630, savings: 30, isSuper: true },
-      7: { price: 735, savings: 30, isSuper: true }
+      1: { price: 1800, savings: null },
+      2: { price: 3300, savings: 8 },
+      3: { price: 4800, savings: 11 },
+      4: { price: 6336, savings: 12 },
+      5: { price: 7200, savings: 20, isSuper: true },
+      6: { price: 7560, savings: 30, isSuper: true },
+      7: { price: 8820, savings: 30, isSuper: true }
     }
   }
 
