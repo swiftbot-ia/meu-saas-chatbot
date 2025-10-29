@@ -1,6 +1,5 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
 
 export default function SupportPage() {
@@ -48,27 +47,31 @@ export default function SupportPage() {
     checkUser()
   }, [])
 
+  // ✅ CORREÇÃO: Usar API ao invés de supabase.auth.getUser() direto
   const checkUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      router.push('/login')
-    } else {
-      setUser(user)
-      await loadUserProfile(user.id)
-    }
-    setLoading(false)
-  }
-
-  const loadUserProfile = async (userId) => {
     try {
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .single()
-      setUserProfile(profile)
+      const response = await fetch('/api/user/profile-id')
+      const data = await response.json()
+      
+      if (!data.success) {
+        router.push('/login')
+        return
+      }
+
+      setUser({
+        id: data.profileId,
+        email: data.email
+      })
+      
+      setUserProfile({
+        full_name: data.fullName,
+        company_name: data.companyName
+      })
     } catch (error) {
-      console.error('Erro ao carregar perfil:', error)
+      console.error('Erro ao verificar usuário:', error)
+      router.push('/login')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -103,27 +106,29 @@ export default function SupportPage() {
     setSending(true)
     
     try {
-      const { error } = await supabase
-        .from('support_tickets')
-        .insert([{
-          user_id: user.id,
-          user_email: user.email,
-          user_name: userProfile?.full_name || user.email.split('@')[0],
-          category: formData.category,
+      // ✅ Usar a API de criação de tickets
+      const response = await fetch('/api/suporte/tickets/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
           subject: formData.subject,
           message: formData.message,
           priority: formData.priority,
-          status: 'open',
-          created_at: new Date().toISOString()
-        }])
+          category: formData.category
+        })
+      })
+
+      const data = await response.json()
       
-      if (error) throw error
+      if (!data.success) throw new Error(data.error)
       
+      // Enviar email de notificação
       await fetch('/api/support/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          to: 'suporte@swiftbot.com.br',
+          to: 'caio.guedes@swiftbot.com.br',
           userEmail: user.email,
           userName: userProfile?.full_name || user.email.split('@')[0],
           category: categories.find(c => c.value === formData.category)?.label || formData.category,
@@ -186,12 +191,12 @@ export default function SupportPage() {
       <header className="sticky top-0 z-50 bg-black/30 backdrop-blur-xl border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <button
+            <button 
               onClick={() => router.push('/dashboard')}
-              className="flex items-center text-gray-400 hover:text-[#04F5A0] transition-colors duration-300"
+              className="flex items-center text-gray-300 hover:text-white transition-colors"
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
               Voltar ao Dashboard
             </button>
@@ -322,7 +327,7 @@ export default function SupportPage() {
                       <p className="text-blue-300 text-sm font-medium mb-1">💡 Dica</p>
                       <p className="text-blue-200 text-sm">
                         Nossa equipe de suporte responde em até 72 horas úteis. Para problemas urgentes, 
-                        selecione prioridade "Urgente". Você receberá uma cópia desta solicitação no email: <span className="font-semibold">{user?.email}</span>
+                        selecione prioridade "Urgente". Você receberá uma cópia desta solicitação no email: <span className="font-semibold">caio.guedes@swiftbot.com.br</span>
                       </p>
                     </div>
                   </div>
