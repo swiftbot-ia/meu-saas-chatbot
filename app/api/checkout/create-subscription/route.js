@@ -13,8 +13,7 @@ import {
 
 // 🧪 CONFIGURAÇÕES DE TESTE
 const TEST_MODE = false  // false = PRODUÇÃO (cobrança real)
-const TEST_TRIAL_DAYS = 4  // Trial padrão de 4 dias
-const TEST_PRICE_OVERRIDE = 10  // R$ 10 para plano de 1 conexão mensal (teste)
+const TEST_TRIAL_DAYS = 1  // ✅ TESTE: 1 dia de trial (para testes rápidos em produção)
 
 export async function POST(request) {
   try {
@@ -83,10 +82,10 @@ export async function POST(request) {
       }, { status: 400 })
     }
 
-    // ✅ DEFINIR PREÇOS (mantém lógica do Pagar.me)
+    // ✅ DEFINIR PREÇOS - VALORES CORRETOS
     const pricing = {
       monthly: {
-        1: 165,
+        1: 10,    // ✅ R$ 10 para teste em produção
         2: 305,
         3: 445,
         4: 585,
@@ -95,19 +94,19 @@ export async function POST(request) {
         7: 875
       },
       annual: {
-        1: 150,
-        2: 275,
-        3: 400,
-        4: 525,
-        5: 525,
-        6: 630,
-        7: 735
+        // ✅ VALORES ANUAIS COMPLETOS (não divididos por 12)
+        1: 1776,  // R$ 1.776/ano (equivalente a R$ 148/mês)
+        2: 3294,  // R$ 3.294/ano (equivalente a R$ 274/mês)
+        3: 4806,  // R$ 4.806/ano (equivalente a R$ 400/mês)
+        4: 6318,  // R$ 6.318/ano (equivalente a R$ 526/mês)
+        5: 6750,  // R$ 6.750/ano (equivalente a R$ 562/mês)
+        6: 8100,  // R$ 8.100/ano (equivalente a R$ 675/mês)
+        7: 9450   // R$ 9.450/ano (equivalente a R$ 787/mês)
       }
     }
 
     const basePlanPrice = pricing[plan.billingPeriod][plan.connections]
-    const isTestPrice = TEST_MODE && plan.billingPeriod === 'monthly' && plan.connections === 1
-    const planPrice = isTestPrice ? TEST_PRICE_OVERRIDE : basePlanPrice
+    const planPrice = basePlanPrice
 
     const displayAmount = planPrice
     const finalAmount = planPrice
@@ -185,10 +184,7 @@ export async function POST(request) {
           billing_frequency: billingFrequency,
           test_mode: TEST_MODE,
           trial_days: isTrialEligible ? trialDays : 0,
-          phone: userProfile?.phone || 'not_provided',
-          is_test_price: isTestPrice,
-          original_price: pricing[plan.billingPeriod][plan.connections],
-          test_price_used: planPrice
+          phone: userProfile?.phone || 'not_provided'
         }
       })
 
@@ -290,9 +286,6 @@ export async function POST(request) {
             billing_period: plan.billingPeriod,
             connections: plan.connections,
             test_mode: TEST_MODE,
-            is_test_price: isTestPrice,
-            original_price: pricing[plan.billingPeriod][plan.connections],
-            test_price_used: planPrice,
             gateway: 'stripe'
           },
           created_at: now.toISOString()
@@ -337,12 +330,6 @@ export async function POST(request) {
       amount_charged: isTrialEligible ? 0 : finalAmount,
       test_mode: TEST_MODE,
       trial_days: isTrialEligible ? trialDays : 0,
-      test_config: {
-        is_test_price: isTestPrice,
-        original_price: pricing[plan.billingPeriod][plan.connections],
-        test_price_used: planPrice,
-        test_trial_days: TEST_TRIAL_DAYS
-      },
       stripe: {
         customer_id: stripeCustomer.id,
         subscription_id: stripeSubscription.id,
