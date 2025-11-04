@@ -1,32 +1,113 @@
-// ====================================================================
-// 1. app/api/portal-interno/tickets/list/route.js
-// ====================================================================
-import { NextResponse } from 'next/server';
-import { getCurrentSession } from '@/lib/support-auth';
-import { getTickets } from '@/lib/support-actions';
+// app/api/portal-interno/tickets/list/route.js
+import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { getCurrentSession } from '@/lib/support-auth'
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
 export async function GET(request) {
   try {
-    const session = await getCurrentSession();
+    // Verificar autenticação
+    const session = await getCurrentSession()
     if (!session) {
-      return NextResponse.json({ success: false, error: 'Não autenticado' }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: 'Não autorizado' },
+        { status: 401 }
+      )
     }
 
-    const { searchParams } = new URL(request.url);
-    const filters = {
-      status: searchParams.get('status') || undefined,
-      limit: parseInt(searchParams.get('limit') || '50')
-    };
+    // Obter parâmetros de query
+    const { searchParams } = new URL(request.url)
+    const status = searchParams.get('status') // open, in_progress, resolved, closed, all
+    const priority = searchParams.get('priority') // low, normal, high, urgent, all
+    const category = searchParams.get('category')
+    const assignedTo = searchParams.get('assignedTo')
+    const search = searchParams.get('search') // Busca por assunto ou mensagem
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '20')
+    const offset = (page - 1) * limit
 
-    const result = await getTickets(filters);
+    // Construir query
+    let query = supabaseAdmin
+      .from('support_tickets')
+      .select(`
+        *,
+        user_profiles (
+          id,
+          email,
+          full_name,
+          phone
+        ),
+        assigned_to_user:support_users!support_tickets_assigned_to_fkey (
+          id,
+          full_name
+        )
+      `, { count: 'exact' })
 
-    if (!result.success) {
-      return NextResponse.json({ success: false, error: result.error }, { status: 400 });
+    // Aplicar filtros
+    if (status && status !== 'all') {
+      query = query.eq('status', status)
     }
 
-    return NextResponse.json({ success: true, tickets: result.tickets });
+    if (priority && priority !== 'all') {
+      query = query.eq('priority', priority)
+    }
+
+    if (category) {
+      query = query.eq('category', category)
+    }
+
+    if (assignedTo && assignedTo !== 'all') {
+      if (assignedTo === 'unassigned') {
+        query = query.is('assigned_to', null)
+      } else {
+        query = query.eq('assigned_to', assignedTo)
+      }
+    }
+
+    if (search) {
+      query = query.or(`subject.ilike.%${search}%,message.ilike.%${search}%`)
+    }
+
+    // Ordenar por data de criação (mais recentes primeiro)
+    query = query.order('created_at', { ascending: false })
+
+    // Aplicar paginação
+    query = query.range(offset, offset + limit - 1)
+
+    const { data: tickets, error, count } = await query
+
+    if (error) {
+      console.error('Erro ao buscar tickets:', error)
+      return NextResponse.json(
+        { success: false, error: 'Erro ao buscar tickets' },
+        { status: 500 }
+      )
+    }
+
+    // Calcular informações de paginação
+    const totalPages = Math.ceil(count / limit)
+
+    return NextResponse.json({
+      success: true,
+      tickets,
+      pagination: {
+        page,
+        limit,
+        total: count,
+        totalPages,
+        hasMore: page < totalPages
+      }
+    })
+
   } catch (error) {
-    console.error('Erro:', error);
-    return NextResponse.json({ success: false, error: 'Erro interno' }, { status: 500 });
+    console.error('Erro ao listar tickets:', error)
+    return NextResponse.json(
+      { success: false, error: 'Erro ao listar tickets' },
+      { status: 500 }
+    )
   }
 }
