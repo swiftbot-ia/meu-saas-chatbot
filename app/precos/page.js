@@ -47,13 +47,13 @@ export default function Precos() {
       7: { price: 875, monthlyEquivalent: 875 }
     },
     annual: {
-      1: { price: 1800, monthlyEquivalent: 150 },
-      2: { price: 3300, monthlyEquivalent: 275 },
-      3: { price: 4800, monthlyEquivalent: 400 },
-      4: { price: 6336, monthlyEquivalent: 528 },
-      5: { price: 7200, monthlyEquivalent: 600 },
-      6: { price: 7560, monthlyEquivalent: 630 },
-      7: { price: 8820, monthlyEquivalent: 735 }
+      1: { price: 1776, monthlyEquivalent: 148 },
+      2: { price: 3294, monthlyEquivalent: 274 },
+      3: { price: 4806, monthlyEquivalent: 400 },
+      4: { price: 6318, monthlyEquivalent: 526 },
+      5: { price: 6750, monthlyEquivalent: 562 },
+      6: { price: 8100, monthlyEquivalent: 675 },
+      7: { price: 9450, monthlyEquivalent: 787 }
     }
   }
 
