@@ -1,13 +1,14 @@
-// /app/api/subscription/cancel/route.js
+// app/api/subscription/cancel/route.js
+// MIGRADO PARA STRIPE - Mantém mesma lógica de cancelamento
 import { NextResponse } from 'next/server'
 import { supabase } from '../../../../lib/supabase'
-import { cancelSubscription } from '../../../../lib/pagarme'
+import { cancelSubscription } from '../../../../lib/stripe'
 
 export async function POST(request) {
   try {
     const { userId, confirmPassword } = await request.json()
     
-    console.log('🚨 Cancelamento de assinatura solicitado:', { userId })
+    console.log('🚨 Cancelamento de assinatura solicitado (STRIPE):', { userId })
 
     if (!userId) {
       return NextResponse.json({
@@ -34,15 +35,19 @@ export async function POST(request) {
       }, { status: 404 })
     }
 
-    // ✅ 2. CANCELAR NO PAGAR.ME
-    let pagarmeSuccess = false
+    // ✅ 2. CANCELAR NA STRIPE
+    let stripeSuccess = false
     try {
-      await cancelSubscription(subscription.pagarme_subscription_id)
-      console.log('✅ Assinatura cancelada no Pagar.me:', subscription.pagarme_subscription_id)
-      pagarmeSuccess = true
-    } catch (pagarmeError) {
-      console.error('❌ Erro ao cancelar no Pagar.me:', pagarmeError)
-      // Continua mesmo com erro no Pagar.me para desconectar WhatsApp
+      if (subscription.stripe_subscription_id) {
+        await cancelSubscription(subscription.stripe_subscription_id, 'customer_request')
+        console.log('✅ Assinatura cancelada na Stripe:', subscription.stripe_subscription_id)
+        stripeSuccess = true
+      } else {
+        console.warn('⚠️ Assinatura sem stripe_subscription_id')
+      }
+    } catch (stripeError) {
+      console.error('❌ Erro ao cancelar na Stripe:', stripeError)
+      // Continua mesmo com erro na Stripe para desconectar WhatsApp
     }
 
     // ✅ 3. DESCONECTAR WHATSAPP IMEDIATAMENTE
@@ -78,14 +83,15 @@ export async function POST(request) {
         event_type: 'subscription_canceled_manual',
         amount: 0,
         payment_method: 'credit_card',
-        pagarme_transaction_id: subscription.pagarme_subscription_id,
+        stripe_transaction_id: subscription.stripe_subscription_id,
         status: 'canceled',
         metadata: {
           reason: 'manual_cancellation',
           canceled_by: 'user',
-          pagarme_success: pagarmeSuccess,
+          stripe_success: stripeSuccess,
           whatsapp_disconnected: true,
-          canceled_at: now
+          canceled_at: now,
+          gateway: 'stripe'
         },
         created_at: now
       }])
@@ -111,61 +117,71 @@ export async function POST(request) {
   }
 }
 
-// ✅ FUNÇÃO AUXILIAR PARA DESCONECTAR WHATSAPP
+// ============================================================================
+// FUNÇÃO AUXILIAR PARA DESCONECTAR WHATSAPP
+// ============================================================================
 async function disconnectUserWhatsApp(userId) {
   try {
     console.log('🔌 Desconectando WhatsApp do usuário:', userId)
 
-    // Buscar conexão WhatsApp
-    const { data: whatsappConnection, error: fetchError } = await supabase
-      .from('whatsapp_connections')
+    // Buscar todas as conexões do usuário
+    const { data: connections, error: fetchError } = await supabase
+      .from('user_connections')
       .select('*')
       .eq('user_id', userId)
-      .single()
 
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      console.error('❌ Erro ao buscar conexão WhatsApp:', fetchError)
+    if (fetchError) {
+      console.error('❌ Erro ao buscar conexões WhatsApp:', fetchError)
       return false
     }
 
-    if (!whatsappConnection) {
+    if (!connections || connections.length === 0) {
       console.log('⚠️ Nenhuma conexão WhatsApp encontrada')
       return true // Não é erro se não tem conexão
     }
 
-    // Desconectar na Evolution API
-    if (whatsappConnection.instance_name && whatsappConnection.evolution_api_key) {
-      try {
-        const evolutionResponse = await fetch(`https://evolution.swiftbot.com.br/instance/logout/${whatsappConnection.instance_name}`, {
-          method: 'DELETE',
-          headers: {
-            'apikey': whatsappConnection.evolution_api_key,
-            'Content-Type': 'application/json'
-          }
-        })
+    // Desconectar cada conexão
+    for (const connection of connections) {
+      if (connection.evolution_instance_name) {
+        try {
+          const evolutionUrl = process.env.EVOLUTION_API_URL || 'https://evolution.swiftbot.com.br'
+          const evolutionApiKey = process.env.EVOLUTION_API_KEY || connection.evolution_api_key
 
-        if (evolutionResponse.ok) {
-          console.log('✅ WhatsApp desconectado na Evolution API')
-        } else {
-          console.warn('⚠️ Erro ao desconectar na Evolution API:', evolutionResponse.status)
+          const evolutionResponse = await fetch(
+            `${evolutionUrl}/instance/logout/${connection.evolution_instance_name}`,
+            {
+              method: 'DELETE',
+              headers: {
+                'apikey': evolutionApiKey,
+                'Content-Type': 'application/json'
+              }
+            }
+          )
+
+          if (evolutionResponse.ok) {
+            console.log('✅ WhatsApp desconectado na Evolution API:', connection.evolution_instance_name)
+          } else {
+            console.warn('⚠️ Erro ao desconectar na Evolution API:', evolutionResponse.status)
+          }
+        } catch (evolutionError) {
+          console.warn('⚠️ Erro na Evolution API:', evolutionError)
         }
-      } catch (evolutionError) {
-        console.warn('⚠️ Erro na Evolution API:', evolutionError)
+      }
+
+      // Remover conexão do banco
+      const { error: deleteError } = await supabase
+        .from('user_connections')
+        .delete()
+        .eq('id', connection.id)
+
+      if (deleteError) {
+        console.error('❌ Erro ao remover conexão do banco:', deleteError)
+      } else {
+        console.log('✅ Conexão removida do banco:', connection.id)
       }
     }
 
-    // Remover conexão do banco
-    const { error: deleteError } = await supabase
-      .from('whatsapp_connections')
-      .delete()
-      .eq('user_id', userId)
-
-    if (deleteError) {
-      console.error('❌ Erro ao remover conexão do banco:', deleteError)
-      return false
-    }
-
-    console.log('✅ WhatsApp desconectado com sucesso')
+    console.log('✅ Todas as conexões WhatsApp desconectadas')
     return true
 
   } catch (error) {

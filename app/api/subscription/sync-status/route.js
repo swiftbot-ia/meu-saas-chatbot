@@ -1,10 +1,11 @@
 // app/api/subscription/sync-status/route.js
-// CRIE ESTE ARQUIVO EM: app/api/subscription/sync-status/route.js
+// MIGRADO PARA STRIPE - Sincroniza status entre banco local e Stripe
 import { NextResponse } from 'next/server'
 import { supabase } from '../../../../lib/supabase'
+import { getSubscriptionStatus, mapStripeStatus } from '../../../../lib/stripe'
 
-const PAGARME_API_KEY = process.env.PAGARME_SECRET_KEY || 'sk_test_908d35ab3a724f368bd986d858324ed5'
-const PAGARME_API_URL = 'https://api.pagar.me/core/v5'
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY
+const STRIPE_API_URL = 'https://api.stripe.com/v1'
 
 export async function POST(request) {
   try {
@@ -17,9 +18,9 @@ export async function POST(request) {
       }, { status: 400 })
     }
 
-    console.log(`🔄 Sincronizando status para usuário: ${userId}`)
+    console.log(`🔄 Sincronizando status Stripe para usuário: ${userId}`)
 
-    // Buscar assinatura no banco local
+    // ✅ 1. BUSCAR ASSINATURA NO BANCO LOCAL
     const { data: localSubscription, error: localError } = await supabase
       .from('user_subscriptions')
       .select('*')
@@ -35,111 +36,113 @@ export async function POST(request) {
       }, { status: 404 })
     }
 
-    // Se não tem ID do Pagar.me, não pode sincronizar
-    if (!localSubscription.pagarme_subscription_id) {
-      console.log('⚠️ Assinatura sem ID do Pagar.me - assumindo status local')
+    // ✅ 2. VERIFICAR SE TEM ID DA STRIPE
+    if (!localSubscription.stripe_subscription_id) {
+      console.log('⚠️ Assinatura sem stripe_subscription_id - assumindo status local')
       return NextResponse.json({
         success: true,
-        message: 'Assinatura local sem ID do Pagar.me',
+        message: 'Assinatura local sem ID da Stripe',
         local_status: localSubscription.status
       })
     }
 
-    // Buscar status atual no Pagar.me
-    const pagarmeResponse = await fetch(
-      `${PAGARME_API_URL}/subscriptions/${localSubscription.pagarme_subscription_id}`,
-      {
-        method: 'GET',
-        headers: {
-          'Authorization': `Basic ${Buffer.from(`${PAGARME_API_KEY}:`).toString('base64')}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    )
+    // ✅ 3. BUSCAR STATUS ATUAL NA STRIPE
+    try {
+      const stripeSubscription = await getSubscriptionStatus(localSubscription.stripe_subscription_id)
+      
+      console.log('📥 Status da Stripe:', stripeSubscription.status)
+      console.log('📊 Detalhes:', {
+        id: stripeSubscription.id,
+        status: stripeSubscription.status,
+        current_period_end: stripeSubscription.current_period_end,
+        cancel_at_period_end: stripeSubscription.cancel_at_period_end
+      })
 
-    if (!pagarmeResponse.ok) {
-      console.error('❌ Erro ao consultar Pagar.me:', pagarmeResponse.status)
+      // ✅ 4. MAPEAR STATUS DA STRIPE PARA NOSSO SISTEMA
+      const newStatus = mapStripeStatus(stripeSubscription.status)
+      
+      // ✅ 5. ATUALIZAR STATUS NO BANCO SE DIFERENTE
+      if (localSubscription.status !== newStatus) {
+        console.log(`🔄 Atualizando status: ${localSubscription.status} → ${newStatus}`)
+        
+        const updateData = {
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        }
+
+        // Se tornou ativo, definir próxima cobrança
+        if (newStatus === 'active' && stripeSubscription.current_period_end) {
+          updateData.next_billing_date = new Date(stripeSubscription.current_period_end * 1000).toISOString()
+        }
+
+        // Se está em trial, atualizar data de fim do trial
+        if (newStatus === 'trial' && stripeSubscription.trial_end) {
+          updateData.trial_end_date = new Date(stripeSubscription.trial_end * 1000).toISOString()
+        }
+
+        const { error: updateError } = await supabase
+          .from('user_subscriptions')
+          .update(updateData)
+          .eq('id', localSubscription.id)
+
+        if (updateError) {
+          console.error('❌ Erro ao atualizar status:', updateError)
+          return NextResponse.json({
+            success: false,
+            error: 'Erro ao atualizar status no banco'
+          }, { status: 500 })
+        }
+
+        console.log('✅ Status sincronizado com sucesso!')
+      } else {
+        console.log('ℹ️ Status já está sincronizado')
+      }
+
+      return NextResponse.json({
+        success: true,
+        local_status: localSubscription.status,
+        stripe_status: stripeSubscription.status,
+        new_status: newStatus,
+        updated: localSubscription.status !== newStatus,
+        next_billing: stripeSubscription.current_period_end 
+          ? new Date(stripeSubscription.current_period_end * 1000).toISOString() 
+          : null,
+        trial_end: stripeSubscription.trial_end
+          ? new Date(stripeSubscription.trial_end * 1000).toISOString()
+          : null,
+        cancel_at_period_end: stripeSubscription.cancel_at_period_end || false
+      })
+
+    } catch (stripeError) {
+      console.error('❌ Erro ao consultar Stripe:', stripeError)
       return NextResponse.json({
         success: false,
-        error: 'Erro ao consultar status no Pagar.me'
+        error: 'Erro ao consultar status na Stripe: ' + stripeError.message
       }, { status: 500 })
     }
-
-    const pagarmeData = await pagarmeResponse.json()
-    console.log('📥 Status do Pagar.me:', pagarmeData.status)
-
-    // Mapear status do Pagar.me para nosso sistema
-    const statusMapping = {
-      'active': 'active',
-      'trialing': 'trial', 
-      'canceled': 'canceled',
-      'past_due': 'expired',
-      'unpaid': 'expired'
-    }
-
-    const newStatus = statusMapping[pagarmeData.status] || 'expired'
-    
-    // Atualizar status no banco se diferente
-    if (localSubscription.status !== newStatus) {
-      console.log(`🔄 Atualizando status: ${localSubscription.status} → ${newStatus}`)
-      
-      const updateData = {
-        status: newStatus,
-        updated_at: new Date().toISOString()
-      }
-
-      // Se tornou ativo, definir próxima cobrança
-      if (newStatus === 'active' && pagarmeData.next_billing_at) {
-        updateData.next_billing_date = pagarmeData.next_billing_at
-      }
-
-      const { error: updateError } = await supabase
-        .from('user_subscriptions')
-        .update(updateData)
-        .eq('id', localSubscription.id)
-
-      if (updateError) {
-        console.error('❌ Erro ao atualizar status:', updateError)
-        return NextResponse.json({
-          success: false,
-          error: 'Erro ao atualizar status no banco'
-        }, { status: 500 })
-      }
-
-      console.log('✅ Status sincronizado com sucesso!')
-    } else {
-      console.log('ℹ️ Status já está sincronizado')
-    }
-
-    return NextResponse.json({
-      success: true,
-      local_status: localSubscription.status,
-      pagarme_status: pagarmeData.status,
-      new_status: newStatus,
-      updated: localSubscription.status !== newStatus,
-      next_billing: pagarmeData.next_billing_at || null
-    })
 
   } catch (error) {
     console.error('❌ Erro na sincronização:', error)
     return NextResponse.json({
       success: false,
-      error: 'Erro interno do servidor'
+      error: 'Erro interno do servidor: ' + error.message
     }, { status: 500 })
   }
 }
 
-// Endpoint GET para sincronizar todas as assinaturas (cron job)
+// ============================================================================
+// ENDPOINT GET - SINCRONIZAR TODAS AS ASSINATURAS (Cron Job)
+// ============================================================================
 export async function GET(request) {
   try {
-    console.log('🔄 Sincronização automática de todas as assinaturas...')
+    console.log('🔄 Sincronização automática de todas as assinaturas (STRIPE)...')
 
-    // Buscar todas as assinaturas ativas ou em trial com ID do Pagar.me
+    // Buscar todas as assinaturas ativas ou em trial com ID da Stripe
     const { data: subscriptions, error } = await supabase
       .from('user_subscriptions')
       .select('*')
       .in('status', ['active', 'trial'])
-      .not('pagarme_subscription_id', 'is', null)
+      .not('stripe_subscription_id', 'is', null)
 
     if (error) {
       console.error('❌ Erro ao buscar assinaturas:', error)
@@ -149,7 +152,20 @@ export async function GET(request) {
       }, { status: 500 })
     }
 
+    if (!subscriptions || subscriptions.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: 'Nenhuma assinatura para sincronizar',
+        synced: 0
+      })
+    }
+
+    console.log(`📋 Encontradas ${subscriptions.length} assinaturas para sincronizar`)
+
     const results = []
+    let successCount = 0
+    let errorCount = 0
+
     for (const subscription of subscriptions) {
       try {
         // Fazer request POST para si mesmo para sincronizar cada uma
@@ -159,6 +175,13 @@ export async function GET(request) {
         }))
         
         const syncData = await syncResult.json()
+        
+        if (syncData.success) {
+          successCount++
+        } else {
+          errorCount++
+        }
+        
         results.push({
           user_id: subscription.user_id,
           subscription_id: subscription.id,
@@ -166,6 +189,7 @@ export async function GET(request) {
         })
       } catch (syncError) {
         console.error(`❌ Erro ao sincronizar ${subscription.user_id}:`, syncError)
+        errorCount++
         results.push({
           user_id: subscription.user_id,
           subscription_id: subscription.id,
@@ -177,6 +201,11 @@ export async function GET(request) {
     return NextResponse.json({
       success: true,
       message: `Sincronização concluída para ${subscriptions.length} assinaturas`,
+      summary: {
+        total: subscriptions.length,
+        success: successCount,
+        errors: errorCount
+      },
       results: results
     })
 
@@ -184,7 +213,7 @@ export async function GET(request) {
     console.error('❌ Erro na sincronização automática:', error)
     return NextResponse.json({
       success: false,
-      error: 'Erro interno do servidor'
+      error: 'Erro interno do servidor: ' + error.message
     }, { status: 500 })
   }
 }
