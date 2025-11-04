@@ -43,29 +43,23 @@ export async function POST(request) {
     // ✅ BUSCAR TELEFONE DO PERFIL DO USUÁRIO (opcional para Stripe)
     console.log('🔍 Buscando dados do usuário...')
     
-    const { createClient } = require('@supabase/supabase-js')
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    )
-
-    const { data: userProfile, error: profileError } = await supabaseAdmin
+    const { data: userProfile, error: profileError } = await supabase
       .from('user_profiles')
       .select('phone, full_name, company_name')
       .eq('user_id', userId)
       .single()
 
     console.log('📊 Dados do usuário:', {
-      profileError: profileError,
+      profileError: profileError ? profileError.message : null,
       hasPhone: !!userProfile?.phone,
       hasFullName: !!userProfile?.full_name
     })
+
+    // ⚠️ IMPORTANTE: Telefone é OPCIONAL na Stripe (diferente do Pagar.me)
+    // Se não encontrar, continua normalmente
+    if (profileError) {
+      console.warn('⚠️ Erro ao buscar perfil (continuando sem telefone):', profileError.message)
+    }
 
     // ✅ VERIFICAR SE JÁ TEM ASSINATURA ATIVA
     const { data: existingSubscription } = await supabase
