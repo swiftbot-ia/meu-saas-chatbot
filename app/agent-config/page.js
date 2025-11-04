@@ -1,1036 +1,1165 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabase'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { 
+  Save, 
+  ArrowLeft, 
+  Loader2, 
+  Sparkles,
+  MessageSquare,
+  Zap,
+  Settings,
+  AlertCircle,
+  Check,
+  X,
+  Plus,
+  Trash2,
+  Copy,
+  Eye,
+  EyeOff
+} from 'lucide-react';
 
-export default function AgentConfig() {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const connectionId = searchParams.get('connectionId')
+// Separar o componente que usa useSearchParams
+function AgentConfigContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const agentId = searchParams.get('id');
 
-  // Estados do formulário
-  const [formData, setFormData] = useState({
-    companyName: '',
-    businessSector: '',
-    personality: 'amigavel',
-    businessHours: '24h',
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [agent, setAgent] = useState(null);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [testMode, setTestMode] = useState(false);
+  const [testMessage, setTestMessage] = useState('');
+  const [testResponse, setTestResponse] = useState('');
+  const [testing, setTesting] = useState(false);
+
+  const [config, setConfig] = useState({
+    name: '',
+    description: '',
+    systemPrompt: '',
+    temperature: 0.7,
+    maxTokens: 2000,
+    model: 'gpt-4',
     welcomeMessage: '',
-    defaultResponse: 'Desculpe, não entendi sua pergunta. Pode reformular?',
-    productDescription: '',
-    botObjective: 'vendas',
-    productUrl: '',
-    priceRange: '',
-    startTime: '08:00',
-    endTime: '18:00',
-    offHoursMessage: '',
-    agentName: '',
-    objectionsQA: [{ question: '', answer: '' }],
-    objectiveQuestions: [],
-    salesCTA: '',
-  })
-
-  // Mouse tracking para efeitos visuais
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      setMousePosition({ x: e.clientX, y: e.clientY })
+    fallbackMessage: '',
+    apiKey: '',
+    knowledgeBase: [],
+    customInstructions: [],
+    conversationStarters: [],
+    behaviorSettings: {
+      personality: 'professional',
+      responseStyle: 'concise',
+      language: 'pt-BR',
+      timezone: 'America/Sao_Paulo',
+      enableEmojis: false,
+      enableMarkdown: true,
+      maxConversationLength: 50,
+      contextWindow: 10
+    },
+    integrations: {
+      whatsapp: false,
+      telegram: false,
+      slack: false,
+      discord: false,
+      webhook: ''
+    },
+    analytics: {
+      trackConversations: true,
+      trackSentiment: true,
+      trackTopics: true,
+      generateReports: true
     }
-    window.addEventListener('mousemove', handleMouseMove)
-    return () => window.removeEventListener('mousemove', handleMouseMove)
-  }, [])
+  });
+
+  const [activeTab, setActiveTab] = useState('basic');
+  const [newKnowledge, setNewKnowledge] = useState({ title: '', content: '' });
+  const [newInstruction, setNewInstruction] = useState('');
+  const [newStarter, setNewStarter] = useState('');
 
   useEffect(() => {
-    checkUser()
-  }, [])
-
-  const checkUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      router.push('/login')
+    if (agentId) {
+      loadAgent();
     } else {
-      setUser(user)
-      loadExistingConfig(user.id)
+      setLoading(false);
     }
-    setLoading(false)
-  }
+  }, [agentId]);
 
-  const loadExistingConfig = async (userId) => {
+  const loadAgent = async () => {
+    setLoading(true);
     try {
-      const query = supabase
-        .from('ai_agents')
-        .select('*')
-        .eq('user_id', userId)
-
-      if (connectionId) {
-        query.eq('connection_id', connectionId)
-      }
-
-      const { data, error } = await query.single()
-
-      if (data && !error) {
-        setFormData({
-          companyName: data.company_name || '',
-          businessSector: data.business_sector || '',
-          personality: data.personality || 'amigavel',
-          businessHours: data.business_hours || '24h',
-          welcomeMessage: data.welcome_message || '',
-          defaultResponse: data.default_response || 'Desculpe, não entendi sua pergunta. Pode reformular?',
-          productDescription: data.product_description || '',
-          botObjective: data.bot_objective || 'vendas',
-          productUrl: data.product_url || '',
-          priceRange: data.price_range || '',
-          startTime: data.start_time || '08:00',
-          endTime: data.end_time || '18:00',
-          offHoursMessage: data.off_hours_message || '',
-          agentName: data.agent_name || '',
-          objectionsQA: data.objections_qa && data.objections_qa.length > 0 ? data.objections_qa : [{ question: '', answer: '' }],
-          objectiveQuestions: data.objective_questions || [],
-          salesCTA: data.sales_cta || ''
-        })
+      const response = await fetch(`/api/agents/${agentId}`);
+      const data = await response.json();
+      
+      if (data.success && data.agent) {
+        setAgent(data.agent);
+        setConfig({
+          name: data.agent.name || '',
+          description: data.agent.description || '',
+          systemPrompt: data.agent.system_prompt || '',
+          temperature: data.agent.temperature || 0.7,
+          maxTokens: data.agent.max_tokens || 2000,
+          model: data.agent.model || 'gpt-4',
+          welcomeMessage: data.agent.welcome_message || '',
+          fallbackMessage: data.agent.fallback_message || '',
+          apiKey: data.agent.api_key || '',
+          knowledgeBase: data.agent.knowledge_base || [],
+          customInstructions: data.agent.custom_instructions || [],
+          conversationStarters: data.agent.conversation_starters || [],
+          behaviorSettings: data.agent.behavior_settings || config.behaviorSettings,
+          integrations: data.agent.integrations || config.integrations,
+          analytics: data.agent.analytics || config.analytics
+        });
       }
     } catch (error) {
-      console.log('Nenhuma configuração existente encontrada')
+      console.error('Erro ao carregar agente:', error);
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
-  }
-
-  const generateWelcomeMessage = () => {
-    if (formData.companyName) {
-      const agentName = formData.agentName || 'assistente virtual'
-      const message = `Olá! 👋 Sou ${agentName} da ${formData.companyName}. Como posso ajudá-lo hoje?`
-      setFormData(prev => ({
-        ...prev,
-        welcomeMessage: message
-      }))
+  const handleSave = async () => {
+    if (!config.name.trim()) {
+      alert('Por favor, preencha o nome do agente');
+      return;
     }
-  }
 
-  const generateAgentNameSuggestions = () => {
-    const suggestions = [
-      'Ana', 'Carlos', 'Maria', 'João', 'Carla', 'Pedro', 'Julia', 'Bruno',
-      'Assistente Virtual', 'Bot da Empresa', 'Atendente Digital'
-    ]
-    
-    const randomSuggestion = suggestions[Math.floor(Math.random() * suggestions.length)]
-    setFormData(prev => ({
-      ...prev,
-      agentName: randomSuggestion
-    }))
-  }
+    setSaving(true);
+    try {
+      const url = agentId ? `/api/agents/${agentId}` : '/api/agents';
+      const method = agentId ? 'PUT' : 'POST';
 
-  const addObjectionQA = () => {
-    if (formData.objectionsQA.length < 6) {
-      setFormData(prev => ({
-        ...prev,
-        objectionsQA: [...prev.objectionsQA, { question: '', answer: '' }]
-      }))
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        alert(agentId ? 'Configurações salvas com sucesso!' : 'Agente criado com sucesso!');
+        router.push('/dashboard');
+      } else {
+        alert(data.message || 'Erro ao salvar configurações');
+      }
+    } catch (error) {
+      console.error('Erro ao salvar:', error);
+      alert('Erro ao salvar configurações');
+    } finally {
+      setSaving(false);
     }
-  }
+  };
 
-  const removeObjectionQA = (index) => {
-    if (formData.objectionsQA.length > 1) {
-      setFormData(prev => ({
-        ...prev,
-        objectionsQA: prev.objectionsQA.filter((_, i) => i !== index)
-      }))
-    }
-  }
+  const handleTest = async () => {
+    if (!testMessage.trim()) return;
 
-  const updateObjectionQA = (index, field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      objectionsQA: prev.objectionsQA.map((item, i) => 
-        i === index ? { ...item, [field]: value } : item
-      )
-    }))
-  }
-
-  const addCommonObjections = () => {
-    const commonObjections = [
-      { question: "Muito caro", answer: "O investimento se paga em poucos dias com o aumento nas vendas. Quanto vale economizar tempo e vender mais?" },
-      { question: "Não sei mexer", answer: "Foi desenvolvido para pessoas sem conhecimento técnico, com passo a passo simples. Gostaria de ver como funciona?" },
-      { question: "Não funciona", answer: "Nossos clientes relatam aumento de 30-80% nas conversões. Qual seria o impacto disso no seu negócio?" }
-    ]
-    
-    setFormData(prev => ({
-      ...prev,
-      objectionsQA: commonObjections
-    }))
-  }
-
-  const addObjectiveQuestion = () => {
-    if (formData.objectiveQuestions.length < 7) {
-      const newQuestion = getEmptyQuestionByObjective()
-      setFormData(prev => ({
-        ...prev,
-        objectiveQuestions: [...prev.objectiveQuestions, newQuestion]
-      }))
-    }
-  }
-
-  const removeObjectiveQuestion = (index) => {
-    if (formData.objectiveQuestions.length > 0) {
-      setFormData(prev => ({
-        ...prev,
-        objectiveQuestions: prev.objectiveQuestions.filter((_, i) => i !== index)
-      }))
-    }
-  }
-
-  const updateObjectiveQuestion = (index, field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      objectiveQuestions: prev.objectiveQuestions.map((item, i) => 
-        i === index ? { ...item, [field]: value } : item
-      )
-    }))
-  }
-
-  const getEmptyQuestionByObjective = () => {
-    switch (formData.botObjective) {
-      case 'qualificacao':
-        return { question: '' }
-      case 'informacoes':
-        return { info: '', details: '' }
-      case 'suporte':
-        return { problem: '', solution: '' }
-      case 'vendas':
-        return { question: '' }
-      case 'agendamento':
-        return { question: '' }
-      default:
-        return { question: '' }
-    }
-  }
-
-  const handleObjectiveChange = (e) => {
-    const newObjective = e.target.value
-    setFormData(prev => ({
-      ...prev,
-      botObjective: newObjective,
-      objectiveQuestions: []
-    }))
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setSaving(true)
+    setTesting(true);
+    setTestResponse('');
 
     try {
-      const agentData = {
-        user_id: user.id,
-        connection_id: connectionId,
-        company_name: formData.companyName,
-        business_sector: formData.businessSector,
-        personality: formData.personality,
-        business_hours: formData.businessHours,
-        welcome_message: formData.welcomeMessage,
-        default_response: formData.defaultResponse,
-        product_description: formData.productDescription,
-        bot_objective: formData.botObjective,
-        product_url: formData.productUrl,
-        price_range: formData.priceRange,
-        start_time: formData.startTime,
-        end_time: formData.endTime,
-        off_hours_message: formData.offHoursMessage,
-        agent_name: formData.agentName,
-        objections_qa: formData.objectionsQA.filter(item => item.question && item.question.trim() && item.answer && item.answer.trim()),
-        objective_questions: formData.objectiveQuestions.filter(item => {
-          switch (formData.botObjective) {
-            case 'qualificacao':
-            case 'vendas':
-            case 'agendamento':
-              return item.question && item.question.trim()
-            case 'informacoes':
-              return item.info && item.info.trim() && item.details && item.details.trim()
-            case 'suporte':
-              return item.problem && item.problem.trim() && item.solution && item.solution.trim()
-            default:
-              return false
-          }
-        }),
-        sales_cta: formData.salesCTA || '',
-        is_active: true
-      }
-
-      const { error } = await supabase
-        .from('ai_agents')
-        .upsert(agentData, {
-          onConflict: connectionId ? 'user_id,connection_id' : 'user_id'
-        })
-
-      if (error) throw error
-
-      await fetch('/api/n8n/update-agent', {
+      const response = await fetch('/api/agents/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, connectionId, agentData })
-      })
+        body: JSON.stringify({
+          config,
+          message: testMessage
+        }),
+      });
 
-      alert('✅ Agente configurado com sucesso!')
-      router.push('/dashboard')
+      const data = await response.json();
       
+      if (data.success) {
+        setTestResponse(data.response);
+      } else {
+        setTestResponse('Erro ao testar agente: ' + data.message);
+      }
     } catch (error) {
-      console.error('Erro ao salvar:', error)
-      alert('❌ Erro ao salvar configuração: ' + error.message)
+      console.error('Erro ao testar:', error);
+      setTestResponse('Erro ao testar agente');
+    } finally {
+      setTesting(false);
     }
+  };
 
-    setSaving(false)
-  }
+  const addKnowledge = () => {
+    if (newKnowledge.title && newKnowledge.content) {
+      setConfig({
+        ...config,
+        knowledgeBase: [...config.knowledgeBase, { ...newKnowledge, id: Date.now() }]
+      });
+      setNewKnowledge({ title: '', content: '' });
+    }
+  };
+
+  const removeKnowledge = (id) => {
+    setConfig({
+      ...config,
+      knowledgeBase: config.knowledgeBase.filter(k => k.id !== id)
+    });
+  };
+
+  const addInstruction = () => {
+    if (newInstruction.trim()) {
+      setConfig({
+        ...config,
+        customInstructions: [...config.customInstructions, newInstruction]
+      });
+      setNewInstruction('');
+    }
+  };
+
+  const removeInstruction = (index) => {
+    setConfig({
+      ...config,
+      customInstructions: config.customInstructions.filter((_, i) => i !== index)
+    });
+  };
+
+  const addStarter = () => {
+    if (newStarter.trim()) {
+      setConfig({
+        ...config,
+        conversationStarters: [...config.conversationStarters, newStarter]
+      });
+      setNewStarter('');
+    }
+  };
+
+  const removeStarter = (index) => {
+    setConfig({
+      ...config,
+      conversationStarters: config.conversationStarters.filter((_, i) => i !== index)
+    });
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
         <div className="text-center">
-          <div className="relative">
-            <div className="w-16 h-16 bg-[#04F5A0] rounded-2xl flex items-center justify-center mx-auto animate-pulse mb-4">
-              <div className="w-8 h-8 bg-black rounded-sm" 
-                   style={{
-                     clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)'
-                   }}
-              />
-            </div>
-            <div className="absolute inset-0 bg-[#04F5A0]/30 rounded-2xl blur-xl animate-pulse mx-auto w-16 h-16" />
-          </div>
-          <p className="text-gray-300">Carregando configurações...</p>
+          <Loader2 className="w-12 h-12 text-[#04F5A0] animate-spin mx-auto mb-4" />
+          <p className="text-gray-400">Carregando configurações...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden">
-      {/* Background Effects */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute inset-0" 
-             style={{
-               backgroundImage: `radial-gradient(circle at 1px 1px, rgba(4, 245, 160, 0.15) 1px, transparent 0)`,
-               backgroundSize: '50px 50px'
-             }}
-        />
-      </div>
-
-      {/* Dynamic Gradient */}
-      <div 
-        className="absolute inset-0 opacity-20 pointer-events-none"
-        style={{
-          background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(4, 245, 160, 0.08), transparent 40%)`
-        }}
-      />
-
-      {/* Header */}
-      <header className="relative z-10 bg-black/30 backdrop-blur-xl border-b border-white/10">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <button 
+    <div className="min-h-screen bg-[#0A0A0A] text-white">
+      {/* Header Fixo */}
+      <div className="sticky top-0 z-50 bg-[#0A0A0A]/95 backdrop-blur-xl border-b border-[#2A2A2A]">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
                 onClick={() => router.push('/dashboard')}
-                className="text-gray-400 hover:text-[#04F5A0] mr-4 transition-colors duration-300 flex items-center"
+                className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
               >
-                <span className="mr-2">←</span> Voltar
+                <ArrowLeft className="w-5 h-5" />
+                <span className="hidden sm:inline">Voltar</span>
               </button>
-              <div className="w-8 h-8 mr-3 flex items-center justify-center">
-                <div className="w-6 h-6 bg-[#04F5A0] rounded-sm opacity-90 hover:opacity-100 transition-all duration-300 hover:shadow-[0_0_15px_rgba(4,245,160,0.6)]" 
-                     style={{
-                       clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)'
-                     }}
-                />
+              <div>
+                <h1 className="text-2xl font-bold flex items-center gap-2">
+                  <Sparkles className="w-6 h-6 text-[#04F5A0]" />
+                  {agentId ? 'Configurar Agente' : 'Novo Agente'}
+                </h1>
+                {agent && (
+                  <p className="text-sm text-gray-400 mt-1">ID: {agent.id}</p>
+                )}
               </div>
-              <h1 className="text-xl font-bold text-white hover:text-[#04F5A0] transition-colors duration-300">
-                Configurar Agente IA
-              </h1>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setTestMode(!testMode)}
+                className="px-4 py-2 bg-[#1A1A1A] hover:bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg transition-all flex items-center gap-2"
+              >
+                <Zap className="w-4 h-4" />
+                <span className="hidden sm:inline">Testar</span>
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-6 py-2 bg-[#04F5A0] text-black font-semibold rounded-lg hover:bg-[#03E691] transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Salvar
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
-      {/* Conteúdo */}
-      <main className="relative z-10 max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-8 hover:border-[#04F5A0]/30 transition-all duration-500 relative overflow-hidden">
-          {/* Animated Background Effects */}
-          <div className="absolute inset-0 opacity-30 pointer-events-none">
-            <div className="absolute top-0 left-0 w-40 h-40 bg-purple-500/30 rounded-full blur-3xl animate-pulse"></div>
-            <div className="absolute top-1/2 right-0 w-32 h-32 bg-pink-500/25 rounded-full blur-2xl animate-pulse" style={{animationDelay: '1s'}}></div>
-            <div className="absolute bottom-0 left-1/3 w-28 h-28 bg-violet-500/20 rounded-full blur-xl animate-pulse" style={{animationDelay: '2s'}}></div>
-          </div>
-          
-          {/* Glass Effect Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Sidebar de Tabs */}
+          <div className="lg:col-span-1">
+            <div className="bg-[#121212] rounded-xl border border-[#2A2A2A] p-4 sticky top-24">
+              <nav className="space-y-2">
+                <button
+                  onClick={() => setActiveTab('basic')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all flex items-center gap-3 ${
+                    activeTab === 'basic'
+                      ? 'bg-[#04F5A0]/10 text-[#04F5A0] border border-[#04F5A0]/20'
+                      : 'hover:bg-[#1A1A1A] text-gray-400'
+                  }`}
+                >
+                  <Settings className="w-5 h-5" />
+                  <span className="font-medium">Básico</span>
+                </button>
 
-          {/* Content */}
-          <div className="relative z-20">
-            <div className="mb-8">
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-white via-[#04F5A0] to-white bg-clip-text text-transparent mb-4">
-                Personalize seu Assistente Virtual 🎯
-              </h2>
-              <p className="text-gray-400">
-                Configure a personalidade e as respostas do seu chatbot WhatsApp
-              </p>
+                <button
+                  onClick={() => setActiveTab('prompt')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all flex items-center gap-3 ${
+                    activeTab === 'prompt'
+                      ? 'bg-[#04F5A0]/10 text-[#04F5A0] border border-[#04F5A0]/20'
+                      : 'hover:bg-[#1A1A1A] text-gray-400'
+                  }`}
+                >
+                  <MessageSquare className="w-5 h-5" />
+                  <span className="font-medium">Prompt</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('knowledge')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all flex items-center gap-3 ${
+                    activeTab === 'knowledge'
+                      ? 'bg-[#04F5A0]/10 text-[#04F5A0] border border-[#04F5A0]/20'
+                      : 'hover:bg-[#1A1A1A] text-gray-400'
+                  }`}
+                >
+                  <Sparkles className="w-5 h-5" />
+                  <span className="font-medium">Base de Conhecimento</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('behavior')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all flex items-center gap-3 ${
+                    activeTab === 'behavior'
+                      ? 'bg-[#04F5A0]/10 text-[#04F5A0] border border-[#04F5A0]/20'
+                      : 'hover:bg-[#1A1A1A] text-gray-400'
+                  }`}
+                >
+                  <Zap className="w-5 h-5" />
+                  <span className="font-medium">Comportamento</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('integrations')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all flex items-center gap-3 ${
+                    activeTab === 'integrations'
+                      ? 'bg-[#04F5A0]/10 text-[#04F5A0] border border-[#04F5A0]/20'
+                      : 'hover:bg-[#1A1A1A] text-gray-400'
+                  }`}
+                >
+                  <Settings className="w-5 h-5" />
+                  <span className="font-medium">Integrações</span>
+                </button>
+              </nav>
             </div>
+          </div>
 
-            <form onSubmit={handleSubmit} className="space-y-8">
-              {/* Informações da Empresa */}
-              <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-2xl p-6 relative overflow-hidden">
-                {/* Animated Background Effects */}
-                <div className="absolute inset-0 opacity-30 pointer-events-none">
-                  <div className="absolute top-0 left-0 w-28 h-28 bg-blue-500/30 rounded-full blur-2xl animate-pulse"></div>
-                  <div className="absolute bottom-0 right-0 w-20 h-20 bg-blue-600/25 rounded-full blur-xl animate-pulse" style={{animationDelay: '1s'}}></div>
-                </div>
-                
-                {/* Glass Effect Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-                
-                {/* Content */}
-                <div className="relative z-10">
-                  <h3 className="text-xl font-semibold text-blue-400 mb-6 flex items-center">
-                    📢 Informações da Empresa
-                  </h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Nome da Empresa *
-                      </label>
-                      <input
-                        type="text"
-                        name="companyName"
-                        required
-                        value={formData.companyName}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
-                        placeholder="Ex: TechSolutions Ltda"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Setor/Área de Atuação *
-                      </label>
-                      <select
-                        name="businessSector"
-                        required
-                        value={formData.businessSector}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl text-white focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
-                      >
-                        <option value="">Selecione o setor</option>
-                        <option value="tecnologia">Tecnologia</option>
-                        <option value="saude">Saúde</option>
-                        <option value="educacao">Educação</option>
-                        <option value="comercio">Comércio</option>
-                        <option value="servicos">Serviços</option>
-                        <option value="industria">Indústria</option>
-                        <option value="alimentacao">Alimentação</option>
-                        <option value="imobiliario">Imobiliário</option>
-                        <option value="financeiro">Financeiro</option>
-                        <option value="outro">Outro</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Personalidade do Bot */}
-              <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-2xl p-6 relative overflow-hidden">
-                {/* Animated Background Effects */}
-                <div className="absolute inset-0 opacity-30 pointer-events-none">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/30 rounded-full blur-3xl animate-pulse"></div>
-                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-600/25 rounded-full blur-xl animate-pulse" style={{animationDelay: '1.5s'}}></div>
-                </div>
-                
-                {/* Glass Effect Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-                
-                {/* Content */}
-                <div className="relative z-10">
-                  <h3 className="text-xl font-semibold text-green-400 mb-6 flex items-center">
-                    🎭 Personalidade do Bot
-                  </h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Estilo de Comunicação *
-                      </label>
-                      <select
-                        name="personality"
-                        value={formData.personality}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl text-white focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
-                      >
-                        <option value="amigavel">😊 Amigável e Descontraído</option>
-                        <option value="formal">🎩 Formal e Profissional</option>
-                        <option value="tecnico">🔧 Técnico e Objetivo</option>
-                        <option value="vendas">💼 Focado em Vendas</option>
-                        <option value="suporte">🛠️ Suporte ao Cliente</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Horário de Funcionamento
-                      </label>
-                      <select
-                        name="businessHours"
-                        value={formData.businessHours}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl text-white focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
-                      >
-                        <option value="24h">🌍 24 horas (sempre ativo)</option>
-                        <option value="comercial">🏢 Comercial (8h às 18h)</option>
-                        <option value="estendido">🌙 Estendido (8h às 22h)</option>
-                        <option value="personalizado">⚙️ Personalizado</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="block text-sm font-medium text-gray-300">
-                        👤 Nome do seu Assistente Virtual *
-                      </label>
-                      <button
-                        type="button"
-                        onClick={generateAgentNameSuggestions}
-                        className="text-xs bg-[#04F5A0]/20 hover:bg-[#04F5A0]/30 border border-[#04F5A0]/50 text-[#04F5A0] px-3 py-1 rounded-lg transition-all duration-300"
-                      >
-                        💡 Sugestão
-                      </button>
-                    </div>
-                    <input
-                      type="text"
-                      name="agentName"
-                      required
-                      value={formData.agentName}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
-                      placeholder="Ex: Ana, Carlos, Assistente Virtual..."
-                    />
-                    <p className="text-sm text-gray-500 mt-2">
-                      💡 <strong>Dica:</strong> Escolha um nome que combine com a personalidade da sua empresa.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Mensagens */}
-              <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-2xl p-6 relative overflow-hidden">
-                {/* Animated Background Effects */}
-                <div className="absolute inset-0 opacity-30 pointer-events-none">
-                  <div className="absolute top-0 left-0 w-36 h-36 bg-purple-500/30 rounded-full blur-3xl animate-pulse"></div>
-                  <div className="absolute bottom-0 right-0 w-28 h-28 bg-violet-600/25 rounded-full blur-2xl animate-pulse" style={{animationDelay: '1.2s'}}></div>
-                </div>
-                
-                {/* Glass Effect Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-                
-                {/* Content */}
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-semibold text-purple-400 flex items-center">
-                      💬 Mensagens do Bot
-                    </h3>
-                    <button
-                      type="button"
-                      onClick={generateWelcomeMessage}
-                      className="text-sm bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/50 text-purple-400 px-4 py-2 rounded-lg transition-all duration-300"
-                    >
-                      Gerar Automático
-                    </button>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Mensagem de Boas-vindas
-                      </label>
-                      <textarea
-                        name="welcomeMessage"
-                        value={formData.welcomeMessage}
-                        onChange={handleInputChange}
-                        rows={3}
-                        className="w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
-                        placeholder="Ex: Olá! Sou o assistente virtual da [Empresa]. Como posso ajudá-lo hoje?"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Resposta Padrão (quando não entender)
-                      </label>
-                      <textarea
-                        name="defaultResponse"
-                        value={formData.defaultResponse}
-                        onChange={handleInputChange}
-                        rows={2}
-                        className="w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
-                        placeholder="Ex: Desculpe, não entendi. Pode reformular sua pergunta?"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Instruções Específicas do Negócio */}
-              <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-2xl p-6 relative overflow-hidden">
-                {/* Animated Background Effects */}
-                <div className="absolute inset-0 opacity-30 pointer-events-none">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/30 rounded-full blur-3xl animate-pulse"></div>
-                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-amber-600/25 rounded-full blur-xl animate-pulse" style={{animationDelay: '0.8s'}}></div>
-                </div>
-                
-                {/* Glass Effect Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-                
-                {/* Content */}
-                <div className="relative z-10">
-                  <h3 className="text-xl font-semibold text-orange-400 mb-6">
-                    📝 Instruções Específicas do Negócio
-                  </h3>
+          {/* Conteúdo Principal */}
+          <div className="lg:col-span-3">
+            {/* Tab: Básico */}
+            {activeTab === 'basic' && (
+              <div className="space-y-6">
+                <div className="bg-[#121212] rounded-xl border border-[#2A2A2A] p-6">
+                  <h2 className="text-xl font-bold mb-6">Informações Básicas</h2>
                   
                   <div className="space-y-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Descreva seu produto/serviço principal
-                      </label>
-                      <textarea
-                        name="productDescription"
-                        value={formData.productDescription}
-                        onChange={handleInputChange}
-                        rows={3}
-                        className="w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
-                        placeholder="Ex: Vendemos cursos de automação para WhatsApp usando n8n e IA..."
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Objetivo principal do bot
-                      </label>
-                      <select
-                        name="botObjective"
-                        value={formData.botObjective}
-                        onChange={handleObjectiveChange}
-                        className="w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl text-white focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
-                      >
-                        <option value="vendas">🎯 Gerar e converter vendas</option>
-                        <option value="suporte">🛠️ Suporte ao cliente</option>
-                        <option value="informacoes">📢 Fornecer informações</option>
-                        <option value="qualificacao">✅ Qualificar leads</option>
-                        <option value="agendamento">📅 Agendar consultas</option>
-                      </select>
-                    </div>
-
-                    {formData.botObjective && (
-                      <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-xl p-6 relative overflow-hidden">
-                        {/* Mini Animated Background */}
-                        <div className="absolute inset-0 opacity-20 pointer-events-none">
-                          <div className="absolute top-0 right-0 w-20 h-20 bg-orange-500/30 rounded-full blur-xl animate-pulse"></div>
-                        </div>
-                        
-                        <div className="relative z-10">
-                          <h4 className="text-lg font-semibold text-white mb-4">
-                            {formData.botObjective === 'qualificacao' && '📋 Perguntas Obrigatórias de Qualificação'}
-                            {formData.botObjective === 'informacoes' && '📚 Informações Importantes para Fornecer'}
-                            {formData.botObjective === 'suporte' && '🛠️ Principais Problemas e Soluções'}
-                            {formData.botObjective === 'vendas' && '💰 Perguntas de Qualificação para Vendas'}
-                            {formData.botObjective === 'agendamento' && '📅 Perguntas para Agendamento'}
-                          </h4>
-                          
-                          <p className="text-sm text-gray-400 mb-4">
-                            {formData.botObjective === 'qualificacao' && '💡 Configure até 7 perguntas que o bot deve fazer para qualificar leads.'}
-                            {formData.botObjective === 'informacoes' && '💡 Configure até 7 informações importantes que o bot deve saber para informar clientes.'}
-                            {formData.botObjective === 'suporte' && '💡 Configure até 7 problemas comuns e suas respectivas soluções.'}
-                            {formData.botObjective === 'vendas' && '💡 Configure até 7 perguntas de qualificação antes do CTA de vendas.'}
-                            {formData.botObjective === 'agendamento' && '💡 Configure até 7 perguntas necessárias para agendar consultas.'}
-                          </p>
-
-                          <div className="space-y-4">
-                            {formData.objectiveQuestions.map((item, index) => (
-                              <div key={index} className="bg-black/30 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-                                <div className="flex items-center justify-between mb-3">
-                                  <span className="text-sm font-medium text-gray-300">
-                                    {formData.botObjective === 'qualificacao' && `Pergunta #${index + 1}`}
-                                    {formData.botObjective === 'informacoes' && `Informação #${index + 1}`}
-                                    {formData.botObjective === 'suporte' && `Problema #${index + 1}`}
-                                    {formData.botObjective === 'vendas' && `Pergunta #${index + 1}`}
-                                    {formData.botObjective === 'agendamento' && `Pergunta #${index + 1}`}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => removeObjectiveQuestion(index)}
-                                    className="text-red-400 hover:text-red-300 text-sm transition-colors duration-300"
-                                  >
-                                    🗑️ Remover
-                                  </button>
-                                </div>
-                                
-                                <div className="space-y-3">
-                                  {(['qualificacao', 'vendas', 'agendamento'].includes(formData.botObjective)) && (
-                                    <div>
-                                      <label className="block text-sm font-medium text-gray-400 mb-1">
-                                        ❓ Pergunta:
-                                      </label>
-                                      <input
-                                        type="text"
-                                        value={item.question || ''}
-                                        onChange={(e) => updateObjectiveQuestion(index, 'question', e.target.value)}
-                                        className="w-full px-3 py-2 bg-black/30 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300 text-sm"
-                                        placeholder="Ex: Qual seu orçamento mensal?, Quando precisa da solução?"
-                                      />
-                                    </div>
-                                  )}
-
-                                  {formData.botObjective === 'informacoes' && (
-                                    <>
-                                      <div>
-                                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                                          📋 Tópico da Informação:
-                                        </label>
-                                        <input
-                                          type="text"
-                                          value={item.info || ''}
-                                          onChange={(e) => updateObjectiveQuestion(index, 'info', e.target.value)}
-                                          className="w-full px-3 py-2 bg-black/30 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300 text-sm"
-                                          placeholder="Ex: Horário de funcionamento, Formas de pagamento..."
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                                          📝 Detalhes da Informação:
-                                        </label>
-                                        <textarea
-                                          value={item.details || ''}
-                                          onChange={(e) => updateObjectiveQuestion(index, 'details', e.target.value)}
-                                          rows={2}
-                                          className="w-full px-3 py-2 bg-black/30 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300 text-sm"
-                                          placeholder="Ex: Segunda a sexta das 8h às 18h, sábado das 8h às 12h"
-                                        />
-                                      </div>
-                                    </>
-                                  )}
-
-                                  {formData.botObjective === 'suporte' && (
-                                    <>
-                                      <div>
-                                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                                          ⚠️ Problema Comum:
-                                        </label>
-                                        <input
-                                          type="text"
-                                          value={item.problem || ''}
-                                          onChange={(e) => updateObjectiveQuestion(index, 'problem', e.target.value)}
-                                          className="w-full px-3 py-2 bg-black/30 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300 text-sm"
-                                          placeholder="Ex: Login não funciona, Esqueci minha senha..."
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="block text-sm font-medium text-gray-400 mb-1">
-                                          ✅ Solução:
-                                        </label>
-                                        <textarea
-                                          value={item.solution || ''}
-                                          onChange={(e) => updateObjectiveQuestion(index, 'solution', e.target.value)}
-                                          rows={2}
-                                          className="w-full px-3 py-2 bg-black/30 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300 text-sm"
-                                          placeholder="Ex: Verifique se o email está correto e tente resetar a senha..."
-                                        />
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                            
-                            <div className="flex justify-center pt-2">
-                              <button
-                                type="button"
-                                onClick={addObjectiveQuestion}
-                                disabled={formData.objectiveQuestions.length >= 7}
-                                className="bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/50 text-orange-400 px-4 py-2 rounded-xl disabled:bg-gray-700 disabled:text-gray-500 disabled:border-gray-600 transition-all duration-300 flex items-center"
-                              >
-                                ➕ Adicionar ({formData.objectiveQuestions.length}/7)
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {formData.botObjective === 'vendas' && (
-                      <div className="bg-green-500/10 backdrop-blur-sm border border-green-500/30 rounded-xl p-4 relative overflow-hidden">
-                        {/* Mini Animated Background */}
-                        <div className="absolute inset-0 opacity-20 pointer-events-none">
-                          <div className="absolute bottom-0 left-0 w-16 h-16 bg-green-500/30 rounded-full blur-lg animate-pulse"></div>
-                        </div>
-                        
-                        <div className="relative z-10">
-                          <h4 className="text-lg font-semibold text-green-400 mb-2">
-                            🎯 Call-to-Action (CTA) de Vendas
-                          </h4>
-                          <p className="text-sm text-gray-400 mb-3">
-                            💡 Mensagem final que o bot enviará para conduzir à compra após as perguntas de qualificação.
-                          </p>
-                          <textarea
-                            value={formData.salesCTA}
-                            onChange={(e) => setFormData(prev => ({ ...prev, salesCTA: e.target.value }))}
-                            rows={3}
-                            className="w-full px-3 py-2 bg-black/30 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300 text-sm"
-                            placeholder="Ex: Perfeito! Baseado no que me contou, nossa solução é ideal para você. Acesse o link abaixo..."
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Estratégia de Vendas */}
-              <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-2xl p-6 relative overflow-hidden">
-                {/* Animated Background Effects */}
-                <div className="absolute inset-0 opacity-30 pointer-events-none">
-                  <div className="absolute top-0 left-0 w-32 h-32 bg-red-500/30 rounded-full blur-3xl animate-pulse"></div>
-                  <div className="absolute bottom-0 right-0 w-24 h-24 bg-rose-600/25 rounded-full blur-xl animate-pulse" style={{animationDelay: '1.3s'}}></div>
-                </div>
-                
-                {/* Glass Effect Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-                
-                {/* Content */}
-                <div className="relative z-10">
-                  <h3 className="text-xl font-semibold text-red-400 mb-6">
-                    💰 Estratégia de Vendas
-                  </h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Link/URL principal do produto
-                      </label>
-                      <input
-                        type="url"
-                        name="productUrl"
-                        value={formData.productUrl}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
-                        placeholder="https://seusite.com/produto"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Preço ou faixa de preço
+                      <label className="block text-sm font-medium mb-2 text-gray-300">
+                        Nome do Agente *
                       </label>
                       <input
                         type="text"
-                        name="priceRange"
-                        value={formData.priceRange}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
-                        placeholder="Ex: R$ 197 ou Entre R$ 100-500"
+                        value={config.name}
+                        onChange={(e) => setConfig({ ...config, name: e.target.value })}
+                        className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-3 focus:outline-none focus:border-[#04F5A0] transition-colors"
+                        placeholder="Ex: Assistente de Vendas SwiftBot"
                       />
                     </div>
-                  </div>
 
-                  <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-xl p-6 relative overflow-hidden">
-                    {/* Mini Animated Background */}
-                    <div className="absolute inset-0 opacity-20 pointer-events-none">
-                      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 bg-red-500/30 rounded-full blur-xl animate-pulse"></div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2 text-gray-300">
+                        Descrição
+                      </label>
+                      <textarea
+                        value={config.description}
+                        onChange={(e) => setConfig({ ...config, description: e.target.value })}
+                        className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-3 focus:outline-none focus:border-[#04F5A0] transition-colors h-24 resize-none"
+                        placeholder="Descreva o propósito e as responsabilidades do agente..."
+                      />
                     </div>
-                    
-                    <div className="relative z-10">
-                      <div className="mb-4">
-                        <h4 className="text-lg font-semibold text-white">
-                          🛡️ Principais Objeções e Respostas
-                        </h4>
-                      </div>
-                      
-                      <p className="text-sm text-gray-400 mb-4">
-                        💡 Configure respostas prontas para as principais objeções dos seus clientes.
-                      </p>
 
-                      <div className="space-y-4">
-                        {formData.objectionsQA.map((item, index) => (
-                          <div key={index} className="bg-black/30 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-                            <div className="flex items-center justify-between mb-3">
-                              <span className="text-sm font-medium text-gray-300">
-                                Objeção #{index + 1}
-                              </span>
-                              {formData.objectionsQA.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => removeObjectionQA(index)}
-                                  className="text-red-400 hover:text-red-300 text-sm transition-colors duration-300"
-                                >
-                                  🗑️ Remover
-                                </button>
-                              )}
-                            </div>
-                            
-                            <div className="space-y-3">
-                              <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">
-                                  ❓ Pergunta/Objeção do Cliente:
-                                </label>
-                                <input
-                                  type="text"
-                                  value={item.question}
-                                  onChange={(e) => updateObjectionQA(index, 'question', e.target.value)}
-                                  className="w-full px-3 py-2 bg-black/30 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300 text-sm"
-                                  placeholder="Ex: Muito caro, Não sei mexer, Não funciona..."
-                                />
-                              </div>
-                              
-                              <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">
-                                  💬 Resposta do Bot:
-                                </label>
-                                <textarea
-                                  value={item.answer}
-                                  onChange={(e) => updateObjectionQA(index, 'answer', e.target.value)}
-                                  rows={2}
-                                  className="w-full px-3 py-2 bg-black/30 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300 text-sm"
-                                  placeholder="Ex: O investimento se paga em poucos dias com o aumento nas vendas..."
-                                />
-                              </div>
-                            </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-gray-300">
+                          Modelo de IA
+                        </label>
+                        <select
+                          value={config.model}
+                          onChange={(e) => setConfig({ ...config, model: e.target.value })}
+                          className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-3 focus:outline-none focus:border-[#04F5A0] transition-colors"
+                        >
+                          <option value="gpt-4">GPT-4 (Mais preciso)</option>
+                          <option value="gpt-4-turbo">GPT-4 Turbo (Rápido)</option>
+                          <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Econômico)</option>
+                          <option value="claude-3-opus">Claude 3 Opus</option>
+                          <option value="claude-3-sonnet">Claude 3 Sonnet</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-gray-300">
+                          Temperatura: {config.temperature}
+                        </label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="2"
+                          step="0.1"
+                          value={config.temperature}
+                          onChange={(e) => setConfig({ ...config, temperature: parseFloat(e.target.value) })}
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-gray-500 mt-1">
+                          <span>Preciso</span>
+                          <span>Criativo</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2 text-gray-300">
+                        Max Tokens
+                      </label>
+                      <input
+                        type="number"
+                        value={config.maxTokens}
+                        onChange={(e) => setConfig({ ...config, maxTokens: parseInt(e.target.value) })}
+                        className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-3 focus:outline-none focus:border-[#04F5A0] transition-colors"
+                        min="100"
+                        max="4000"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Limite de tokens por resposta (100-4000)
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2 text-gray-300 flex items-center gap-2">
+                        API Key
+                        <button
+                          type="button"
+                          onClick={() => setShowApiKey(!showApiKey)}
+                          className="text-gray-400 hover:text-white"
+                        >
+                          {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </label>
+                      <input
+                        type={showApiKey ? "text" : "password"}
+                        value={config.apiKey}
+                        onChange={(e) => setConfig({ ...config, apiKey: e.target.value })}
+                        className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-3 focus:outline-none focus:border-[#04F5A0] transition-colors font-mono text-sm"
+                        placeholder="sk-..."
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Sua chave API OpenAI ou provedor de IA
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mensagens */}
+                <div className="bg-[#121212] rounded-xl border border-[#2A2A2A] p-6">
+                  <h2 className="text-xl font-bold mb-6">Mensagens do Sistema</h2>
+                  
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-sm font-medium mb-2 text-gray-300">
+                        Mensagem de Boas-vindas
+                      </label>
+                      <textarea
+                        value={config.welcomeMessage}
+                        onChange={(e) => setConfig({ ...config, welcomeMessage: e.target.value })}
+                        className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-3 focus:outline-none focus:border-[#04F5A0] transition-colors h-24 resize-none"
+                        placeholder="Olá! Como posso ajudar você hoje?"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2 text-gray-300">
+                        Mensagem de Fallback
+                      </label>
+                      <textarea
+                        value={config.fallbackMessage}
+                        onChange={(e) => setConfig({ ...config, fallbackMessage: e.target.value })}
+                        className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-3 focus:outline-none focus:border-[#04F5A0] transition-colors h-24 resize-none"
+                        placeholder="Desculpe, não entendi. Pode reformular sua pergunta?"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Enviada quando o agente não consegue responder
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Tab: Prompt */}
+            {activeTab === 'prompt' && (
+              <div className="space-y-6">
+                <div className="bg-[#121212] rounded-xl border border-[#2A2A2A] p-6">
+                  <div className="flex items-start justify-between mb-6">
+                    <div>
+                      <h2 className="text-xl font-bold">System Prompt</h2>
+                      <p className="text-sm text-gray-400 mt-1">
+                        Define o comportamento e personalidade do agente
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const template = `Você é um assistente virtual profissional chamado ${config.name || '[Nome]'}. 
+
+Suas responsabilidades incluem:
+- Responder perguntas de forma clara e objetiva
+- Manter um tom profissional e amigável
+- Solicitar esclarecimentos quando necessário
+- Não inventar informações
+
+Diretrizes:
+- Seja sempre educado e prestativo
+- Use linguagem clara e acessível
+- Mantenha respostas concisas quando possível
+- Peça permissão antes de realizar ações`;
+                        setConfig({ ...config, systemPrompt: template });
+                      }}
+                      className="px-3 py-1.5 text-sm bg-[#1A1A1A] hover:bg-[#2A2A2A] border border-[#2A2A2A] rounded-lg transition-colors"
+                    >
+                      Usar Template
+                    </button>
+                  </div>
+                  
+                  <textarea
+                    value={config.systemPrompt}
+                    onChange={(e) => setConfig({ ...config, systemPrompt: e.target.value })}
+                    className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-3 focus:outline-none focus:border-[#04F5A0] transition-colors h-96 resize-none font-mono text-sm"
+                    placeholder="Você é um assistente especializado em..."
+                  />
+
+                  <div className="mt-4 p-4 bg-[#1A1A1A] rounded-lg border border-[#2A2A2A]">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 text-[#04F5A0] flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-gray-400">
+                        <p className="font-medium text-white mb-1">Dicas para um bom prompt:</p>
+                        <ul className="space-y-1 list-disc list-inside">
+                          <li>Seja específico sobre a função e objetivos</li>
+                          <li>Defina o tom e estilo de comunicação</li>
+                          <li>Liste restrições e limitações importantes</li>
+                          <li>Inclua exemplos se necessário</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Instruções Personalizadas */}
+                <div className="bg-[#121212] rounded-xl border border-[#2A2A2A] p-6">
+                  <h2 className="text-xl font-bold mb-6">Instruções Personalizadas</h2>
+                  
+                  <div className="space-y-4">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newInstruction}
+                        onChange={(e) => setNewInstruction(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && addInstruction()}
+                        className="flex-1 bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-2 focus:outline-none focus:border-[#04F5A0] transition-colors"
+                        placeholder="Ex: Sempre pergunte o nome do cliente antes de continuar"
+                      />
+                      <button
+                        onClick={addInstruction}
+                        className="px-4 py-2 bg-[#04F5A0] text-black rounded-lg hover:bg-[#03E691] transition-colors"
+                      >
+                        <Plus className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    {config.customInstructions.length > 0 && (
+                      <div className="space-y-2">
+                        {config.customInstructions.map((instruction, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center gap-3 p-3 bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg"
+                          >
+                            <Check className="w-5 h-5 text-[#04F5A0] flex-shrink-0" />
+                            <span className="flex-1 text-sm">{instruction}</span>
+                            <button
+                              onClick={() => removeInstruction(index)}
+                              className="text-gray-400 hover:text-red-400 transition-colors"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
                           </div>
                         ))}
                       </div>
-                      
-                      <div className="flex justify-center gap-4 pt-4">
-                        <button
-                          type="button"
-                          onClick={addObjectionQA}
-                          disabled={formData.objectionsQA.length >= 6}
-                          className="bg-red-600/20 hover:bg-red-600/30 border border-red-500/50 text-red-400 px-4 py-2 rounded-xl disabled:bg-gray-700 disabled:text-gray-500 disabled:border-gray-600 transition-all duration-300 flex items-center"
-                        >
-                          ➕ Adicionar ({formData.objectionsQA.length}/6)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={addCommonObjections}
-                          className="bg-red-500/20 hover:bg-red-500/30 border border-red-400/50 text-red-400 px-4 py-2 rounded-xl transition-all duration-300"
-                        >
-                          💡 Objeções Comuns
-                        </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Conversation Starters */}
+                <div className="bg-[#121212] rounded-xl border border-[#2A2A2A] p-6">
+                  <h2 className="text-xl font-bold mb-6">Sugestões de Conversa</h2>
+                  
+                  <div className="space-y-4">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newStarter}
+                        onChange={(e) => setNewStarter(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && addStarter()}
+                        className="flex-1 bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-2 focus:outline-none focus:border-[#04F5A0] transition-colors"
+                        placeholder="Ex: Como posso criar minha primeira automação?"
+                      />
+                      <button
+                        onClick={addStarter}
+                        className="px-4 py-2 bg-[#04F5A0] text-black rounded-lg hover:bg-[#03E691] transition-colors"
+                      >
+                        <Plus className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    {config.conversationStarters.length > 0 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {config.conversationStarters.map((starter, index) => (
+                          <div
+                            key={index}
+                            className="flex items-start gap-3 p-3 bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg group"
+                          >
+                            <MessageSquare className="w-5 h-5 text-[#04F5A0] flex-shrink-0 mt-0.5" />
+                            <span className="flex-1 text-sm">{starter}</span>
+                            <button
+                              onClick={() => removeStarter(index)}
+                              className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400 transition-all"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                      
-                      <p className="text-xs text-gray-500 mt-3 text-center">
-                        ⚡ <strong>Dica:</strong> Termine sempre as respostas com uma pergunta que conduza à venda.
-                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Tab: Knowledge Base */}
+            {activeTab === 'knowledge' && (
+              <div className="space-y-6">
+                <div className="bg-[#121212] rounded-xl border border-[#2A2A2A] p-6">
+                  <h2 className="text-xl font-bold mb-6">Base de Conhecimento</h2>
+                  
+                  <div className="space-y-6">
+                    <div className="space-y-4">
+                      <input
+                        type="text"
+                        value={newKnowledge.title}
+                        onChange={(e) => setNewKnowledge({ ...newKnowledge, title: e.target.value })}
+                        className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-2 focus:outline-none focus:border-[#04F5A0] transition-colors"
+                        placeholder="Título do conhecimento"
+                      />
+                      <textarea
+                        value={newKnowledge.content}
+                        onChange={(e) => setNewKnowledge({ ...newKnowledge, content: e.target.value })}
+                        className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-3 focus:outline-none focus:border-[#04F5A0] transition-colors h-32 resize-none"
+                        placeholder="Conteúdo do conhecimento..."
+                      />
+                      <button
+                        onClick={addKnowledge}
+                        className="w-full px-4 py-2 bg-[#04F5A0] text-black rounded-lg hover:bg-[#03E691] transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Plus className="w-5 h-5" />
+                        Adicionar Conhecimento
+                      </button>
+                    </div>
+
+                    {config.knowledgeBase.length > 0 && (
+                      <div className="space-y-3">
+                        <h3 className="font-medium text-gray-300">Conhecimentos Salvos</h3>
+                        {config.knowledgeBase.map((knowledge) => (
+                          <div
+                            key={knowledge.id}
+                            className="p-4 bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <h4 className="font-medium">{knowledge.title}</h4>
+                              <button
+                                onClick={() => removeKnowledge(knowledge.id)}
+                                className="text-gray-400 hover:text-red-400 transition-colors"
+                              >
+                                <Trash2 className="w-5 h-5" />
+                              </button>
+                            </div>
+                            <p className="text-sm text-gray-400">{knowledge.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Tab: Behavior */}
+            {activeTab === 'behavior' && (
+              <div className="space-y-6">
+                <div className="bg-[#121212] rounded-xl border border-[#2A2A2A] p-6">
+                  <h2 className="text-xl font-bold mb-6">Configurações de Comportamento</h2>
+                  
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-gray-300">
+                          Personalidade
+                        </label>
+                        <select
+                          value={config.behaviorSettings.personality}
+                          onChange={(e) => setConfig({
+                            ...config,
+                            behaviorSettings: { ...config.behaviorSettings, personality: e.target.value }
+                          })}
+                          className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-3 focus:outline-none focus:border-[#04F5A0] transition-colors"
+                        >
+                          <option value="professional">Profissional</option>
+                          <option value="friendly">Amigável</option>
+                          <option value="casual">Casual</option>
+                          <option value="formal">Formal</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-gray-300">
+                          Estilo de Resposta
+                        </label>
+                        <select
+                          value={config.behaviorSettings.responseStyle}
+                          onChange={(e) => setConfig({
+                            ...config,
+                            behaviorSettings: { ...config.behaviorSettings, responseStyle: e.target.value }
+                          })}
+                          className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-3 focus:outline-none focus:border-[#04F5A0] transition-colors"
+                        >
+                          <option value="concise">Conciso</option>
+                          <option value="detailed">Detalhado</option>
+                          <option value="balanced">Balanceado</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-gray-300">
+                          Idioma
+                        </label>
+                        <select
+                          value={config.behaviorSettings.language}
+                          onChange={(e) => setConfig({
+                            ...config,
+                            behaviorSettings: { ...config.behaviorSettings, language: e.target.value }
+                          })}
+                          className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-3 focus:outline-none focus:border-[#04F5A0] transition-colors"
+                        >
+                          <option value="pt-BR">Português (Brasil)</option>
+                          <option value="en-US">Inglês (EUA)</option>
+                          <option value="es-ES">Espanhol</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-gray-300">
+                          Fuso Horário
+                        </label>
+                        <select
+                          value={config.behaviorSettings.timezone}
+                          onChange={(e) => setConfig({
+                            ...config,
+                            behaviorSettings: { ...config.behaviorSettings, timezone: e.target.value }
+                          })}
+                          className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-3 focus:outline-none focus:border-[#04F5A0] transition-colors"
+                        >
+                          <option value="America/Sao_Paulo">São Paulo (BRT)</option>
+                          <option value="America/New_York">Nova York (EST)</option>
+                          <option value="Europe/London">Londres (GMT)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 bg-[#0A0A0A] rounded-lg border border-[#2A2A2A]">
+                        <div>
+                          <p className="font-medium">Habilitar Emojis</p>
+                          <p className="text-sm text-gray-400">Usar emojis nas respostas</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={config.behaviorSettings.enableEmojis}
+                            onChange={(e) => setConfig({
+                              ...config,
+                              behaviorSettings: { ...config.behaviorSettings, enableEmojis: e.target.checked }
+                            })}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#04F5A0]"></div>
+                        </label>
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 bg-[#0A0A0A] rounded-lg border border-[#2A2A2A]">
+                        <div>
+                          <p className="font-medium">Habilitar Markdown</p>
+                          <p className="text-sm text-gray-400">Formatar texto com markdown</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={config.behaviorSettings.enableMarkdown}
+                            onChange={(e) => setConfig({
+                              ...config,
+                              behaviorSettings: { ...config.behaviorSettings, enableMarkdown: e.target.checked }
+                            })}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#04F5A0]"></div>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-gray-300">
+                          Limite de Conversa
+                        </label>
+                        <input
+                          type="number"
+                          value={config.behaviorSettings.maxConversationLength}
+                          onChange={(e) => setConfig({
+                            ...config,
+                            behaviorSettings: { ...config.behaviorSettings, maxConversationLength: parseInt(e.target.value) }
+                          })}
+                          className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-3 focus:outline-none focus:border-[#04F5A0] transition-colors"
+                          min="10"
+                          max="100"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Máximo de mensagens na conversa</p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-gray-300">
+                          Janela de Contexto
+                        </label>
+                        <input
+                          type="number"
+                          value={config.behaviorSettings.contextWindow}
+                          onChange={(e) => setConfig({
+                            ...config,
+                            behaviorSettings: { ...config.behaviorSettings, contextWindow: parseInt(e.target.value) }
+                          })}
+                          className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-3 focus:outline-none focus:border-[#04F5A0] transition-colors"
+                          min="5"
+                          max="50"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Mensagens anteriores consideradas</p>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-              
-              {/* Horário de Funcionamento Detalhado */}
-              {formData.businessHours === 'personalizado' && (
-                <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-2xl p-6 relative overflow-hidden">
-                  {/* Animated Background Effects */}
-                  <div className="absolute inset-0 opacity-30 pointer-events-none">
-                    <div className="absolute top-0 right-0 w-28 h-28 bg-gray-500/30 rounded-full blur-2xl animate-pulse"></div>
-                    <div className="absolute bottom-0 left-0 w-20 h-20 bg-slate-600/25 rounded-full blur-xl animate-pulse" style={{animationDelay: '1.1s'}}></div>
-                  </div>
-                  
-                  {/* Glass Effect Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-                  
-                  {/* Content */}
-                  <div className="relative z-10">
-                    <h3 className="text-xl font-semibold text-gray-400 mb-6">
-                      ⏰ Horário Personalizado
-                    </h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Horário de Início
-                        </label>
-                        <input
-                          type="time"
-                          name="startTime"
-                          value={formData.startTime}
-                          onChange={handleInputChange}
-                          className="w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl text-white focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
-                        />
-                      </div>
+            )}
 
+            {/* Tab: Integrations */}
+            {activeTab === 'integrations' && (
+              <div className="space-y-6">
+                <div className="bg-[#121212] rounded-xl border border-[#2A2A2A] p-6">
+                  <h2 className="text-xl font-bold mb-6">Integrações</h2>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-[#0A0A0A] rounded-lg border border-[#2A2A2A]">
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Horário de Fim
-                        </label>
-                        <input
-                          type="time"
-                          name="endTime"
-                          value={formData.endTime}
-                          onChange={handleInputChange}
-                          className="w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl text-white focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
-                        />
+                        <p className="font-medium">WhatsApp</p>
+                        <p className="text-sm text-gray-400">Conectar com WhatsApp Business</p>
                       </div>
-                    </div>
-
-                    <div className="mt-4">
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Mensagem fora do horário
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={config.integrations.whatsapp}
+                          onChange={(e) => setConfig({
+                            ...config,
+                            integrations: { ...config.integrations, whatsapp: e.target.checked }
+                          })}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#04F5A0]"></div>
                       </label>
-                      <textarea
-                        name="offHoursMessage"
-                        value={formData.offHoursMessage}
-                        onChange={handleInputChange}
-                        rows={2}
-                        className="w-full px-4 py-3 bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
-                        placeholder="Ex: Obrigado pelo contato! Nosso horário é das 8h às 18h. Retornaremos em breve!"
-                      />
                     </div>
+
+                    <div className="flex items-center justify-between p-4 bg-[#0A0A0A] rounded-lg border border-[#2A2A2A]">
+                      <div>
+                        <p className="font-medium">Telegram</p>
+                        <p className="text-sm text-gray-400">Conectar com Telegram Bot</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={config.integrations.telegram}
+                          onChange={(e) => setConfig({
+                            ...config,
+                            integrations: { ...config.integrations, telegram: e.target.checked }
+                          })}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#04F5A0]"></div>
+                      </label>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-[#0A0A0A] rounded-lg border border-[#2A2A2A]">
+                      <div>
+                        <p className="font-medium">Slack</p>
+                        <p className="text-sm text-gray-400">Integrar com Slack Workspace</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={config.integrations.slack}
+                          onChange={(e) => setConfig({
+                            ...config,
+                            integrations: { ...config.integrations, slack: e.target.checked }
+                          })}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#04F5A0]"></div>
+                      </label>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-[#0A0A0A] rounded-lg border border-[#2A2A2A]">
+                      <div>
+                        <p className="font-medium">Discord</p>
+                        <p className="text-sm text-gray-400">Adicionar bot ao Discord</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={config.integrations.discord}
+                          onChange={(e) => setConfig({
+                            ...config,
+                            integrations: { ...config.integrations, discord: e.target.checked }
+                          })}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#04F5A0]"></div>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="mt-6">
+                    <label className="block text-sm font-medium mb-2 text-gray-300">
+                      Webhook URL
+                    </label>
+                    <input
+                      type="url"
+                      value={config.integrations.webhook}
+                      onChange={(e) => setConfig({
+                        ...config,
+                        integrations: { ...config.integrations, webhook: e.target.value }
+                      })}
+                      className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-3 focus:outline-none focus:border-[#04F5A0] transition-colors font-mono text-sm"
+                      placeholder="https://seu-webhook.com/endpoint"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Receba notificações de eventos via webhook
+                    </p>
+                  </div>
+                </div>
+
+                {/* Analytics */}
+                <div className="bg-[#121212] rounded-xl border border-[#2A2A2A] p-6">
+                  <h2 className="text-xl font-bold mb-6">Analytics</h2>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-[#0A0A0A] rounded-lg border border-[#2A2A2A]">
+                      <div>
+                        <p className="font-medium">Rastrear Conversas</p>
+                        <p className="text-sm text-gray-400">Salvar histórico de conversas</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={config.analytics.trackConversations}
+                          onChange={(e) => setConfig({
+                            ...config,
+                            analytics: { ...config.analytics, trackConversations: e.target.checked }
+                          })}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#04F5A0]"></div>
+                      </label>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-[#0A0A0A] rounded-lg border border-[#2A2A2A]">
+                      <div>
+                        <p className="font-medium">Análise de Sentimento</p>
+                        <p className="text-sm text-gray-400">Detectar sentimento dos usuários</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={config.analytics.trackSentiment}
+                          onChange={(e) => setConfig({
+                            ...config,
+                            analytics: { ...config.analytics, trackSentiment: e.target.checked }
+                          })}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#04F5A0]"></div>
+                      </label>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-[#0A0A0A] rounded-lg border border-[#2A2A2A]">
+                      <div>
+                        <p className="font-medium">Rastrear Tópicos</p>
+                        <p className="text-sm text-gray-400">Identificar tópicos principais</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={config.analytics.trackTopics}
+                          onChange={(e) => setConfig({
+                            ...config,
+                            analytics: { ...config.analytics, trackTopics: e.target.checked }
+                          })}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#04F5A0]"></div>
+                      </label>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-[#0A0A0A] rounded-lg border border-[#2A2A2A]">
+                      <div>
+                        <p className="font-medium">Gerar Relatórios</p>
+                        <p className="text-sm text-gray-400">Relatórios automáticos semanais</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={config.analytics.generateReports}
+                          onChange={(e) => setConfig({
+                            ...config,
+                            analytics: { ...config.analytics, generateReports: e.target.checked }
+                          })}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#04F5A0]"></div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Test Panel */}
+      {testMode && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#121212] rounded-xl border border-[#2A2A2A] max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="sticky top-0 bg-[#121212] border-b border-[#2A2A2A] p-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Zap className="w-6 h-6 text-[#04F5A0]" />
+                  Testar Agente
+                </h2>
+                <button
+                  onClick={() => setTestMode(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-300">
+                  Mensagem de Teste
+                </label>
+                <textarea
+                  value={testMessage}
+                  onChange={(e) => setTestMessage(e.target.value)}
+                  className="w-full bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg px-4 py-3 focus:outline-none focus:border-[#04F5A0] transition-colors h-24 resize-none"
+                  placeholder="Digite sua mensagem de teste..."
+                />
+              </div>
+
+              <button
+                onClick={handleTest}
+                disabled={testing || !testMessage.trim()}
+                className="w-full px-4 py-3 bg-[#04F5A0] text-black font-semibold rounded-lg hover:bg-[#03E691] transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {testing ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Testando...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-5 h-5" />
+                    Enviar Teste
+                  </>
+                )}
+              </button>
+
+              {testResponse && (
+                <div className="mt-6">
+                  <label className="block text-sm font-medium mb-2 text-gray-300">
+                    Resposta do Agente
+                  </label>
+                  <div className="bg-[#0A0A0A] border border-[#2A2A2A] rounded-lg p-4">
+                    <p className="text-sm whitespace-pre-wrap">{testResponse}</p>
                   </div>
                 </div>
               )}
-
-              {/* Botões */}
-              <div className="flex justify-between pt-6 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => router.push('/dashboard')}
-                  className="px-6 py-3 bg-white/10 backdrop-blur-sm hover:bg-white/20 border border-white/20 text-gray-300 hover:text-white rounded-xl font-medium transition-all duration-300"
-                >
-                  Cancelar
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-8 py-3 bg-[#04F5A0] hover:bg-[#03E691] disabled:bg-gray-600 text-black font-bold rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-[0_0_30px_rgba(4,245,160,0.5)] flex items-center"
-                >
-                  {saving ? (
-                    <div className="flex items-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></div>
-                      Salvando...
-                    </div>
-                  ) : (
-                    <>
-                      <span className="mr-2">🚀</span>
-                      Salvar e Ativar Agente
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
+            </div>
           </div>
         </div>
-      </main>
+      )}
     </div>
-  )
+  );
 }
+
+// Componente principal exportado com Suspense
+export default function AgentConfigPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-[#04F5A0] animate-spin mx-auto mb-4" />
+          <p className="text-gray-400">Carregando configurações...</p>
+        </div>
+      </div>
+    }>
+      <AgentConfigContent />
+    </Suspense>
+  );
+}
+EOF
