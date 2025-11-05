@@ -547,7 +547,6 @@ export default function Dashboard() {
   // ============================================================================
   // 🆕 INICIALIZAR PAYMENT ELEMENT QUANDO TIVER CLIENT_SECRET
   // ============================================================================
-  // --- INÍCIO DA MUDANÇA 1 ---
   useEffect(() => {
     // ✅ Criar Payment Element apenas quando:
     // 1. Temos clientSecret
@@ -587,8 +586,16 @@ export default function Dashboard() {
         '.Label': {
           fontSize: '14px',
           fontWeight: '500',
-          color: 'rgb(209, 213, 219)',
-          marginBottom: '8px',
+    _E_
+_E_
+_N_
+_N_
+_S_
+_A_
+_G_
+_E_
+_M_
+        marginBottom: '8px',
         }
       }
     }
@@ -641,9 +648,7 @@ export default function Dashboard() {
     // ❌ NÃO RETORNAR CLEANUP AQUI!
     // O cleanup deve acontecer apenas quando o modal fechar
   }, [clientSecret, showCheckoutModal, paymentElement, window.stripeInstance])
-  // --- FIM DA MUDANÇA 1 ---
 
-  // --- INÍCIO DA MUDANÇA 2 ---
   // ✅ Cleanup do Payment Element quando modal fechar
   useEffect(() => {
     // Quando o modal fecha, limpar tudo
@@ -656,7 +661,6 @@ export default function Dashboard() {
       setClientSecret(null)
     }
   }, [showCheckoutModal])
-  // --- FIM DA MUDANÇA 2 ---
 
 
   // ============================================================================
@@ -700,6 +704,7 @@ export default function Dashboard() {
   // ============================================================================
   // 🆕 CONFIRMAR PAGAMENTO COM PAYMENT ELEMENT
   // ============================================================================
+  // --- INÍCIO DA MUDANÇA (PASSO 1) ---
   const handleConfirmPayment = async (e) => {
     e.preventDefault()
 
@@ -725,7 +730,7 @@ export default function Dashboard() {
     }
 
     setCheckoutLoading(true)
-    setCheckoutStep('processing')
+    // ❌ LINHA REMOVIDA: setCheckoutStep('processing')
 
     try {
       console.log('💳 Confirmando pagamento...')
@@ -769,7 +774,6 @@ export default function Dashboard() {
 
       console.log('✅ Pagamento confirmado com sucesso!')
 
-      // --- INÍCIO DA MUDANÇA 3 ---
       // ✅ Aguardar um pouco antes de limpar (para não desmontar durante o processo)
       await new Promise(resolve => setTimeout(resolve, 500))
 
@@ -777,7 +781,6 @@ export default function Dashboard() {
       setShowCheckoutModal(false)
       setCheckoutStep('plan')
       setClientSecret(null)
-      // --- FIM DA MUDANÇA 3 ---
 
       // Recarregar subscription
       await checkSubscriptionStatus()
@@ -792,11 +795,14 @@ export default function Dashboard() {
     } catch (error) {
       console.error('❌ Erro completo:', error)
       alert('❌ Erro ao processar pagamento: ' + error.message)
-      setCheckoutStep('payment')
+      // ✅ MODIFICADO: Apenas desativa o loading
+      setCheckoutLoading(false) 
     }
 
+    // ✅ Garantir que o loading seja desativado
     setCheckoutLoading(false)
   }
+  // --- FIM DA MUDANÇA (PASSO 1) ---
   
   // Funções de Gerenciamento de Conexão
   const loadUserConnections = async () => {
@@ -1827,6 +1833,25 @@ export default function Dashboard() {
             {/* Step 2: Dados do Cartão (SEM CPF E ENDEREÇO) */}
             {checkoutStep === 'payment' && (
               <div className="relative z-10">
+              
+                {/* ============================================== */}
+                {/* ⬇️ INÍCIO DA MUDANÇA (PASSO 2): OVERLAY ⬇️ */}
+                {/* ============================================== */}
+                {checkoutLoading && (
+                  <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm rounded-3xl -m-8">
+                    <div className="relative z-10 text-center">
+                      <div className="w-16 h-16 bg-[#04F5A0] rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
+                      </div>
+                      <h2 className="text-2xl font-bold text-white mb-2">Processando Pagamento</h2>
+                      <p className="text-gray-400">Por favor, aguarde. Não feche esta janela.</p>
+                    </div>
+                  </div>
+                )}
+                {/* ============================================== */}
+                {/* ⬆️ FIM DA MUDANÇA (PASSO 2) ⬆️ */}
+                {/* ============================================== */}
+
                 <div className="text-center mb-6">
                   <div className="w-16 h-16 bg-[#04F5A0] rounded-2xl flex items-center justify-center mx-auto mb-4">
                     <span className="text-2xl">💳</span>
@@ -1936,16 +1961,10 @@ export default function Dashboard() {
               </div>
             )}
             
-            {/* Step 3: Processing */}
-            {checkoutStep === 'processing' && (
-              <div className="relative z-10 text-center">
-                <div className="w-16 h-16 bg-[#04F5A0] rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
-                </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Processando Pagamento</h2>
-                <p className="text-gray-400">Por favor, aguarde. Não feche esta janela.</p>
-              </div>
-            )}
+            {/* --- INÍCIO DA MUDANÇA (PASSO 3): REMOÇÃO DO STEP 3 --- */}
+            {/* O bloco 'checkoutStep === 'processing' foi removido daqui */}
+            {/* --- FIM DA MUDANÇA (PASSO 3) --- */}
+
           </div>
         </div>
       )}
