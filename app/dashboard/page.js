@@ -510,78 +510,77 @@ export default function Dashboard() {
     }
   }, [activeConnection, whatsappStatus])
 
-  // Carregar script do Pagar.me apenas quando necessário
+  // ============================================================================
+  // 1. ADICIONAR SCRIPT DO STRIPE.JS NO HEAD
+  // ============================================================================
   useEffect(() => {
-    if (checkoutStep === 'payment' && showCheckoutModal) {
-      loadPagarmeScript()
-    }
-  }, [checkoutStep, showCheckoutModal])
-
-  const loadPagarmeScript = () => {
-    const existingScript = document.querySelector('script[src*="checkout.js"]')
-    if (existingScript) {
-      document.head.removeChild(existingScript)
-    }
-
-    const script = document.createElement('script')
-    script.src = 'https://assets.pagar.me/checkout/checkout.js'
-    script.async = true
-    script.onload = () => {
-      console.log('✅ Script Pagar.me carregado')
-    }
-    script.onerror = () => {
-      console.error('❌ Erro ao carregar script Pagar.me')
-      alert('Erro ao carregar sistema de pagamento. Tente novamente.')
-    }
-    document.head.appendChild(script)
-  }
-
-  const validateCPF = (cpf) => {
-    cpf = cpf.replace(/[^\d]/g, '')
-    if (cpf.length !== 11) return false
-    if (/^(\d)\1{10}$/.test(cpf)) return false
-    
-    let sum = 0
-    for (let i = 0; i < 9; i++) {
-      sum += parseInt(cpf[i]) * (10 - i)
-    }
-    let remainder = 11 - (sum % 11)
-    if (remainder === 10 || remainder === 11) remainder = 0
-    if (remainder !== parseInt(cpf[9])) return false
-    
-    sum = 0
-    for (let i = 0; i < 10; i++) {
-      sum += parseInt(cpf[i]) * (11 - i)
-    }
-    remainder = 11 - (sum % 11)
-    if (remainder === 10 || remainder === 11) remainder = 0
-    if (remainder !== parseInt(cpf[10])) return false
-    
-    return true
-  }
-
-  const fetchAddressByCEP = async (cep) => {
-    try {
-      const cleanCEP = cep.replace(/\D/g, '')
-      if (cleanCEP.length !== 8) return null
-      
-      const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`)
-      const data = await response.json()
-      
-      if (data.erro) return null
-      
-      return {
-        street: data.logradouro || '',
-        neighborhood: data.bairro || '',
-        city: data.localidade || '',
-        state: data.uf || ''
+    // Carregar Stripe.js dinamicamente
+    if (!window.Stripe) {
+      const script = document.createElement('script')
+      script.src = 'https://js.stripe.com/v3/'
+      script.async = true
+      script.onload = () => {
+        console.log('✅ Stripe.js carregado')
+        // Inicializar Stripe
+        // Certifique-se de que NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY está no seu .env.local
+        if (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+           window.stripeInstance = window.Stripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+        } else {
+           console.error("❌ Chave publicável do Stripe não encontrada. Defina NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY em .env.local")
+        }
       }
+      script.onerror = () => {
+         console.error("❌ Erro ao carregar script do Stripe.js")
+      }
+      document.head.appendChild(script)
+    } else if (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+      window.stripeInstance = window.Stripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+    }
+  }, [])
+
+
+  // ============================================================================
+  // 2. FUNÇÃO PARA TOKENIZAR CARTÃO
+  // ============================================================================
+  const tokenizeCard = async (cardData) => {
+    try {
+      console.log('🔐 Tokenizando cartão com Stripe.js...')
+
+      if (!window.stripeInstance) {
+        throw new Error('Stripe.js não carregado ou falha na inicialização.')
+      }
+
+      // Criar Payment Method no Stripe (lado cliente - seguro)
+      const { paymentMethod, error } = await window.stripeInstance.createPaymentMethod({
+        type: 'card',
+        card: {
+          number: cardData.card_number.replace(/\s/g, ''),
+          exp_month: parseInt(cardData.card_expiration_month),
+          exp_year: parseInt(cardData.card_expiration_year),
+          cvc: cardData.card_cvv,
+        },
+        billing_details: {
+          name: cardData.card_holder_name,
+          email: cardData.userEmail,
+        },
+      })
+
+      if (error) {
+        console.error('❌ Erro ao tokenizar cartão:', error)
+        throw new Error(error.message)
+      }
+
+      console.log('✅ Cartão tokenizado:', paymentMethod.id)
+      return paymentMethod
     } catch (error) {
-      console.error('Erro ao buscar CEP:', error)
-      return null
+      console.error('❌ Erro na tokenização:', error)
+      throw error
     }
   }
 
+  // ============================================================================
+  // 3. ATUALIZAR handleTokenizedSubmit (Substituindo a função antiga)
+  // ============================================================================
   const handleTokenizedSubmit = async (e) => {
     e.preventDefault()
     setCheckoutLoading(true)
@@ -591,46 +590,49 @@ export default function Dashboard() {
 
     try {
       const formData = new FormData(e.target)
+      
+      // ✅ COLETAR DADOS DO CARTÃO
       const cardData = {
-        card_number: formData.get('card_number').replace(/\s/g, ''),
+        card_number: formData.get('card_number'),
         card_holder_name: formData.get('card_holder_name'),
         card_expiration_month: formData.get('card_expiration_month'),
         card_expiration_year: formData.get('card_expiration_year'),
         card_cvv: formData.get('card_cvv'),
-        cpf: formData.get('cpf').replace(/[^\d]/g, '')
+        userEmail: user.email // Adiciona o email do usuário para o billing_details
+      }
+      
+      // Validação simples de campos
+      if (!cardData.card_number || !cardData.card_holder_name || !cardData.card_expiration_month || !cardData.card_expiration_year || !cardData.card_cvv) {
+          throw new Error("Por favor, preencha todos os dados do cartão.")
       }
 
-      const addressData = {
-        zipcode: formData.get('zipcode').replace(/[^\d]/g, ''),
-        state: formData.get('state'),
-        city: formData.get('city'),
-        neighborhood: formData.get('neighborhood'),
-        street: formData.get('street'),
-        street_number: formData.get('street_number'),
-        complementary: formData.get('complementary') || ''
+      // ✅ TOKENIZAR CARTÃO NO FRONTEND (SEGURO)
+      console.log('🔐 Tokenizando cartão...')
+      const paymentMethod = await tokenizeCard(cardData)
+
+      if (!paymentMethod || !paymentMethod.id) {
+        throw new Error('Erro ao processar cartão. Tente novamente.')
       }
 
-      if (!validateCPF(cardData.cpf)) {
-        throw new Error('CPF inválido. Por favor, verifique e tente novamente.')
-      }
-
-      if (!addressData.zipcode || !addressData.state || !addressData.city || 
-          !addressData.neighborhood || !addressData.street || !addressData.street_number) {
-        throw new Error('Todos os campos de endereço são obrigatórios.')
-      }
-
-      const isUpgrade = subscription && selectedPlan.connections > subscription.connections_purchased;
-      const apiEndpoint = isUpgrade ? '/api/checkout/upgrade-subscription' : '/api/checkout/create-subscription';
+      // ✅ ENVIAR APENAS O TOKEN PARA O BACKEND
+      const isUpgrade = subscription && selectedPlan.connections > subscription.connections_purchased
+      const apiEndpoint = isUpgrade 
+        ? '/api/checkout/upgrade-subscription' 
+        : '/api/checkout/create-subscription'
 
       const payload = {
-          userId: user.id,
-          plan: selectedPlan,
-          cardData: cardData,
-          addressData: addressData,
-          userEmail: user.email,
-          userName: userProfile?.full_name || user.email.split('@')[0],
-          ...(isUpgrade && { subscriptionId: subscription.pagarme_subscription_id })
-      };
+        userId: user.id,
+        plan: selectedPlan,
+        paymentMethodId: paymentMethod.id, // ✅ Apenas o token, não os dados do cartão!
+        userEmail: user.email,
+        userName: userProfile?.full_name || user.email.split('@')[0],
+        ...(isUpgrade && { subscriptionId: subscription.stripe_subscription_id }) // ATENÇÃO: Verifique se o backend espera 'stripe_subscription_id'
+      }
+
+      console.log('📤 Enviando para backend:', {
+        ...payload,
+        paymentMethodId: paymentMethod.id.substring(0, 10) + '****'
+      })
 
       const response = await fetch(apiEndpoint, {
         method: 'POST',
@@ -650,11 +652,11 @@ export default function Dashboard() {
           ? `🎉 Trial de ${data.trial_days} dia${data.trial_days > 1 ? 's' : ''} ativado com sucesso!`
           : isUpgrade
           ? `🚀 Upgrade realizado com sucesso! Total de conexões: ${selectedPlan.connections}`
-          : `💳 Plano ativado! Cobrado R$ ${data.amount_charged.toFixed(2)}`
+          : `💳 Plano ativado! Cobrado R$ ${data.amount_charged ? data.amount_charged.toFixed(2) : '0.00'}` // Adicionado fallback para amount_charged
           
         alert(message)
         
-        await loadUserConnections();
+        await loadUserConnections()
 
       } else {
         throw new Error(data.error || 'Erro ao processar pagamento')
@@ -770,7 +772,8 @@ export default function Dashboard() {
           billing_period: 'annual',
           trial_end_date: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
           next_billing_date: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
-          pagarme_subscription_id: 'super_account_bypass',
+          // Usando 'stripe_subscription_id' para consistência, embora seja fake
+          stripe_subscription_id: 'super_account_bypass', 
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }
@@ -800,7 +803,8 @@ export default function Dashboard() {
           hoursSinceUpdate > 24
         )
         
-        if (shouldSync && data.pagarme_subscription_id) {
+        // Alterado de 'pagarme_subscription_id' para 'stripe_subscription_id'
+        if (shouldSync && data.stripe_subscription_id) { 
           try {
             const syncResponse = await fetch('/api/subscription/sync-status', {
               method: 'POST',
@@ -1201,20 +1205,21 @@ export default function Dashboard() {
         {/* Banner de Status da Assinatura */}
         {subscription && (
           <div className={`mb-8 p-6 rounded-3xl relative overflow-hidden ${
-            subscription.pagarme_subscription_id === 'super_account_bypass' ? 'bg-black/30 backdrop-blur-xl border border-purple-500/30' :
+            // Alterado de 'pagarme_subscription_id' para 'stripe_subscription_id'
+            subscription.stripe_subscription_id === 'super_account_bypass' ? 'bg-black/30 backdrop-blur-xl border border-purple-500/30' :
             subscriptionStatus === 'active' ? 'bg-black/30 backdrop-blur-xl border border-[#04F5A0]/30' :
             subscriptionStatus === 'trial' ? 'bg-black/30 backdrop-blur-xl border border-blue-500/30' :
             'bg-black/30 backdrop-blur-xl border border-red-500/30'
           }`}>
             <div className="absolute inset-0 opacity-40 pointer-events-none">
               <div className={`absolute top-0 left-0 w-32 h-32 rounded-full blur-2xl animate-pulse ${
-                subscription.pagarme_subscription_id === 'super_account_bypass' ? 'bg-purple-500/40' :
+                subscription.stripe_subscription_id === 'super_account_bypass' ? 'bg-purple-500/40' :
                 subscriptionStatus === 'active' ? 'bg-[#04F5A0]/40' :
                 subscriptionStatus === 'trial' ? 'bg-blue-500/40' :
                 'bg-red-500/40'
               }`}></div>
               <div className={`absolute bottom-0 right-0 w-24 h-24 rounded-full blur-xl animate-pulse ${
-                subscription.pagarme_subscription_id === 'super_account_bypass' ? 'bg-purple-500/30' :
+                subscription.stripe_subscription_id === 'super_account_bypass' ? 'bg-purple-500/30' :
                 subscriptionStatus === 'active' ? 'bg-[#04F5A0]/30' :
                 subscriptionStatus === 'trial' ? 'bg-blue-500/30' :
                 'bg-red-500/30'
@@ -1226,18 +1231,18 @@ export default function Dashboard() {
             <div className="relative z-20 flex items-center justify-between">
               <div>
                 <h3 className={`text-lg font-semibold mb-2 ${
-                  subscription.pagarme_subscription_id === 'super_account_bypass' ? 'text-purple-400' :
+                  subscription.stripe_subscription_id === 'super_account_bypass' ? 'text-purple-400' :
                   subscriptionStatus === 'active' ? 'text-[#04F5A0]' :
                   subscriptionStatus === 'trial' ? 'text-blue-400' :
                   'text-red-400'
                 }`}>
-                  {subscription.pagarme_subscription_id === 'super_account_bypass' ? '👑 Super Account' :
+                  {subscription.stripe_subscription_id === 'super_account_bypass' ? '👑 Super Account' :
                    subscriptionStatus === 'active' ? '💎 Plano Ativo' :
                    subscriptionStatus === 'trial' ? '🔥 Trial Ativo' :
                    '⚠️ Plano Expirado'}
                 </h3>
                 <p className="text-gray-300">
-                  {subscription.pagarme_subscription_id === 'super_account_bypass' ?
+                  {subscription.stripe_subscription_id === 'super_account_bypass' ?
                     `${subscription.connections_purchased} conexão(ões) • Acesso supremo ilimitado` :
                     subscriptionStatus === 'active' ?
                     `${subscription.connections_purchased} conexão(ões) • Próxima cobrança: ${new Date(subscription.next_billing_date).toLocaleDateString()}` :
@@ -1254,7 +1259,7 @@ export default function Dashboard() {
                 >
                   Renovar Plano
                 </button>
-              ) : subscription.pagarme_subscription_id !== 'super_account_bypass' ? (
+              ) : subscription.stripe_subscription_id !== 'super_account_bypass' ? (
                 <button onClick={syncSubscriptionStatus} title="Sincronizar status da assinatura" className="bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white p-2 rounded-full transition-all duration-300 relative z-50">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h5M20 20v-5h-5M4 4l16 16"></path></svg>
                 </button>
@@ -1477,7 +1482,7 @@ export default function Dashboard() {
         </div>
       </main>
       
-      {/* 💳 MODAL DE CHECKOUT COM CPF E ENDEREÇO */}
+      {/* 💳 MODAL DE CHECKOUT - AGORA SEM CPF E ENDEREÇO */}
       {showCheckoutModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm">
           <div className="absolute inset-0 opacity-20 pointer-events-none">
@@ -1690,7 +1695,7 @@ export default function Dashboard() {
               </div>
             )}
             
-            {/* Step 2: Dados do Cartão COM CPF E ENDEREÇO */}
+            {/* Step 2: Dados do Cartão (SEM CPF E ENDEREÇO) */}
             {checkoutStep === 'payment' && (
               <div className="relative z-10">
                 <div className="text-center mb-6">
@@ -1698,7 +1703,7 @@ export default function Dashboard() {
                     <span className="text-2xl">💳</span>
                   </div>
                   <h2 className="text-2xl font-bold text-white mb-2">Dados do Cartão</h2>
-                  <p className="text-gray-400">Checkout seguro e criptografado</p>
+                  <p className="text-gray-400">Checkout seguro e criptografado via Stripe</p>
                 </div>
                 
                 <div className="bg-gradient-to-r from-[#04F5A0]/10 to-orange-500/10 border border-[#04F5A0]/30 rounded-xl p-4 mb-6 backdrop-blur-sm">
@@ -1749,6 +1754,10 @@ export default function Dashboard() {
                   </div>
                 </div>
                 
+                {/* ============================================================
+                  FORMULÁRIO ATUALIZADO (SEM CPF E ENDEREÇO)
+                  ============================================================
+                */}
                 <form onSubmit={handleTokenizedSubmit}>
                   <div className="space-y-4 mb-6">
                     <div>
@@ -1773,155 +1782,8 @@ export default function Dashboard() {
                         <input type="text" id="card_cvv" name="card_cvv" required placeholder="123" maxLength="4" className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300" />
                       </div>
                     </div>
-
-                    <div>
-                      <label htmlFor="cpf" className="block text-sm font-medium text-gray-300 mb-2">
-                        CPF <span className="text-red-400">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        id="cpf"
-                        name="cpf"
-                        placeholder="000.000.000-00"
-                        maxLength="14"
-                        required
-                        className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300"
-                        onChange={(e) => {
-                          let value = e.target.value.replace(/\D/g, '')
-                          value = value.replace(/(\d{3})(\d)/, '$1.$2')
-                          value = value.replace(/(\d{3})(\d)/, '$1.$2')
-                          value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2')
-                          e.target.value = value
-                        }}
-                      />
-                    </div>
-
-                    <div className="bg-black/20 backdrop-blur-sm rounded-xl p-4 border border-white/10">
-                      <h4 className="text-sm font-medium text-gray-300 mb-4">🏠 Endereço de Cobrança</h4>
-                      
-                      <div className="grid grid-cols-2 gap-3 mb-4">
-                        <div>
-                          <label htmlFor="zipcode" className="block text-sm font-medium text-gray-300 mb-2">
-                            CEP <span className="text-red-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            id="zipcode"
-                            name="zipcode"
-                            placeholder="00000-000"
-                            maxLength="9"
-                            required
-                            className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300"
-                            onChange={async (e) => {
-                              let value = e.target.value.replace(/\D/g, '')
-                              value = value.replace(/(\d{5})(\d)/, '$1-$2')
-                              e.target.value = value
-                              
-                              if (value.replace(/\D/g, '').length === 8) {
-                                const addressData = await fetchAddressByCEP(value)
-                                if (addressData) {
-                                  document.getElementById('state').value = addressData.state
-                                  document.getElementById('city').value = addressData.city
-                                  document.getElementById('neighborhood').value = addressData.neighborhood
-                                  document.getElementById('street').value = addressData.street
-                                }
-                              }
-                            }}
-                          />
-                        </div>
-                        
-                        <div>
-                          <label htmlFor="state" className="block text-sm font-medium text-gray-300 mb-2">
-                            Estado <span className="text-red-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            id="state"
-                            name="state"
-                            placeholder="SP"
-                            maxLength="2"
-                            required
-                            className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300 uppercase"
-                            onChange={(e) => {
-                              e.target.value = e.target.value.toUpperCase()
-                            }}
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-3 mb-4">
-                        <div>
-                          <label htmlFor="city" className="block text-sm font-medium text-gray-300 mb-2">
-                            Cidade <span className="text-red-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            id="city"
-                            name="city"
-                            placeholder="São Paulo"
-                            required
-                            className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300"
-                          />
-                        </div>
-                        
-                        <div>
-                          <label htmlFor="neighborhood" className="block text-sm font-medium text-gray-300 mb-2">
-                            Bairro <span className="text-red-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            id="neighborhood"
-                            name="neighborhood"
-                            placeholder="Centro"
-                            required
-                            className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300"
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-3 mb-4">
-                        <div className="col-span-2">
-                          <label htmlFor="street" className="block text-sm font-medium text-gray-300 mb-2">
-                            Rua <span className="text-red-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            id="street"
-                            name="street"
-                            placeholder="Rua das Flores"
-                            required
-                            className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300"
-                          />
-                        </div>
-                        
-                        <div>
-                          <label htmlFor="street_number" className="block text-sm font-medium text-gray-300 mb-2">
-                            Número <span className="text-red-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            id="street_number"
-                            name="street_number"
-                            placeholder="123"
-                            required
-                            className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label htmlFor="complementary" className="block text-sm font-medium text-gray-300 mb-2">
-                          Complemento
-                        </label>
-                        <input
-                          type="text"
-                          id="complementary"
-                          name="complementary"
-                          placeholder="Apto 101, Bloco B"
-                          className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300"
-                        />
-                      </div>
-                    </div>
+                    
+                    {/* CAMPOS DE CPF E ENDEREÇO REMOVIDOS */}
 
                   </div>
                   <div className="flex space-x-3">
