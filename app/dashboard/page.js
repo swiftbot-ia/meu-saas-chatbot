@@ -451,6 +451,11 @@ export default function Dashboard() {
     billingPeriod: 'annual'
   })
   const [checkoutStep, setCheckoutStep] = useState('plan')
+
+  // 🆕 Estados para Stripe Payment Element
+  const [clientSecret, setClientSecret] = useState(null)
+  const [stripeElements, setStripeElements] = useState(null)
+  const [paymentElement, setPaymentElement] = useState(null)
   
   // 📊 Estados para as estatísticas
   const [stats, setStats] = useState({
@@ -538,99 +543,175 @@ export default function Dashboard() {
     }
   }, [])
 
+  // ============================================================================
+  // 🆕 INICIALIZAR PAYMENT ELEMENT QUANDO TIVER CLIENT_SECRET
+  // ============================================================================
+  useEffect(() => {
+    if (!clientSecret || !window.stripeInstance || paymentElement) return
+
+    console.log('🎨 Inicializando Stripe Payment Element...')
+
+    const appearance = {
+      theme: 'night',
+      variables: {
+        colorPrimary: '#04F5A0',
+        colorBackground: '#1a1a1a',
+        colorText: '#ffffff',
+        colorDanger: '#ef4444',
+        colorTextSecondary: '#9ca3af',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        borderRadius: '12px',
+        spacingUnit: '4px',
+      },
+      rules: {
+        '.Input': {
+          padding: '12px',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          backgroundColor: 'rgba(0, 0, 0, 0.2)',
+        },
+        '.Input:focus': {
+          borderColor: '#04F5A0',
+          outline: 'none',
+          boxShadow: '0 0 0 1px #04F5A0',
+        },
+        '.Label': {
+          fontSize: '14px',
+          fontWeight: '500',
+          color: 'rgb(209, 213, 219)',
+          marginBottom: '8px',
+        }
+      }
+    }
+
+    const elements = window.stripeInstance.elements({
+      clientSecret,
+      appearance
+    })
+
+    setStripeElements(elements)
+
+    // Pequeno delay para garantir que o DOM está pronto
+    setTimeout(() => {
+      const container = document.getElementById('payment-element')
+      if (container) {
+        const payment = elements.create('payment', {
+          layout: 'accordion'
+        })
+
+        payment.mount('#payment-element')
+        setPaymentElement(payment)
+
+        console.log('✅ Payment Element montado com sucesso')
+
+        // Event listener para erros
+        payment.on('change', (event) => {
+          const messageContainer = document.getElementById('payment-message')
+          if (messageContainer) {
+            if (event.error) {
+              messageContainer.textContent = event.error.message
+            } else {
+              messageContainer.textContent = ''
+            }
+          }
+        })
+      }
+    }, 100)
+
+    // Cleanup
+    return () => {
+      if (paymentElement) {
+        paymentElement.unmount()
+        setPaymentElement(null)
+      }
+    }
+  }, [clientSecret, window.stripeInstance])
+
 
   // ============================================================================
-  // 🆕 ATUALIZAR handleTokenizedSubmit PARA USAR STRIPE ELEMENTS
+  // 🆕 CRIAR SUBSCRIPTION E OBTER CLIENT_SECRET
   // ============================================================================
-  const handleTokenizedSubmit = async (e) => {
-    e.preventDefault()
+  const handleCreateSubscription = async () => {
     setCheckoutLoading(true)
-    setCheckoutStep('processing')
-
-    let subscriptionCreated = null
 
     try {
-      if (!window.stripeInstance) {
-        throw new Error('Stripe.js não carregado')
-      }
+      console.log('📤 Criando subscription no backend...')
 
-      if (!cardElement) {
-        throw new Error('Stripe Card Element não inicializado')
-      }
-
-      const formData = new FormData(e.target)
-      const cardHolderName = formData.get('card_holder_name')
-
-      if (!cardHolderName) {
-        throw new Error('Por favor, preencha o nome no cartão')
-      }
-
-      console.log('🔐 Criando Payment Method com Stripe Elements...')
-
-      // ✅ CRIAR PAYMENT METHOD COM STRIPE ELEMENTS
-      const { paymentMethod, error } = await window.stripeInstance.createPaymentMethod({
-        type: 'card',
-        card: cardElement,
-        billing_details: {
-          name: cardHolderName,
-          email: user.email,
-        },
-      })
-
-      if (error) {
-        console.error('❌ Erro ao criar Payment Method:', error)
-        throw new Error(error.message)
-      }
-
-      console.log('✅ Payment Method criado:', paymentMethod.id)
-
-      // ✅ ENVIAR APENAS O TOKEN PARA O BACKEND
-      const isUpgrade = subscription && selectedPlan.connections > subscription.connections_purchased
-      const apiEndpoint = isUpgrade 
-        ? '/api/checkout/upgrade-subscription' 
-        : '/api/checkout/create-subscription'
-
-      const payload = {
-        userId: user.id,
-        plan: selectedPlan,
-        paymentMethodId: paymentMethod.id,
-        userEmail: user.email,
-        userName: userProfile?.full_name || user.email.split('@')[0],
-        ...(isUpgrade && { subscriptionId: subscription.stripe_subscription_id })
-      }
-
-      console.log('📤 Enviando para backend:', {
-        ...payload,
-        paymentMethodId: paymentMethod.id.substring(0, 10) + '****'
-      })
-
-      const response = await fetch(apiEndpoint, {
+      const response = await fetch('/api/checkout/create-subscription', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          userId: user.id,
+          plan: selectedPlan,
+          userEmail: user.email,
+          userName: userProfile?.full_name || user.email.split('@')[0]
+        })
       })
 
       const data = await response.json()
 
-      if (data.success) {
-        subscriptionCreated = data.subscription
-        setSubscription(data.subscription)
-        setShowCheckoutModal(false)
-        setCheckoutStep('plan')
-        
-        const message = data.is_trial 
-          ? `🎉 Trial de ${data.trial_days} dia${data.trial_days > 1 ? 's' : ''} ativado com sucesso!`
-          : isUpgrade
-          ? `🚀 Upgrade realizado com sucesso! Total de conexões: ${selectedPlan.connections}`
-          : `💳 Plano ativado! Cobrado R$ ${data.amount_charged ? data.amount_charged.toFixed(2) : '0.00'}`
-          
-        alert(message)
-        
-        await loadUserConnections()
-
+      if (data.success && data.clientSecret) {
+        console.log('✅ Client secret recebido')
+        setClientSecret(data.clientSecret)
+        setCheckoutStep('payment')
       } else {
-        throw new Error(data.error || 'Erro ao processar pagamento')
+        throw new Error(data.error || 'Erro ao criar subscription')
       }
+
+    } catch (error) {
+      console.error('❌ Erro ao criar subscription:', error)
+      alert('❌ Erro: ' + error.message)
+    }
+
+    setCheckoutLoading(false)
+  }
+
+  // ============================================================================
+  // 🆕 CONFIRMAR PAGAMENTO COM PAYMENT ELEMENT
+  // ============================================================================
+  const handleConfirmPayment = async (e) => {
+    e.preventDefault()
+
+    if (!window.stripeInstance || !stripeElements) {
+      alert('Stripe não está inicializado')
+      return
+    }
+
+    setCheckoutLoading(true)
+    setCheckoutStep('processing')
+
+    try {
+      console.log('💳 Confirmando pagamento...')
+
+      const { error } = await window.stripeInstance.confirmPayment({
+        elements: stripeElements,
+        confirmParams: {
+          return_url: `${window.location.origin}/dashboard`,
+        },
+        redirect: 'if_required'
+      })
+
+      if (error) {
+        console.error('❌ Erro ao confirmar pagamento:', error)
+        throw new Error(error.message)
+      }
+
+      console.log('✅ Pagamento confirmado com sucesso!')
+
+      // Sucesso! Atualizar dados locais
+      setShowCheckoutModal(false)
+      setCheckoutStep('plan')
+      setClientSecret(null)
+
+      // Recarregar subscription
+      await checkSubscriptionStatus()
+      await loadUserConnections()
+
+      const message = selectedPlan.trialEligible 
+        ? '🎉 Trial ativado com sucesso!'
+        : '💳 Plano ativado com sucesso!'
+
+      alert(message)
+
     } catch (error) {
       console.error('❌ Erro completo:', error)
       alert('❌ Erro ao processar pagamento: ' + error.message)
@@ -1656,10 +1737,11 @@ export default function Dashboard() {
                     Cancelar
                   </button>
                   <button
-                    onClick={() => setCheckoutStep('payment')}
-                    className="flex-1 bg-[#04F5A0] hover:bg-[#03E691] text-black py-3 px-4 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_25px_rgba(4,245,160,0.4)]"
+                    onClick={handleCreateSubscription}
+                    disabled={checkoutLoading}
+                    className="flex-1 bg-[#04F5A0] hover:bg-[#03E691] disabled:bg-gray-600 disabled:cursor-not-allowed text-black py-3 px-4 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_25px_rgba(4,245,160,0.4)]"
                   >
-                    Continuar
+                    {checkoutLoading ? 'Criando...' : 'Continuar'}
                   </button>
                 </div>
               </div>
@@ -1728,38 +1810,33 @@ export default function Dashboard() {
                   FORMULÁRIO ATUALIZADO (SEM CPF E ENDEREÇO)
                   ============================================================
                 */}
-                <form onSubmit={handleTokenizedSubmit}>
+                <form onSubmit={handleConfirmPayment}>
                   <div className="space-y-4 mb-6">
-                    {/* Nome no Cartão */}
+                    {/* 🆕 Stripe Payment Element - Componente pronto da Stripe */}
                     <div>
-                      <label htmlFor="card_holder_name" className="block text-sm font-medium text-gray-300 mb-2">
-                        Nome no Cartão
-                      </label>
-                      <input 
-                        type="text" 
-                        id="card_holder_name" 
-                        name="card_holder_name" 
-                        required 
-                        className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300" 
-                      />
-                    </div>
-                    
-                    {/* 🆕 Stripe Card Element - Substitui todos os campos de cartão */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Dados do Cartão
-                      </label>
                       <div 
-                        id="card-element" 
-                        className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 min-h-[44px] focus-within:border-[#04F5A0] transition-colors duration-300"
+                        id="payment-element"
+                        className="min-h-[200px]"
                       />
-                      <div id="card-errors" className="text-red-400 text-sm mt-2"></div>
+                      {/* Mensagens de erro aparecem aqui */}
+                      <div 
+                        id="payment-message" 
+                        className="text-red-400 text-sm mt-2"
+                      />
                     </div>
                   </div>
+                  
                   <div className="flex space-x-3">
                     <button
                       type="button"
-                      onClick={() => setCheckoutStep('plan')}
+                      onClick={() => {
+                        setCheckoutStep('plan')
+                        setClientSecret(null)
+                        if (paymentElement) {
+                          paymentElement.unmount()
+                          setPaymentElement(null)
+                        }
+                      }}
                       disabled={checkoutLoading}
                       className="flex-1 bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 border border-white/20"
                     >
@@ -1767,7 +1844,7 @@ export default function Dashboard() {
                     </button>
                     <button
                       type="submit"
-                      disabled={checkoutLoading}
+                      disabled={checkoutLoading || !paymentElement}
                       className="flex-1 bg-[#04F5A0] hover:bg-[#03E691] disabled:bg-gray-600 disabled:cursor-not-allowed text-black py-3 px-4 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_25px_rgba(4,245,160,0.4)]"
                     >
                       {checkoutLoading ? 'Processando...' : (shouldShowTrial() ? 'Ativar Trial Grátis' : 'Pagar e Ativar')}

@@ -8,6 +8,8 @@ import {
   createSubscription,
   cancelSubscription
 } from '../../../../lib/stripe'
+import Stripe from 'stripe'
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
 // 🧪 CONFIGURAÇÕES DE TESTE
 const TEST_MODE = false  // false = PRODUÇÃO (cobrança real)
@@ -15,7 +17,7 @@ const TEST_TRIAL_DAYS = 1  // ✅ TESTE: 1 dia de trial (para testes rápidos em
 
 export async function POST(request) {
   try {
-    const { userId, plan, paymentMethodId, userEmail, userName } = await request.json()
+    const { userId, plan, userEmail, userName } = await request.json()
     
     console.log('🎯 Dados recebidos (STRIPE):', {
       userId,
@@ -27,10 +29,10 @@ export async function POST(request) {
     })
 
     // ✅ VALIDAR DADOS OBRIGATÓRIOS
-    if (!userId || !plan || !paymentMethodId || !userEmail) {
+    if (!userId || !plan) {
       return NextResponse.json({
         success: false,
-        error: 'Dados obrigatórios não fornecidos'
+        error: 'Dados obrigatórios não fornecidos (userId ou plan)'
       }, { status: 400 })
     }
 
@@ -145,7 +147,7 @@ export async function POST(request) {
       console.log('🔷 STEP 3: Criando assinatura na Stripe...')
       stripeSubscription = await createSubscription({
         customerId: stripeCustomer.id,
-        paymentMethodId: paymentMethodId,
+        paymentMethodId: null,
         planData: {
           billingPeriod: plan.billingPeriod,
           connections: plan.connections,
@@ -285,9 +287,24 @@ export async function POST(request) {
 
     console.log(`✅ ${isTrialEligible ? 'Trial iniciado' : 'Assinatura ativada'} na Stripe:`, subscription.id)
 
+    // ✅ EXPANDIR SUBSCRIPTION PARA PEGAR CLIENT_SECRET
+    const expandedSubscription = await stripe.subscriptions.retrieve(
+      stripeSubscription.id,
+      { expand: ['latest_invoice.payment_intent'] }
+    )
+
+    const clientSecret = expandedSubscription.latest_invoice?.payment_intent?.client_secret
+
+    if (!clientSecret) {
+      throw new Error('Não foi possível obter client_secret do PaymentIntent')
+    }
+
+    console.log('✅ Client secret obtido:', clientSecret.substring(0, 20) + '...')
+
     return NextResponse.json({
       success: true,
       message: successMessage,
+      clientSecret, // ← NOVO: Client secret para Payment Element
       subscription: subscription,
       trial_end_date: trialEndDate ? trialEndDate.toISOString() : null,
       next_billing_date: nextBillingDate.toISOString(),
@@ -310,7 +327,8 @@ export async function POST(request) {
       stripe: {
         customer_id: stripeCustomer.id,
         subscription_id: stripeSubscription.id,
-        payment_method_id: paymentMethodId
+        payment_method_id: paymentMethodId,
+        client_secret: clientSecret // ← NOVO
       }
     })
 
