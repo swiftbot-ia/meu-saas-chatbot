@@ -456,6 +456,7 @@ export default function Dashboard() {
   const [clientSecret, setClientSecret] = useState(null)
   const [stripeElements, setStripeElements] = useState(null)
   const [paymentElement, setPaymentElement] = useState(null)
+  const [isPaymentElementReady, setIsPaymentElementReady] = useState(false) // ← NOVO
   
   // 📊 Estados para as estatísticas
   const [stats, setStats] = useState({
@@ -603,6 +604,12 @@ export default function Dashboard() {
 
         console.log('✅ Payment Element montado com sucesso')
 
+        // ✅ Event listener para saber quando está pronto
+        payment.on('ready', () => {
+          console.log('✅ Payment Element completamente carregado')
+          setIsPaymentElementReady(true)
+        })
+
         // Event listener para erros
         payment.on('change', (event) => {
           const messageContainer = document.getElementById('payment-message')
@@ -613,6 +620,11 @@ export default function Dashboard() {
               messageContainer.textContent = ''
             }
           }
+          
+          // Atualizar estado de pronto quando estiver completo
+          if (event.complete) {
+            setIsPaymentElementReady(true)
+          }
         })
       }
     }, 100)
@@ -622,6 +634,7 @@ export default function Dashboard() {
       if (paymentElement) {
         paymentElement.unmount()
         setPaymentElement(null)
+        setIsPaymentElementReady(false) // ← ADICIONAR
       }
     }
   }, [clientSecret])
@@ -671,8 +684,24 @@ export default function Dashboard() {
   const handleConfirmPayment = async (e) => {
     e.preventDefault()
 
-    if (!window.stripeInstance || !stripeElements) {
+    // ✅ VALIDAÇÕES ANTES DE PROCESSAR
+    if (!window.stripeInstance) {
       alert('Stripe não está inicializado')
+      return
+    }
+
+    if (!stripeElements) {
+      alert('Elements não está inicializado')
+      return
+    }
+
+    if (!paymentElement) {
+      alert('Payment Element não está montado')
+      return
+    }
+
+    if (!isPaymentElementReady) {
+      alert('Por favor, aguarde o formulário carregar completamente')
       return
     }
 
@@ -681,6 +710,8 @@ export default function Dashboard() {
 
     try {
       console.log('💳 Confirmando pagamento...')
+      console.log('🔍 Elements:', stripeElements)
+      console.log('🔍 Payment Element:', paymentElement)
 
 const isSetupIntent = clientSecret.startsWith('seti_')
 const isPaymentIntent = clientSecret.startsWith('pi_')
@@ -1864,10 +1895,15 @@ const { error } = result
                     </button>
                     <button
                       type="submit"
-                      disabled={checkoutLoading || !paymentElement}
+                      disabled={checkoutLoading || !isPaymentElementReady}
                       className="flex-1 bg-[#04F5A0] hover:bg-[#03E691] disabled:bg-gray-600 disabled:cursor-not-allowed text-black py-3 px-4 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_25px_rgba(4,245,160,0.4)]"
                     >
-                      {checkoutLoading ? 'Processando...' : (shouldShowTrial() ? 'Ativar Trial Grátis' : 'Pagar e Ativar')}
+                      {checkoutLoading 
+                        ? 'Processando...' 
+                        : !isPaymentElementReady 
+                          ? 'Carregando formulário...'
+                          : (shouldShowTrial() ? 'Ativar Trial Grátis' : 'Pagar e Ativar')
+                      }
                     </button>
                   </div>
                 </form>
