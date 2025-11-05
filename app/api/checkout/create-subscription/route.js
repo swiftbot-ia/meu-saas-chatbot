@@ -22,7 +22,6 @@ export async function POST(request) {
     console.log('🎯 Dados recebidos (STRIPE):', {
       userId,
       plan,
-      paymentMethodId: paymentMethodId ? paymentMethodId.substring(0, 10) + '****' : 'N/A',
       userEmail,
       userName,
       TEST_MODE: TEST_MODE
@@ -138,10 +137,8 @@ export async function POST(request) {
 
       // PASSO 2: ANEXAR PAYMENT METHOD AO CUSTOMER
       // O Payment Method já foi criado no frontend via Stripe.js
-      console.log('🔷 STEP 2: Anexando Payment Method ao Customer...')
-      await attachPaymentMethodToCustomer(paymentMethodId, stripeCustomer.id)
 
-      console.log('✅ Payment Method anexado')
+      console.log('✅ Customer criado. Payment Method será anexado pelo Payment Element.')
 
       // PASSO 3: CRIAR ASSINATURA COM TRIAL
       console.log('🔷 STEP 3: Criando assinatura na Stripe...')
@@ -216,7 +213,7 @@ export async function POST(request) {
       next_billing_date: nextBillingDate.toISOString(),
       // ✅ CAMPOS STRIPE
       stripe_customer_id: stripeCustomer.id,
-      stripe_payment_method_id: paymentMethodId,
+      stripe_payment_method_id: null,
       stripe_subscription_id: stripeSubscription.id,
       created_at: now.toISOString(),
       updated_at: now.toISOString()
@@ -288,23 +285,39 @@ export async function POST(request) {
     console.log(`✅ ${isTrialEligible ? 'Trial iniciado' : 'Assinatura ativada'} na Stripe:`, subscription.id)
 
     // ✅ EXPANDIR SUBSCRIPTION PARA PEGAR CLIENT_SECRET
-    const expandedSubscription = await stripe.subscriptions.retrieve(
-      stripeSubscription.id,
-      { expand: ['latest_invoice.payment_intent'] }
-    )
+const expandedSubscription = await stripe.subscriptions.retrieve(
+  stripeSubscription.id,
+  { expand: ['latest_invoice.payment_intent', 'pending_setup_intent'] }
+)
 
-    const clientSecret = expandedSubscription.latest_invoice?.payment_intent?.client_secret
+// ✅ DECIDIR QUAL CLIENT_SECRET USAR
+let clientSecret = null
+let intentType = null
 
-    if (!clientSecret) {
-      throw new Error('Não foi possível obter client_secret do PaymentIntent')
-    }
+if (expandedSubscription.pending_setup_intent) {
+  // Trial ou situação onde não há cobrança imediata
+  clientSecret = expandedSubscription.pending_setup_intent.client_secret
+  intentType = 'setup'
+  console.log('✅ Usando SetupIntent (trial ou sem cobrança imediata)')
+} else if (expandedSubscription.latest_invoice?.payment_intent) {
+  // Cobrança imediata
+  clientSecret = expandedSubscription.latest_invoice.payment_intent.client_secret
+  intentType = 'payment'
+  console.log('✅ Usando PaymentIntent (cobrança imediata)')
+}
 
-    console.log('✅ Client secret obtido:', clientSecret.substring(0, 20) + '...')
+if (!clientSecret) {
+  throw new Error('Não foi possível obter client_secret (nem PaymentIntent nem SetupIntent)')
+}
+
+console.log('✅ Client secret obtido:', clientSecret.substring(0, 20) + '...')
+console.log('📌 Tipo de Intent:', intentType)
 
     return NextResponse.json({
       success: true,
       message: successMessage,
-      clientSecret, // ← NOVO: Client secret para Payment Element
+      clientSecret, 
+      intentType, 
       subscription: subscription,
       trial_end_date: trialEndDate ? trialEndDate.toISOString() : null,
       next_billing_date: nextBillingDate.toISOString(),
@@ -327,7 +340,6 @@ export async function POST(request) {
       stripe: {
         customer_id: stripeCustomer.id,
         subscription_id: stripeSubscription.id,
-        payment_method_id: paymentMethodId,
         client_secret: clientSecret // ← NOVO
       }
     })
