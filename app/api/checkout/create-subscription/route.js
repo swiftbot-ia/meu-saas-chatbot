@@ -4,11 +4,9 @@ import { NextResponse } from 'next/server'
 import { supabase } from '../../../../lib/supabase'
 import { 
   createCustomer, 
-  createPaymentMethod,
   attachPaymentMethodToCustomer,
   createSubscription,
-  cancelSubscription,
-  detectCardBrand 
+  cancelSubscription
 } from '../../../../lib/stripe'
 
 // 🧪 CONFIGURAÇÕES DE TESTE
@@ -17,23 +15,19 @@ const TEST_TRIAL_DAYS = 1  // ✅ TESTE: 1 dia de trial (para testes rápidos em
 
 export async function POST(request) {
   try {
-    const { userId, plan, cardData, addressData, userEmail, userName } = await request.json()
+    const { userId, plan, paymentMethodId, userEmail, userName } = await request.json()
     
     console.log('🎯 Dados recebidos (STRIPE):', {
       userId,
       plan,
-      cardData: {
-        ...cardData,
-        card_number: cardData.card_number ? cardData.card_number.substring(0, 4) + '****' : 'N/A',
-        // Stripe NÃO precisa de CPF
-      },
+      paymentMethodId: paymentMethodId ? paymentMethodId.substring(0, 10) + '****' : 'N/A',
       userEmail,
       userName,
       TEST_MODE: TEST_MODE
     })
 
     // ✅ VALIDAR DADOS OBRIGATÓRIOS
-    if (!userId || !plan || !cardData || !userEmail) {
+    if (!userId || !plan || !paymentMethodId || !userEmail) {
       return NextResponse.json({
         success: false,
         error: 'Dados obrigatórios não fornecidos'
@@ -120,13 +114,14 @@ export async function POST(request) {
       TEST_MODE
     })
 
-    // ✅ EXTRAIR DADOS DO CARTÃO
-    const { card_number, card_holder_name, card_expiration_month, card_expiration_year, card_cvv } = cardData
+    // ✅ EXTRAIR ÚLTIMOS 4 DÍGITOS DO CARTÃO (virá do frontend)
+    let cardLast4 = 'XXXX'
+    let cardBrand = 'card'
 
     // ==================================================================
     // 🚀 INTEGRAÇÃO COM STRIPE
     // ==================================================================
-    let stripeCustomer, stripePaymentMethod, stripeSubscription
+    let stripeCustomer, stripeSubscription
     
     try {
       // PASSO 1: CRIAR CUSTOMER NA STRIPE
@@ -139,29 +134,18 @@ export async function POST(request) {
 
       console.log('✅ Customer Stripe criado:', stripeCustomer.id)
 
-      // PASSO 2: CRIAR PAYMENT METHOD
-      console.log('🔷 STEP 2: Criando Payment Method...')
-      stripePaymentMethod = await createPaymentMethod({
-        card_number: card_number.replace(/\s/g, ''),
-        card_holder_name: card_holder_name,
-        card_expiration_month: card_expiration_month,
-        card_expiration_year: card_expiration_year,
-        card_cvv: card_cvv
-      })
-
-      console.log('✅ Payment Method criado:', stripePaymentMethod.id)
-
-      // PASSO 3: ANEXAR PAYMENT METHOD AO CUSTOMER
-      console.log('🔷 STEP 3: Anexando Payment Method ao Customer...')
-      await attachPaymentMethodToCustomer(stripePaymentMethod.id, stripeCustomer.id)
+      // PASSO 2: ANEXAR PAYMENT METHOD AO CUSTOMER
+      // O Payment Method já foi criado no frontend via Stripe.js
+      console.log('🔷 STEP 2: Anexando Payment Method ao Customer...')
+      await attachPaymentMethodToCustomer(paymentMethodId, stripeCustomer.id)
 
       console.log('✅ Payment Method anexado')
 
-      // PASSO 4: CRIAR ASSINATURA COM TRIAL
-      console.log('🔷 STEP 4: Criando assinatura na Stripe...')
+      // PASSO 3: CRIAR ASSINATURA COM TRIAL
+      console.log('🔷 STEP 3: Criando assinatura na Stripe...')
       stripeSubscription = await createSubscription({
         customerId: stripeCustomer.id,
-        paymentMethodId: stripePaymentMethod.id,
+        paymentMethodId: paymentMethodId,
         planData: {
           billingPeriod: plan.billingPeriod,
           connections: plan.connections,
@@ -228,9 +212,9 @@ export async function POST(request) {
       trial_start_date: isTrialEligible ? now.toISOString() : null,
       trial_end_date: trialEndDate ? trialEndDate.toISOString() : null,
       next_billing_date: nextBillingDate.toISOString(),
-      // ✅ CAMPOS STRIPE (substituem pagarme_*)
+      // ✅ CAMPOS STRIPE
       stripe_customer_id: stripeCustomer.id,
-      stripe_payment_method_id: stripePaymentMethod.id,
+      stripe_payment_method_id: paymentMethodId,
       stripe_subscription_id: stripeSubscription.id,
       created_at: now.toISOString(),
       updated_at: now.toISOString()
@@ -315,9 +299,8 @@ export async function POST(request) {
         final_amount: finalAmount,
         billing_frequency: billingFrequency,
         card: {
-          last_four_digits: stripePaymentMethod.card.last4,
-          holder_name: card_holder_name,
-          brand: stripePaymentMethod.card.brand
+          last_four_digits: cardLast4,
+          brand: cardBrand
         }
       },
       is_trial: isTrialEligible,
@@ -327,7 +310,7 @@ export async function POST(request) {
       stripe: {
         customer_id: stripeCustomer.id,
         subscription_id: stripeSubscription.id,
-        payment_method_id: stripePaymentMethod.id
+        payment_method_id: paymentMethodId
       }
     })
 
