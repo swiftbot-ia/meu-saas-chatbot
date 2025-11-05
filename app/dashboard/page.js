@@ -159,7 +159,7 @@ const AccountDropdown = ({ user, userProfile, onLogout }) => {
                   className="w-full flex items-center px-4 py-3 text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-all duration-200"
                 >
                   <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3 3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                   </svg>
                   Sair da Conta
                 </button>
@@ -547,97 +547,116 @@ export default function Dashboard() {
   // ============================================================================
   // 🆕 INICIALIZAR PAYMENT ELEMENT QUANDO TIVER CLIENT_SECRET
   // ============================================================================
+  // --- INÍCIO DA MUDANÇA 1 ---
   useEffect(() => {
-    if (!clientSecret || !window.stripeInstance || paymentElement) return
+    // ✅ Criar Payment Element apenas quando:
+    // 1. Temos clientSecret
+    // 2. Stripe está carregado  
+    // 3. Modal está aberto
+    // 4. Ainda não criamos o Payment Element
+    if (!clientSecret || !window.stripeInstance || paymentElement || !showCheckoutModal) {
+      return
+    }
 
-    console.log('🎨 Inicializando Stripe Payment Element...')
+    console.log('🎨 Inicializando Stripe Payment Element...')
+    console.log('🔍 Client Secret:', clientSecret.substring(0, 20) + '...')
 
-    const appearance = {
-      theme: 'night',
-      variables: {
-        colorPrimary: '#04F5A0',
-        colorBackground: '#1a1a1a',
-        colorText: '#ffffff',
-        colorDanger: '#ef4444',
-        colorTextSecondary: '#9ca3af',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-        borderRadius: '12px',
-        spacingUnit: '4px',
-      },
-      rules: {
-        '.Input': {
-          padding: '12px',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          backgroundColor: 'rgba(0, 0, 0, 0.2)',
-        },
-        '.Input:focus': {
-          borderColor: '#04F5A0',
-          outline: 'none',
-          boxShadow: '0 0 0 1px #04F5A0',
-        },
-        '.Label': {
-          fontSize: '14px',
-          fontWeight: '500',
-          color: 'rgb(209, 213, 219)',
-          marginBottom: '8px',
-        }
-      }
-    }
+    const appearance = {
+      theme: 'night',
+      variables: {
+        colorPrimary: '#04F5A0',
+        colorBackground: '#1a1a1a',
+        colorText: '#ffffff',
+        colorDanger: '#ef4444',
+        colorTextSecondary: '#9ca3af',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        borderRadius: '12px',
+        spacingUnit: '4px',
+      },
+      rules: {
+        '.Input': {
+          padding: '12px',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          backgroundColor: 'rgba(0, 0, 0, 0.2)',
+        },
+        '.Input:focus': {
+          borderColor: '#04F5A0',
+          outline: 'none',
+          boxShadow: '0 0 0 1px #04F5A0',
+        },
+        '.Label': {
+          fontSize: '14px',
+          fontWeight: '500',
+          color: 'rgb(209, 213, 219)',
+          marginBottom: '8px',
+        }
+      }
+    }
 
-    const elements = window.stripeInstance.elements({
-      clientSecret,
-      appearance
-    })
+    const elements = window.stripeInstance.elements({
+      clientSecret,
+      appearance
+    })
 
-    setStripeElements(elements)
+    setStripeElements(elements)
 
-    // Pequeno delay para garantir que o DOM está pronto
-    setTimeout(() => {
-      const container = document.getElementById('payment-element')
-      if (container) {
-        const payment = elements.create('payment', {
-          layout: 'accordion'
-        })
+    // Delay para garantir que o DOM está pronto
+    setTimeout(() => {
+      const container = document.getElementById('payment-element')
+      if (container) {
+        const payment = elements.create('payment', {
+          layout: 'accordion'
+        })
 
-        payment.mount('#payment-element')
-        setPaymentElement(payment)
+        payment.mount('#payment-element')
+        setPaymentElement(payment)
 
-        console.log('✅ Payment Element montado com sucesso')
+        console.log('✅ Payment Element montado com sucesso')
 
-        // ✅ Event listener para saber quando está pronto
-        payment.on('ready', () => {
-          console.log('✅ Payment Element completamente carregado')
-          setIsPaymentElementReady(true)
-        })
+        // Event listeners
+        payment.on('ready', () => {
+          console.log('✅ Payment Element completamente carregado')
+          setIsPaymentElementReady(true)
+        })
 
-        // Event listener para erros
-        payment.on('change', (event) => {
-          const messageContainer = document.getElementById('payment-message')
-          if (messageContainer) {
-            if (event.error) {
-              messageContainer.textContent = event.error.message
-            } else {
-              messageContainer.textContent = ''
-            }
-          }
-          
-          // Atualizar estado de pronto quando estiver completo
-          if (event.complete) {
-            setIsPaymentElementReady(true)
-          }
-        })
-      }
-    }, 100)
+        payment.on('change', (event) => {
+          const messageContainer = document.getElementById('payment-message')
+          if (messageContainer) {
+            if (event.error) {
+              messageContainer.textContent = event.error.message
+            } else {
+              messageContainer.textContent = ''
+            }
+          }
+          
+          if (event.complete) {
+            setIsPaymentElementReady(true)
+          }
+        })
+      } else {
+        console.error('❌ Container #payment-element não encontrado!')
+      }
+    }, 100)
 
-    // Cleanup
-    return () => {
-      if (paymentElement) {
-        paymentElement.unmount()
-        setPaymentElement(null)
-        setIsPaymentElementReady(false) // ← ADICIONAR
-      }
-    }
-  }, [clientSecret])
+    // ❌ NÃO RETORNAR CLEANUP AQUI!
+    // O cleanup deve acontecer apenas quando o modal fechar
+  }, [clientSecret, showCheckoutModal, paymentElement, window.stripeInstance])
+  // --- FIM DA MUDANÇA 1 ---
+
+  // --- INÍCIO DA MUDANÇA 2 ---
+  // ✅ Cleanup do Payment Element quando modal fechar
+  useEffect(() => {
+    // Quando o modal fecha, limpar tudo
+    if (!showCheckoutModal && paymentElement) {
+      console.log('🧹 Limpando Payment Element (modal fechou)')
+      paymentElement.unmount()
+      setPaymentElement(null)
+      setStripeElements(null)
+      setIsPaymentElementReady(false)
+      setClientSecret(null)
+    }
+  }, [showCheckoutModal])
+  // --- FIM DA MUDANÇA 2 ---
 
 
   // ============================================================================
@@ -750,10 +769,15 @@ export default function Dashboard() {
 
       console.log('✅ Pagamento confirmado com sucesso!')
 
+      // --- INÍCIO DA MUDANÇA 3 ---
+      // ✅ Aguardar um pouco antes de limpar (para não desmontar durante o processo)
+      await new Promise(resolve => setTimeout(resolve, 500))
+
       // Sucesso! Atualizar dados locais
       setShowCheckoutModal(false)
       setCheckoutStep('plan')
       setClientSecret(null)
+      // --- FIM DA MUDANÇA 3 ---
 
       // Recarregar subscription
       await checkSubscriptionStatus()
