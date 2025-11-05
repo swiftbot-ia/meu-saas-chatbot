@@ -70,3 +70,18 @@ clean-next.sh
 # Arquivos pessoais
 TODO.md
 NOTES.md
+
+# Backups
+*.backup
+
+# Environment files
+.env.production
+.env.local
+.env
+
+# Temporary files
+*.log
+build.log
+
+# Route configs temporários
+app/*/route.config.js

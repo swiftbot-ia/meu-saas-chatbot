@@ -19,7 +19,7 @@ const AccountDropdown = ({ user, userProfile, onLogout }) => {
       {/* Avatar/Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-3 bg-black/30 backdrop-blur-xl hover:bg-black/40 rounded-xl px-3 py-2 transition-all duration-300 border border-white/10 hover:border-[#04F5A0]/30 relative overflow-hidden z-50"
+        className="flex items-center space-x-3 bg-black/30 backdrop-blur-xl hover:bg-black/40 rounded-xl px-3 py-2 transition-all duration-300 border border-white/10 hover:border-[#04F5A0]/30 relative overflow-hidden z-[210]"
       >
         {/* Animated Background Effect */}
         <div className="absolute inset-0 opacity-30 pointer-events-none z-0">
@@ -70,12 +70,12 @@ const AccountDropdown = ({ user, userProfile, onLogout }) => {
         <>
           {/* Overlay */}
           <div 
-            className="fixed inset-0 z-[70]" 
+            className="fixed inset-0 z-[220]" 
             onClick={() => setIsOpen(false)}
           />
           
           {/* Menu */}
-          <div className="absolute right-0 mt-2 w-64 bg-black/30 backdrop-blur-xl rounded-2xl shadow-xl border border-white/10 z-[80] overflow-hidden">
+          <div className="absolute right-0 mt-2 w-64 bg-black/40 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 z-[230] overflow-hidden">
             {/* Header do Menu */}
             <div className="p-4 border-b border-white/10">
               <div className="flex items-center space-x-3">
@@ -123,17 +123,32 @@ const AccountDropdown = ({ user, userProfile, onLogout }) => {
                 </svg>
                 Gerenciar Assinatura
               </button>
-              <button
+                            <button
                 onClick={() => {
                   setIsOpen(false)
-                  router.push('/account/security')
+                  router.push('/sugestao')
                 }}
                 className="w-full flex items-center px-4 py-3 text-gray-300 hover:bg-white/5 hover:text-[#04F5A0] transition-all duration-200"
               >
                 <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6">
+  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
+</svg>
+
                 </svg>
-                Segurança
+                Central de Sugestões
+              </button>
+                                          <button
+                onClick={() => {
+                  setIsOpen(false)
+                  router.push('/suporte')
+                }}
+                className="w-full flex items-center px-4 py-3 text-gray-300 hover:bg-white/5 hover:text-[#04F5A0] transition-all duration-200"
+              >
+                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+                </svg>
+                Central de Ajuda
               </button>
               <div className="border-t border-white/10 mt-2 pt-2">
                 <button
@@ -157,76 +172,253 @@ const AccountDropdown = ({ user, userProfile, onLogout }) => {
   )
 }
 
-const ConnectionCard = ({ connectionIndex, connection, isActive, onSelect, onConnect, onConfigure }) => {
-    
-    const getStatusText = () => {
-        if (!connection) return '🔴 Inativa';
-        switch (connection.status) {
-            case 'connected': return '🟢 Conectado';
-            case 'pending_qr': return '🟡 Aguardando QR';
-            case 'error': return '🔴 Erro';
-            default: return '🔴 Desconectado';
-        }
-    };
+// ====================================================================
+// 🆕 MODAL DE QR CODE GRANDE
+// ====================================================================
+const QRCodeModal = ({ qrCode, onClose }) => {
+  if (!qrCode) return null;
 
-    return (
-        <div 
-            onClick={() => onSelect(connectionIndex)}
-            className={`rounded-2xl p-4 cursor-pointer transition-all duration-300 group relative overflow-hidden ${
-                isActive 
-                    ? 'bg-black/30 backdrop-blur-xl border border-[#04F5A0]/30' 
-                    : 'bg-black/20 backdrop-blur-xl border border-white/10 hover:border-[#04F5A0]/20'
-            }`}
-        >
-            {/* Animated Background Effects */}
-            <div className="absolute inset-0 opacity-40 pointer-events-none z-0">
-                <div className="absolute top-0 left-0 w-20 h-20 bg-purple-500/30 rounded-full blur-xl animate-pulse"></div>
-                <div className="absolute bottom-0 right-0 w-16 h-16 bg-pink-500/25 rounded-full blur-lg animate-pulse" style={{animationDelay: '1s'}}></div>
-                {isActive && (
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-[#04F5A0]/20 rounded-full blur-md animate-pulse" style={{animationDelay: '0.5s'}}></div>
-                )}
-            </div>
-            
-            {/* Glass Effect Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-            
-            {/* Content */}
-            <div className="relative z-20">
-                <div className="flex justify-between items-start mb-2">
-                    <h4 className={`font-bold ${isActive ? 'text-[#04F5A0]' : 'text-white'}`}>
-                        Conexão {connectionIndex + 1}
-                    </h4>
-                    {isActive && <div className="w-2.5 h-2.5 bg-[#04F5A0] rounded-full shadow-[0_0_8px_rgba(4,245,160,0.8)] animate-pulse"></div>}
-                </div>
-                
-                <div className="text-sm text-gray-400 mb-4">{getStatusText()}</div>
-
-                {connection ? (
-                     <div className="flex space-x-2 relative z-30">
-                         <button 
-                             onClick={(e) => { e.stopPropagation(); onConfigure(connection); }} 
-                             className="text-xs bg-blue-600/60 backdrop-blur-sm hover:bg-blue-600/80 text-white font-medium py-1 px-2 rounded-md transition-all w-full border border-blue-500/30 relative z-40"
-                         >
-                             Agente
-                         </button>
-                         <button 
-                             onClick={(e) => { e.stopPropagation(); onConnect(connection); }} 
-                             className="text-xs bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white font-medium py-1 px-2 rounded-md transition-all w-full border border-white/20 relative z-40"
-                         >
-                             {connection.status === 'connected' ? 'Status' : 'Conectar'}
-                         </button>
-                     </div>
-                ) : (
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); onConnect(null, connectionIndex); }} 
-                        className="w-full text-center text-sm text-orange-400 font-semibold group-hover:text-orange-300 relative z-40"
-                    >
-                        Ativar
-                    </button>
-                )}
-            </div>
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center">
+      {/* Backdrop com blur */}
+      <div 
+        className="absolute inset-0 bg-black/80 backdrop-blur-md"
+        onClick={onClose}
+      />
+      
+      {/* Modal */}
+      <div className="relative bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl p-8 max-w-md w-full mx-4 shadow-[0_0_50px_rgba(4,245,160,0.2)]">
+        {/* Animated Background Effects */}
+        <div className="absolute inset-0 opacity-30 pointer-events-none">
+          <div className="absolute top-0 left-0 w-32 h-32 bg-[#04F5A0]/30 rounded-full blur-2xl animate-pulse"></div>
+          <div className="absolute bottom-0 right-0 w-40 h-40 bg-green-500/25 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
         </div>
-    );
+        
+        {/* Glass Effect Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none rounded-3xl"></div>
+        
+        {/* Botão X */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full transition-all duration-300 border border-white/20"
+        >
+          <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        
+        {/* Conteúdo */}
+        <div className="relative z-10 text-center">
+          <h3 className="text-2xl font-bold text-white mb-2">
+            📱 Conectar WhatsApp
+          </h3>
+          <p className="text-gray-400 mb-6">
+            Escaneie o QR Code com seu WhatsApp
+          </p>
+          
+          {/* QR Code */}
+          <div className="bg-white rounded-2xl p-4 mb-4 inline-block">
+            <img
+              src={qrCode}
+              alt="QR Code WhatsApp"
+              className="w-64 h-64"
+            />
+          </div>
+          
+          {/* Instruções */}
+          <div className="bg-[#04F5A0]/10 border border-[#04F5A0]/30 rounded-xl p-4 backdrop-blur-sm">
+            <p className="text-sm text-gray-300 mb-2 font-medium">
+              📲 Como conectar:
+            </p>
+            <ol className="text-xs text-gray-400 space-y-1 text-left">
+              <li>1. Abra o WhatsApp no seu celular</li>
+              <li>2. Toque em Menu (⋮) ou Configurações</li>
+              <li>3. Toque em "Aparelhos conectados"</li>
+              <li>4. Toque em "Conectar um aparelho"</li>
+              <li>5. Aponte a câmera para este QR Code</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ====================================================================
+// 🆕 DROPDOWN DE CONEXÕES
+// ====================================================================
+const ConnectionsDropdown = ({ connections, activeConnection, subscription, onSelect, onConnect, onConfigure, onUpgrade, onAddNew }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const getStatusText = (connection) => {
+    if (!connection) return '🔴 Inativa';
+    switch (connection.status) {
+      case 'connected': return '🟢 Conectado';
+      case 'pending_qr': return '🟡 Aguardando QR';
+      case 'error': return '🔴 Erro';
+      default: return '🔴 Desconectado';
+    }
+  };
+
+  const connectedCount = connections.filter(c => c.status === 'connected').length;
+  const totalSlots = subscription?.connections_purchased || 1;
+
+return (
+    <div className="relative z-[240]">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 hover:border-[#04F5A0]/30 transition-all duration-300 group relative w-full"
+      >  
+        {/* Animated Background Effects */}
+        <div className="absolute inset-0 opacity-40 pointer-events-none">
+          <div className="absolute top-0 left-0 w-20 h-20 bg-purple-500/30 rounded-full blur-xl animate-pulse"></div>
+          <div className="absolute bottom-0 right-0 w-16 h-16 bg-pink-500/25 rounded-full blur-lg animate-pulse" style={{animationDelay: '1s'}}></div>
+        </div>
+        
+        {/* Glass Effect Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
+        
+        {/* Content */}
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <span className="text-2xl">📱</span>
+            <div className="text-left">
+              <h3 className="text-lg font-semibold text-white group-hover:text-[#04F5A0] transition-colors duration-300">
+                Suas Conexões
+              </h3>
+              <p className="text-sm text-gray-400">
+                {connectedCount} de {totalSlots} ativas
+              </p>
+            </div>
+          </div>
+          <svg
+            className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
+
+      {/* Dropdown - AGORA COM Z-INDEX ALTO E SEM OVERFLOW */}
+      {isOpen && (
+        <>
+          <div 
+            className="fixed inset-0 z-[250]" 
+            onClick={() => setIsOpen(false)}
+          />
+          
+          <div className="absolute top-full mt-2 left-0 right-0 bg-black/40 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 z-[260] max-h-[400px] overflow-y-auto">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-sm font-semibold text-white">
+                  {connectedCount}/{totalSlots} Conexões Ativas
+                </h4>
+                {subscription?.status === 'active' && connections.length < totalSlots && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsOpen(false);
+                      onAddNew();
+                    }}
+                    className="text-xs bg-[#04F5A0] hover:bg-[#03E691] text-black px-3 py-1.5 rounded-lg font-bold transition-all duration-300"
+                  >
+                    + Nova
+                  </button>
+                )}
+                {subscription?.status === 'active' && connections.length >= totalSlots && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsOpen(false);
+                      onUpgrade();
+                    }}
+                    className="text-xs bg-orange-500 hover:bg-orange-400 text-black px-3 py-1.5 rounded-lg font-bold transition-all duration-300"
+                  >
+                    + Upgrade
+                  </button>
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                {Array.from({length: totalSlots}).map((_, index) => {
+                  const connection = connections.find(c => c.connection_number === index + 1);
+                  const isActive = activeConnection?.connection_number === index + 1;
+                  
+                  return (
+                    <div
+                      key={index}
+                      onClick={() => {
+                        if (connection) {
+                          onSelect(index);
+                          setIsOpen(false);
+                        }
+                      }}
+                      className={`p-3 rounded-xl cursor-pointer transition-all duration-300 ${
+                        isActive 
+                          ? 'bg-[#04F5A0]/10 border border-[#04F5A0]/30' 
+                          : 'bg-white/5 border border-white/10 hover:border-[#04F5A0]/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <span className={`text-sm font-bold ${isActive ? 'text-[#04F5A0]' : 'text-white'}`}>
+                            Conexão {index + 1}
+                          </span>
+                          {isActive && <div className="w-2 h-2 bg-[#04F5A0] rounded-full animate-pulse"></div>}
+                        </div>
+                        <span className="text-xs text-gray-400">
+                          {getStatusText(connection)}
+                        </span>
+                      </div>
+                      
+                      {connection ? (
+                        <div className="flex space-x-2">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onConfigure(connection);
+                              setIsOpen(false);
+                            }}
+                            className="flex-1 text-xs bg-blue-600/60 hover:bg-blue-600/80 text-white font-medium py-1.5 px-2 rounded-lg transition-all border border-blue-500/30"
+                          >
+                            Agente
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onConnect(connection);
+                              setIsOpen(false);
+                            }}
+                            className="flex-1 text-xs bg-white/10 hover:bg-white/20 text-white font-medium py-1.5 px-2 rounded-lg transition-all border border-white/20"
+                          >
+                            {connection.status === 'connected' ? 'Status' : 'Conectar'}
+                          </button>
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onConnect(null, index);
+                            setIsOpen(false);
+                          }}
+                          className="w-full text-center text-xs text-orange-400 font-semibold hover:text-orange-300"
+                        >
+                          Ativar Conexão
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 };
 
 export default function Dashboard() {
@@ -245,9 +437,12 @@ export default function Dashboard() {
   const [connecting, setConnecting] = useState(false)
   const [agentConfigured, setAgentConfigured] = useState(false)
   
+  // 🆕 Estado para controlar o modal do QR Code
+  const [showQRModal, setShowQRModal] = useState(false)
+  
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   
-  // 💳 Novos estados para checkout
+  // 💳 Estados para checkout
   const [subscription, setSubscription] = useState(null)
   const [showCheckoutModal, setShowCheckoutModal] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
@@ -255,7 +450,7 @@ export default function Dashboard() {
     connections: 1,
     billingPeriod: 'annual'
   })
-  const [checkoutStep, setCheckoutStep] = useState('plan') // plan, payment, processing
+  const [checkoutStep, setCheckoutStep] = useState('plan')
   
   // 📊 Estados para as estatísticas
   const [stats, setStats] = useState({
@@ -315,86 +510,38 @@ export default function Dashboard() {
     }
   }, [activeConnection, whatsappStatus])
 
-  // ====================================================================
-  // ✅ Lógica do Pagar.me (mantida igual)
-  // ====================================================================
-  
-  // Carregar script do Pagar.me apenas quando necessário
+  // ============================================================================
+  // 1. ADICIONAR SCRIPT DO STRIPE.JS NO HEAD
+  // ============================================================================
   useEffect(() => {
-    if (checkoutStep === 'payment' && showCheckoutModal) {
-      loadPagarmeScript()
-    }
-  }, [checkoutStep, showCheckoutModal])
-
-  const loadPagarmeScript = () => {
-    // Remove script anterior se existir
-    const existingScript = document.querySelector('script[src*="checkout.js"]')
-    if (existingScript) {
-      document.head.removeChild(existingScript)
-    }
-
-    const script = document.createElement('script')
-    script.src = 'https://assets.pagar.me/checkout/checkout.js'
-    script.async = true
-    script.onload = () => {
-      console.log('✅ Script Pagar.me carregado')
-    }
-    script.onerror = () => {
-      console.error('❌ Erro ao carregar script Pagar.me')
-      alert('Erro ao carregar sistema de pagamento. Tente novamente.')
-    }
-    document.head.appendChild(script)
-  }
-
-  // ✅ Validação de CPF
-  const validateCPF = (cpf) => {
-    cpf = cpf.replace(/[^\d]/g, '')
-    if (cpf.length !== 11) return false
-    if (/^(\d)\1{10}$/.test(cpf)) return false
-    
-    let sum = 0
-    for (let i = 0; i < 9; i++) {
-      sum += parseInt(cpf[i]) * (10 - i)
-    }
-    let remainder = 11 - (sum % 11)
-    if (remainder === 10 || remainder === 11) remainder = 0
-    if (remainder !== parseInt(cpf[9])) return false
-    
-    sum = 0
-    for (let i = 0; i < 10; i++) {
-      sum += parseInt(cpf[i]) * (11 - i)
-    }
-    remainder = 11 - (sum % 11)
-    if (remainder === 10 || remainder === 11) remainder = 0
-    if (remainder !== parseInt(cpf[10])) return false
-    
-    return true
-  }
-
-  // ✅ FUNÇÃO PARA BUSCAR ENDEREÇO POR CEP
-  const fetchAddressByCEP = async (cep) => {
-    try {
-      const cleanCEP = cep.replace(/\D/g, '')
-      if (cleanCEP.length !== 8) return null
-      
-      const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`)
-      const data = await response.json()
-      
-      if (data.erro) return null
-      
-      return {
-        street: data.logradouro || '',
-        neighborhood: data.bairro || '',
-        city: data.localidade || '',
-        state: data.uf || ''
+    // Carregar Stripe.js dinamicamente
+    if (!window.Stripe) {
+      const script = document.createElement('script')
+      script.src = 'https://js.stripe.com/v3/'
+      script.async = true
+      script.onload = () => {
+        console.log('✅ Stripe.js carregado')
+        // Inicializar Stripe
+        // Certifique-se de que NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY está no seu .env.local
+        if (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+           window.stripeInstance = window.Stripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+        } else {
+           console.error("❌ Chave publicável do Stripe não encontrada. Defina NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY em .env.local")
+        }
       }
-    } catch (error) {
-      console.error('Erro ao buscar CEP:', error)
-      return null
+      script.onerror = () => {
+         console.error("❌ Erro ao carregar script do Stripe.js")
+      }
+      document.head.appendChild(script)
+    } else if (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+      window.stripeInstance = window.Stripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
     }
-  }
+  }, [])
 
-  // ✅ Processar formulário com validações CRÍTICAS + ENDEREÇO
+
+  // ============================================================================
+  // 🆕 ATUALIZAR handleTokenizedSubmit PARA USAR STRIPE ELEMENTS
+  // ============================================================================
   const handleTokenizedSubmit = async (e) => {
     e.preventDefault()
     setCheckoutLoading(true)
@@ -403,71 +550,60 @@ export default function Dashboard() {
     let subscriptionCreated = null
 
     try {
-      // Capturar dados do formulário
+      if (!window.stripeInstance) {
+        throw new Error('Stripe.js não carregado')
+      }
+
+      if (!cardElement) {
+        throw new Error('Stripe Card Element não inicializado')
+      }
+
       const formData = new FormData(e.target)
-      const cardData = {
-        card_number: formData.get('card_number').replace(/\s/g, ''),
-        card_holder_name: formData.get('card_holder_name'),
-        card_expiration_month: formData.get('card_expiration_month'),
-        card_expiration_year: formData.get('card_expiration_year'),
-        card_cvv: formData.get('card_cvv'),
-        cpf: formData.get('cpf').replace(/[^\d]/g, '') // ✅ CPF
+      const cardHolderName = formData.get('card_holder_name')
+
+      if (!cardHolderName) {
+        throw new Error('Por favor, preencha o nome no cartão')
       }
 
-      // ✅ NOVO: CAPTURAR DADOS DE ENDEREÇO
-      const addressData = {
-        zipcode: formData.get('zipcode').replace(/[^\d]/g, ''),
-        state: formData.get('state'),
-        city: formData.get('city'),
-        neighborhood: formData.get('neighborhood'),
-        street: formData.get('street'),
-        street_number: formData.get('street_number'),
-        complementary: formData.get('complementary') || ''
-      }
+      console.log('🔐 Criando Payment Method com Stripe Elements...')
 
-      // ✅ VALIDAR CPF
-      if (!validateCPF(cardData.cpf)) {
-        throw new Error('CPF inválido. Por favor, verifique e tente novamente.')
-      }
-
-      // ✅ VALIDAR ENDEREÇO
-      if (!addressData.zipcode || !addressData.state || !addressData.city || 
-          !addressData.neighborhood || !addressData.street || !addressData.street_number) {
-        throw new Error('Todos os campos de endereço são obrigatórios.')
-      }
-
-      console.log('🔍 Dados capturados:', {
-        cardData: {
-          card_number: cardData.card_number.substring(0, 4) + '****',
-          card_holder_name: cardData.card_holder_name,
-          cpf: cardData.cpf.substring(0, 3) + '***' + cardData.cpf.substring(9)
+      // ✅ CRIAR PAYMENT METHOD COM STRIPE ELEMENTS
+      const { paymentMethod, error } = await window.stripeInstance.createPaymentMethod({
+        type: 'card',
+        card: cardElement,
+        billing_details: {
+          name: cardHolderName,
+          email: user.email,
         },
-        addressData: {
-          zipcode: addressData.zipcode.substring(0, 5) + '-***',
-          city: addressData.city,
-          state: addressData.state,
-          street: addressData.street.substring(0, 10) + '...',
-          street_number: addressData.street_number
-        }
       })
 
-      // Lógica de upgrade ou nova assinatura
-      const isUpgrade = subscription && selectedPlan.connections > subscription.connections_purchased;
+      if (error) {
+        console.error('❌ Erro ao criar Payment Method:', error)
+        throw new Error(error.message)
+      }
 
-      const apiEndpoint = isUpgrade ? '/api/checkout/upgrade-subscription' : '/api/checkout/create-subscription';
+      console.log('✅ Payment Method criado:', paymentMethod.id)
+
+      // ✅ ENVIAR APENAS O TOKEN PARA O BACKEND
+      const isUpgrade = subscription && selectedPlan.connections > subscription.connections_purchased
+      const apiEndpoint = isUpgrade 
+        ? '/api/checkout/upgrade-subscription' 
+        : '/api/checkout/create-subscription'
 
       const payload = {
-          userId: user.id,
-          plan: selectedPlan,
-          cardData: cardData,
-          addressData: addressData,
-          userEmail: user.email,
-          userName: userProfile?.full_name || user.email.split('@')[0],
-          ...(isUpgrade && { subscriptionId: subscription.pagarme_subscription_id })
-      };
+        userId: user.id,
+        plan: selectedPlan,
+        paymentMethodId: paymentMethod.id,
+        userEmail: user.email,
+        userName: userProfile?.full_name || user.email.split('@')[0],
+        ...(isUpgrade && { subscriptionId: subscription.stripe_subscription_id })
+      }
 
+      console.log('📤 Enviando para backend:', {
+        ...payload,
+        paymentMethodId: paymentMethod.id.substring(0, 10) + '****'
+      })
 
-      // ✅ ENVIAR PARA API COM ENDEREÇO
       const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -475,33 +611,28 @@ export default function Dashboard() {
       })
 
       const data = await response.json()
-      console.log('📤 Resposta da API:', data)
 
-      // ✅ CRÍTICO: SÓ ATIVAR TRIAL/PLANO SE PAGAMENTO OK
       if (data.success) {
         subscriptionCreated = data.subscription
         setSubscription(data.subscription)
         setShowCheckoutModal(false)
         setCheckoutStep('plan')
         
-        // Mensagem baseada se foi trial ou pagamento
         const message = data.is_trial 
           ? `🎉 Trial de ${data.trial_days} dia${data.trial_days > 1 ? 's' : ''} ativado com sucesso!`
           : isUpgrade
           ? `🚀 Upgrade realizado com sucesso! Total de conexões: ${selectedPlan.connections}`
-          : `💳 Plano ativado! Cobrado R$ ${data.amount_charged.toFixed(2)}`
+          : `💳 Plano ativado! Cobrado R$ ${data.amount_charged ? data.amount_charged.toFixed(2) : '0.00'}`
           
         alert(message)
         
-        // Recarrega conexões para refletir o upgrade
-        await loadUserConnections();
+        await loadUserConnections()
 
       } else {
         throw new Error(data.error || 'Erro ao processar pagamento')
       }
     } catch (error) {
       console.error('❌ Erro completo:', error)
-      
       alert('❌ Erro ao processar pagamento: ' + error.message)
       setCheckoutStep('payment')
     }
@@ -509,10 +640,7 @@ export default function Dashboard() {
     setCheckoutLoading(false)
   }
   
-  // ====================================================================
   // Funções de Gerenciamento de Conexão
-  // ====================================================================
-
   const loadUserConnections = async () => {
     if (!user) return;
     try {
@@ -526,7 +654,6 @@ export default function Dashboard() {
         
         setConnections(data || []);
         if (data && data.length > 0) {
-            // Se já existe uma conexão ativa, a mantém. Senão, define a primeira.
             const currentActive = data.find(c => c.id === activeConnection?.id);
             if (!currentActive) {
                 setActiveConnection(data[0]);
@@ -549,9 +676,7 @@ export default function Dashboard() {
   };
 
   const handleAddConnection = () => {
-    // Lógica para upgrade ou adicionar nova conexão
     if (connections.length < subscription?.connections_purchased) {
-        // Futuramente, criar uma nova conexão no banco de dados aqui.
         alert('Funcionalidade para adicionar nova conexão em breve. Por enquanto, configure as existentes.');
     } else {
         handleUpgradeConnections();
@@ -563,25 +688,16 @@ export default function Dashboard() {
         alert("Você precisa de um plano ativo para fazer upgrade.");
         return;
     }
-    // Prepara o modal para o upgrade
     setSelectedPlan({
         ...selectedPlan,
         connections: subscription.connections_purchased + 1
     });
-    setCheckoutStep('plan'); // Começa da seleção para confirmar o upgrade
+    setCheckoutStep('plan');
     setShowCheckoutModal(true);
   };
   
-  // ====================================================================
-  // Funções do Componente (Modificadas)
-  // ====================================================================
   const checkUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-  
-    // 🔍 DEBUG CRÍTICO
-    console.log('🔍 USER ID REAL:', user?.id)
-    console.log('🔍 USER COMPLETO:', user)
-  
     if (!user) {
       router.push('/login')
     } else {
@@ -607,7 +723,36 @@ export default function Dashboard() {
   const checkSubscriptionStatus = async () => {
     if (!user) return
     try {
-      // 1. Buscar status local
+      // 🆕 SUPER ACCOUNT CHECK - PRIORIDADE MÁXIMA
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('is_super_account')
+        .eq('user_id', user.id)
+        .single()
+      
+      if (profile?.is_super_account) {
+        console.log('👑 SUPER ACCOUNT DETECTADA - Bypass total')
+        
+        // Criar subscription fake para super account
+        const fakeSubscription = {
+          id: 'super-account-fake-id',
+          user_id: user.id,
+          status: 'active',
+          connections_purchased: 7,
+          billing_period: 'annual',
+          trial_end_date: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
+          next_billing_date: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
+          // Usando 'stripe_subscription_id' para consistência, embora seja fake
+          stripe_subscription_id: 'super_account_bypass', 
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+        
+        setSubscription(fakeSubscription)
+        return
+      }
+      
+      // Continua com a lógica normal para usuários não-super
       const { data, error } = await supabase
         .from('user_subscriptions')
         .select('*')
@@ -619,8 +764,6 @@ export default function Dashboard() {
       if (data && !error) {
         setSubscription(data)
         
-        // 2. Sincronizar com Pagar.me se necessário
-        // Sincroniza se: está em trial expirado OU não foi atualizado nas últimas 24h
         const lastUpdate = new Date(data.updated_at)
         const now = new Date()
         const hoursSinceUpdate = (now - lastUpdate) / (1000 * 60 * 60)
@@ -630,8 +773,8 @@ export default function Dashboard() {
           hoursSinceUpdate > 24
         )
         
-        if (shouldSync && data.pagarme_subscription_id) {
-          console.log('🔄 Sincronizando status com Pagar.me...')
+        // Alterado de 'pagarme_subscription_id' para 'stripe_subscription_id'
+        if (shouldSync && data.stripe_subscription_id) { 
           try {
             const syncResponse = await fetch('/api/subscription/sync-status', {
               method: 'POST',
@@ -642,13 +785,10 @@ export default function Dashboard() {
             const syncResult = await syncResponse.json()
             
             if (syncResult.success && syncResult.updated) {
-              console.log('✅ Status sincronizado! Novo status:', syncResult.new_status)
-              // Recarregar dados atualizados
               setTimeout(() => checkSubscriptionStatus(), 1000)
             }
           } catch (syncError) {
             console.error('⚠️ Erro na sincronização:', syncError)
-            // Continua com dados locais se sincronização falhar
           }
         }
       } else {
@@ -674,7 +814,7 @@ export default function Dashboard() {
       
       if (result.success) {
         alert('✅ Status sincronizado com sucesso!')
-        checkSubscriptionStatus() // Recarregar dados
+        checkSubscriptionStatus()
       } else {
         alert('❌ Erro na sincronização: ' + result.error)
       }
@@ -700,7 +840,6 @@ export default function Dashboard() {
       const isConfigured = !!data && !error;
       setAgentConfigured(isConfigured);
       
-      // Atualiza o estado da conexão específica
       setConnections(prev => prev.map(c => 
         c.id === connection.id ? { ...c, agentConfigured: isConfigured } : c
       ));
@@ -727,7 +866,7 @@ export default function Dashboard() {
       
       if (data.success && data.stats) {
         setConnectionStats(prev => ({...prev, [connection.id]: data.stats}));
-        setStats(data.stats); // Mantém o estado de stats para a UI atual
+        setStats(data.stats);
         setLastStatsUpdate(Date.now());
       }
     } catch (error) {
@@ -751,9 +890,9 @@ export default function Dashboard() {
       if (data.connected) {
           setConnecting(false);
           setQrCode(null);
+          setShowQRModal(false); // 🆕 Fecha o modal se conectou
       }
 
-      // Atualiza o estado da conexão específica
       setConnections(prev => prev.map(c => 
           c.id === connection.id ? { ...c, status: newStatus, qrCode: null } : c
       ));
@@ -770,13 +909,11 @@ export default function Dashboard() {
   const connectWhatsApp = async (connection) => {
     const targetConnection = connection || activeConnection;
     
-    // Verificar se tem assinatura ativa ou trial válido
     if (!subscription || (subscription.status !== 'active' && subscription.status !== 'trial')) {
       setShowCheckoutModal(true)
       return
     }
     
-    // Se trial expirado, mostrar checkout sem trial
     if (subscription.status === 'trial' && new Date() > new Date(subscription.trial_end_date)) {
       setShowCheckoutModal(true)
       return
@@ -785,7 +922,6 @@ export default function Dashboard() {
     if (targetConnection) {
         await proceedWithWhatsAppConnection(targetConnection);
     } else {
-        // Se não houver conexão, pode ser um slot vazio para ativar.
         alert("Selecione ou ative uma conexão primeiro.");
     }
   }
@@ -804,6 +940,7 @@ export default function Dashboard() {
       if (data.success) {
         if (data.qrCode) {
           setQrCode(data.qrCode)
+          setShowQRModal(true) // 🆕 Abre o modal com QR grande
           setWhatsappStatus('pending_qr')
 
           setConnections(prev => prev.map(c =>
@@ -822,6 +959,7 @@ export default function Dashboard() {
               setWhatsappStatus('connected');
               setConnecting(false);
               setQrCode(null);
+              setShowQRModal(false); // 🆕 Fecha o modal quando conectar
               clearInterval(checkInterval);
               
               setConnections(prev => prev.map(c =>
@@ -834,11 +972,11 @@ export default function Dashboard() {
           
           setTimeout(() => {
             clearInterval(checkInterval)
-            // Re-verifica o status após o timeout
             const currentConn = connections.find(c => c.id === connection.id);
             if (currentConn && currentConn.status !== 'connected') {
                 setConnecting(false);
                 setQrCode(null);
+                setShowQRModal(false); // 🆕 Fecha o modal no timeout
                 setWhatsappStatus('disconnected');
                 setConnections(prev => prev.map(c => 
                     c.id === connection.id ? { ...c, status: 'disconnected', qrCode: null } : c
@@ -885,21 +1023,12 @@ export default function Dashboard() {
   const getSubscriptionStatus = () => {
     if (!subscription) return 'none'
     
-    // 🔍 DEBUG - ADICIONE ISSO TEMPORARIAMENTE
-    console.log('🔍 DEBUG SUBSCRIPTION:', {
-      status: subscription.status,
-      trial_end_date: subscription.trial_end_date,
-      current_date: new Date().toISOString(),
-      is_trial_expired: subscription.status === 'trial' && new Date() > new Date(subscription.trial_end_date)
-    })
-    
     if (subscription.status === 'trial' && new Date() > new Date(subscription.trial_end_date)) {
       return 'expired'
     }
     return subscription.status
   }
 
-  // FUNÇÕES CORRIGIDAS COM PRICING TABLES LOCAIS
   const calculateAnnualDiscount = () => {
     const pricing = {
       monthly: { 1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875 },
@@ -922,19 +1051,15 @@ export default function Dashboard() {
     return (annualMonthlyPrice || 0) * 12
   }
   
-  // Verificar se o usuário já usou trial antes
   const hasUsedTrial = () => {
     if (!subscription) return false
     
-    // Se tem uma subscription (mesmo cancelada/expirada), já usou trial
     return subscription.status === 'canceled' || 
            subscription.status === 'expired' || 
            (subscription.status === 'trial' && new Date() > new Date(subscription.trial_end_date))
   }
   
-  // Verificar se deve mostrar trial ou pagamento direto
   const shouldShowTrial = () => {
-    // Não mostra trial se for upgrade
     if (subscription && selectedPlan.connections > subscription.connections_purchased) {
         return false;
     }
@@ -982,9 +1107,9 @@ export default function Dashboard() {
   const subscriptionStatus = getSubscriptionStatus()
   
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden">
+    <div className="min-h-screen bg-black relative">
       {/* Background Effects */}
-      <div className="absolute inset-0 opacity-10 pointer-events-none">
+      <div className="fixed inset-0 opacity-10 pointer-events-none">
         <div className="absolute inset-0"
              style={{
                backgroundImage: `radial-gradient(circle at 1px 1px, rgba(4, 245, 160, 0.15) 1px, transparent 0)`,
@@ -995,14 +1120,25 @@ export default function Dashboard() {
       
       {/* Dynamic Gradient */}
       <div
-        className="absolute inset-0 opacity-20 pointer-events-none"
+        className="fixed inset-0 opacity-20 pointer-events-none"
         style={{
           background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(4, 245, 160, 0.08), transparent 40%)`
         }}
       />
       
-      {/* Header */}
-      <header className="relative z-30 bg-black/30 backdrop-blur-xl border-b border-white/10">
+      {/* 🆕 Modal do QR Code */}
+      {showQRModal && (
+        <QRCodeModal 
+          qrCode={qrCode} 
+          onClose={() => {
+            setShowQRModal(false);
+            setConnecting(false);
+          }} 
+        />
+      )}
+      
+      {/* Header - STICKY COM POSITION FIXED */}
+      <header className="sticky top-0 z-[200] bg-black/40 backdrop-blur-2xl border-b border-white/10 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center group">
@@ -1039,41 +1175,46 @@ export default function Dashboard() {
         {/* Banner de Status da Assinatura */}
         {subscription && (
           <div className={`mb-8 p-6 rounded-3xl relative overflow-hidden ${
+            // Alterado de 'pagarme_subscription_id' para 'stripe_subscription_id'
+            subscription.stripe_subscription_id === 'super_account_bypass' ? 'bg-black/30 backdrop-blur-xl border border-purple-500/30' :
             subscriptionStatus === 'active' ? 'bg-black/30 backdrop-blur-xl border border-[#04F5A0]/30' :
             subscriptionStatus === 'trial' ? 'bg-black/30 backdrop-blur-xl border border-blue-500/30' :
             'bg-black/30 backdrop-blur-xl border border-red-500/30'
           }`}>
-            {/* Animated Background Effects */}
             <div className="absolute inset-0 opacity-40 pointer-events-none">
               <div className={`absolute top-0 left-0 w-32 h-32 rounded-full blur-2xl animate-pulse ${
+                subscription.stripe_subscription_id === 'super_account_bypass' ? 'bg-purple-500/40' :
                 subscriptionStatus === 'active' ? 'bg-[#04F5A0]/40' :
                 subscriptionStatus === 'trial' ? 'bg-blue-500/40' :
                 'bg-red-500/40'
               }`}></div>
               <div className={`absolute bottom-0 right-0 w-24 h-24 rounded-full blur-xl animate-pulse ${
+                subscription.stripe_subscription_id === 'super_account_bypass' ? 'bg-purple-500/30' :
                 subscriptionStatus === 'active' ? 'bg-[#04F5A0]/30' :
                 subscriptionStatus === 'trial' ? 'bg-blue-500/30' :
                 'bg-red-500/30'
               }`} style={{animationDelay: '1s'}}></div>
             </div>
             
-            {/* Glass Effect Overlay */}
             <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
             
-            {/* Content */}
             <div className="relative z-20 flex items-center justify-between">
               <div>
                 <h3 className={`text-lg font-semibold mb-2 ${
+                  subscription.stripe_subscription_id === 'super_account_bypass' ? 'text-purple-400' :
                   subscriptionStatus === 'active' ? 'text-[#04F5A0]' :
                   subscriptionStatus === 'trial' ? 'text-blue-400' :
                   'text-red-400'
                 }`}>
-                  {subscriptionStatus === 'active' ? '💎 Plano Ativo' :
+                  {subscription.stripe_subscription_id === 'super_account_bypass' ? '👑 Super Account' :
+                   subscriptionStatus === 'active' ? '💎 Plano Ativo' :
                    subscriptionStatus === 'trial' ? '🔥 Trial Ativo' :
                    '⚠️ Plano Expirado'}
                 </h3>
                 <p className="text-gray-300">
-                  {subscriptionStatus === 'active' ?
+                  {subscription.stripe_subscription_id === 'super_account_bypass' ?
+                    `${subscription.connections_purchased} conexão(ões) • Acesso supremo ilimitado` :
+                    subscriptionStatus === 'active' ?
                     `${subscription.connections_purchased} conexão(ões) • Próxima cobrança: ${new Date(subscription.next_billing_date).toLocaleDateString()}` :
                     subscriptionStatus === 'trial' ?
                     `Trial expira em: ${new Date(subscription.trial_end_date).toLocaleDateString()}` :
@@ -1088,146 +1229,49 @@ export default function Dashboard() {
                 >
                   Renovar Plano
                 </button>
-              ) : (
+              ) : subscription.stripe_subscription_id !== 'super_account_bypass' ? (
                 <button onClick={syncSubscriptionStatus} title="Sincronizar status da assinatura" className="bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white p-2 rounded-full transition-all duration-300 relative z-50">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h5M20 20v-5h-5M4 4l16 16"></path></svg>
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
         )}
-
-        {/* Seletor de Conexões */}
-        <div className="mb-8 bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-6 relative overflow-hidden">
-            {/* Animated Background Effects */}
-            <div className="absolute inset-0 opacity-40 pointer-events-none">
-                <div className="absolute top-0 left-0 w-40 h-40 bg-purple-500/30 rounded-full blur-3xl animate-pulse"></div>
-                <div className="absolute top-1/2 right-0 w-32 h-32 bg-pink-500/25 rounded-full blur-2xl animate-pulse" style={{animationDelay: '1s'}}></div>
-                <div className="absolute bottom-0 left-1/3 w-28 h-28 bg-violet-500/20 rounded-full blur-xl animate-pulse" style={{animationDelay: '2s'}}></div>
-            </div>
-            
-            {/* Glass Effect Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-            
-            {/* Content */}
-            <div className="relative z-20">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-semibold text-white">Suas Conexões WhatsApp</h3>
-                    {subscription?.status === 'active' && connections.length < subscription?.connections_purchased && (
-                    <button onClick={handleAddConnection} className="bg-[#04F5A0] hover:bg-[#03E691] text-black px-4 py-2 rounded-xl font-bold transition-all duration-300 text-sm relative z-50">
-                        + Nova Conexão
-                    </button>
-                    )}
-                     {subscription?.status === 'active' && connections.length >= subscription?.connections_purchased && (
-                    <button onClick={handleUpgradeConnections} className="bg-orange-500 hover:bg-orange-400 text-black px-4 py-2 rounded-xl font-bold transition-all duration-300 text-sm relative z-50">
-                        + Fazer Upgrade
-                    </button>
-                    )}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {Array.from({length: subscription?.connections_purchased || 1}).map((_, index) => {
-                        const connection = connections.find(c => c.connection_number === index + 1);
-                        return (
-                            <ConnectionCard 
-                                key={index} 
-                                connectionIndex={index}
-                                connection={connection}
-                                isActive={activeConnection?.connection_number === index + 1}
-                                onSelect={() => handleConnectionSelect(index)}
-                                onConnect={(conn) => connectWhatsApp(conn || connection)}
-                                onConfigure={(conn) => router.push(`/agent-config?connectionId=${(conn || activeConnection).id}`)}
-                            />
-                        );
-                    })}
-                </div>
-            </div>
-        </div>
         
-        {/* Seção de Estatísticas */}
-        <div className="mb-8 bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-6 relative overflow-hidden">
-          {/* Animated Background Effects */}
-          <div className="absolute inset-0 opacity-40 pointer-events-none">
-            <div className="absolute top-0 right-0 w-36 h-36 bg-blue-500/30 rounded-full blur-3xl animate-pulse"></div>
-            <div className="absolute bottom-0 left-0 w-28 h-28 bg-[#04F5A0]/25 rounded-full blur-2xl animate-pulse" style={{animationDelay: '1.5s'}}></div>
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-purple-500/20 rounded-full blur-xl animate-pulse" style={{animationDelay: '0.5s'}}></div>
-          </div>
+        {/* Cards do Dashboard - AGORA EM GRID COM DROPDOWN INTEGRADO */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 relative z-20">
           
-          {/* Glass Effect Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-          
-          {/* Content */}
-          <div className="relative z-20">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-white flex items-center">
-                📊 Estatísticas da Conexão {activeConnection?.connection_number || ''}
-                {statsLoading && (
-                  <div className="ml-2 animate-spin rounded-full h-5 w-5 border-b-2 border-[#04F5A0]"></div>
-                )}
-              </h3>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {[
-                { value: stats.mensagensHoje, label: 'Mensagens Hoje', color: 'text-blue-400', bg: 'bg-blue-500/10' },
-                { value: stats.conversasAtivas, label: 'Conversas Ativas', color: 'text-[#04F5A0]', bg: 'bg-[#04F5A0]/10' },
-                { value: `${stats.taxaResposta}%`, label: 'Taxa de Resposta', color: 'text-purple-400', bg: 'bg-purple-500/10' },
-                { value: stats.clientesAtendidos, label: 'Clientes Atendidos', color: 'text-orange-400', bg: 'bg-orange-500/10' }
-              ].map((stat, index) => (
-                <div key={index} className={`${stat.bg} backdrop-blur-sm border border-white/10 rounded-2xl p-6 text-center hover:border-[#04F5A0]/30 transition-all duration-300 group relative overflow-hidden`}>
-                  {/* Individual Animated Background Effects */}
-                  <div className="absolute inset-0 opacity-30 pointer-events-none">
-                    <div className={`absolute top-0 right-0 w-12 h-12 ${stat.bg.replace('/10', '/20')} rounded-full blur-lg animate-pulse`}></div>
-                    <div className={`absolute bottom-0 left-0 w-8 h-8 ${stat.bg.replace('/10', '/15')} rounded-full blur-md animate-pulse`} style={{animationDelay: '0.7s'}}></div>
-                  </div>
-                  
-                  {/* Content */}
-                  <div className="relative z-10">
-                    <div className={`text-3xl font-bold ${stat.color} mb-2 group-hover:scale-110 transition-transform duration-300`}>
-                      {(statsLoading || !activeConnection) ? '...' : stat.value}
-                    </div>
-                    <div className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors duration-300">
-                      {stat.label}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            {whatsappStatus !== 'connected' && (
-              <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl backdrop-blur-sm">
-                <p className="text-sm text-yellow-400 text-center">
-                  💡 Conecte a conexão selecionada para ver estatísticas em tempo real
-                </p>
-              </div>
-            )}
-            {lastStatsUpdate && (
-              <div className="mt-3 text-xs text-gray-500 text-center">
-                Última atualização: {new Date(lastStatsUpdate).toLocaleTimeString()}
-              </div>
-            )}
-          </div>
-        </div>
-        
-        {/* Cards do Dashboard */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          
-          {/* Card WhatsApp */}
-          <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-6 transition-all duration-500 group lg:col-span-1 relative overflow-hidden">
-            {/* Animated Background Effects */}
-            <div className="absolute inset-0 opacity-40 pointer-events-none">
+{/* Card WhatsApp (Conexão Ativa) - COM DROPDOWN INTEGRADO */}
+          <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-2xl p-6 transition-all duration-500 group relative overflow-visible">
+            <div className="absolute inset-0 opacity-40 pointer-events-none rounded-2xl">
               <div className="absolute top-0 left-0 w-28 h-28 bg-green-500/30 rounded-full blur-2xl animate-pulse"></div>
               <div className="absolute bottom-0 right-0 w-20 h-20 bg-[#04F5A0]/25 rounded-full blur-xl animate-pulse" style={{animationDelay: '1s'}}></div>
             </div>
             
-            {/* Glass Effect Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none rounded-2xl"></div>
             
-            {/* Content */}
             <div className="relative z-20">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white group-hover:text-[#04F5A0] transition-colors duration-300">Conexão Ativa: {activeConnection?.connection_number || 'N/A'}</h3>
+                <h3 className="text-lg font-semibold text-white group-hover:text-[#04F5A0] transition-colors duration-300">
+                  Conexão Ativa
+                </h3>
                 <span className="text-2xl group-hover:scale-110 transition-transform duration-300">📱</span>
               </div>
+              
+              {/* 🆕 DROPDOWN DE CONEXÕES INTEGRADO */}
+              <div className="mb-4">
+                <ConnectionsDropdown
+                  connections={connections}
+                  activeConnection={activeConnection}
+                  subscription={subscription}
+                  onSelect={handleConnectionSelect}
+                  onConnect={connectWhatsApp}
+                  onConfigure={(conn) => router.push(`/agent-config?connectionId=${conn.id}`)}
+                  onUpgrade={handleUpgradeConnections}
+                  onAddNew={handleAddConnection}
+                />
+              </div>
+              
               <div className="mb-4">
                 {!activeConnection ? (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white/10 text-gray-400 border border-white/20">
@@ -1243,27 +1287,6 @@ export default function Dashboard() {
                   </span>
                 )}
               </div>
-              
-              {qrCode && (
-                <div className="mb-4 p-4 bg-black/20 backdrop-blur-sm rounded-2xl text-center border border-white/10 relative overflow-hidden">
-                  {/* QR Code Background Effect */}
-                  <div className="absolute inset-0 opacity-30 pointer-events-none">
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-[#04F5A0]/20 rounded-full blur-md animate-pulse"></div>
-                  </div>
-                  
-                  <div className="relative z-10">
-                    <p className="text-sm text-gray-300 mb-3">Escaneie o QR Code com seu WhatsApp:</p>
-                    <img
-                      src={qrCode}
-                      alt="QR Code WhatsApp"
-                      className="mx-auto max-w-48 max-h-48 border border-[#04F5A0]/30 rounded-xl"
-                    />
-                    <p className="text-xs text-gray-500 mt-2">
-                      Abra o WhatsApp → Menu → Aparelhos conectados → Conectar um aparelho
-                    </p>
-                  </div>
-                </div>
-              )}
               
               {whatsappStatus === 'connected' ? (
                 <div className="text-center">
@@ -1297,24 +1320,21 @@ export default function Dashboard() {
           </div>
           
           {/* Card Agente IA */}
-          <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-6 transition-all duration-500 group relative overflow-hidden">
-            {/* Animated Background Effects */}
+          <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-2xl p-6 transition-all duration-500 group relative overflow-hidden">
             <div className="absolute inset-0 opacity-40 pointer-events-none">
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/30 rounded-full blur-3xl animate-pulse"></div>
               <div className="absolute bottom-0 left-0 w-24 h-24 bg-purple-500/25 rounded-full blur-xl animate-pulse" style={{animationDelay: '1.2s'}}></div>
             </div>
             
-            {/* Glass Effect Overlay */}
             <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
             
-            {/* Content */}
             <div className="relative z-20">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white group-hover:text-[#04F5A0] transition-colors duration-300">Agente IA (Conexão {activeConnection?.connection_number || 'N/A'})</h3>
+                <h3 className="text-lg font-semibold text-white group-hover:text-[#04F5A0] transition-colors duration-300">Agente IA</h3>
                 <span className="text-2xl group-hover:scale-110 transition-transform duration-300">🤖</span>
               </div>
               <p className="text-gray-400 mb-4 group-hover:text-gray-300 transition-colors duration-300">
-                Configure a personalidade do bot para a conexão ativa.
+                Configure a personalidade do bot
               </p>
               <div className="mb-4">
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium backdrop-blur-sm border ${
@@ -1342,17 +1362,14 @@ export default function Dashboard() {
           </div>
 
           {/* Card Chat */}
-          <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-6 transition-all duration-500 group relative overflow-hidden">
-            {/* Animated Background Effects */}
+          <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-2xl p-6 transition-all duration-500 group relative overflow-hidden">
             <div className="absolute inset-0 opacity-40 pointer-events-none">
               <div className="absolute top-0 left-0 w-28 h-28 bg-purple-500/30 rounded-full blur-2xl animate-pulse"></div>
               <div className="absolute bottom-0 right-0 w-20 h-20 bg-pink-500/25 rounded-full blur-xl animate-pulse" style={{animationDelay: '0.8s'}}></div>
             </div>
             
-            {/* Glass Effect Overlay */}
             <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
             
-            {/* Content */}
             <div className="relative z-20">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-white group-hover:text-[#04F5A0] transition-colors duration-300">Bate-Papo</h3>
@@ -1373,9 +1390,69 @@ export default function Dashboard() {
           </div>
           
         </div>
+        
+        {/* Seção de Estatísticas */}
+        <div className="mb-8 bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-6 relative overflow-hidden">
+          <div className="absolute inset-0 opacity-40 pointer-events-none">
+            <div className="absolute top-0 right-0 w-36 h-36 bg-blue-500/30 rounded-full blur-3xl animate-pulse"></div>
+            <div className="absolute bottom-0 left-0 w-28 h-28 bg-[#04F5A0]/25 rounded-full blur-2xl animate-pulse" style={{animationDelay: '1.5s'}}></div>
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-purple-500/20 rounded-full blur-xl animate-pulse" style={{animationDelay: '0.5s'}}></div>
+          </div>
+          
+          <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
+          
+          <div className="relative z-20">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-white flex items-center">
+                📊 Estatísticas da Conexão {activeConnection?.connection_number || ''}
+                {statsLoading && (
+                  <div className="ml-2 animate-spin rounded-full h-5 w-5 border-b-2 border-[#04F5A0]"></div>
+                )}
+              </h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {[
+                { value: stats.mensagensHoje, label: 'Mensagens Hoje', color: 'text-blue-400', bg: 'bg-blue-500/10' },
+                { value: stats.conversasAtivas, label: 'Conversas Ativas', color: 'text-[#04F5A0]', bg: 'bg-[#04F5A0]/10' },
+                { value: `${stats.taxaResposta}%`, label: 'Taxa de Resposta', color: 'text-purple-400', bg: 'bg-purple-500/10' },
+                { value: stats.clientesAtendidos, label: 'Clientes Atendidos', color: 'text-orange-400', bg: 'bg-orange-500/10' }
+              ].map((stat, index) => (
+                <div key={index} className={`${stat.bg} backdrop-blur-sm border border-white/10 rounded-2xl p-6 text-center hover:border-[#04F5A0]/30 transition-all duration-300 group relative overflow-hidden`}>
+                  <div className="absolute inset-0 opacity-30 pointer-events-none">
+                    <div className={`absolute top-0 right-0 w-12 h-12 ${stat.bg.replace('/10', '/20')} rounded-full blur-lg animate-pulse`}></div>
+                    <div className={`absolute bottom-0 left-0 w-8 h-8 ${stat.bg.replace('/10', '/15')} rounded-full blur-md animate-pulse`} style={{animationDelay: '0.7s'}}></div>
+                  </div>
+                  
+                  <div className="relative z-10">
+                    <div className={`text-3xl font-bold ${stat.color} mb-2 group-hover:scale-110 transition-transform duration-300`}>
+                      {(statsLoading || !activeConnection) ? '...' : stat.value}
+                    </div>
+                    <div className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors duration-300">
+                      {stat.label}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {whatsappStatus !== 'connected' && (
+              <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl backdrop-blur-sm">
+                <p className="text-sm text-yellow-400 text-center">
+                  💡 Conecte a conexão selecionada para ver estatísticas em tempo real
+                </p>
+              </div>
+            )}
+            {lastStatsUpdate && (
+              <div className="mt-3 text-xs text-gray-500 text-center">
+                Última atualização: {new Date(lastStatsUpdate).toLocaleTimeString()}
+              </div>
+            )}
+          </div>
+        </div>
       </main>
       
-      {/* 💳 MODAL DE CHECKOUT COM CPF E ENDEREÇO */}
+      {/* 💳 MODAL DE CHECKOUT - AGORA SEM CPF E ENDEREÇO */}
       {showCheckoutModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm">
           <div className="absolute inset-0 opacity-20 pointer-events-none">
@@ -1396,14 +1473,12 @@ export default function Dashboard() {
           
           <div className="relative bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-8 max-w-lg lg:max-w-xl w-full mx-4 max-h-[90vh] overflow-y-auto shadow-[0_0_50px_rgba(4,245,160,0.15)] z-[70]">
             
-            {/* Animated Background Effects */}
             <div className="absolute inset-0 opacity-40 pointer-events-none">
               <div className="absolute top-0 left-0 w-48 h-48 bg-purple-500/40 rounded-full blur-3xl animate-pulse"></div>
               <div className="absolute top-1/2 right-0 w-56 h-56 bg-pink-500/35 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
               <div className="absolute bottom-0 left-1/3 w-52 h-52 bg-violet-500/40 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
             </div>
             
-            {/* Glass Effect Overlay */}
             <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
             
             {/* Step 1: Seleção de Plano */}
@@ -1590,7 +1665,7 @@ export default function Dashboard() {
               </div>
             )}
             
-            {/* Step 2: Dados do Cartão COM CPF E ENDEREÇO */}
+            {/* Step 2: Dados do Cartão (SEM CPF E ENDEREÇO) */}
             {checkoutStep === 'payment' && (
               <div className="relative z-10">
                 <div className="text-center mb-6">
@@ -1598,10 +1673,9 @@ export default function Dashboard() {
                     <span className="text-2xl">💳</span>
                   </div>
                   <h2 className="text-2xl font-bold text-white mb-2">Dados do Cartão</h2>
-                  <p className="text-gray-400">Checkout seguro e criptografado</p>
+                  <p className="text-gray-400">Checkout seguro e criptografado via Stripe</p>
                 </div>
                 
-                {/* DESTAQUE DO VALOR FINAL */}
                 <div className="bg-gradient-to-r from-[#04F5A0]/10 to-orange-500/10 border border-[#04F5A0]/30 rounded-xl p-4 mb-6 backdrop-blur-sm">
                   <div className="flex justify-between items-center">
                     <div>
@@ -1650,183 +1724,37 @@ export default function Dashboard() {
                   </div>
                 </div>
                 
+                {/* ============================================================
+                  FORMULÁRIO ATUALIZADO (SEM CPF E ENDEREÇO)
+                  ============================================================
+                */}
                 <form onSubmit={handleTokenizedSubmit}>
                   <div className="space-y-4 mb-6">
-                    {/* Campos do Cartão */}
+                    {/* Nome no Cartão */}
                     <div>
-                      <label htmlFor="card_holder_name" className="block text-sm font-medium text-gray-300 mb-2">Nome no Cartão</label>
-                      <input type="text" id="card_holder_name" name="card_holder_name" required className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300" />
-                    </div>
-                    <div>
-                      <label htmlFor="card_number" className="block text-sm font-medium text-gray-300 mb-2">Número do Cartão</label>
-                      <input type="text" id="card_number" name="card_number" required placeholder="0000 0000 0000 0000" className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300" />
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label htmlFor="card_expiration_month" className="block text-sm font-medium text-gray-300 mb-2">Mês</label>
-                        <input type="text" id="card_expiration_month" name="card_expiration_month" required placeholder="MM" maxLength="2" className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300" />
-                      </div>
-                      <div>
-                        <label htmlFor="card_expiration_year" className="block text-sm font-medium text-gray-300 mb-2">Ano</label>
-                        <input type="text" id="card_expiration_year" name="card_expiration_year" required placeholder="AA" maxLength="2" className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300" />
-                      </div>
-                      <div>
-                        <label htmlFor="card_cvv" className="block text-sm font-medium text-gray-300 mb-2">CVV</label>
-                        <input type="text" id="card_cvv" name="card_cvv" required placeholder="123" maxLength="4" className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300" />
-                      </div>
-                    </div>
-
-                    {/* ✅ CAMPO: CPF */}
-                    <div>
-                      <label htmlFor="cpf" className="block text-sm font-medium text-gray-300 mb-2">
-                        CPF <span className="text-red-400">*</span>
+                      <label htmlFor="card_holder_name" className="block text-sm font-medium text-gray-300 mb-2">
+                        Nome no Cartão
                       </label>
-                      <input
-                        type="text"
-                        id="cpf"
-                        name="cpf"
-                        placeholder="000.000.000-00"
-                        maxLength="14"
-                        required
-                        className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300"
-                        onChange={(e) => {
-                          let value = e.target.value.replace(/\D/g, '')
-                          value = value.replace(/(\d{3})(\d)/, '$1.$2')
-                          value = value.replace(/(\d{3})(\d)/, '$1.$2')
-                          value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2')
-                          e.target.value = value
-                        }}
+                      <input 
+                        type="text" 
+                        id="card_holder_name" 
+                        name="card_holder_name" 
+                        required 
+                        className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300" 
                       />
                     </div>
-
-                    {/* ✅ CAMPOS DE ENDEREÇO */}
-                    <div className="bg-black/20 backdrop-blur-sm rounded-xl p-4 border border-white/10">
-                      <h4 className="text-sm font-medium text-gray-300 mb-4">🏠 Endereço de Cobrança</h4>
-                      
-                      <div className="grid grid-cols-2 gap-3 mb-4">
-                        <div>
-                          <label htmlFor="zipcode" className="block text-sm font-medium text-gray-300 mb-2">
-                            CEP <span className="text-red-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            id="zipcode"
-                            name="zipcode"
-                            placeholder="00000-000"
-                            maxLength="9"
-                            required
-                            className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300"
-                            onChange={async (e) => {
-                              let value = e.target.value.replace(/\D/g, '')
-                              value = value.replace(/(\d{5})(\d)/, '$1-$2')
-                              e.target.value = value
-                              
-                              if (value.replace(/\D/g, '').length === 8) {
-                                const addressData = await fetchAddressByCEP(value)
-                                if (addressData) {
-                                  document.getElementById('state').value = addressData.state
-                                  document.getElementById('city').value = addressData.city
-                                  document.getElementById('neighborhood').value = addressData.neighborhood
-                                  document.getElementById('street').value = addressData.street
-                                }
-                              }
-                            }}
-                          />
-                        </div>
-                        
-                        <div>
-                          <label htmlFor="state" className="block text-sm font-medium text-gray-300 mb-2">
-                            Estado <span className="text-red-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            id="state"
-                            name="state"
-                            placeholder="SP"
-                            maxLength="2"
-                            required
-                            className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300 uppercase"
-                            onChange={(e) => {
-                              e.target.value = e.target.value.toUpperCase()
-                            }}
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-3 mb-4">
-                        <div>
-                          <label htmlFor="city" className="block text-sm font-medium text-gray-300 mb-2">
-                            Cidade <span className="text-red-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            id="city"
-                            name="city"
-                            placeholder="São Paulo"
-                            required
-                            className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300"
-                          />
-                        </div>
-                        
-                        <div>
-                          <label htmlFor="neighborhood" className="block text-sm font-medium text-gray-300 mb-2">
-                            Bairro <span className="text-red-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            id="neighborhood"
-                            name="neighborhood"
-                            placeholder="Centro"
-                            required
-                            className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300"
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-3 mb-4">
-                        <div className="col-span-2">
-                          <label htmlFor="street" className="block text-sm font-medium text-gray-300 mb-2">
-                            Rua <span className="text-red-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            id="street"
-                            name="street"
-                            placeholder="Rua das Flores"
-                            required
-                            className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300"
-                          />
-                        </div>
-                        
-                        <div>
-                          <label htmlFor="street_number" className="block text-sm font-medium text-gray-300 mb-2">
-                            Número <span className="text-red-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            id="street_number"
-                            name="street_number"
-                            placeholder="123"
-                            required
-                            className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300"
-                          />
-                        </div>
-                      </div>
-
-                       <div>
-                          <label htmlFor="complementary" className="block text-sm font-medium text-gray-300 mb-2">
-                            Complemento
-                          </label>
-                          <input
-                            type="text"
-                            id="complementary"
-                            name="complementary"
-                            placeholder="Apto 101, Bloco B"
-                            className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 text-white focus:border-[#04F5A0] focus:outline-none transition-colors duration-300"
-                          />
-                        </div>
+                    
+                    {/* 🆕 Stripe Card Element - Substitui todos os campos de cartão */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Dados do Cartão
+                      </label>
+                      <div 
+                        id="card-element" 
+                        className="w-full bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-3 min-h-[44px] focus-within:border-[#04F5A0] transition-colors duration-300"
+                      />
+                      <div id="card-errors" className="text-red-400 text-sm mt-2"></div>
                     </div>
-
                   </div>
                   <div className="flex space-x-3">
                     <button

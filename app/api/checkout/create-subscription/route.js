@@ -1,219 +1,157 @@
 // app/api/checkout/create-subscription/route.js
+// MIGRADO PARA STRIPE - Mantém mesma lógica de negócio do Pagar.me
 import { NextResponse } from 'next/server'
 import { supabase } from '../../../../lib/supabase'
 import { 
   createCustomer, 
-  createCard, 
+  attachPaymentMethodToCustomer,
   createSubscription,
-  cancelSubscription,  // ✅ ADICIONAR ESTA IMPORTAÇÃO
-  detectCardBrand 
-} from '../../../../lib/pagarme'
+  cancelSubscription
+} from '../../../../lib/stripe'
 
-// 🧪 CONFIGURAÇÕES DE TESTE - MODO PRODUÇÃO COM VALORES DE TESTE
-const TEST_MODE = false  // ✅ IMPORTANTE: false = PRODUÇÃO (cobrança real)
-const TEST_TRIAL_DAYS = 1  // ✅ TESTE: 1 dia de trial (em vez de 4)
-const TEST_PRICE_OVERRIDE = 10  // ✅ TESTE: R$ 10 para plano de 1 conexão mensal
+// 🧪 CONFIGURAÇÕES DE TESTE
+const TEST_MODE = false  // false = PRODUÇÃO (cobrança real)
+const TEST_TRIAL_DAYS = 1  // ✅ TESTE: 1 dia de trial (para testes rápidos em produção)
 
 export async function POST(request) {
   try {
-    const { userId, plan, cardData, addressData, userEmail, userName } = await request.json()
+    const { userId, plan, paymentMethodId, userEmail, userName } = await request.json()
     
-    console.log('🎯 Dados recebidos:', {
+    console.log('🎯 Dados recebidos (STRIPE):', {
       userId,
       plan,
-      cardData: {
-        ...cardData,
-        card_number: cardData.card_number ? cardData.card_number.substring(0, 4) + '****' : 'N/A',
-        cpf: cardData.cpf ? cardData.cpf.substring(0, 3) + '***' + cardData.cpf.substring(9) : 'N/A'
-      },
-      addressData: {
-        ...addressData,
-        zipcode: addressData.zipcode ? addressData.zipcode.substring(0, 5) + '-***' : 'N/A'
-      },
+      paymentMethodId: paymentMethodId ? paymentMethodId.substring(0, 10) + '****' : 'N/A',
       userEmail,
       userName,
       TEST_MODE: TEST_MODE
     })
 
     // ✅ VALIDAR DADOS OBRIGATÓRIOS
-    if (!userId || !plan || !cardData || !addressData || !userEmail) {
+    if (!userId || !plan || !paymentMethodId || !userEmail) {
       return NextResponse.json({
         success: false,
         error: 'Dados obrigatórios não fornecidos'
       }, { status: 400 })
     }
 
-    // ✅ BUSCAR TELEFONE DO PERFIL DO USUÁRIO - USANDO SERVICE ROLE
-    console.log('🔍 INICIANDO BUSCA DO TELEFONE...')
+    // ✅ BUSCAR TELEFONE DO PERFIL DO USUÁRIO (opcional para Stripe)
+    console.log('🔍 Buscando dados do usuário...')
     
-    // Criar cliente Supabase com service role (ignora RLS)
-    const { createClient } = require('@supabase/supabase-js')
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY, // Chave que ignora RLS
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    )
-
-    const { data: userProfile, error: profileError } = await supabaseAdmin
+    const { data: userProfile, error: profileError } = await supabase
       .from('user_profiles')
       .select('phone, full_name, company_name')
       .eq('user_id', userId)
       .single()
 
-    console.log('📊 DEBUG TELEFONE (Service Role):', {
-      profileError: profileError,
-      userProfile: userProfile,
-      userId: userId
+    console.log('📊 Dados do usuário:', {
+      profileError: profileError ? profileError.message : null,
+      hasPhone: !!userProfile?.phone,
+      hasFullName: !!userProfile?.full_name
     })
 
-    if (profileError || !userProfile?.phone) {
-      console.log('❌ TELEFONE NÃO ENCONTRADO:', {
-        profileError,
-        userProfile,
-        phone: userProfile?.phone
-      })
-      return NextResponse.json({
-        success: false,
-        error: 'Telefone é obrigatório. Por favor, atualize seu perfil com um número de telefone válido antes de continuar.'
-      }, { status: 400 })
+    // ⚠️ IMPORTANTE: Telefone é OPCIONAL na Stripe (diferente do Pagar.me)
+    // Se não encontrar, continua normalmente
+    if (profileError) {
+      console.warn('⚠️ Erro ao buscar perfil (continuando sem telefone):', profileError.message)
     }
 
-    // ✅ VERIFICAR ASSINATURA ATIVA EXISTENTE
-    console.log('🔍 Verificando assinaturas existentes...')
-    
-    const { data: existingSubscription, error: subError } = await supabase
+    // ✅ VERIFICAR SE JÁ TEM ASSINATURA ATIVA
+    const { data: existingSubscription } = await supabase
       .from('user_subscriptions')
       .select('*')
       .eq('user_id', userId)
       .in('status', ['active', 'trial'])
-      .order('created_at', { ascending: false })
-      .limit(1)
       .single()
 
-    if (!subError && existingSubscription) {
-      console.log('❌ Usuário já possui assinatura ativa:', existingSubscription.status)
+    if (existingSubscription) {
       return NextResponse.json({
         success: false,
-        error: `Você já possui uma assinatura ${existingSubscription.status === 'trial' ? 'trial' : 'ativa'}. Não é possível criar nova assinatura.`
+        error: 'Você já possui uma assinatura ativa. Por favor, cancele a atual antes de criar uma nova.'
       }, { status: 400 })
     }
 
-    // ✅ EXTRAIR DADOS DOS CAMPOS
-    const {
-      card_number,
-      card_holder_name,
-      card_expiration_month,
-      card_expiration_year,
-      card_cvv,
-      cpf
-    } = cardData
-
-    const {
-      zipcode,
-      street,
-      street_number,
-      neighborhood,
-      city,
-      state
-    } = addressData
-
-    // ✅ CONFIGURAÇÃO DE PREÇOS
+    // ✅ DEFINIR PREÇOS - VALORES CORRETOS
     const pricing = {
-      monthly: { 1: 165, 2: 305, 3: 445, 5: 585 },
-      annual: { 1: 150, 2: 275, 3: 400, 5: 525 }
+      monthly: {
+        1: 10,    // ✅ R$ 10 para teste em produção
+        2: 305,
+        3: 445,
+        4: 585,
+        5: 625,
+        6: 750,
+        7: 875
+      },
+      annual: {
+        // ✅ VALORES ANUAIS COMPLETOS (não divididos por 12)
+        1: 1776,  // R$ 1.776/ano (equivalente a R$ 148/mês)
+        2: 3294,  // R$ 3.294/ano (equivalente a R$ 274/mês)
+        3: 4806,  // R$ 4.806/ano (equivalente a R$ 400/mês)
+        4: 6318,  // R$ 6.318/ano (equivalente a R$ 526/mês)
+        5: 6750,  // R$ 6.750/ano (equivalente a R$ 562/mês)
+        6: 8100,  // R$ 8.100/ano (equivalente a R$ 675/mês)
+        7: 9450   // R$ 9.450/ano (equivalente a R$ 787/mês)
+      }
     }
 
-    // ✅ LÓGICA DE TESTE: R$ 10 para 1 conexão mensal
-    const isTestPrice = plan.billingPeriod === 'monthly' && plan.connections === 1
-    const planPrice = isTestPrice ? TEST_PRICE_OVERRIDE : pricing[plan.billingPeriod][plan.connections]
-    
-    // ✅ VERIFICAR ELEGIBILIDADE PARA TRIAL
-    const isTrialEligible = !await hasUserUsedTrial(userId)
-    const trialDays = isTrialEligible ? TEST_TRIAL_DAYS : 0
+    const basePlanPrice = pricing[plan.billingPeriod][plan.connections]
+    const planPrice = basePlanPrice
 
-    // ✅ CALCULAR VALORES
+    const displayAmount = planPrice
     const finalAmount = planPrice
-    const displayAmount = `R$ ${planPrice}`
     const billingFrequency = plan.billingPeriod === 'monthly' ? '/mês' : '/ano'
+    const trialDays = TEST_TRIAL_DAYS
 
-    // ✅ CALCULAR DATAS
-    const now = new Date()
-    const trialEndDate = isTrialEligible ? new Date(now.getTime() + (trialDays * 24 * 60 * 60 * 1000)) : null
-    const nextBillingDate = new Date(trialEndDate || now)
-    
-    if (plan.billingPeriod === 'monthly') {
-      nextBillingDate.setMonth(nextBillingDate.getMonth() + 1)
-    } else {
-      nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1)
-    }
+    // ✅ VERIFICAR ELEGIBILIDADE PARA TRIAL
+    const isTrialEligible = !(await hasUserUsedTrial(userId))
 
-    // ✅ CORREÇÃO: Valor para cobrança no trial vs valor real da assinatura
-    const chargeAmount = isTrialEligible ? 0 : finalAmount
-    const subscriptionAmount = finalAmount // ✅ SEMPRE o valor real da assinatura
-
-    console.log('💰 Valores calculados (TESTE):', { 
-      planPrice, 
-      finalAmount, 
-      displayAmount, 
-      chargeAmount, 
-      subscriptionAmount,
+    console.log('💰 Valores calculados (STRIPE):', {
+      planPrice,
+      finalAmount,
+      displayAmount,
       billingFrequency,
       isTrialEligible,
-      trialDays: trialDays,
-      TEST_MODE: TEST_MODE,
-      IS_TEST_OVERRIDE: plan.billingPeriod === 'monthly' && plan.connections === 1
+      trialDays,
+      TEST_MODE
     })
 
+    // ✅ EXTRAIR ÚLTIMOS 4 DÍGITOS DO CARTÃO (virá do frontend)
+    let cardLast4 = 'XXXX'
+    let cardBrand = 'card'
+
     // ==================================================================
-    // 🚀 INTEGRAÇÃO REAL COM PAGAR.ME (PRODUÇÃO) - MODELO CORRIGIDO
+    // 🚀 INTEGRAÇÃO COM STRIPE
     // ==================================================================
-    let pagarmeCustomer, pagarmeCard, pagarmeSubscription
+    let stripeCustomer, stripeSubscription
+    
     try {
-      // ✅ 1. CRIAR CUSTOMER NO PAGAR.ME COM CPF, TELEFONE E ENDEREÇO COMPLETO
-      pagarmeCustomer = await createCustomer({
+      // PASSO 1: CRIAR CUSTOMER NA STRIPE
+      console.log('🔷 STEP 1: Criando customer na Stripe...')
+      stripeCustomer = await createCustomer({
         name: userName || userEmail.split('@')[0],
         email: userEmail,
-        document: cpf.replace(/\D/g, ''), // ✅ ENVIAR CPF LIMPO
-        phone: userProfile.phone, // ✅ TELEFONE DO PERFIL DO USUÁRIO
-        // ✅ ENDEREÇO COMPLETO PARA PAGAR.ME
-        address: {
-          street: street,
-          street_number: street_number,
-          neighborhood: neighborhood,
-          zipcode: zipcode.replace(/\D/g, ''), // ✅ CEP LIMPO
-          city: city,
-          state: state,
-          country: 'BR',
-          complementary: addressData.complementary || ''
-        }
+        phone: userProfile?.phone || undefined  // Opcional na Stripe
       })
 
-      // 2. CRIAR CARTÃO TOKENIZADO
-      pagarmeCard = await createCard(pagarmeCustomer.id, cardData, {
-        street: street,
-        street_number: street_number,
-        neighborhood: neighborhood,
-        zipcode: zipcode.replace(/\D/g, ''),
-        city: city,
-        state: state,
-        complementary: addressData.complementary || ''
-      })
+      console.log('✅ Customer Stripe criado:', stripeCustomer.id)
 
-      // ✅ 3. CRIAR ASSINATURA - MODELO ORIGINAL QUE FUNCIONAVA
-      pagarmeSubscription = await createSubscription({
-        customerId: pagarmeCustomer.id,
-        cardId: pagarmeCard.id,
+      // PASSO 2: ANEXAR PAYMENT METHOD AO CUSTOMER
+      // O Payment Method já foi criado no frontend via Stripe.js
+      console.log('🔷 STEP 2: Anexando Payment Method ao Customer...')
+      await attachPaymentMethodToCustomer(paymentMethodId, stripeCustomer.id)
+
+      console.log('✅ Payment Method anexado')
+
+      // PASSO 3: CRIAR ASSINATURA COM TRIAL
+      console.log('🔷 STEP 3: Criando assinatura na Stripe...')
+      stripeSubscription = await createSubscription({
+        customerId: stripeCustomer.id,
+        paymentMethodId: paymentMethodId,
         planData: {
           billingPeriod: plan.billingPeriod,
           connections: plan.connections,
           isTrialEligible,
-          planPrice: subscriptionAmount, // ✅ VALOR REAL (R$ 10 para 1 conexão mensal)
-          trialDays: trialDays  // ✅ 1 dia de trial
+          planPrice: finalAmount,
+          trialDays: isTrialEligible ? trialDays : 0
         },
         metadata: {
           userId,
@@ -223,57 +161,66 @@ export async function POST(request) {
           final_amount: finalAmount,
           billing_frequency: billingFrequency,
           test_mode: TEST_MODE,
-          trial_days: trialDays,
-          cpf: cpf.replace(/\D/g, ''), // ✅ SALVAR CPF NOS METADADOS
-          phone: userProfile.phone, // ✅ SALVAR TELEFONE NOS METADADOS
-          // ✅ METADADOS DE TESTE
-          is_test_price: plan.billingPeriod === 'monthly' && plan.connections === 1,
-          original_price: pricing[plan.billingPeriod][plan.connections],
-          test_price_used: planPrice,
-          // ✅ SALVAR ENDEREÇO NOS METADADOS
-          address: {
-            street: street,
-            street_number: street_number,
-            neighborhood: neighborhood,
-            zipcode: zipcode.replace(/\D/g, ''),
-            city: city,
-            state: state,
-            complementary: addressData.complementary || ''
-          }
+          trial_days: isTrialEligible ? trialDays : 0,
+          phone: userProfile?.phone || 'not_provided'
         }
       })
 
-      console.log('✅ Assinatura Pagar.me criada (TESTE):', pagarmeSubscription.id)
-    } catch (pagarmeError) {
-      console.error('❌ Erro na integração Pagar.me:', pagarmeError)
+      console.log('✅ Assinatura Stripe criada:', stripeSubscription.id)
+      console.log('📊 Status da assinatura:', stripeSubscription.status)
+
+    } catch (stripeError) {
+      console.error('❌ Erro na integração Stripe:', stripeError)
       
-      // ✅ CRÍTICO: NÃO SALVAR NO BANCO SE PAGAR.ME FALHOU
       return NextResponse.json({
         success: false,
-        error: 'Erro ao processar pagamento: ' + pagarmeError.message
+        error: 'Erro ao processar pagamento: ' + stripeError.message
       }, { status: 500 })
     }
 
     // ==================================================================
-    // 💾 SALVAR NO BANCO LOCAL APENAS SE PAGAR.ME OK
+    // 💾 SALVAR NO BANCO LOCAL (apenas se Stripe OK)
     // ==================================================================
+    const now = new Date()
+    
+    // Calcular datas
+    let trialEndDate = null
+    if (isTrialEligible && stripeSubscription.trial_end) {
+      trialEndDate = new Date(stripeSubscription.trial_end * 1000) // Stripe usa Unix timestamp
+    }
+
+    let nextBillingDate = new Date()
+    if (stripeSubscription.current_period_end) {
+      nextBillingDate = new Date(stripeSubscription.current_period_end * 1000)
+    } else {
+      // Fallback: calcular manualmente
+      const baseDate = trialEndDate || now
+      if (plan.billingPeriod === 'monthly') {
+        nextBillingDate = new Date(baseDate)
+        nextBillingDate.setMonth(nextBillingDate.getMonth() + 1)
+      } else {
+        nextBillingDate = new Date(baseDate)
+        nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1)
+      }
+    }
+
     const subscriptionData = {
       user_id: userId,
       billing_period: plan.billingPeriod,
       connections_purchased: plan.connections,
-      status: isTrialEligible ? 'trial' : 'active',
+      status: stripeSubscription.status === 'trialing' ? 'trial' : 'active',
       trial_start_date: isTrialEligible ? now.toISOString() : null,
-      trial_end_date: isTrialEligible ? trialEndDate.toISOString() : null,
+      trial_end_date: trialEndDate ? trialEndDate.toISOString() : null,
       next_billing_date: nextBillingDate.toISOString(),
-      // amount: finalAmount,  // ❌ REMOVER - coluna não existe
-      pagarme_customer_id: pagarmeCustomer.id,
-      pagarme_card_id: pagarmeCard.id,
-      pagarme_subscription_id: pagarmeSubscription.id,
+      // ✅ CAMPOS STRIPE
+      stripe_customer_id: stripeCustomer.id,
+      stripe_payment_method_id: paymentMethodId,
+      stripe_subscription_id: stripeSubscription.id,
       created_at: now.toISOString(),
       updated_at: now.toISOString()
     }
 
-    console.log('💾 Salvando assinatura local (TESTE):', subscriptionData)
+    console.log('💾 Salvando assinatura local (STRIPE):', subscriptionData)
 
     const { data: subscription, error: subscriptionError } = await supabase
       .from('user_subscriptions')
@@ -284,18 +231,12 @@ export async function POST(request) {
     if (subscriptionError) {
       console.error('❌ Erro ao salvar assinatura:', subscriptionError)
       
-      // ✅ SE ERRO NO BANCO, CANCELAR NO PAGAR.ME
+      // ✅ SE ERRO NO BANCO, CANCELAR NA STRIPE
       try {
-        await fetch('/api/subscription/cancel-pagarme', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            subscriptionId: pagarmeSubscription.id,
-            reason: 'Database error'
-          }),
-        })
+        await cancelSubscription(stripeSubscription.id, 'database_error')
+        console.log('✅ Assinatura cancelada na Stripe devido a erro no banco')
       } catch (cancelError) {
-        console.error('❌ Erro ao cancelar no Pagar.me:', cancelError)
+        console.error('❌ Erro ao cancelar na Stripe:', cancelError)
       }
       
       return NextResponse.json({
@@ -314,18 +255,16 @@ export async function POST(request) {
           user_id: userId,
           subscription_id: subscription.id,
           event_type: isTrialEligible ? 'trial_started' : 'subscription_created',
-          amount: subscriptionAmount,
+          amount: finalAmount,
           payment_method: 'credit_card',
-          pagarme_transaction_id: pagarmeSubscription.id,
-          status: isTrialEligible ? 'trial' : 'active',
+          stripe_transaction_id: stripeSubscription.id,
+          status: stripeSubscription.status === 'trialing' ? 'trial' : 'active',
           metadata: {
-            trial_days: trialDays,
+            trial_days: isTrialEligible ? trialDays : 0,
             billing_period: plan.billingPeriod,
             connections: plan.connections,
             test_mode: TEST_MODE,
-            is_test_price: isTestPrice,
-            original_price: pricing[plan.billingPeriod][plan.connections],
-            test_price_used: planPrice
+            gateway: 'stripe'
           },
           created_at: now.toISOString()
         }])
@@ -339,12 +278,12 @@ export async function POST(request) {
     // 🎉 RESPOSTA DE SUCESSO
     // ==================================================================
     const successMessage = isTrialEligible 
-      ? `🧪 ${isTestPrice ? 'TESTE: ' : ''}Trial de ${trialDays} dia${trialDays > 1 ? 's' : ''} ativado com sucesso!` 
+      ? `🎉 Trial de ${trialDays} dia${trialDays > 1 ? 's' : ''} ativado com sucesso!` 
       : plan.billingPeriod === 'annual'
         ? `Plano anual ativado! Cobrado R$ ${finalAmount.toFixed(2)}/ano`
         : `Plano mensal ativado! Cobrado R$ ${finalAmount.toFixed(2)}/mês`
 
-    console.log(`✅ ${isTrialEligible ? 'Trial iniciado (TESTE)' : 'Assinatura ativada (TESTE)'}:`, subscription.id)
+    console.log(`✅ ${isTrialEligible ? 'Trial iniciado' : 'Assinatura ativada'} na Stripe:`, subscription.id)
 
     return NextResponse.json({
       success: true,
@@ -353,41 +292,28 @@ export async function POST(request) {
       trial_end_date: trialEndDate ? trialEndDate.toISOString() : null,
       next_billing_date: nextBillingDate.toISOString(),
       payment: {
-        id: pagarmeSubscription.id,
-        status: pagarmeSubscription.status,
-        amount: chargeAmount,
+        id: stripeSubscription.id,
+        status: stripeSubscription.status,
+        amount: isTrialEligible ? 0 : finalAmount,
         display_amount: displayAmount,
         final_amount: finalAmount,
         billing_frequency: billingFrequency,
         card: {
-          last_four_digits: card_number.slice(-4),
-          holder_name: card_holder_name,
-          brand: detectCardBrand(card_number)
+          last_four_digits: cardLast4,
+          brand: cardBrand
         }
       },
       is_trial: isTrialEligible,
-      amount_charged: chargeAmount,
+      amount_charged: isTrialEligible ? 0 : finalAmount,
       test_mode: TEST_MODE,
-      trial_days: trialDays,
-      // ✅ INFORMAÇÕES DE TESTE
-      test_config: {
-        is_test_price: isTestPrice,
-        original_price: pricing[plan.billingPeriod][plan.connections],
-        test_price_used: planPrice,
-        test_trial_days: TEST_TRIAL_DAYS
-      },
-      pagarme: {
-        customer_id: pagarmeCustomer.id,
-        subscription_id: pagarmeSubscription.id
-      },
-      // ✅ CONFIRMAR ENDEREÇO PROCESSADO
-      address_processed: {
-        zipcode: zipcode,
-        city: city,
-        state: state,
-        street: `${street}, ${street_number}`
+      trial_days: isTrialEligible ? trialDays : 0,
+      stripe: {
+        customer_id: stripeCustomer.id,
+        subscription_id: stripeSubscription.id,
+        payment_method_id: paymentMethodId
       }
     })
+
   } catch (error) {
     console.error('❌ Erro geral na API:', error)
     return NextResponse.json({
@@ -409,12 +335,12 @@ async function hasUserUsedTrial(userId) {
 
     if (error) {
       console.error('Erro ao verificar trial:', error)
-      return false // Em caso de erro, permitir trial
+      return false
     }
 
     return data && data.length > 0
   } catch (error) {
     console.error('Erro na verificação de trial:', error)
-    return false // Em caso de erro, permitir trial
+    return false
   }
 }
