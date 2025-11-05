@@ -1,7 +1,6 @@
 // /app/api/subscription/cancel-failed/route.js
 import { NextResponse } from 'next/server'
-import { supabase } from '../../../../lib/supabase'
-import { cancelSubscription } from '../../../../lib/pagarme'
+
 
 export async function POST(request) {
   try {
