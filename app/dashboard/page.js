@@ -98,32 +98,72 @@ const AccountDropdown = ({ user, userProfile, onLogout }) => {
             </div>
 
             {/* Menu Items */}
-            <div className="p-2">
+            <div className="py-2">
               <button
                 onClick={() => {
                   setIsOpen(false)
-                  router.push('/profile')
+                  router.push('/account/profile')
                 }}
-                className="w-full text-left px-4 py-3 hover:bg-white/10 rounded-xl transition-colors duration-200 flex items-center space-x-3 text-gray-300 hover:text-white"
+                className="w-full flex items-center px-4 py-3 text-gray-300 hover:bg-white/5 hover:text-[#04F5A0] transition-all duration-200"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
-                <span>Perfil</span>
+                Configurar Conta
               </button>
-              
               <button
                 onClick={() => {
                   setIsOpen(false)
-                  onLogout()
+                  router.push('/account/subscription')
                 }}
-                className="w-full text-left px-4 py-3 hover:bg-red-500/10 rounded-xl transition-colors duration-200 flex items-center space-x-3 text-gray-300 hover:text-red-400"
+                className="w-full flex items-center px-4 py-3 text-gray-300 hover:bg-white/5 hover:text-[#04F5A0] transition-all duration-200"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                 </svg>
-                <span>Sair</span>
+                Gerenciar Assinatura
               </button>
+                            <button
+                onClick={() => {
+                  setIsOpen(false)
+                  router.push('/sugestao')
+                }}
+                className="w-full flex items-center px-4 py-3 text-gray-300 hover:bg-white/5 hover:text-[#04F5A0] transition-all duration-200"
+              >
+                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6">
+  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
+</svg>
+
+                </svg>
+                Central de Sugestões
+              </button>
+                                          <button
+                onClick={() => {
+                  setIsOpen(false)
+                  router.push('/suporte')
+                }}
+                className="w-full flex items-center px-4 py-3 text-gray-300 hover:bg-white/5 hover:text-[#04F5A0] transition-all duration-200"
+              >
+                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+                </svg>
+                Central de Ajuda
+              </button>
+              <div className="border-t border-white/10 mt-2 pt-2">
+                <button
+                  onClick={() => {
+                    setIsOpen(false)
+                    onLogout()
+                  }}
+                  className="w-full flex items-center px-4 py-3 text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-all duration-200"
+                >
+                  <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  Sair da Conta
+                </button>
+              </div>
             </div>
           </div>
         </>
@@ -133,29 +173,29 @@ const AccountDropdown = ({ user, userProfile, onLogout }) => {
 }
 
 // ====================================================================
-// MODAL DE QR CODE GRANDE
+// 🆕 MODAL DE QR CODE GRANDE
 // ====================================================================
 const QRCodeModal = ({ qrCode, onClose }) => {
   if (!qrCode) return null;
 
   return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-[100] flex items-center justify-center">
+      {/* Backdrop com blur */}
       <div 
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/80 backdrop-blur-md"
         onClick={onClose}
       />
       
       {/* Modal */}
-      <div className="relative bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl p-8 max-w-md w-full shadow-2xl">
+      <div className="relative bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl p-8 max-w-md w-full mx-4 shadow-[0_0_50px_rgba(4,245,160,0.2)]">
         {/* Animated Background Effects */}
-        <div className="absolute inset-0 opacity-40 pointer-events-none">
-          <div className="absolute top-0 left-0 w-32 h-32 bg-green-500/30 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-0 right-0 w-24 h-24 bg-[#04F5A0]/25 rounded-full blur-xl animate-pulse" style={{animationDelay: '1s'}}></div>
+        <div className="absolute inset-0 opacity-30 pointer-events-none">
+          <div className="absolute top-0 left-0 w-32 h-32 bg-[#04F5A0]/30 rounded-full blur-2xl animate-pulse"></div>
+          <div className="absolute bottom-0 right-0 w-40 h-40 bg-green-500/25 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
         </div>
         
-        {/* Glass Effect */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
+        {/* Glass Effect Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none rounded-3xl"></div>
         
         {/* Botão X */}
         <button
@@ -358,15 +398,15 @@ return (
                           </button>
                         </div>
                       ) : (
-                        <button
+                        <button 
                           onClick={(e) => {
                             e.stopPropagation();
+                            onConnect(null, index);
                             setIsOpen(false);
-                            onAddNew();
                           }}
-                          className="w-full text-xs bg-[#04F5A0]/20 hover:bg-[#04F5A0]/30 text-[#04F5A0] font-medium py-1.5 px-2 rounded-lg transition-all border border-[#04F5A0]/30"
+                          className="w-full text-center text-xs text-orange-400 font-semibold hover:text-orange-300"
                         >
-                          + Adicionar
+                          Ativar Conexão
                         </button>
                       )}
                     </div>
@@ -411,10 +451,6 @@ export default function Dashboard() {
     billingPeriod: 'annual'
   })
   const [checkoutStep, setCheckoutStep] = useState('plan')
-  
-  // 🆕 Estados para Stripe Elements
-  const [stripeElements, setStripeElements] = useState(null)
-  const [cardElement, setCardElement] = useState(null)
   
   // 📊 Estados para as estatísticas
   const [stats, setStats] = useState({
@@ -475,93 +511,36 @@ export default function Dashboard() {
   }, [activeConnection, whatsappStatus])
 
   // ============================================================================
-  // 1. CARREGAR STRIPE.JS E INICIALIZAR ELEMENTS
+  // 1. ADICIONAR SCRIPT DO STRIPE.JS NO HEAD
   // ============================================================================
   useEffect(() => {
-    if (!window.Stripe && !document.querySelector('script[src*="stripe"]')) {
+    // Carregar Stripe.js dinamicamente
+    if (!window.Stripe) {
       const script = document.createElement('script')
       script.src = 'https://js.stripe.com/v3/'
       script.async = true
       script.onload = () => {
         console.log('✅ Stripe.js carregado')
+        // Inicializar Stripe
+        // Certifique-se de que NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY está no seu .env.local
         if (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
-          window.stripeInstance = window.Stripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
-          console.log('✅ Stripe inicializado')
+           window.stripeInstance = window.Stripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
         } else {
-          console.error("❌ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY não encontrada")
+           console.error("❌ Chave publicável do Stripe não encontrada. Defina NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY em .env.local")
         }
       }
       script.onerror = () => {
-        console.error("❌ Erro ao carregar Stripe.js")
+         console.error("❌ Erro ao carregar script do Stripe.js")
       }
       document.head.appendChild(script)
-    } else if (window.Stripe && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY && !window.stripeInstance) {
+    } else if (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
       window.stripeInstance = window.Stripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
-      console.log('✅ Stripe inicializado (já estava carregado)')
     }
   }, [])
 
-  // ============================================================================
-  // 2. CRIAR STRIPE ELEMENTS QUANDO MODAL ABRE
-  // ============================================================================
-  useEffect(() => {
-    if (showCheckoutModal && checkoutStep === 'payment' && window.stripeInstance && !stripeElements) {
-      console.log('🎨 Criando Stripe Elements...')
-      
-      const elements = window.stripeInstance.elements()
-      setStripeElements(elements)
-      
-      // Pequeno delay para garantir que o DOM está pronto
-      setTimeout(() => {
-        const cardElementContainer = document.getElementById('card-element')
-        if (cardElementContainer) {
-          const card = elements.create('card', {
-            style: {
-              base: {
-                fontSize: '16px',
-                color: '#ffffff',
-                '::placeholder': {
-                  color: '#9ca3af',
-                },
-                backgroundColor: 'transparent',
-              },
-              invalid: {
-                color: '#ef4444',
-              },
-            },
-          })
-          
-          card.mount('#card-element')
-          setCardElement(card)
-          console.log('✅ Stripe Card Element montado')
-          
-          // Event listener para erros
-          card.on('change', (event) => {
-            const displayError = document.getElementById('card-errors')
-            if (event.error) {
-              displayError.textContent = event.error.message
-            } else {
-              displayError.textContent = ''
-            }
-          })
-        }
-      }, 100)
-    }
-    
-    // Cleanup quando modal fecha
-    return () => {
-      if (cardElement) {
-        cardElement.unmount()
-        setCardElement(null)
-      }
-      if (stripeElements) {
-        setStripeElements(null)
-      }
-    }
-  }, [showCheckoutModal, checkoutStep])
 
   // ============================================================================
-  // 3. ATUALIZAR handleTokenizedSubmit PARA USAR STRIPE ELEMENTS
+  // 🆕 ATUALIZAR handleTokenizedSubmit PARA USAR STRIPE ELEMENTS
   // ============================================================================
   const handleTokenizedSubmit = async (e) => {
     e.preventDefault()
@@ -579,6 +558,13 @@ export default function Dashboard() {
         throw new Error('Stripe Card Element não inicializado')
       }
 
+      const formData = new FormData(e.target)
+      const cardHolderName = formData.get('card_holder_name')
+
+      if (!cardHolderName) {
+        throw new Error('Por favor, preencha o nome no cartão')
+      }
+
       console.log('🔐 Criando Payment Method com Stripe Elements...')
 
       // ✅ CRIAR PAYMENT METHOD COM STRIPE ELEMENTS
@@ -586,7 +572,7 @@ export default function Dashboard() {
         type: 'card',
         card: cardElement,
         billing_details: {
-          name: document.getElementById('card_holder_name')?.value,
+          name: cardHolderName,
           email: user.email,
         },
       })
@@ -747,6 +733,7 @@ export default function Dashboard() {
       if (profile?.is_super_account) {
         console.log('👑 SUPER ACCOUNT DETECTADA - Bypass total')
         
+        // Criar subscription fake para super account
         const fakeSubscription = {
           id: 'super-account-fake-id',
           user_id: user.id,
@@ -755,6 +742,7 @@ export default function Dashboard() {
           billing_period: 'annual',
           trial_end_date: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
           next_billing_date: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
+          // Usando 'stripe_subscription_id' para consistência, embora seja fake
           stripe_subscription_id: 'super_account_bypass', 
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -785,6 +773,7 @@ export default function Dashboard() {
           hoursSinceUpdate > 24
         )
         
+        // Alterado de 'pagarme_subscription_id' para 'stripe_subscription_id'
         if (shouldSync && data.stripe_subscription_id) { 
           try {
             const syncResponse = await fetch('/api/subscription/sync-status', {
@@ -901,7 +890,7 @@ export default function Dashboard() {
       if (data.connected) {
           setConnecting(false);
           setQrCode(null);
-          setShowQRModal(false);
+          setShowQRModal(false); // 🆕 Fecha o modal se conectou
       }
 
       setConnections(prev => prev.map(c => 
@@ -951,7 +940,7 @@ export default function Dashboard() {
       if (data.success) {
         if (data.qrCode) {
           setQrCode(data.qrCode)
-          setShowQRModal(true)
+          setShowQRModal(true) // 🆕 Abre o modal com QR grande
           setWhatsappStatus('pending_qr')
 
           setConnections(prev => prev.map(c =>
@@ -970,7 +959,7 @@ export default function Dashboard() {
               setWhatsappStatus('connected');
               setConnecting(false);
               setQrCode(null);
-              setShowQRModal(false);
+              setShowQRModal(false); // 🆕 Fecha o modal quando conectar
               clearInterval(checkInterval);
               
               setConnections(prev => prev.map(c =>
@@ -983,147 +972,200 @@ export default function Dashboard() {
           
           setTimeout(() => {
             clearInterval(checkInterval)
-            setConnecting(false)
-          }, 120000)
+            const currentConn = connections.find(c => c.id === connection.id);
+            if (currentConn && currentConn.status !== 'connected') {
+                setConnecting(false);
+                setQrCode(null);
+                setShowQRModal(false); // 🆕 Fecha o modal no timeout
+                setWhatsappStatus('disconnected');
+                setConnections(prev => prev.map(c => 
+                    c.id === connection.id ? { ...c, status: 'disconnected', qrCode: null } : c
+                ));
+            }
+          }, 60000)
+          
         } else {
-          setConnecting(false);
-          setWhatsappStatus('connected');
-          setConnections(prev => prev.map(c =>
-            c.id === connection.id ? { ...c, status: 'connected' } : c
-          ));
+          alert('QR Code não foi gerado. Tente novamente.')
+          setConnecting(false)
         }
       } else {
-        setConnecting(false);
-        alert('Erro ao gerar QR Code: ' + data.error);
+        alert('Erro ao gerar QR Code: ' + (data.error || 'Erro desconhecido'))
+        setConnecting(false)
       }
     } catch (error) {
       console.error('Erro ao conectar WhatsApp:', error)
+      alert('Erro ao conectar WhatsApp: ' + error.message)
       setConnecting(false)
-      alert('Erro ao conectar: ' + error.message)
     }
   }
-  
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
   }
   
   const calculatePrice = () => {
-    const connections = selectedPlan.connections;
-    const basePrice = {
-      monthly: { 1: 165, 2: 295, 3: 395, 4: 490, 5: 575, 6: 650, 7: 715 },
-      annual: { 1: 148, 2: 265, 3: 355, 4: 441, 5: 518, 6: 585, 7: 644 }
-    };
-    return basePrice[selectedPlan.billingPeriod][connections] || 0;
-  };
-
-  const calculateAnnualTotal = () => {
-    return calculatePrice() * 12;
-  };
+    const pricing = {
+      monthly: { 1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875 },
+      annual: { 1: 150, 2: 275, 3: 400, 4: 525, 5: 525, 6: 630, 7: 735 }
+    }
+    return pricing[selectedPlan.billingPeriod][selectedPlan.connections] || 0;
+  }
+  
+  const hasDiscount = () => {
+    const savings = {
+      monthly: { 2: 8, 3: 10, 4: 11, 5: 24, 6: 24, 7: 24 },
+      annual: { 2: 8, 3: 11, 4: 12, 5: 30, 6: 30, 7: 30 }
+    }
+    return savings[selectedPlan.billingPeriod][selectedPlan.connections] || 0
+  }
+  
+  const getSubscriptionStatus = () => {
+    if (!subscription) return 'none'
+    
+    if (subscription.status === 'trial' && new Date() > new Date(subscription.trial_end_date)) {
+      return 'expired'
+    }
+    return subscription.status
+  }
 
   const calculateAnnualDiscount = () => {
-    const monthly = calculatePrice();
-    const annual = monthly * 12;
-    const annualPrice = calculateAnnualTotal();
-    return Math.round(((annual - annualPrice) / annual) * 100);
-  };
+    const pricing = {
+      monthly: { 1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875 },
+      annual: { 1: 150, 2: 275, 3: 400, 4: 525, 5: 525, 6: 630, 7: 735 }
+    }
+    const monthlyPrice = pricing.monthly[selectedPlan.connections]
+    const annualPrice = pricing.annual[selectedPlan.connections]
+    if (!monthlyPrice || !annualPrice) return 0;
+    const monthlyTotal = monthlyPrice * 12
+    const annualTotal = annualPrice * 12
+    const discount = Math.round(((monthlyTotal - annualTotal) / monthlyTotal) * 100)
+    return discount
+  }
 
-  const hasDiscount = () => {
-    const discountMap = { 1: 0, 2: 10, 3: 20, 4: 25, 5: 30, 6: 35, 7: 39 };
-    return discountMap[selectedPlan.connections] || 0;
-  };
-
+  const calculateAnnualTotal = () => {
+    const pricing = {
+      annual: { 1: 150, 2: 275, 3: 400, 4: 525, 5: 525, 6: 630, 7: 735 }
+    }
+    const annualMonthlyPrice = pricing.annual[selectedPlan.connections]
+    return (annualMonthlyPrice || 0) * 12
+  }
+  
+  const hasUsedTrial = () => {
+    if (!subscription) return false
+    
+    return subscription.status === 'canceled' || 
+           subscription.status === 'expired' || 
+           (subscription.status === 'trial' && new Date() > new Date(subscription.trial_end_date))
+  }
+  
   const shouldShowTrial = () => {
-    return !subscription || !subscription.has_used_trial;
-  };
-
+    if (subscription && selectedPlan.connections > subscription.connections_purchased) {
+        return false;
+    }
+    return !hasUsedTrial()
+  }
+  
+  const getStatusColor = () => {
+    switch (whatsappStatus) {
+      case 'connected': return 'bg-[#04F5A0]/20 text-[#04F5A0] border-[#04F5A0]/30'
+      case 'pending_qr': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+      case 'error': return 'bg-red-500/20 text-red-400 border-red-500/30'
+      default: return 'bg-red-500/20 text-red-400 border-red-500/30'
+    }
+  }
+  
   const getStatusText = () => {
     switch (whatsappStatus) {
-      case 'connected': return '🟢 Conectado';
-      case 'pending_qr': return '🟡 Aguardando QR';
-      case 'error': return '🔴 Erro';
-      default: return '🔴 Desconectado';
+      case 'connected': return '🟢 Conectado'
+      case 'pending_qr': return '🟡 Aguardando QR'
+      case 'error': return '🔴 Erro'
+      default: return '🔴 Desconectado'
     }
-  };
-
-  const subscriptionStatus = subscription
-    ? subscription.stripe_subscription_id === 'super_account_bypass'
-      ? 'active'
-      : subscription.status === 'trial' && new Date() > new Date(subscription.trial_end_date)
-      ? 'expired'
-      : subscription.status
-    : 'none';
-
+  }
+  
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-[#04F5A0] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-400">Carregando...</p>
+          <div className="relative">
+            <div className="w-16 h-16 bg-[#04F5A0] rounded-2xl flex items-center justify-center mx-auto animate-pulse mb-4">
+              <div className="w-8 h-8 bg-black rounded-sm"
+                   style={{
+                     clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)'
+                   }}
+              />
+            </div>
+            <div className="absolute inset-0 bg-[#04F5A0]/30 rounded-2xl blur-xl animate-pulse mx-auto w-16 h-16" />
+          </div>
+          <p className="text-gray-300">Carregando dashboard...</p>
         </div>
       </div>
     )
   }
-
+  
+  const subscriptionStatus = getSubscriptionStatus()
+  
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white relative overflow-hidden">
-      {/* Elementos de fundo animados */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-20 left-10 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute top-40 right-20 w-96 h-96 bg-pink-600/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
-        <div className="absolute bottom-20 left-1/3 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '4s'}}></div>
-        <div className="absolute bottom-40 right-1/4 w-96 h-96 bg-[#04F5A0]/5 rounded-full blur-3xl animate-pulse" style={{animationDelay: '6s'}}></div>
+    <div className="min-h-screen bg-black relative">
+      {/* Background Effects */}
+      <div className="fixed inset-0 opacity-10 pointer-events-none">
+        <div className="absolute inset-0"
+             style={{
+               backgroundImage: `radial-gradient(circle at 1px 1px, rgba(4, 245, 160, 0.15) 1px, transparent 0)`,
+               backgroundSize: '50px 50px'
+             }}
+        />
       </div>
       
-      {/* Efeito de cursor */}
-      <div 
-        className="fixed inset-0 pointer-events-none z-10 transition-opacity duration-300"
+      {/* Dynamic Gradient */}
+      <div
+        className="fixed inset-0 opacity-20 pointer-events-none"
         style={{
-          background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(4, 245, 160, 0.06), transparent 40%)`
+          background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(4, 245, 160, 0.08), transparent 40%)`
         }}
       />
       
-      {/* Modal QR Code */}
-      {showQRModal && <QRCodeModal qrCode={qrCode} onClose={() => setShowQRModal(false)} />}
+      {/* 🆕 Modal do QR Code */}
+      {showQRModal && (
+        <QRCodeModal 
+          qrCode={qrCode} 
+          onClose={() => {
+            setShowQRModal(false);
+            setConnecting(false);
+          }} 
+        />
+      )}
       
-      {/* Header/Navbar */}
-      <div className="relative z-20 backdrop-blur-xl bg-black/20 border-b border-white/10">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            {/* Logo */}
-            <div className="flex items-center space-x-3 group cursor-pointer" onClick={() => router.push('/dashboard')}>
-              <div className="w-12 h-12 bg-[#04F5A0] rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent"></div>
-                <div className="w-6 h-6 bg-black rounded-sm relative z-10"
+      {/* Header - STICKY COM POSITION FIXED */}
+      <header className="sticky top-0 z-[200] bg-black/40 backdrop-blur-2xl border-b border-white/10 shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center group">
+              <div className="w-8 h-8 mr-3 flex items-center justify-center">
+                <div className="w-6 h-6 bg-[#04F5A0] rounded-sm opacity-90 group-hover:opacity-100 transition-all duration-300 group-hover:shadow-[0_0_15px_rgba(4,245,160,0.6)]"
                      style={{
                        clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)'
                      }}
                 />
               </div>
-              <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-[#04F5A0] to-white bg-clip-text text-transparent">
-                  SwiftBot
-                </h1>
-                <p className="text-xs text-gray-400">Seu chatbot inteligente</p>
-              </div>
+              <h1 className="text-xl font-bold text-white group-hover:text-[#04F5A0] transition-colors duration-300">
+                SwiftBot Dashboard
+              </h1>
             </div>
             
-            {/* Account Dropdown */}
-            <AccountDropdown 
-              user={user} 
-              userProfile={userProfile} 
-              onLogout={handleLogout}
-            />
+            {user && userProfile && (
+              <AccountDropdown user={user} userProfile={userProfile} onLogout={handleLogout} />
+            )}
           </div>
         </div>
-      </div>
+      </header>
       
-      {/* Main Content */}
-      <div className="relative z-20 container mx-auto px-6 py-8">
-        {/* Header */}
+      {/* Conteúdo Principal */}
+      <main className="relative z-10 max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <h2 className="text-4xl font-bold mb-2 bg-gradient-to-r from-[#04F5A0] to-white bg-clip-text text-transparent">
-            Dashboard
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-white via-[#04F5A0] to-white bg-clip-text text-transparent mb-2">
+            Bem-vindo de volta! 🎉
           </h2>
           <p className="text-gray-400">
             Gerencie seu chatbot WhatsApp com inteligência artificial
@@ -1133,6 +1175,7 @@ export default function Dashboard() {
         {/* Banner de Status da Assinatura */}
         {subscription && (
           <div className={`mb-8 p-6 rounded-3xl relative overflow-hidden ${
+            // Alterado de 'pagarme_subscription_id' para 'stripe_subscription_id'
             subscription.stripe_subscription_id === 'super_account_bypass' ? 'bg-black/30 backdrop-blur-xl border border-purple-500/30' :
             subscriptionStatus === 'active' ? 'bg-black/30 backdrop-blur-xl border border-[#04F5A0]/30' :
             subscriptionStatus === 'trial' ? 'bg-black/30 backdrop-blur-xl border border-blue-500/30' :
@@ -1329,89 +1372,100 @@ export default function Dashboard() {
             
             <div className="relative z-20">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white group-hover:text-[#04F5A0] transition-colors duration-300">Conversas</h3>
+                <h3 className="text-lg font-semibold text-white group-hover:text-[#04F5A0] transition-colors duration-300">Bate-Papo</h3>
                 <span className="text-2xl group-hover:scale-110 transition-transform duration-300">💬</span>
               </div>
               <p className="text-gray-400 mb-4 group-hover:text-gray-300 transition-colors duration-300">
-                Histórico e análise de conversas
+                Visualize conversas em tempo real
               </p>
               <div className="mb-4">
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white/10 text-gray-400 border border-white/20 backdrop-blur-sm">
-                  {statsLoading ? '🔄 Carregando...' : `📊 ${stats.conversasAtivas} ativas`}
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-500/10 text-purple-400 border border-purple-500/30 backdrop-blur-sm">
+                  {activeConnection ? `${stats.conversasAtivas} conversas hoje` : 'N/A'}
                 </span>
               </div>
-              <button
-                onClick={() => {
-                  if(activeConnection) {
-                      router.push(`/chat?connectionId=${activeConnection.id}`)
-                  } else {
-                      alert("Por favor, selecione uma conexão primeiro.")
-                  }
-                }}
-                disabled={!activeConnection}
-                className="w-full bg-purple-600/60 backdrop-blur-sm hover:bg-purple-600/80 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-xl transition-all duration-300 hover:shadow-[0_0_25px_rgba(168,85,247,0.3)] border border-purple-500/30 relative z-50"
-              >
-                📱 Ver Conversas
-              </button>
+              <div className="w-full bg-white/5 backdrop-blur-sm border border-purple-500/30 text-purple-300 font-medium py-3 px-4 rounded-xl text-center relative z-50">
+                🚀 Em breve
+              </div>
             </div>
           </div>
+          
         </div>
         
-        {/* Estatísticas */}
-        <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-2xl p-6 mb-8 relative overflow-hidden">
+        {/* Seção de Estatísticas */}
+        <div className="mb-8 bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-6 relative overflow-hidden">
           <div className="absolute inset-0 opacity-40 pointer-events-none">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[#04F5A0]/20 rounded-full blur-3xl animate-pulse"></div>
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-orange-500/20 rounded-full blur-xl animate-pulse" style={{animationDelay: '1.5s'}}></div>
+            <div className="absolute top-0 right-0 w-36 h-36 bg-blue-500/30 rounded-full blur-3xl animate-pulse"></div>
+            <div className="absolute bottom-0 left-0 w-28 h-28 bg-[#04F5A0]/25 rounded-full blur-2xl animate-pulse" style={{animationDelay: '1.5s'}}></div>
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-purple-500/20 rounded-full blur-xl animate-pulse" style={{animationDelay: '0.5s'}}></div>
           </div>
           
           <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
           
           <div className="relative z-20">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-white">📊 Estatísticas Hoje</h3>
-              {lastStatsUpdate && (
-                <span className="text-xs text-gray-500">
-                  Atualizado: {new Date(lastStatsUpdate).toLocaleTimeString()}
-                </span>
-              )}
+              <h3 className="text-xl font-semibold text-white flex items-center">
+                📊 Estatísticas da Conexão {activeConnection?.connection_number || ''}
+                {statsLoading && (
+                  <div className="ml-2 animate-spin rounded-full h-5 w-5 border-b-2 border-[#04F5A0]"></div>
+                )}
+              </h3>
             </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
-                <div className="text-gray-400 text-sm mb-1">Mensagens</div>
-                <div className="text-2xl font-bold text-white">{statsLoading ? '...' : stats.mensagensHoje}</div>
-              </div>
-              
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
-                <div className="text-gray-400 text-sm mb-1">Conversas Ativas</div>
-                <div className="text-2xl font-bold text-white">{statsLoading ? '...' : stats.conversasAtivas}</div>
-              </div>
-              
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
-                <div className="text-gray-400 text-sm mb-1">Taxa Resposta</div>
-                <div className="text-2xl font-bold text-white">{statsLoading ? '...' : stats.taxaResposta}%</div>
-              </div>
-              
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
-                <div className="text-gray-400 text-sm mb-1">Clientes</div>
-                <div className="text-2xl font-bold text-white">{statsLoading ? '...' : stats.clientesAtendidos}</div>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {[
+                { value: stats.mensagensHoje, label: 'Mensagens Hoje', color: 'text-blue-400', bg: 'bg-blue-500/10' },
+                { value: stats.conversasAtivas, label: 'Conversas Ativas', color: 'text-[#04F5A0]', bg: 'bg-[#04F5A0]/10' },
+                { value: `${stats.taxaResposta}%`, label: 'Taxa de Resposta', color: 'text-purple-400', bg: 'bg-purple-500/10' },
+                { value: stats.clientesAtendidos, label: 'Clientes Atendidos', color: 'text-orange-400', bg: 'bg-orange-500/10' }
+              ].map((stat, index) => (
+                <div key={index} className={`${stat.bg} backdrop-blur-sm border border-white/10 rounded-2xl p-6 text-center hover:border-[#04F5A0]/30 transition-all duration-300 group relative overflow-hidden`}>
+                  <div className="absolute inset-0 opacity-30 pointer-events-none">
+                    <div className={`absolute top-0 right-0 w-12 h-12 ${stat.bg.replace('/10', '/20')} rounded-full blur-lg animate-pulse`}></div>
+                    <div className={`absolute bottom-0 left-0 w-8 h-8 ${stat.bg.replace('/10', '/15')} rounded-full blur-md animate-pulse`} style={{animationDelay: '0.7s'}}></div>
+                  </div>
+                  
+                  <div className="relative z-10">
+                    <div className={`text-3xl font-bold ${stat.color} mb-2 group-hover:scale-110 transition-transform duration-300`}>
+                      {(statsLoading || !activeConnection) ? '...' : stat.value}
+                    </div>
+                    <div className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors duration-300">
+                      {stat.label}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
+            
+            {whatsappStatus !== 'connected' && (
+              <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl backdrop-blur-sm">
+                <p className="text-sm text-yellow-400 text-center">
+                  💡 Conecte a conexão selecionada para ver estatísticas em tempo real
+                </p>
+              </div>
+            )}
+            {lastStatsUpdate && (
+              <div className="mt-3 text-xs text-gray-500 text-center">
+                Última atualização: {new Date(lastStatsUpdate).toLocaleTimeString()}
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      </main>
       
-      {/* Modal de Checkout */}
+      {/* 💳 MODAL DE CHECKOUT - AGORA SEM CPF E ENDEREÇO */}
       {showCheckoutModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div 
-            className="absolute inset-0 bg-black/80 backdrop-blur-sm z-[60]"
-            onClick={() => !checkoutLoading && setShowCheckoutModal(false)}
-          />
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="absolute inset-0 opacity-20 pointer-events-none">
+            <div className="absolute inset-0"
+                 style={{
+                   backgroundImage: `radial-gradient(circle at 1px 1px, rgba(4, 245, 160, 0.15) 1px, transparent 0)`,
+                   backgroundSize: '50px 50px'
+                 }}
+            />
+          </div>
           
-          {/* Efeito de cursor no modal */}
-          <div 
-            className="absolute inset-0 pointer-events-none z-[65] transition-opacity duration-300"
+          <div
+            className="absolute inset-0 opacity-30 pointer-events-none"
             style={{
               background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(4, 245, 160, 0.1), transparent 40%)`
             }}
@@ -1611,7 +1665,7 @@ export default function Dashboard() {
               </div>
             )}
             
-            {/* Step 2: Dados do Cartão COM STRIPE ELEMENTS */}
+            {/* Step 2: Dados do Cartão (SEM CPF E ENDEREÇO) */}
             {checkoutStep === 'payment' && (
               <div className="relative z-10">
                 <div className="text-center mb-6">
@@ -1670,7 +1724,10 @@ export default function Dashboard() {
                   </div>
                 </div>
                 
-                {/* FORMULÁRIO COM STRIPE ELEMENTS */}
+                {/* ============================================================
+                  FORMULÁRIO ATUALIZADO (SEM CPF E ENDEREÇO)
+                  ============================================================
+                */}
                 <form onSubmit={handleTokenizedSubmit}>
                   <div className="space-y-4 mb-6">
                     {/* Nome no Cartão */}
@@ -1687,7 +1744,7 @@ export default function Dashboard() {
                       />
                     </div>
                     
-                    {/* Stripe Card Element */}
+                    {/* 🆕 Stripe Card Element - Substitui todos os campos de cartão */}
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
                         Dados do Cartão
@@ -1699,7 +1756,6 @@ export default function Dashboard() {
                       <div id="card-errors" className="text-red-400 text-sm mt-2"></div>
                     </div>
                   </div>
-                  
                   <div className="flex space-x-3">
                     <button
                       type="button"
