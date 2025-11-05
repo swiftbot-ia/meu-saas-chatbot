@@ -624,7 +624,7 @@ export default function Dashboard() {
         setPaymentElement(null)
       }
     }
-  }, [clientSecret, window.stripeInstance])
+  }, [clientSecret])
 
 
   // ============================================================================
@@ -682,13 +682,33 @@ export default function Dashboard() {
     try {
       console.log('💳 Confirmando pagamento...')
 
-      const { error } = await window.stripeInstance.confirmPayment({
-        elements: stripeElements,
-        confirmParams: {
-          return_url: `${window.location.origin}/dashboard`,
-        },
-        redirect: 'if_required'
-      })
+const isSetupIntent = clientSecret.startsWith('seti_')
+const isPaymentIntent = clientSecret.startsWith('pi_')
+
+let result
+if (isSetupIntent) {
+  console.log('💳 Confirmando SetupIntent (trial)...')
+  result = await window.stripeInstance.confirmSetup({
+    elements: stripeElements,
+    confirmParams: {
+      return_url: `${window.location.origin}/dashboard`,
+    },
+    redirect: 'if_required'
+  })
+} else if (isPaymentIntent) {
+  console.log('💳 Confirmando PaymentIntent (pagamento)...')
+  result = await window.stripeInstance.confirmPayment({
+    elements: stripeElements,
+    confirmParams: {
+      return_url: `${window.location.origin}/dashboard`,
+    },
+    redirect: 'if_required'
+  })
+} else {
+  throw new Error('Tipo de Intent desconhecido')
+}
+
+const { error } = result
 
       if (error) {
         console.error('❌ Erro ao confirmar pagamento:', error)
