@@ -713,34 +713,36 @@ export default function Dashboard() {
       console.log('🔍 Elements:', stripeElements)
       console.log('🔍 Payment Element:', paymentElement)
 
-const isSetupIntent = clientSecret.startsWith('seti_')
-const isPaymentIntent = clientSecret.startsWith('pi_')
+      console.log('🔍 Client Secret:', clientSecret)
 
-let result
-if (isSetupIntent) {
-  console.log('💳 Confirmando SetupIntent (trial)...')
-  result = await window.stripeInstance.confirmSetup({
-    elements: stripeElements,
-    confirmParams: {
-      return_url: `${window.location.origin}/dashboard`,
-    },
-    redirect: 'if_required'
-  })
-} else if (isPaymentIntent) {
-  console.log('💳 Confirmando PaymentIntent (pagamento)...')
-  result = await window.stripeInstance.confirmPayment({
-    elements: stripeElements,
-    confirmParams: {
-      return_url: `${window.location.origin}/dashboard`,
-    },
-    redirect: 'if_required'
-  })
-} else {
-  throw new Error('Tipo de Intent desconhecido')
-}
+      // ✅ Detectar tipo de Intent
+      const isSetupIntent = clientSecret.startsWith('seti_')
+      const isPaymentIntent = clientSecret.startsWith('pi_')
 
-const { error } = result
+      let result
+      if (isSetupIntent) {
+        console.log('💳 Confirmando SetupIntent (trial)...')
+        result = await window.stripeInstance.confirmSetup({
+          elements: stripeElements,
+          confirmParams: {
+            return_url: `${window.location.origin}/dashboard`,
+          },
+          redirect: 'if_required'
+        })
+      } else if (isPaymentIntent) {
+        console.log('💳 Confirmando PaymentIntent (pagamento)...')
+        result = await window.stripeInstance.confirmPayment({
+          elements: stripeElements,
+          confirmParams: {
+            return_url: `${window.location.origin}/dashboard`,
+          },
+          redirect: 'if_required'
+        })
+      } else {
+        throw new Error('Tipo de Intent desconhecido')
+      }
 
+      const { error } = result
       if (error) {
         console.error('❌ Erro ao confirmar pagamento:', error)
         throw new Error(error.message)
