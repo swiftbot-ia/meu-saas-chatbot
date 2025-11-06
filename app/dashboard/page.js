@@ -159,7 +159,7 @@ const AccountDropdown = ({ user, userProfile, onLogout }) => {
                   className="w-full flex items-center px-4 py-3 text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-all duration-200"
                 >
                   <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3 3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                   </svg>
                   Sair da Conta
                 </button>
@@ -547,6 +547,7 @@ export default function Dashboard() {
   // ============================================================================
   // 🆕 INICIALIZAR PAYMENT ELEMENT QUANDO TIVER CLIENT_SECRET
   // ============================================================================
+  // --- INÍCIO DA CORREÇÃO ---
   useEffect(() => {
     // ✅ Criar Payment Element apenas quando:
     // 1. Temos clientSecret
@@ -586,19 +587,12 @@ export default function Dashboard() {
         '.Label': {
           fontSize: '14px',
           fontWeight: '500',
-    _E_
-_E_
-_N_
-_N_
-_S_
-_A_
-_G_
-_E_
-_M_
-        marginBottom: '8px',
+          color: 'rgb(209, 213, 219)', // <-- LINHA RESTAURADA
+          marginBottom: '8px',
         }
       }
     }
+    // --- TEXTO CORROMPIDO REMOVIDO DAQUI ---
 
     const elements = window.stripeInstance.elements({
       clientSecret,
@@ -638,7 +632,18 @@ _M_
           
           if (event.complete) {
             setIsPaymentElementReady(true)
-          }
+    _E_
+_E_
+_N_
+_N_
+_S_
+_A_
+_G_
+_E_
+_M_
+_E_
+_M_
+        }
         })
       } else {
         console.error('❌ Container #payment-element não encontrado!')
@@ -648,6 +653,7 @@ _M_
     // ❌ NÃO RETORNAR CLEANUP AQUI!
     // O cleanup deve acontecer apenas quando o modal fechar
   }, [clientSecret, showCheckoutModal, paymentElement, window.stripeInstance])
+  // --- FIM DA CORREÇÃO ---
 
   // ✅ Cleanup do Payment Element quando modal fechar
   useEffect(() => {
@@ -704,7 +710,6 @@ _M_
   // ============================================================================
   // 🆕 CONFIRMAR PAGAMENTO COM PAYMENT ELEMENT
   // ============================================================================
-  // --- INÍCIO DA MUDANÇA (PASSO 1) ---
   const handleConfirmPayment = async (e) => {
     e.preventDefault()
 
@@ -802,7 +807,6 @@ _M_
     // ✅ Garantir que o loading seja desativado
     setCheckoutLoading(false)
   }
-  // --- FIM DA MUDANÇA (PASSO 1) ---
   
   // Funções de Gerenciamento de Conexão
   const loadUserConnections = async () => {
@@ -1835,7 +1839,7 @@ _M_
               <div className="relative z-10">
               
                 {/* ============================================== */}
-                {/* ⬇️ INÍCIO DA MUDANÇA (PASSO 2): OVERLAY ⬇️ */}
+                {/* ⬇️ OVERLAY DE LOADING ⬇️ */}
                 {/* ============================================== */}
                 {checkoutLoading && (
                   <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm rounded-3xl -m-8">
@@ -1849,7 +1853,7 @@ _M_
                   </div>
                 )}
                 {/* ============================================== */}
-                {/* ⬆️ FIM DA MUDANÇA (PASSO 2) ⬆️ */}
+                {/* ⬆️ FIM DO OVERLAY ⬆️ */}
                 {/* ============================================== */}
 
                 <div className="text-center mb-6">
@@ -1961,9 +1965,7 @@ _M_
               </div>
             )}
             
-            {/* --- INÍCIO DA MUDANÇA (PASSO 3): REMOÇÃO DO STEP 3 --- */}
-            {/* O bloco 'checkoutStep === 'processing' foi removido daqui */}
-            {/* --- FIM DA MUDANÇA (PASSO 3) --- */}
+            {/* Bloco 'processing' removido */}
 
           </div>
         </div>
