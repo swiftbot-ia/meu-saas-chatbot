@@ -70,6 +70,21 @@ export async function POST(request) {
 
     console.log('✅ Customer criado:', stripeCustomer.id)
 
+    // ✅ ANEXAR PAYMENT METHOD AO CUSTOMER
+console.log('📎 Anexando payment method ao customer...')
+await stripe.paymentMethods.attach(paymentMethodId, {
+  customer: stripeCustomer.id,
+})
+
+// ✅ DEFINIR COMO PAYMENT METHOD PADRÃO
+await stripe.customers.update(stripeCustomer.id, {
+  invoice_settings: {
+    default_payment_method: paymentMethodId,
+  },
+})
+
+console.log('✅ Payment method anexado e definido como padrão')
+
     // ✅ DEFINIR PREÇOS
     const pricing = {
       monthly: {
