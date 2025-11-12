@@ -1,0 +1,267 @@
+// app/api/checkout/confirm-subscription/route.js
+// ✅ ETAPA 2: Criar CUSTOMER + SUBSCRIPTION após cartão validado
+import { NextResponse } from 'next/server'
+import { supabase } from '../../../../lib/supabase'
+import { createCustomer, createSubscription, cancelSubscription } from '../../../../lib/stripe'
+import Stripe from 'stripe'
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
+
+const TEST_TRIAL_DAYS = 1
+
+export async function POST(request) {
+  try {
+    const { 
+      userId, 
+      paymentMethodId, 
+      plan,
+      userEmail,
+      userName 
+    } = await request.json()
+    
+    console.log('🎯 [STEP 2] Confirmando Subscription:', {
+      userId,
+      paymentMethodId,
+      plan
+    })
+
+    // ✅ VALIDAR DADOS OBRIGATÓRIOS
+    if (!userId || !paymentMethodId || !plan) {
+      return NextResponse.json({
+        success: false,
+        error: 'Dados obrigatórios não fornecidos'
+      }, { status: 400 })
+    }
+
+    // ✅ VERIFICAR SE JÁ TEM ASSINATURA ATIVA
+    const { data: existingSubscription } = await supabase
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .in('status', ['active', 'trial'])
+      .single()
+
+    if (existingSubscription) {
+      return NextResponse.json({
+        success: false,
+        error: 'Você já possui uma assinatura ativa.'
+      }, { status: 400 })
+    }
+
+    // ✅ BUSCAR DADOS DO PERFIL
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('phone, full_name')
+      .eq('user_id', userId)
+      .single()
+
+    // ✅ CRIAR CUSTOMER NA STRIPE (AGORA SIM!)
+    console.log('📝 Criando customer na Stripe...')
+    
+    const stripeCustomer = await createCustomer({
+      name: userName || userEmail.split('@')[0],
+      email: userEmail,
+      phone: userProfile?.phone || undefined,
+      metadata: {
+        user_id: userId,
+        environment: 'production'
+      }
+    })
+
+    console.log('✅ Customer criado:', stripeCustomer.id)
+
+    // ✅ DEFINIR PREÇOS
+    const pricing = {
+      monthly: {
+        1: 10, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875
+      },
+      annual: {
+        1: 1776, 2: 3294, 3: 4806, 4: 6318, 5: 6750, 6: 8100, 7: 9450
+      }
+    }
+
+    const planPrice = pricing[plan.billingPeriod][plan.connections]
+    const billingFrequency = plan.billingPeriod === 'monthly' ? '/mês' : '/ano'
+    
+    const isTrialEligible = !(await hasUserUsedTrial(userId))
+    const trialDays = isTrialEligible ? TEST_TRIAL_DAYS : 0
+
+    console.log('💰 Valores:', {
+      planPrice,
+      billingFrequency,
+      isTrialEligible,
+      trialDays
+    })
+
+    // ✅ CRIAR SUBSCRIPTION NA STRIPE
+    let stripeSubscription
+    
+    try {
+      console.log('📝 Criando assinatura na Stripe...')
+
+      stripeSubscription = await createSubscription({
+        customerId: stripeCustomer.id,
+        paymentMethodId: paymentMethodId,
+        planData: {
+          billingPeriod: plan.billingPeriod,
+          connections: plan.connections,
+          isTrialEligible: isTrialEligible,
+          planPrice: planPrice,
+          trialDays: trialDays
+        },
+        metadata: {
+          userId: userId,
+          userName: userName || userEmail.split('@')[0],
+          userEmail: userEmail,
+          display_amount: planPrice,
+          final_amount: planPrice,
+          billing_frequency: billingFrequency,
+          trial_days: trialDays,
+          phone: userProfile?.phone || 'not_provided'
+        }
+      })
+
+      console.log('✅ Subscription criada:', stripeSubscription.id)
+
+    } catch (stripeError) {
+      console.error('❌ Erro na Stripe:', stripeError)
+      
+      // Deletar customer criado em caso de erro
+      try {
+        await stripe.customers.del(stripeCustomer.id)
+      } catch (e) {}
+      
+      return NextResponse.json({
+        success: false,
+        error: 'Erro ao criar assinatura: ' + stripeError.message
+      }, { status: 500 })
+    }
+
+    // ✅ SALVAR NO BANCO LOCAL
+    const now = new Date()
+    
+    let trialEndDate = null
+    if (isTrialEligible && stripeSubscription.trial_end) {
+      trialEndDate = new Date(stripeSubscription.trial_end * 1000)
+    }
+
+    let nextBillingDate = new Date()
+    if (stripeSubscription.current_period_end) {
+      nextBillingDate = new Date(stripeSubscription.current_period_end * 1000)
+    } else {
+      const baseDate = trialEndDate || now
+      if (plan.billingPeriod === 'monthly') {
+        nextBillingDate = new Date(baseDate)
+        nextBillingDate.setMonth(nextBillingDate.getMonth() + 1)
+      } else {
+        nextBillingDate = new Date(baseDate)
+        nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1)
+      }
+    }
+
+    const subscriptionData = {
+      user_id: userId,
+      billing_period: plan.billingPeriod,
+      connections_purchased: plan.connections,
+      status: stripeSubscription.status === 'trialing' ? 'trial' : 'active',
+      trial_start_date: isTrialEligible ? now.toISOString() : null,
+      trial_end_date: trialEndDate ? trialEndDate.toISOString() : null,
+      next_billing_date: nextBillingDate.toISOString(),
+      stripe_customer_id: stripeCustomer.id,
+      stripe_payment_method_id: paymentMethodId,
+      stripe_subscription_id: stripeSubscription.id,
+      created_at: now.toISOString(),
+      updated_at: now.toISOString()
+    }
+
+    console.log('💾 Salvando no banco:', subscriptionData)
+
+    const { data: subscription, error: subscriptionError } = await supabase
+      .from('user_subscriptions')
+      .insert([subscriptionData])
+      .select()
+      .single()
+
+    if (subscriptionError) {
+      console.error('❌ Erro ao salvar:', subscriptionError)
+      
+      // Cancelar na Stripe
+      try {
+        await cancelSubscription(stripeSubscription.id, 'database_error')
+        await stripe.customers.del(stripeCustomer.id)
+      } catch (e) {}
+      
+      return NextResponse.json({
+        success: false,
+        error: 'Erro ao salvar assinatura: ' + subscriptionError.message
+      }, { status: 500 })
+    }
+
+    // ✅ LOG DA TRANSAÇÃO
+    if (subscription && subscription.id) {
+      await supabase
+        .from('payment_logs')
+        .insert([{
+          user_id: userId,
+          subscription_id: subscription.id,
+          event_type: isTrialEligible ? 'trial_started' : 'subscription_created',
+          amount: planPrice,
+          payment_method: 'credit_card',
+          stripe_transaction_id: stripeSubscription.id,
+          status: stripeSubscription.status === 'trialing' ? 'trial' : 'active',
+          metadata: {
+            trial_days: trialDays,
+            billing_period: plan.billingPeriod,
+            connections: plan.connections,
+            gateway: 'stripe'
+          },
+          created_at: now.toISOString()
+        }])
+    }
+
+    const successMessage = isTrialEligible 
+      ? `🎉 Trial de ${trialDays} dias ativado!` 
+      : `✅ Plano ativado com sucesso!`
+
+    console.log('✅ SUBSCRIPTION CONFIRMADA:', subscription.id)
+
+    return NextResponse.json({
+      success: true,
+      message: successMessage,
+      subscription: subscription,
+      trial_end_date: trialEndDate ? trialEndDate.toISOString() : null,
+      next_billing_date: nextBillingDate.toISOString(),
+      is_trial: isTrialEligible,
+      amount_charged: isTrialEligible ? 0 : planPrice,
+      trial_days: trialDays
+    })
+
+  } catch (error) {
+    console.error('❌ Erro geral:', error)
+    return NextResponse.json({
+      success: false,
+      error: 'Erro interno: ' + error.message
+    }, { status: 500 })
+  }
+}
+
+async function hasUserUsedTrial(userId) {
+  try {
+    const { data, error } = await supabase
+      .from('user_subscriptions')
+      .select('id')
+      .eq('user_id', userId)
+      .not('trial_start_date', 'is', null)
+      .limit(1)
+
+    if (error) {
+      console.error('Erro ao verificar trial:', error)
+      return false
+    }
+
+    return data && data.length > 0
+  } catch (error) {
+    console.error('Erro na verificação de trial:', error)
+    return false
+  }
+}
