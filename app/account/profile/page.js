@@ -11,18 +11,21 @@ export default function AccountProfile() {
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false)
   const [pendingChanges, setPendingChanges] = useState(null)
   const [errors, setErrors] = useState({})
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const [emailEditMode, setEmailEditMode] = useState(false)
   const [originalEmail, setOriginalEmail] = useState('')
   const [showEmailChangeSuccess, setShowEmailChangeSuccess] = useState(false)
   
+  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false)
+  // REMOVIDO: Estado de loading do avatar
+  // const [uploadingAvatar, setUploadingAvatar] = useState(false)
+
   // Form states
   const [formData, setFormData] = useState({
     full_name: '',
     company_name: '',
     phone: '',
     email: '',
-    avatar_url: '',
+    // avatar_url: '', // REMOVIDO
     current_password: '',
     new_password: '',
     confirm_password: ''
@@ -30,26 +33,15 @@ export default function AccountProfile() {
   
   const router = useRouter()
 
-  // Mouse tracking para efeitos visuais
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      setMousePosition({ x: e.clientX, y: e.clientY })
-    }
-    window.addEventListener('mousemove', handleMouseMove)
-    return () => window.removeEventListener('mousemove', handleMouseMove)
-  }, [])
-
   useEffect(() => {
     checkUser()
     
-    // Listener para detectar mudanças de autenticação (quando usuário confirma email)
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔔 Auth event:', event, 'Email:', session?.user?.email)
       
       if (event === 'USER_UPDATED' || event === 'SIGNED_IN') {
         console.log('📧 Email pode ter mudado, atualizando...')
         
-        // Atualizar email no formulário
         if (session?.user?.email) {
           setOriginalEmail(session.user.email)
           setFormData(prev => ({
@@ -82,9 +74,7 @@ export default function AccountProfile() {
 
   const loadUserProfile = async (userId) => {
     try {
-      // Buscar usuário atual para pegar email
       const { data: { user: currentUser } } = await supabase.auth.getUser()
-      
       console.log('📧 loadUserProfile - Email do usuário:', currentUser?.email)
       
       const { data: profile, error } = await supabase
@@ -100,20 +90,19 @@ export default function AccountProfile() {
           company_name: profile.company_name || '',
           phone: profile.phone ? formatPhone(profile.phone) : '',
           email: currentUser?.email || '',
-          avatar_url: profile.avatar_url || '',
+          // avatar_url: profile.avatar_url || '', // REMOVIDO
           current_password: '',
           new_password: '',
           confirm_password: ''
         })
         console.log('✅ FormData preenchido com email:', currentUser?.email)
       } else {
-        // Criar perfil se não existir
         const newProfile = {
           user_id: userId,
           full_name: currentUser?.user_metadata?.full_name || '',
           company_name: '',
           phone: '',
-          avatar_url: currentUser?.user_metadata?.avatar_url || '',
+          // avatar_url: currentUser?.user_metadata?.avatar_url || '', // REMOVIDO
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }
@@ -130,7 +119,7 @@ export default function AccountProfile() {
           company_name: newProfile.company_name,
           phone: newProfile.phone,
           email: currentUser?.email || '',
-          avatar_url: newProfile.avatar_url,
+          // avatar_url: newProfile.avatar_url, // REMOVIDO
           current_password: '',
           new_password: '',
           confirm_password: ''
@@ -140,6 +129,9 @@ export default function AccountProfile() {
       console.error('Erro ao carregar perfil:', error)
     }
   }
+
+  // REMOVIDA: Função de Upload de Avatar
+  // const handleAvatarUpload = async (event) => { ... }
 
   const formatPhone = (value) => {
     const numbers = value.replace(/\D/g, '')
@@ -195,7 +187,6 @@ export default function AccountProfile() {
     
     if (!validateForm()) return
     
-    // Se há mudança sensível, pedir confirmação de senha
     const emailChanged = emailEditMode && formData.email !== originalEmail
     const sensitiveChanges = emailChanged || formData.new_password
     
@@ -205,7 +196,6 @@ export default function AccountProfile() {
       return
     }
     
-    // Se não há mudanças sensíveis, salvar diretamente
     await saveProfile()
   }
 
@@ -216,7 +206,6 @@ export default function AccountProfile() {
     }
 
     try {
-      // Verificar senha atual
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: user.email,
         password: password
@@ -242,21 +231,20 @@ export default function AccountProfile() {
     try {
       const cleanPhone = data.phone.replace(/\D/g, '')
 
-      // Atualizar perfil no banco
+      // Atualizar perfil no banco (sem avatar_url)
       const { error: profileError } = await supabase
         .from('user_profiles')
         .update({
           full_name: data.full_name,
           company_name: data.company_name,
           phone: cleanPhone,
-          avatar_url: data.avatar_url,
+          // avatar_url: data.avatar_url, // REMOVIDO
           updated_at: new Date().toISOString()
         })
         .eq('user_id', user.id)
 
       if (profileError) throw profileError
 
-      // Atualizar email se mudou e está em modo de edição
       let emailWasChanged = false
       if (emailEditMode && data.email !== originalEmail) {
         console.log('🔄 Tentando atualizar email de:', originalEmail, 'para:', data.email)
@@ -272,15 +260,9 @@ export default function AccountProfile() {
         }
         
         console.log('✅ RESPOSTA COMPLETA do updateUser:', JSON.stringify(updateData, null, 2))
-        console.log('📧 Email atual do user:', updateData?.user?.email)
-        console.log('📧 Novo email pendente:', updateData?.user?.new_email)
-        console.log('📧 Email confirmado em:', updateData?.user?.email_confirmed_at)
-        console.log('📧 Metadados do user:', updateData?.user?.user_metadata)
-        
         emailWasChanged = true
       }
 
-      // Atualizar senha se fornecida
       if (data.new_password) {
         const { error: passwordError } = await supabase.auth.updateUser({
           password: data.new_password
@@ -288,7 +270,6 @@ export default function AccountProfile() {
         if (passwordError) throw passwordError
       }
 
-      // Mensagem de sucesso diferenciada
       if (emailWasChanged) {
         alert(`✅ Solicitação de mudança de email enviada!
 
@@ -305,19 +286,14 @@ O email só será atualizado após você confirmar no link.`)
         alert('✅ Perfil atualizado com sucesso!')
       }
       
-      // Desativar modo de edição de email
       setEmailEditMode(false)
-      
-      // Recarregar dados
       await loadUserProfile(user.id)
       
-      // Atualizar originalEmail com o email atual do usuário (que pode ter mudado após confirmação)
       const { data: { user: updatedUser } } = await supabase.auth.getUser()
       if (updatedUser?.email) {
         setOriginalEmail(updatedUser.email)
       }
       
-      // Limpar campos de senha
       setFormData(prev => ({
         ...prev,
         current_password: '',
@@ -339,142 +315,154 @@ O email só será atualizado após você confirmar no link.`)
     setErrors({...errors, email: ''})
   }
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative">
-            <div className="w-16 h-16 bg-[#04F5A0] rounded-2xl flex items-center justify-center mx-auto animate-pulse mb-4">
-              <div className="w-8 h-8 bg-black rounded-sm"
-                   style={{
-                     clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)'
-                   }}
-              />
-            </div>
-            <div className="absolute inset-0 bg-[#04F5A0]/30 rounded-2xl blur-xl animate-pulse mx-auto w-16 h-16" />
-          </div>
-          <p className="text-gray-300">Carregando configurações...</p>
-        </div>
+      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00FF99]" />
       </div>
     )
   }
+  
+  const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'Usuário'
+  const initials = displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
 
   return (
-    <div className="min-h-screen bg-black relative">
-      {/* Background Effects */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute inset-0" 
-             style={{
-               backgroundImage: `radial-gradient(circle at 1px 1px, rgba(4, 245, 160, 0.15) 1px, transparent 0)`,
-               backgroundSize: '50px 50px'
-             }}
-        />
-      </div>
+    <div className="min-h-screen bg-[#0A0A0A]">
+      
+      {/* REMOVIDO: Input de file escondido */}
 
-      {/* Dynamic Gradient */}
-      <div 
-        className="absolute inset-0 opacity-20 pointer-events-none"
-        style={{
-          background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(4, 245, 160, 0.08), transparent 40%)`
-        }}
-      />
+      <main className="relative z-10 max-w-4xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
 
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-black/30 backdrop-blur-xl border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+        <div className="mb-12 flex justify-between items-start gap-4">
+          
+          <div className="flex-1">
             <button
               onClick={() => router.push('/dashboard')}
-              className="flex items-center text-gray-400 hover:text-[#04F5A0] transition-colors duration-300"
+              className="flex items-center gap-2 text-sm text-[#B0B0B0] hover:text-white transition-colors duration-200 mb-4"
             >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
               Voltar ao Dashboard
             </button>
-            <h1 className="text-xl font-bold text-white">Configurações da Conta</h1>
+            
+            <h1 className="text-5xl font-bold text-white">
+              Configurações da Conta
+            </h1>
+            <p className="text-[#B0B0B0] text-lg mt-3">
+              Gerencie suas informações pessoais e de segurança
+            </p>
+          </div>
+
+          <div className="relative">
+            <button
+              onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
+              className="flex items-center justify-center p-2 rounded-xl hover:opacity-80 transition-opacity duration-200"
+              style={{ backgroundColor: '#272727' }}
+            >
+              
+              <div className="hidden lg:flex items-center gap-3">
+                <div 
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-black font-bold text-sm"
+                  style={{
+                    background: 'linear-gradient(135deg, #00FF99 0%, #00E88C 100%)',
+                    boxShadow: '0 0 0 2px rgba(0, 255, 153, 0.2)'
+                  }}
+                >
+                  {initials}
+                </div>
+                <svg className={`w-4 h-4 text-white/60 transition-transform duration-200 ${accountDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+
+              <div className="lg:hidden w-9 h-9 flex items-center justify-center">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 8h16M4 16h16" />
+                </svg>
+              </div>
+
+            </button>
+
+            {accountDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setAccountDropdownOpen(false)} />
+                <div 
+                  className="absolute right-0 mt-3 w-64 shadow-2xl rounded-2xl overflow-hidden z-50"
+                  style={{ backgroundColor: '#272727' }}
+                >
+                  <div className="py-2">
+                    <button
+                      onClick={() => { setAccountDropdownOpen(false); router.push('/account/profile'); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#B0B0B0] hover:text-white hover:bg-white/5 transition-all"
+                    >
+<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>                      Configurar Conta
+                    </button>
+                    <button
+                      onClick={() => { setAccountDropdownOpen(false); router.push('/account/subscription'); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#B0B0B0] hover:text-white hover:bg-white/5 transition-all"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                      Gerenciar Assinatura
+                    </button>
+                    <button
+                      onClick={() => { setAccountDropdownOpen(false); router.push('/sugestao'); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#B0B0B0] hover:text-white hover:bg-white/5 transition-all"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" /></svg>
+                      Central de Sugestões
+                    </button>
+                    <button
+                      onClick={() => { setAccountDropdownOpen(false); router.push('/suporte'); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#B0B0B0] hover:text-white hover:bg-white/5 transition-all"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                      Central de Ajuda
+                    </button>
+                    <div className="border-t border-white/10 mt-2 pt-2">
+                      <button
+                        onClick={() => { setAccountDropdownOpen(false); handleLogout(); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:text-red-300 hover:bg-red-900/10 transition-all"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                        Sair da Conta
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
-      </header>
 
-      {/* Conteúdo */}
-      <main className="relative z-10 max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-8 relative overflow-hidden">
-          {/* Animated Background Effects */}
-          <div className="absolute inset-0 opacity-30 pointer-events-none">
-            <div className="absolute top-0 left-0 w-40 h-40 bg-purple-500/30 rounded-full blur-3xl animate-pulse"></div>
-            <div className="absolute top-1/2 right-0 w-32 h-32 bg-pink-500/25 rounded-full blur-2xl animate-pulse" style={{animationDelay: '1s'}}></div>
-            <div className="absolute bottom-0 left-1/3 w-28 h-28 bg-violet-500/20 rounded-full blur-xl animate-pulse" style={{animationDelay: '2s'}}></div>
-          </div>
+        <div className="bg-[#111111] rounded-2xl p-8">
           
-          {/* Glass Effect Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-
-          {/* Content */}
           <div className="relative z-20">
             <div className="mb-8">
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-white via-[#04F5A0] to-white bg-clip-text text-transparent mb-4">
+              <h2 className="text-3xl font-bold text-white mb-4">
                 Informações do Perfil
               </h2>
               <p className="text-gray-400">Gerencie suas informações pessoais e preferências da conta.</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-8">
-              {/* Avatar Section */}
-              <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl p-6 relative overflow-hidden">
-                {/* Mini Animated Background */}
-                <div className="absolute inset-0 opacity-20 pointer-events-none">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#04F5A0]/30 rounded-full blur-xl animate-pulse"></div>
-                </div>
-                
-                <div className="relative z-10 flex items-center space-x-6">
-                  <div className="relative group">
-                    {formData.avatar_url ? (
-                      <img
-                        src={formData.avatar_url}
-                        alt="Avatar"
-                        className="w-24 h-24 rounded-full border-4 border-[#04F5A0]/50 group-hover:border-[#04F5A0] transition-all duration-300"
-                      />
-                    ) : (
-                      <div className="w-24 h-24 rounded-full bg-[#04F5A0] flex items-center justify-center text-black font-bold text-3xl group-hover:scale-105 transition-all duration-300 shadow-[0_0_20px_rgba(4,245,160,0.3)]">
-                        {formData.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                      </div>
-                    )}
-                    <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-green-500 rounded-full border-4 border-black flex items-center justify-center">
-                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      🖼️ URL do Avatar
-                    </label>
-                    <input
-                      type="url"
-                      value={formData.avatar_url}
-                      onChange={(e) => setFormData({...formData, avatar_url: e.target.value})}
-                      placeholder="https://exemplo.com/avatar.jpg"
-                      className="w-full bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
-                    />
-                  </div>
-                </div>
-              </div>
-
+              
+              {/* REMOVIDA: Seção do Avatar */}
+              
               {/* Informações Pessoais */}
-              <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl p-6 relative overflow-hidden">
-                {/* Mini Animated Background */}
-                <div className="absolute inset-0 opacity-20 pointer-events-none">
-                  <div className="absolute bottom-0 left-0 w-28 h-28 bg-blue-500/30 rounded-full blur-2xl animate-pulse"></div>
-                </div>
-                
+              <div className="bg-[#0A0A0A] rounded-2xl p-6">
                 <div className="relative z-10">
-                  <h3 className="text-xl font-semibold text-blue-400 mb-6 flex items-center">
-                    👤 Informações Pessoais
+                  <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                    Informações Pessoais
                   </h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Nome Completo */}
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
                         Nome Completo *
@@ -483,15 +471,15 @@ O email só será atualizado após você confirmar no link.`)
                         type="text"
                         value={formData.full_name}
                         onChange={(e) => setFormData({...formData, full_name: e.target.value})}
-                        className="w-full bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
+                        className="w-full bg-[#0A0A0A] border-0 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] outline-none transition-all duration-300"
                       />
                       {errors.full_name && <p className="mt-1 text-red-400 text-sm">{errors.full_name}</p>}
                     </div>
 
-                    {/* Telefone */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        📱 Telefone de Contato *
+                      <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                        Telefone de Contato *
                       </label>
                       <input
                         type="tel"
@@ -503,29 +491,20 @@ O email só será atualizado após você confirmar no link.`)
                           }
                         }}
                         placeholder="(11) 99999-9999"
-                        className="w-full bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
+                        className="w-full bg-[#0A0A0A] border-0 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] outline-none transition-all duration-300"
                       />
                       {errors.phone && <p className="mt-1 text-red-400 text-sm">{errors.phone}</p>}
-                      {!errors.phone && (
-                        <p className="mt-1 text-gray-500 text-xs">
-                          💡 Necessário para notificações e suporte
-                        </p>
-                      )}
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Informações da Empresa */}
-              <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl p-6 relative overflow-hidden">
-                {/* Mini Animated Background */}
-                <div className="absolute inset-0 opacity-20 pointer-events-none">
-                  <div className="absolute top-1/2 right-0 w-24 h-24 bg-purple-500/30 rounded-full blur-xl animate-pulse"></div>
-                </div>
-                
+              <div className="bg-[#0A0A0A] rounded-2xl p-6">
                 <div className="relative z-10">
-                  <h3 className="text-xl font-semibold text-purple-400 mb-6 flex items-center">
-                    🏢 Informações da Empresa
+                  <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                    Informações da Empresa
                   </h3>
                   
                   <div>
@@ -537,29 +516,25 @@ O email só será atualizado após você confirmar no link.`)
                       value={formData.company_name}
                       onChange={(e) => setFormData({...formData, company_name: e.target.value})}
                       placeholder="Ex: TechSolutions Ltda"
-                      className="w-full bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
+                      className="w-full bg-[#0A0A0A] border-0 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] outline-none transition-all duration-300"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Segurança da Conta */}
-              <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-2xl p-6 relative overflow-hidden">
-                {/* Mini Animated Background */}
-                <div className="absolute inset-0 opacity-20 pointer-events-none">
-                  <div className="absolute top-0 left-0 w-32 h-32 bg-orange-500/30 rounded-full blur-3xl animate-pulse"></div>
-                </div>
-                
+              <div className="bg-[#0A0A0A] rounded-2xl p-6">
                 <div className="relative z-10">
-                  <h3 className="text-xl font-semibold text-orange-400 mb-6 flex items-center">
-                    🔐 Segurança da Conta
+                  <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-3">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                    Segurança da Conta
                   </h3>
                   
                   <div className="space-y-6">
-                    {/* Email */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        📧 Email *
+                      <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                        Email *
                       </label>
                       <div className="flex gap-3 items-start">
                         <div className="flex-1">
@@ -568,15 +543,15 @@ O email só será atualizado após você confirmar no link.`)
                             value={formData.email}
                             onChange={(e) => setFormData({...formData, email: e.target.value})}
                             disabled={!emailEditMode}
-                            className={`w-full bg-black/30 backdrop-blur-sm border rounded-xl px-4 py-3 text-white placeholder-gray-500 transition-all duration-300 ${
+                            className={`w-full bg-[#0A0A0A] border-0 rounded-xl px-4 py-3 text-white placeholder-gray-500 transition-all duration-300 ${
                               emailEditMode 
-                                ? 'border-white/20 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none' 
-                                : 'border-white/10 opacity-60 cursor-not-allowed'
+                                ? 'focus:ring-2 focus:ring-[#00FF99] outline-none' 
+                                : 'opacity-60 cursor-not-allowed'
                             }`}
                           />
                           {errors.email && <p className="mt-1 text-red-400 text-sm">{errors.email}</p>}
                           {emailEditMode && formData.email !== originalEmail && !errors.email && (
-                            <div className="mt-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg backdrop-blur-sm">
+                            <div className="mt-2 p-3 bg-yellow-500/10 rounded-lg">
                               <p className="text-yellow-400 text-sm flex items-center">
                                 <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -589,16 +564,23 @@ O email só será atualizado após você confirmar no link.`)
                         <button
                           type="button"
                           onClick={() => emailEditMode ? handleCancelEmailEdit() : setEmailEditMode(true)}
-                          className="bg-black/30 backdrop-blur-xl hover:bg-black/40 text-white px-4 py-3 rounded-xl transition-all duration-300 border border-white/10 hover:border-[#04F5A0]/30 whitespace-nowrap"
+                          className="bg-[#272727] hover:bg-[#333333] text-white px-4 py-3 rounded-xl transition-all duration-300 whitespace-nowrap flex items-center gap-2"
                         >
-                          {emailEditMode ? '❌ Cancelar' : '✏️ Editar Email'}
+                          {emailEditMode ? (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                          ) : (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                          )}
+                          {emailEditMode ? 'Cancelar' : 'Editar'}
                         </button>
                       </div>
                     </div>
 
-                    {/* Alterar Senha */}
                     <div className="border-t border-white/10 pt-6">
-                      <h4 className="text-lg font-semibold text-white mb-4">🔑 Alterar Senha</h4>
+                      <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
+                        <svg width="18px" height="18px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" strokeWidth="0"></g><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"></g><g id="SVGRepo_iconCarrier"> <path d="M2 12C2 8.22876 2 6.34315 3.17157 5.17157C4.34315 4 6.22876 4 10 4H14C17.7712 4 19.6569 4 20.8284 5.17157C22 6.34315 22 8.22876 22 12C22 15.7712 22 17.6569 20.8284 18.8284C19.6569 20 17.7712 20 14 20H10C6.22876 20 4.34315 20 3.17157 18.8284C2 17.6569 2 15.7712 2 12Z" stroke="#BDBDBD" strokeWidth="1.5"></path> <path d="M9 12C9 12.5523 8.55228 13 8 13C7.44772 13 7 12.5523 7 12C7 11.4477 7.44772 11 8 11C8.55228 11 9 11.4477 9 12Z" fill="#BDBDBD"></path> <path d="M13 12C13 12.5523 12.5523 13 12 13C11.4477 13 11 12.5523 11 12C11 11.4477 11.4477 11 12 11C12.5523 11 13 11.4477 13 12Z" fill="#BDBDBD"></path> <path d="M17 12C17 12.5523 16.5523 13 16 13C15.4477 13 15 12.5523 15 12C15 11.4477 15.4477 11 16 11C16.5523 11 17 11.4477 17 12Z" fill="#BDBDBD"></path> </g></svg>
+                        Alterar Senha
+                      </h4>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -610,7 +592,7 @@ O email só será atualizado após você confirmar no link.`)
                             value={formData.new_password}
                             onChange={(e) => setFormData({...formData, new_password: e.target.value})}
                             placeholder="Deixe em branco para manter a atual"
-                            className="w-full bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
+                            className="w-full bg-[#0A0A0A] border-0 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] outline-none transition-all duration-300"
                           />
                           {errors.new_password && <p className="mt-1 text-red-400 text-sm">{errors.new_password}</p>}
                         </div>
@@ -624,7 +606,7 @@ O email só será atualizado após você confirmar no link.`)
                             value={formData.confirm_password}
                             onChange={(e) => setFormData({...formData, confirm_password: e.target.value})}
                             placeholder="Confirme a nova senha"
-                            className="w-full bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
+                            className="w-full bg-[#0A0A0A] border-0 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] outline-none transition-all duration-300"
                           />
                           {errors.confirm_password && <p className="mt-1 text-red-400 text-sm">{errors.confirm_password}</p>}
                         </div>
@@ -634,19 +616,18 @@ O email só será atualizado após você confirmar no link.`)
                 </div>
               </div>
 
-              {/* Botões */}
               <div className="flex justify-end space-x-4 pt-6 border-t border-white/10">
                 <button
                   type="button"
                   onClick={() => router.push('/dashboard')}
-                  className="px-6 py-3 bg-white/10 backdrop-blur-sm hover:bg-white/20 border border-white/20 text-gray-300 hover:text-white rounded-xl font-medium transition-all duration-300"
+                  className="px-6 py-3 bg-[#272727] hover:bg-[#333333] text-white rounded-xl font-medium transition-all duration-300"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-8 py-3 bg-[#04F5A0] hover:bg-[#03E691] disabled:bg-gray-600 text-black font-bold rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-[0_0_30px_rgba(4,245,160,0.5)] flex items-center"
+                  className="px-8 py-3 bg-gradient-to-r from-[#00FF99] to-[#00E88C] disabled:opacity-50 text-black font-bold rounded-xl transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] flex items-center"
                 >
                   {saving ? (
                     <>
@@ -670,37 +651,13 @@ O email só será atualizado após você confirmar no link.`)
 
       {/* Modal de Confirmação de Senha */}
       {showPasswordConfirm && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="absolute inset-0 opacity-20 pointer-events-none">
-            <div className="absolute inset-0"
-                 style={{
-                   backgroundImage: `radial-gradient(circle at 1px 1px, rgba(4, 245, 160, 0.15) 1px, transparent 0)`,
-                   backgroundSize: '50px 50px'
-                 }}
-            />
-          </div>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           
-          <div
-            className="absolute inset-0 opacity-30 pointer-events-none"
-            style={{
-              background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(4, 245, 160, 0.1), transparent 40%)`
-            }}
-          />
-          
-          <div className="relative bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-8 max-w-md w-full mx-4 shadow-[0_0_50px_rgba(4,245,160,0.15)] z-[70]">
-            {/* Animated Background Effects */}
-            <div className="absolute inset-0 opacity-40 pointer-events-none">
-              <div className="absolute top-0 left-0 w-32 h-32 bg-yellow-500/40 rounded-full blur-3xl animate-pulse"></div>
-              <div className="absolute bottom-0 right-0 w-24 h-24 bg-orange-500/35 rounded-full blur-xl animate-pulse" style={{animationDelay: '1s'}}></div>
-            </div>
+          <div className="relative bg-[#111111] rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl z-[70]">
             
-            {/* Glass Effect Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-            
-            {/* Content */}
             <div className="relative z-10">
               <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-yellow-500/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-4 border border-yellow-500/30">
+                <div className="w-16 h-16 bg-yellow-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
                   </svg>
@@ -712,15 +669,16 @@ O email só será atualizado após você confirmar no link.`)
               </div>
 
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  🔐 Senha Atual *
+                <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+                  <svg width="18px" height="18px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" strokeWidth="0"></g><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"></g><g id="SVGRepo_iconCarrier"> <path d="M2 12C2 8.22876 2 6.34315 3.17157 5.17157C4.34315 4 6.22876 4 10 4H14C17.7712 4 19.6569 4 20.8284 5.17157C22 6.34315 22 8.22876 22 12C22 15.7712 22 17.6569 20.8284 18.8284C19.6569 20 17.7712 20 14 20H10C6.22876 20 4.34315 20 3.17157 18.8284C2 17.6569 2 15.7712 2 12Z" stroke="#BDBDBD" strokeWidth="1.5"></path> <path d="M9 12C9 12.5523 8.55228 13 8 13C7.44772 13 7 12.5523 7 12C7 11.4477 7.44772 11 8 11C8.55228 11 9 11.4477 9 12Z" fill="#BDBDBD"></path> <path d="M13 12C13 12.5523 12.5523 13 12 13C11.4477 13 11 12.5523 11 12C11 11.4477 11.4477 11 12 11C12.5523 11 13 11.4477 13 12Z" fill="#BDBDBD"></path> <path d="M17 12C17 12.5523 16.5523 13 16 13C15.4477 13 15 12.5523 15 12C15 11.4477 15.4477 11 16 11C16.5523 11 17 11.4477 17 12Z" fill="#BDBDBD"></path> </g></svg>
+                  Senha Atual *
                 </label>
                 <input
                   type="password"
                   value={formData.current_password}
                   onChange={(e) => setFormData({...formData, current_password: e.target.value})}
                   placeholder="Digite sua senha atual"
-                  className="w-full bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300"
+                  className="w-full bg-[#0A0A0A] border-0 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] outline-none transition-all duration-300"
                   autoFocus
                 />
                 {errors.current_password && <p className="mt-1 text-red-400 text-sm">{errors.current_password}</p>}
@@ -734,14 +692,14 @@ O email só será atualizado após você confirmar no link.`)
                     setFormData({...formData, current_password: ''})
                     setErrors({})
                   }}
-                  className="flex-1 bg-white/10 backdrop-blur-sm hover:bg-white/20 border border-white/20 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300"
+                  className="flex-1 bg-[#272727] hover:bg-[#333333] text-white py-3 px-4 rounded-xl font-medium transition-all duration-300"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={() => confirmAndSave(formData.current_password)}
                   disabled={saving}
-                  className="flex-1 bg-[#04F5A0] hover:bg-[#03E691] disabled:bg-gray-600 text-black py-3 px-4 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_25px_rgba(4,245,160,0.4)]"
+                  className="flex-1 bg-gradient-to-r from-[#00FF99] to-[#00E88C] disabled:opacity-50 text-black py-3 px-4 rounded-xl font-bold transition-all duration-300"
                 >
                   {saving ? (
                     <div className="flex items-center justify-center">

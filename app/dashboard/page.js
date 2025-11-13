@@ -88,35 +88,48 @@ export default function Dashboard() {
     }
   }
 
-  const loadSubscription = async (userId) => {
-    try {
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', userId)
-        .single()
+const loadSubscription = async (userId) => {
+  try {
+    const { data, error } = await supabase
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
 
-      if (error) {
-        setSubscriptionStatus('none')
-        return
-      }
-
-      setSubscription(data)
-      
-      if (data.stripe_subscription_id === 'super_account_bypass') {
-        setSubscriptionStatus('super_account')
-      } else if (data.status === 'active' || data.status === 'trialing') {
-        setSubscriptionStatus('active')
-      } else if (data.status === 'past_due') {
-        setSubscriptionStatus('past_due')
-      } else {
-        setSubscriptionStatus('expired')
-      }
-    } catch (error) {
-      console.error('Erro ao carregar assinatura:', error)
+    if (error) {
+      console.log('Nenhuma assinatura encontrada')
       setSubscriptionStatus('none')
+      setSubscription(null)
+      return
     }
+
+    console.log('📊 Assinatura carregada:', data)
+    setSubscription(data)
+    
+    // ✅ LÓGICA CORRETA DE STATUS
+    if (data.stripe_subscription_id === 'super_account_bypass') {
+      setSubscriptionStatus('super_account')
+    } else if (data.status === 'trial' || data.status === 'trialing') {
+      setSubscriptionStatus('trial')
+    } else if (data.status === 'active') {
+      setSubscriptionStatus('active')
+    } else if (data.status === 'past_due') {
+      setSubscriptionStatus('past_due')
+    } else if (data.status === 'canceled' || data.status === 'cancelled') {
+      setSubscriptionStatus('canceled')
+    } else {
+      setSubscriptionStatus('expired')
+    }
+
+    console.log('✅ Status definido como:', data.status)
+  } catch (error) {
+    console.error('Erro ao carregar assinatura:', error)
+    setSubscriptionStatus('none')
+    setSubscription(null)
   }
+}
 
   const loadConnections = async (userId) => {
     try {
@@ -124,7 +137,6 @@ export default function Dashboard() {
         .from('whatsapp_connections')
         .select('*')
         .eq('user_id', userId)
-        .order('connection_number', { ascending: true })
 
       if (error) throw error
       
@@ -301,7 +313,6 @@ export default function Dashboard() {
         .from('whatsapp_connections')
         .insert({
           user_id: user.id,
-          connection_number: nextNumber,
           status: 'disconnected'
         })
         .select()
@@ -325,7 +336,7 @@ export default function Dashboard() {
     }
 
     try {
-      const response = await fetch('/api/subscription/sync', {
+      const response = await fetch('/api/subscription/sync-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -498,7 +509,7 @@ export default function Dashboard() {
       }
     }, 100)
 
-  }, [clientSecret, showCheckoutModal, paymentElement, window.stripeInstance])
+  }, [clientSecret, showCheckoutModal, paymentElement])
 
   // ✅ Cleanup do Payment Element quando modal fechar
   useEffect(() => {
@@ -510,7 +521,6 @@ export default function Dashboard() {
       setStripeElements(null)
       setIsPaymentElementReady(false)
       setClientSecret(null)
-      setStripeCustomerId(null)
     }
   }, [showCheckoutModal])
   // -->
@@ -727,7 +737,7 @@ const handleConfirmPayment = async (e) => {
     )
   }
 
-  const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'Usuário'
+  const displayName = (userProfile?.full_name || user?.email?.split('@')[0] || 'Usuário').split(' ')[0]
   const initials = displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
   const connectedCount = connections.filter(c => c.status === 'connected').length
   const totalSlots = subscription?.connections_purchased || 1
@@ -754,7 +764,7 @@ const handleConfirmPayment = async (e) => {
             {/* MODIFICADO: Adicionado flex e items-center, gap-4 */}
             <div className="flex items-center lg:gap-4">
               <h1 className="text-5xl font-bold text-white">
-                Olá, <span className="bg-gradient-to-r from-[#00FF99] via-[#00E88C] to-[#00D97F] bg-clip-text text-transparent">{displayName}</span>
+                Olá, <span className="capitalize bg-gradient-to-r from-[#00FF99] via-[#00E88C] to-[#00D97F] bg-clip-text text-transparent">{displayName}</span>
               </h1>
               {/* LOGO MOVIDA PARA CÁ */}
               <div className="hidden lg:flex w-10 h-10 items-center justify-center">
@@ -940,7 +950,7 @@ const handleConfirmPayment = async (e) => {
               {subscription?.stripe_subscription_id && subscription.stripe_subscription_id !== 'super_account_bypass' && (
                 <button 
                   onClick={syncSubscriptionStatus}
-                  className="ml-4 p-3 bg-[#0A0A0A] hover:bg-[#1A1A1A] rounded-xl transition-all duration-300 border border-[#333333]"
+                  className="ml-4 p-3 bg-[#0A0A0A] hover:bg-[#1A1A1A] rounded-xl transition-all duration-300"
                   title="Sincronizar status"
                 >
                   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -956,7 +966,7 @@ const handleConfirmPayment = async (e) => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
           
           {/* Conexão Ativa - Estilo Unificado Neutro */}
-          <div className="bg-[#111111] rounded-2xl p-8 hover:bg-[#1A1A1A] transition-all duration-300 border border-[#333333]">
+          <div className="bg-[#111111] rounded-2xl p-8 hover:bg-[#1A1A1A] transition-all duration-300">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 {/* Ícone com Fundo Gradiente Verde→Azul */}
@@ -976,7 +986,7 @@ const handleConfirmPayment = async (e) => {
             <div className="relative mb-6">
               <button
                 onClick={() => setConnectionsDropdownOpen(!connectionsDropdownOpen)}
-                className="w-full bg-[#0A0A0A] hover:bg-black border border-[#333333] rounded-xl p-4 transition-all duration-300"
+                className="w-full bg-[#0A0A0A] hover:bg-black rounded-xl p-4 transition-all duration-300"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -1083,7 +1093,7 @@ const handleConfirmPayment = async (e) => {
               <button
                 onClick={() => connectWhatsApp(activeConnection)}
                 disabled={connecting || !activeConnection}
-                className="w-full bg-transparent hover:bg-white/5 border border-[#B0B0B0] text-[#B0B0B0] hover:text-white hover:border-white font-medium py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center disabled:opacity-50"
+                className="w-full bg-[#222222] text-[#B0B0B0] hover:bg-gradient-to-r hover:from-[#00FF99] hover:to-[#00E88C] hover:text-black font-medium py-3 px-4 rounded-xl transition-all duration-1000 flex items-center justify-center disabled:opacity-50"
               >
                 {connecting ? (
                   <>
@@ -1098,7 +1108,7 @@ const handleConfirmPayment = async (e) => {
           </div>
 
           {/* Agente IA - Estilo Unificado Neutro */}
-          <div className="bg-[#111111] rounded-2xl p-8 hover:bg-[#1A1A1A] transition-all duration-300 border border-[#333333]">
+          <div className="bg-[#111111] rounded-2xl p-8 hover:bg-[#1A1A1A] transition-all duration-300">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 {/* Ícone com Fundo Gradiente Roxo→Rosa */}
@@ -1148,7 +1158,7 @@ const handleConfirmPayment = async (e) => {
           </div>
 
           {/* Bate-Papo - Estilo Unificado Neutro */}
-          <div className="bg-[#111111] rounded-2xl p-8 hover:bg-[#1A1A1A] transition-all duration-300 border border-[#333333]">
+          <div className="bg-[#111111] rounded-2xl p-8 hover:bg-[#1A1A1A] transition-all duration-300">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 {/* Ícone com Fundo Gradiente Cinza */}
@@ -1183,7 +1193,7 @@ const handleConfirmPayment = async (e) => {
         </div>
 
         {/* Estatísticas - Estilo Unificado Neutro */}
-        <div className="bg-[#111111] rounded-2xl p-8 border border-[#333333]">
+        <div className="bg-[#111111] rounded-2xl p-8">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-3xl font-bold text-white flex items-center gap-3">
               Estatísticas da Conexão {activeConnection?.connection_number || ''}
