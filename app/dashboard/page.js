@@ -744,13 +744,6 @@ const handleConfirmPayment = async (e) => {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A]">
-{/*
-  BLOCO DE CÓDIGO SUBSTITUTO (LINHAS 710 ATÉ 785)
-  - Logo movida para ao lado do "Olá, Caio Guedes"
-  - Logo NÃO é mais clicável.
-  - Menu da conta (Avatar + Seta) tem fundo #272727 e cantos arredondados, SEM borda.
-  - Dropdown do menu tem fundo #272727 e SEM borda.
-*/}
 
       {/* Main Content */}
       {/* Padding top mantido em pt-16 */}

@@ -11,11 +11,15 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false)
   const [socialLoading, setSocialLoading] = useState('')
   const [message, setMessage] = useState('')
-  const [isLogin, setIsLogin] = useState(true)
+  
+  // MODIFICADO: Trocamos 'isLogin' (booleano) por 'authView' (string)
+  // para acomodar 3 estados: 'login', 'register', 'forgotPassword'
+  const [authView, setAuthView] = useState('login') 
+
   const [errors, setErrors] = useState({})
   const router = useRouter()
 
-  // ✅ Animação IntersectionObserver (padrão estabelecido)
+  // Animação IntersectionObserver (sem alterações)
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -33,21 +37,26 @@ export default function AuthPage() {
     return () => observer.disconnect()
   }, [])
 
-  // Validações em tempo real
+  // MODIFICADO: A validação de 'isLogin' agora checa 'authView'
   const validateForm = () => {
     const newErrors = {}
-    if (!isLogin) {
+    if (authView === 'register') {
       if (!fullName.trim()) newErrors.fullName = 'Nome é obrigatório'
       if (password !== confirmPassword) newErrors.confirmPassword = 'Senhas não coincidem'
       if (password.length < 6) newErrors.password = 'Senha deve ter pelo menos 6 caracteres'
     }
     if (!email.includes('@')) newErrors.email = 'Email inválido'
-    if (!password) newErrors.password = 'Senha é obrigatória'
+    
+    // Senha só é obrigatória para login e registro
+    if (authView !== 'forgotPassword' && !password) {
+      newErrors.password = 'Senha é obrigatória'
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
-  // Verificar se perfil está completo
+  // Verificar se perfil está completo (sem alterações)
   const checkProfileCompletion = async (userId) => {
     try {
       const { data: profile, error } = await supabase
@@ -59,12 +68,12 @@ export default function AuthPage() {
       console.log('Profile check:', { profile, error })
 
       const needsCompletion = !profile || 
-                             !profile.company_name || 
-                             profile.company_name.trim() === '' ||
-                             !profile.full_name ||
-                             profile.full_name.trim() === '' ||
-                             !profile.phone || 
-                             profile.phone.trim() === ''
+                              !profile.company_name || 
+                              profile.company_name.trim() === '' ||
+                              !profile.full_name ||
+                              profile.full_name.trim() === '' ||
+                              !profile.phone || 
+                              profile.phone.trim() === ''
 
       console.log('Needs completion:', needsCompletion, {
         hasProfile: !!profile,
@@ -80,16 +89,22 @@ export default function AuthPage() {
     }
   }
 
-  // Autenticação tradicional
+  // Autenticação tradicional (Login/Registro)
+  // MODIFICADO: A validação de 'isLogin' agora checa 'authView'
   const handleAuth = async (e) => {
     e.preventDefault()
-    if (!validateForm()) return
+    
+    // Validação de senha é diferente para 'forgotPassword'
+    // Então só validamos aqui se NÃO for 'forgotPassword'
+    if (authView !== 'forgotPassword') {
+      if (!validateForm()) return
+    }
 
     setLoading(true)
     setMessage('')
 
     try {
-      if (isLogin) {
+      if (authView === 'login') {
         console.log('🔍 Tentando login com:', { email: email, passwordLength: password.length })
         
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -114,7 +129,7 @@ export default function AuthPage() {
             router.push('/dashboard')
           }
         }
-      } else {
+      } else if (authView === 'register') { // MODIFICADO
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -141,7 +156,37 @@ export default function AuthPage() {
     setLoading(false)
   }
 
-  // Login social
+  // ADICIONADO: Nova função para 'Esqueceu sua senha'
+  const handlePasswordReset = async (e) => {
+    e.preventDefault()
+    if (!email) {
+      setErrors({ email: 'Email é obrigatório' })
+      return
+    }
+    setLoading(true)
+    setMessage('')
+    setErrors({})
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+         redirectTo: 'https://swiftbot.com.br/reset-password',
+      })
+
+      if (error) {
+        throw error
+      }
+      
+      setMessage('✅ Email enviado! Verifique sua caixa de entrada para o link de redefinição.')
+      
+    } catch (error) {
+      console.error('Erro ao redefinir senha:', error)
+      setMessage(`❌ Erro: ${error.message}`)
+    }
+    
+    setLoading(false)
+  }
+
+  // Login social (sem alterações)
   const handleSocialLogin = async (provider) => {
     setSocialLoading(provider)
     
@@ -190,10 +235,9 @@ export default function AuthPage() {
 
   return (
     <>
-
       <div className="min-h-screen bg-black relative overflow-hidden flex items-center justify-center px-4 pt-24 pb-16">
         
-        {/* Background Pattern */}
+        {/* Backgrounds (sem alterações) */}
         <div className="absolute inset-0 opacity-10">
           <div 
             className="absolute inset-0" 
@@ -203,227 +247,334 @@ export default function AuthPage() {
             }}
           />
         </div>
-
-        {/* Animated Gradient Background - Padrão Pricing */}
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-black to-pink-900/20" />
-        
-        {/* Orbs de luz animados */}
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1.5s'}} />
 
-        {/* Auth Card com IntersectionObserver */}
+        {/* Auth Card */}
         <div className="animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000 relative w-full max-w-md">
           
           <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-8 md:p-10 shadow-2xl hover:bg-white/[0.07] transition-all duration-500">
             
-            {/* Badge Trial Gratuito */}
-            <div className="flex justify-center mb-6">
-              <div className="inline-flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-6 py-2">
-                <div className="w-2 h-2 bg-[#00FF99] rounded-full animate-pulse" />
-                <span className="text-sm text-gray-300 font-light">4 dias grátis • Sem cartão de crédito</span>
-              </div>
-            </div>
+            {/* Renderização Condicional da View
+              Mostra (Login/Registro) OU (Esqueceu Senha)
+            */}
+            
+            {/* ADICIONADO: View de Esqueceu Senha */}
+            {authView === 'forgotPassword' ? (
+              <>
+                {/* Título */}
+                <div className="text-center mb-8">
+                  <h1 className="text-4xl font-light text-white mb-3">
+                    Recuperar <span className="font-normal bg-gradient-to-r from-[#00FF99] to-[#00E88C] bg-clip-text text-transparent">Senha</span>
+                  </h1>
+                  <p className="text-gray-400 font-light">
+                    Digite seu email para enviarmos um link de redefinição.
+                  </p>
+                </div>
 
-            {/* Título */}
-            <div className="text-center mb-8">
-              <h1 className="text-4xl font-light text-white mb-3">
-                Bem-vindo ao <span className="font-normal bg-gradient-to-r from-[#00FF99] to-[#00E88C] bg-clip-text text-transparent">SwiftBot</span>
-              </h1>
-              <p className="text-gray-400 font-light">
-                {isLogin ? 'Entre na sua conta e continue automatizando' : 'Crie sua conta e comece em segundos'}
-              </p>
-            </div>
+                {/* Formulário de Esqueceu Senha */}
+                <form onSubmit={handlePasswordReset} className="space-y-4">
+                  {/* Email */}
+                  <div>
+                    <label className="block text-sm font-light text-gray-300 mb-2">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className={`w-full px-4 py-3 bg-white/5 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] focus:border-[#00FF99] outline-none transition-all duration-300 font-light ${
+                        errors.email ? 'border-red-500/50' : 'border-white/10'
+                      }`}
+                      placeholder="seu@email.com"
+                    />
+                    {errors.email && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.email}</p>}
+                  </div>
 
-            {/* Social Login Buttons - Gradientes do Design System */}
-            <div className="space-y-3 mb-6">
-              {socialProviders.map((provider) => (
-                <button
-                  key={provider.name}
-                  onClick={() => handleSocialLogin(provider.name)}
-                  disabled={socialLoading === provider.name}
-                  className={`group w-full flex items-center justify-center gap-3 px-4 py-3 bg-gradient-to-r ${provider.gradient} rounded-xl text-white font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden`}
-                >
-                  {/* Hover effect overlay */}
-                  <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300" />
-                  
-                  {socialLoading === provider.name ? (
-                    <div className="flex items-center relative z-10">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      <span className="font-light">Conectando...</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-3 relative z-10">
-                      {provider.icon}
-                      <span className="font-light">Continuar com {provider.label}</span>
+                  {/* Message */}
+                  {message && (
+                    <div className={`p-3 rounded-xl text-sm border backdrop-blur-sm font-light ${
+                      message.includes('✅') 
+                        ? 'bg-green-900/20 text-green-400 border-green-800/50' 
+                        : 'bg-red-900/20 text-red-400 border-red-800/50'
+                    }`}>
+                      {message}
                     </div>
                   )}
-                </button>
-              ))}
-            </div>
 
-{/* Divider */}
-<div className="relative flex items-center justify-center mb-6 gap-4">
-  <div className="flex-1 border-t border-white/10"></div>
-  <span className="text-sm text-gray-400 font-light">ou</span>
-  <div className="flex-1 border-t border-white/10"></div>
-</div>
-
-            {/* Toggle Login/Register */}
-            <div className="flex bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-1 mb-6">
-              <button
-                onClick={() => setIsLogin(true)}
-                className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-light transition-all duration-300 ${
-                  isLogin 
-                    ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black shadow-lg font-medium' 
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Entrar
-              </button>
-              <button
-                onClick={() => setIsLogin(false)}
-                className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-light transition-all duration-300 ${
-                  !isLogin 
-                    ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black shadow-lg font-medium' 
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Cadastrar
-              </button>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleAuth} className="space-y-4">
-              
-              {/* Nome Completo - apenas no cadastro */}
-              {!isLogin && (
-                <div>
-                  <label className="block text-sm font-light text-gray-300 mb-2">
-                    Nome Completo *
-                  </label>
-                  <input
-                    type="text"
-                    required={!isLogin}
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className={`w-full px-4 py-3 bg-white/5 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] focus:border-[#00FF99] outline-none transition-all duration-300 font-light ${
-                      errors.fullName ? 'border-red-500/50' : 'border-white/10'
-                    }`}
-                    placeholder="João Silva"
-                  />
-                  {errors.fullName && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.fullName}</p>}
-                </div>
-              )}
-
-              {/* Email */}
-              <div>
-                <label className="block text-sm font-light text-gray-300 mb-2">
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className={`w-full px-4 py-3 bg-white/5 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] focus:border-[#00FF99] outline-none transition-all duration-300 font-light ${
-                    errors.email ? 'border-red-500/50' : 'border-white/10'
-                  }`}
-                  placeholder="seu@email.com"
-                />
-                {errors.email && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.email}</p>}
-              </div>
-
-              {/* Senha */}
-              <div>
-                <label className="block text-sm font-light text-gray-300 mb-2">
-                  Senha *
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={`w-full px-4 py-3 bg-white/5 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] focus:border-[#00FF99] outline-none transition-all duration-300 font-light ${
-                    errors.password ? 'border-red-500/50' : 'border-white/10'
-                  }`}
-                  placeholder="••••••••"
-                  minLength={6}
-                />
-                {errors.password && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.password}</p>}
-              </div>
-
-              {/* Confirmar Senha - apenas no cadastro */}
-              {!isLogin && (
-                <div>
-                  <label className="block text-sm font-light text-gray-300 mb-2">
-                    Confirmar Senha *
-                  </label>
-                  <input
-                    type="password"
-                    required={!isLogin}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className={`w-full px-4 py-3 bg-white/5 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] focus:border-[#00FF99] outline-none transition-all duration-300 font-light ${
-                      errors.confirmPassword ? 'border-red-500/50' : 'border-white/10'
-                    }`}
-                    placeholder="••••••••"
-                  />
-                  {errors.confirmPassword && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.confirmPassword}</p>}
-                </div>
-              )}
-
-              {/* Esqueceu senha link - apenas no login */}
-              {isLogin && (
-                <div className="text-right">
+                  {/* Submit Button */}
                   <button
-                    type="button"
-                    className="text-sm text-gray-400 hover:text-[#00FF99] transition-colors duration-300 font-light"
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] hover:shadow-[0_0_40px_rgba(0,255,153,0.6)] disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-4 px-4 rounded-xl transition-all duration-300 hover:scale-105 flex items-center justify-center"
                   >
-                    Esqueceu sua senha?
+                    {loading ? (
+                      <div className="flex items-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black mr-2"></div>
+                        <span className="font-light">Enviando...</span>
+                      </div>
+                    ) : (
+                      <span className="font-medium">
+                        Enviar Link de Recuperação
+                      </span>
+                    )}
+                  </button>
+                </form>
+
+                {/* Voltar para Login */}
+                <div className="mt-8 text-center">
+                  <button
+                    onClick={() => { setAuthView('login'); setMessage(''); setErrors({}); }}
+                    className="text-gray-500 hover:text-[#00FF99] text-sm transition-colors duration-300 flex items-center justify-center mx-auto font-light group"
+                  >
+                    <span className="mr-2 group-hover:-translate-x-1 transition-transform duration-300">←</span>
+                    Voltar para o Login
                   </button>
                 </div>
-              )}
-
-              {/* Message */}
-              {message && (
-                <div className={`p-3 rounded-xl text-sm border backdrop-blur-sm font-light ${
-                  message.includes('✅') 
-                    ? 'bg-green-900/20 text-green-400 border-green-800/50' 
-                    : 'bg-red-900/20 text-red-400 border-red-800/50'
-                }`}>
-                  {message}
-                </div>
-              )}
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] hover:shadow-[0_0_40px_rgba(0,255,153,0.6)] disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-4 px-4 rounded-xl transition-all duration-300 hover:scale-105 flex items-center justify-center"
-              >
-                {loading ? (
-                  <div className="flex items-center">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black mr-2"></div>
-                    <span className="font-light">{isLogin ? 'Entrando...' : 'Criando conta...'}</span>
+              </>
+            
+            ) : (
+              
+              /* MODIFICADO: View de Login/Registro (todo o conteúdo anterior) */
+              <>
+                {/* Badge Trial Gratuito */}
+                <div className="flex justify-center mb-6">
+                  <div className="inline-flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-6 py-2">
+                    <div className="w-2 h-2 bg-[#00FF99] rounded-full animate-pulse" />
+                    <span className="text-sm text-gray-300 font-light">4 dias grátis • Sem cartão de crédito</span>
                   </div>
-                ) : (
-                  <span className="font-medium">
-                    {isLogin ? '🚀 Entrar na Plataforma' : '✨ Criar Minha Conta'}
-                  </span>
-                )}
-              </button>
-            </form>
+                </div>
 
-            {/* Back to Home */}
-            <div className="mt-8 text-center">
-              <button
-                onClick={() => router.push('/')}
-                className="text-gray-500 hover:text-[#00FF99] text-sm transition-colors duration-300 flex items-center justify-center mx-auto font-light group"
-              >
-                <span className="mr-2 group-hover:-translate-x-1 transition-transform duration-300">←</span>
-                Voltar ao início
-              </button>
-            </div>
+                {/* Título */}
+                <div className="text-center mb-8">
+                  <h1 className="text-4xl font-light text-white mb-3">
+                    Bem-vindo ao <span className="font-normal bg-gradient-to-r from-[#00FF99] to-[#00E88C] bg-clip-text text-transparent">SwiftBot</span>
+                  </h1>
+                  <p className="text-gray-400 font-light">
+                    {authView === 'login' ? 'Entre na sua conta e continue automatizando' : 'Crie sua conta e comece em segundos'}
+                  </p>
+                </div>
+
+                {/* Social Login Buttons */}
+                <div className="space-y-3 mb-6">
+                  {socialProviders.map((provider) => (
+                    <button
+                      key={provider.name}
+                      onClick={() => handleSocialLogin(provider.name)}
+                      disabled={socialLoading === provider.name}
+                      className={`group w-full flex items-center justify-center gap-3 px-4 py-3 bg-gradient-to-r ${provider.gradient} rounded-xl text-white font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden`}
+                    >
+                      <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300" />
+                      
+                      {socialLoading === provider.name ? (
+                        <div className="flex items-center relative z-10">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          <span className="font-light">Conectando...</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3 relative z-10">
+                          {provider.icon}
+                          <span className="font-light">Continuar com {provider.label}</span>
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Divider */}
+                <div className="relative flex items-center justify-center mb-6 gap-4">
+                  <div className="flex-1 border-t border-white/10"></div>
+                  <span className="text-sm text-gray-400 font-light">ou</span>
+                  <div className="flex-1 border-t border-white/10"></div>
+                </div>
+
+                {/* Toggle Login/Register */}
+                <div className="flex bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-1 mb-6">
+                  <button
+                    onClick={() => { setAuthView('login'); setMessage(''); setErrors({}); }} // MODIFICADO
+                    className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-light transition-all duration-300 ${
+                      authView === 'login' 
+                        ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black shadow-lg font-medium' 
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Entrar
+                  </button>
+                  <button
+                    onClick={() => { setAuthView('register'); setMessage(''); setErrors({}); }} // MODIFICADO
+                    className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-light transition-all duration-300 ${
+                      authView === 'register' 
+                        ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black shadow-lg font-medium' 
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Cadastrar
+                  </button>
+                </div>
+
+                {/* Form */}
+                <form onSubmit={handleAuth} className="space-y-4">
+                  
+                  {/* Nome Completo - apenas no cadastro */}
+                  {authView === 'register' && (
+                    <div>
+                      <label className="block text-sm font-light text-gray-300 mb-2">
+                        Nome Completo *
+                      </label>
+                      <input
+                        type="text"
+                        required={authView === 'register'}
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        className={`w-full px-4 py-3 bg-white/5 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] focus:border-[#00FF99] outline-none transition-all duration-300 font-light ${
+                          errors.fullName ? 'border-red-500/50' : 'border-white/10'
+                        }`}
+                        placeholder="João Silva"
+                      />
+                      {errors.fullName && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.fullName}</p>}
+                    </div>
+                  )}
+
+                  {/* Email */}
+                  <div>
+                    <label className="block text-sm font-light text-gray-300 mb-2">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className={`w-full px-4 py-3 bg-white/5 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] focus:border-[#00FF99] outline-none transition-all duration-300 font-light ${
+                        errors.email ? 'border-red-500/50' : 'border-white/10'
+                      }`}
+                      placeholder="seu@email.com"
+                    />
+                    {errors.email && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.email}</p>}
+                  </div>
+
+                  {/* Senha */}
+                  <div>
+                    <label className="block text-sm font-light text-gray-300 mb-2">
+                      Senha *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className={`w-full px-4 py-3 bg-white/5 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] focus:border-[#00FF99] outline-none transition-all duration-300 font-light ${
+                        errors.password ? 'border-red-500/50' : 'border-white/10'
+                      }`}
+                      placeholder="••••••••"
+                      minLength={6}
+                    />
+                    {errors.password && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.password}</p>}
+                  </div>
+
+                  {/* Confirmar Senha - apenas no cadastro */}
+                  {authView === 'register' && (
+                    <div>
+                      <label className="block text-sm font-light text-gray-300 mb-2">
+                        Confirmar Senha *
+                      </label>
+                      <input
+                        type="password"
+                        required={authView === 'register'}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className={`w-full px-4 py-3 bg-white/5 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] focus:border-[#00FF99] outline-none transition-all duration-300 font-light ${
+                          errors.confirmPassword ? 'border-red-500/50' : 'border-white/10'
+                        }`}
+                        placeholder="••••••••"
+                      />
+                      {errors.confirmPassword && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.confirmPassword}</p>}
+                    </div>
+                  )}
+
+                  {/* Esqueceu senha link - apenas no login */}
+                  {authView === 'login' && (
+                    <div className="text-right">
+                      <button
+                        type="button"
+                        // MODIFICADO: onClick para mudar a view
+                        onClick={() => { setAuthView('forgotPassword'); setMessage(''); setErrors({}); }}
+                        className="text-sm text-gray-400 hover:text-[#00FF99] transition-colors duration-300 font-light"
+                      >
+                        Esqueceu sua senha?
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Message */}
+                  {message && (
+                    <div className={`p-3 rounded-xl text-sm border backdrop-blur-sm font-light ${
+                      message.includes('✅') 
+                        ? 'bg-green-900/20 text-green-400 border-green-800/50' 
+                        : 'bg-red-900/20 text-red-400 border-red-800/50'
+                    }`}>
+                      {message}
+                    </div>
+                  )}
+                  {/*(Termos de Uso) */}
+                  {authView === 'register' && (
+                    <p className="text-xs text-gray-500 text-center font-light pt-2">
+                      Ao clicar em "Criar Minha Conta", você aceita nossos<br />
+                      <a 
+                        href="/termos" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-gray-400 hover:text-[#00FF99] underline transition-colors"
+                      >
+                        Termos de Uso
+                      </a> 
+                      {" e "}
+                      <a 
+                        href="/privacidade" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-gray-400 hover:text-[#00FF99] underline transition-colors"
+                      >
+                        Política de Privacidade
+                      </a>.
+                    </p>
+                  )}
+                  
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] hover:shadow-[0_0_40px_rgba(0,255,153,0.6)] disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-4 px-4 rounded-xl transition-all duration-300 hover:scale-105 flex items-center justify-center"
+                  >
+                    {loading ? (
+                      <div className="flex items-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black mr-2"></div>
+                        <span className="font-light">{authView === 'login' ? 'Entrando...' : 'Criando conta...'}</span>
+                      </div>
+                    ) : (
+                      <span className="font-medium">
+                        {authView === 'login' ? 'Entrar na Plataforma' : 'Criar Minha Conta'}
+                      </span>
+                    )}
+                  </button>
+                </form>
+
+                {/* Back to Home */}
+                <div className="mt-8 text-center">
+                  <button
+                    onClick={() => router.push('/')}
+                    className="text-gray-500 hover:text-[#00FF99] text-sm transition-colors duration-300 flex items-center justify-center mx-auto font-light group"
+                  >
+                    <span className="mr-2 group-hover:-translate-x-1 transition-transform duration-300">←</span>
+                    Voltar ao início
+                  </button>
+                </div>
+              </>
+            )} 
+            {/* Fim da renderização condicional */}
+
           </div>
         </div>
       </div>
