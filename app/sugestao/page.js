@@ -3,126 +3,18 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
 
-// Componente Dropdown de Conta (mesmo do dashboard)
-const AccountDropdown = ({ user, userProfile, onLogout }) => {
-  const [isOpen, setIsOpen] = useState(false)
-  const router = useRouter()
-  
-  const displayName = userProfile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário'
-  const avatarUrl = userProfile?.avatar_url
-  const initials = displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-3 bg-black/30 backdrop-blur-xl hover:bg-black/40 rounded-xl px-3 py-2 transition-all duration-300 border border-white/10 hover:border-[#04F5A0]/30 relative overflow-hidden z-[210]"
-      >
-        <div className="absolute inset-0 opacity-30 pointer-events-none z-0">
-          <div className="absolute top-0 right-0 w-8 h-8 bg-purple-500/30 rounded-full blur-md animate-pulse"></div>
-          <div className="absolute bottom-0 left-0 w-6 h-6 bg-[#04F5A0]/20 rounded-full blur-sm animate-pulse" style={{animationDelay: '0.5s'}}></div>
-        </div>
-        
-        <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-        
-        <div className="relative z-10 flex items-center space-x-3">
-          <div className="relative">
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full border-2 border-[#04F5A0]/50" />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-[#04F5A0] flex items-center justify-center text-black font-bold text-sm">
-                {initials}
-              </div>
-            )}
-            <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-900"></div>
-          </div>
-          
-          <span className="text-sm text-gray-300 font-medium">{displayName}</span>
-          
-          <svg
-            className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
-      </button>
-
-      {isOpen && (
-        <>
-          <div className="fixed inset-0 z-[220]" onClick={() => setIsOpen(false)} />
-          
-          <div className="absolute right-0 mt-2 w-64 bg-black/40 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 z-[230] overflow-hidden">
-            <div className="p-4 border-b border-white/10">
-              <div className="flex items-center space-x-3">
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt="Avatar" className="w-12 h-12 rounded-full border-2 border-[#04F5A0]/50" />
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-[#04F5A0] flex items-center justify-center text-black font-bold text-lg">
-                    {initials}
-                  </div>
-                )}
-                <div>
-                  <div className="text-white font-medium">{displayName}</div>
-                  <div className="text-gray-400 text-sm">{user?.email}</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="py-2">
-              <button
-                onClick={() => {
-                  setIsOpen(false)
-                  router.push('/dashboard')
-                }}
-                className="w-full flex items-center px-4 py-3 text-gray-300 hover:bg-gray-800/50 hover:text-[#04F5A0] transition-all duration-200"
-              >
-                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                </svg>
-                Dashboard
-              </button>
-
-              <button
-                onClick={() => {
-                  setIsOpen(false)
-                  router.push('/account/profile')
-                }}
-                className="w-full flex items-center px-4 py-3 text-gray-300 hover:bg-gray-800/50 hover:text-[#04F5A0] transition-all duration-200"
-              >
-                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                Perfil
-              </button>
-
-              <div className="border-t border-white/10 my-2"></div>
-
-              <button
-                onClick={onLogout}
-                className="w-full flex items-center px-4 py-3 text-red-400 hover:bg-gray-800/50 transition-all duration-200"
-              >
-                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                Sair
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
+// REMOVIDO: Componente AccountDropdown antigo
 
 export default function FeedbackPage() {
   const [user, setUser] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+  // REMOVIDO: mousePosition
+  // const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+  
+  // ADICIONADO: Estado do menu da conta
+  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false)
   
   const [formData, setFormData] = useState({
     type: '',
@@ -134,27 +26,23 @@ export default function FeedbackPage() {
   const [errors, setErrors] = useState({})
   const router = useRouter()
 
+  // MODIFICADO: Emojis removidos. Os SVGs serão adicionados no render.
   const suggestionTypes = [
-    { value: 'feature', label: 'Nova Funcionalidade', icon: '🚀', desc: 'Sugira uma nova feature' },
-    { value: 'improvement', label: 'Melhoria', icon: '⚡', desc: 'Melhore algo existente' },
-    { value: 'integration', label: 'Integração', icon: '🔌', desc: 'Integração com outras plataformas' },
-    { value: 'ux', label: 'Design/UX', icon: '🖼️', desc: 'Melhorias visuais ou de usabilidade' }
+    { value: 'feature', label: 'Nova Funcionalidade', desc: 'Sugira uma nova feature' },
+    { value: 'improvement', label: 'Melhoria', desc: 'Melhore algo existente' },
+    { value: 'integration', label: 'Integração', desc: 'Integração com outras plataformas' },
+    { value: 'ux', label: 'Design/UX', desc: 'Melhorias visuais ou de usabilidade' }
   ]
 
+  // MODIFICADO: Emojis removidos.
   const impactLevels = [
-    { value: 'low', label: 'Baixo', color: 'text-blue-400', desc: 'Legal de ter', icon: '🔵' },
-    { value: 'medium', label: 'Médio', color: 'text-yellow-400', desc: 'Útil para vários usuários', icon: '🟡' },
-    { value: 'high', label: 'Alto', color: 'text-orange-400', desc: 'Muito importante', icon: '🟠' },
-    { value: 'critical', label: 'Crítico', color: 'text-red-400', desc: 'Essencial para o negócio', icon: '🔴' }
+    { value: 'low', label: 'Baixo', color: 'text-blue-400', desc: 'Legal de ter' },
+    { value: 'medium', label: 'Médio', color: 'text-yellow-400', desc: 'Útil para vários usuários' },
+    { value: 'high', label: 'Alto', color: 'text-orange-400', desc: 'Muito importante' },
+    { value: 'critical', label: 'Crítico', color: 'text-red-400', desc: 'Essencial para o negócio' }
   ]
 
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      setMousePosition({ x: e.clientX, y: e.clientY })
-    }
-    window.addEventListener('mousemove', handleMouseMove)
-    return () => window.removeEventListener('mousemove', handleMouseMove)
-  }, [])
+  // REMOVIDO: useEffect do mouseMove
 
   useEffect(() => {
     checkUser()
@@ -270,74 +158,141 @@ export default function FeedbackPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#04F5A0] mx-auto"></div>
-          <p className="mt-4 text-gray-400">Carregando...</p>
-        </div>
+      // MODIFICADO: Tela de loading padronizada
+      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00FF99]" />
       </div>
     )
   }
 
+  // ADICIONADO: Constantes para o menu da conta
+  const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'Usuário'
+  const initials = displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+
   return (
-    <div className="min-h-screen bg-black relative">
-      {/* Background Effects */}
-      <div className="fixed inset-0 opacity-10 pointer-events-none">
-        <div className="absolute inset-0"
-             style={{
-               backgroundImage: `radial-gradient(circle at 1px 1px, rgba(4, 245, 160, 0.15) 1px, transparent 0)`,
-               backgroundSize: '50px 50px'
-             }}
-        />
-      </div>
+    // MODIFICADO: Fundo principal
+    <div className="min-h-screen bg-[#0A0A0A]">
       
-      {/* Dynamic Gradient */}
-      <div
-        className="fixed inset-0 opacity-20 pointer-events-none"
-        style={{
-          background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(4, 245, 160, 0.08), transparent 40%)`
-        }}
-      />
+      {/* REMOVIDO: Background Effects (grid e mouse gradient) */}
       
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-black/30 backdrop-blur-xl border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+      {/* REMOVIDO: Header antigo */}
+      
+      {/* Conteúdo Principal */}
+      {/* MODIFICADO: Padding top alterado para pt-16 */}
+      <main className="relative z-10 max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
+
+        {/*
+          ADICIONADO: Novo Header Padrão (igual ao dashboard)
+        */}
+        <div className="mb-12 flex justify-between items-start gap-4">
+          
+          {/* Coluna da Esquerda: "Voltar" e Título */}
+          <div className="flex-1">
             <button
               onClick={() => router.push('/dashboard')}
-              className="flex items-center text-gray-400 hover:text-[#04F5A0] transition-colors duration-300"
+              className="flex items-center gap-2 text-sm text-[#B0B0B0] hover:text-white transition-colors duration-200 mb-4"
             >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
               Voltar ao Dashboard
             </button>
-            <h1 className="text-xl font-bold text-white">Central de Feedback</h1>
+            
+            {/* MODIFICADO: Título da página e SVG */}
+            <h1 className="text-5xl font-bold text-white flex items-center gap-4">
+              Central de Feedback
+              <svg className="w-10 h-10 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-3.86 8.25-8.625 8.25S3.75 16.556 3.75 12c0-4.556 3.86-8.25 8.625-8.25S21 7.444 21 12z" /></svg>
+            </h1>
+            <p className="text-[#B0B0B0] text-lg mt-3">
+              Ajude-nos a construir o SwiftBot ideal para você
+            </p>
           </div>
-        </div>
-      </header>
-      
-      {/* Conteúdo Principal */}
-      <main className="relative z-10 max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-white via-purple-400 to-white bg-clip-text text-transparent mb-2">
-            Sua opinião importa! 💡
-          </h2>
-          <p className="text-gray-400">
-            Ajude-nos a construir o SwiftBot ideal para você
-          </p>
-        </div>
 
-        {/* Form Card */}
-        <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(147,51,234,0.1)] relative">
-          {/* Animated Background Effects */}
-          <div className="absolute inset-0 opacity-40 pointer-events-none">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/30 rounded-full blur-3xl animate-pulse"></div>
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-pink-500/25 rounded-full blur-xl animate-pulse" style={{animationDelay: '1.2s'}}></div>
+          {/* Coluna da Direita: Novo Header (Menu da Conta) */}
+          <div className="relative">
+            {/* Botão Responsivo (Desktop/Mobile) */}
+            <button
+              onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
+              className="flex items-center justify-center p-2 rounded-xl hover:opacity-80 transition-opacity duration-200"
+              style={{ backgroundColor: '#272727' }}
+            >
+              
+              {/* --- Conteúdo Desktop (Avatar + Seta) --- */}
+              <div className="hidden lg:flex items-center gap-3">
+                <div 
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-black font-bold text-sm"
+                  style={{
+                    background: 'linear-gradient(135deg, #00FF99 0%, #00E88C 100%)',
+                    boxShadow: '0 0 0 2px rgba(0, 255, 153, 0.2)'
+                  }}
+                >
+                  {initials}
+                </div>
+                <svg className={`w-4 h-4 text-white/60 transition-transform duration-200 ${accountDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+
+              {/* --- Conteúdo Mobile (Ícone "=") --- */}
+              <div className="lg:hidden w-9 h-9 flex items-center justify-center">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 8h16M4 16h16" />
+                </svg>
+              </div>
+
+            </button>
+
+            {/* Dropdown Menu */}
+            {accountDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setAccountDropdownOpen(false)} />
+                <div 
+                  className="absolute right-0 mt-3 w-64 shadow-2xl rounded-2xl overflow-hidden z-50"
+                  style={{ backgroundColor: '#272727' }}
+                >
+                  <div className="py-2">
+                    <button
+                      onClick={() => { setAccountDropdownOpen(false); router.push('/dashboard'); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#B0B0B0] hover:text-white hover:bg-white/5 transition-all"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                      Dashboard
+                    </button>
+                    <button
+                      onClick={() => { setAccountDropdownOpen(false); router.push('/account/profile'); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#B0B0B0] hover:text-white hover:bg-white/5 transition-all"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                      Configurar Conta
+                    </button>
+                    <button
+                      onClick={() => { setAccountDropdownOpen(false); router.push('/account/subscription'); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#B0B0B0] hover:text-white hover:bg-white/5 transition-all"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                      Gerenciar Assinatura
+                    </button>
+                    <div className="border-t border-white/10 mt-2 pt-2">
+                      <button
+                        onClick={() => { setAccountDropdownOpen(false); handleLogout(); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:text-red-300 hover:bg-red-900/10 transition-all"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                        Sair da Conta
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
+        </div>
+        
+        {/* Form Card */}
+        {/* MODIFICADO: Estilo do card principal (sem borda, sem blur) */}
+        <div className="bg-[#111111] rounded-2xl overflow-hidden relative">
           
-          {/* Glass Effect Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
+          {/* REMOVIDO: Efeitos de blur e vidro */}
           
           <form onSubmit={handleSubmit} className="relative z-20">
             <div className="p-8">
@@ -345,53 +300,70 @@ export default function FeedbackPage() {
                 
                 {/* Tipo de Sugestão */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-3">
-                    🎯 Tipo de Sugestão *
+                  <label className="block text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>
+                    Tipo de Sugestão *
                   </label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {suggestionTypes.map((type) => (
-                      <button
-                        key={type.value}
-                        type="button"
-                        onClick={() => setFormData({...formData, type: type.value})}
-                        className={`p-4 rounded-xl border transition-all duration-300 text-left ${
-                          formData.type === type.value
-                            ? 'bg-purple-500/20 border-purple-500 shadow-[0_0_20px_rgba(147,51,234,0.3)]'
-                            : 'bg-black/30 border-white/10 hover:border-purple-500/30 hover:bg-black/40'
-                        }`}
-                      >
-                        <div className="flex items-start">
-                          <div className="text-3xl mr-3">{type.icon}</div>
-                          <div>
-                            <div className="text-white font-medium mb-1">{type.label}</div>
-                            <div className="text-gray-400 text-sm">{type.desc}</div>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
+                    {/* ADICIONADO: SVGs inline */}
+                    <SuggestionButton
+                      type="feature"
+                      label="Nova Funcionalidade"
+                      desc="Sugira uma nova feature"
+                      icon={<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>}
+                      formData={formData}
+                      setFormData={setFormData}
+                    />
+                    <SuggestionButton
+                      type="improvement"
+                      label="Melhoria"
+                      desc="Melhore algo existente"
+                      icon={<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>}
+                      formData={formData}
+                      setFormData={setFormData}
+                    />
+                    <SuggestionButton
+                      type="integration"
+                      label="Integração"
+                      desc="Integração com outras plataformas"
+                      icon={<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" /></svg>}
+                      formData={formData}
+                      setFormData={setFormData}
+                    />
+                    <SuggestionButton
+                      type="ux"
+                      label="Design/UX"
+                      desc="Melhorias visuais ou de usabilidade"
+                      icon={<svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4.034 15.114a.09.09 0 010-.09l4.42-4.42a.09.09 0 01.127 0l4.42 4.42a.09.09 0 010 .09l-4.42 4.42a.09.09 0 01-.127 0l-4.42-4.42zM19.966 9.114a.09.09 0 010-.09l-4.42-4.42a.09.09 0 01-.127 0l-4.42 4.42a.09.09 0 010 .09l4.42 4.42a.09.09 0 01.127 0l4.42-4.42z" /></svg>}
+                      formData={formData}
+                      setFormData={setFormData}
+                    />
                   </div>
                   {errors.type && <p className="mt-2 text-red-400 text-sm">{errors.type}</p>}
                 </div>
 
                 {/* Título */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    📝 Título da Sugestão *
+                  <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" /></svg>
+                    Título da Sugestão *
                   </label>
+                  {/* MODIFICADO: Estilo do Input */}
                   <input
                     type="text"
                     value={formData.title}
                     onChange={(e) => setFormData({...formData, title: e.target.value})}
                     placeholder="Ex: Adicionar integração com Telegram"
-                    className="w-full bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all duration-300"
+                    className="w-full bg-[#0A0A0A] border-0 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-purple-500 outline-none transition-all duration-300"
                   />
                   {errors.title && <p className="mt-1 text-red-400 text-sm">{errors.title}</p>}
                 </div>
 
                 {/* Impacto */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-3">
-                    📊 Impacto Esperado
+                  <label className="block text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h12M3.75 3.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+                    Impacto Esperado
                   </label>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {impactLevels.map((level) => (
@@ -399,13 +371,14 @@ export default function FeedbackPage() {
                         key={level.value}
                         type="button"
                         onClick={() => setFormData({...formData, impact: level.value})}
-                        className={`p-3 rounded-xl border transition-all duration-300 ${
+                        // MODIFICADO: Estilo do botão de impacto
+                        className={`p-3 rounded-xl transition-all duration-300 ${
                           formData.impact === level.value
-                            ? 'bg-black/50 border-white/30 shadow-lg'
-                            : 'bg-black/20 border-white/10 hover:border-white/20'
+                            ? 'bg-[#0A0A0A] ring-2 ring-white/50'
+                            : 'bg-[#0A0A0A] hover:bg-[#1C1C1C]'
                         }`}
                       >
-                        <div className="text-2xl mb-1">{level.icon}</div>
+                        {/* REMOVIDO: Emoji */}
                         <div className={`text-sm font-medium ${level.color} mb-1`}>{level.label}</div>
                         <div className="text-xs text-gray-400">{level.desc}</div>
                       </button>
@@ -415,9 +388,11 @@ export default function FeedbackPage() {
 
                 {/* Descrição */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    📖 Descreva sua ideia detalhadamente *
+                  <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" /></svg>
+                    Descreva sua ideia detalhadamente *
                   </label>
+                  {/* MODIFICADO: Estilo do Textarea */}
                   <textarea
                     value={formData.description}
                     onChange={(e) => setFormData({...formData, description: e.target.value})}
@@ -429,7 +404,7 @@ export default function FeedbackPage() {
 
 Quanto mais detalhes, melhor poderemos avaliar sua sugestão!`}
                     rows={10}
-                    className="w-full bg-black/30 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all duration-300 resize-none"
+                    className="w-full bg-[#0A0A0A] border-0 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-purple-500 outline-none transition-all duration-300 resize-none"
                   />
                   <div className="flex justify-between items-center mt-2">
                     <div>
@@ -442,18 +417,27 @@ Quanto mais detalhes, melhor poderemos avaliar sua sugestão!`}
                 </div>
 
                 {/* Info Box */}
-                <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 backdrop-blur-sm">
+                {/* MODIFICADO: Estilo do Info Box (sem borda/blur) */}
+                <div className="bg-purple-500/10 rounded-xl p-4">
                   <div className="flex items-start">
                     <svg className="w-6 h-6 text-purple-400 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                     </svg>
                     <div>
-                      <p className="text-purple-300 text-sm font-medium mb-1">💜 Como avaliamos sugestões</p>
+                      {/* MODIFICADO: SVG de coração */}
+                      <p className="text-purple-300 text-sm font-medium mb-1 flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" /></svg>
+                        Como avaliamos sugestões
+                      </p>
                       <ul className="text-purple-200 text-sm space-y-1">
                         <li>• Todas as sugestões são analisadas pela nossa equipe</li>
                         <li>• Priorizamos ideias com maior impacto no negócio dos clientes</li>
                         <li>• Você pode acompanhar o status da sua sugestão por email</li>
-                        <li>• Sugestões implementadas ganham créditos especiais! 🎁</li>
+                        {/* MODIFICADO: SVG de presente */}
+                        <li className="flex items-center gap-2">
+                          • Sugestões implementadas ganham créditos especiais!
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 5a3 3 0 015-2.236A3 3 0 0115 5v2H5V5zm0 3h10v2H5V8zm0 3h10v2H5v-2zm0 3h10v3H5v-3z" clipRule="evenodd" /></svg>
+                        </li>
                       </ul>
                     </div>
                   </div>
@@ -463,18 +447,19 @@ Quanto mais detalhes, melhor poderemos avaliar sua sugestão!`}
             </div>
 
             {/* Botões */}
-            <div className="flex justify-end space-x-4 pt-6 border-t border-white/10 px-8 pb-8">
+            {/* MODIFICADO: Estilo dos botões de rodapé */}
+            <div className="flex justify-end space-x-4 pt-6 border-t border-white/5 px-8 pb-8">
               <button
                 type="button"
                 onClick={() => router.push('/dashboard')}
-                className="px-6 py-3 bg-white/10 backdrop-blur-sm hover:bg-white/20 border border-white/20 text-gray-300 hover:text-white rounded-xl font-medium transition-all duration-300"
+                className="px-6 py-3 bg-[#272727] hover:bg-[#333333] text-white rounded-xl font-medium transition-all duration-300"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={sending}
-                className="px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-600 disabled:to-gray-600 text-white font-bold rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-[0_0_30px_rgba(147,51,234,0.5)] flex items-center"
+                className="px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 text-white font-bold rounded-xl transition-all duration-300 flex items-center"
               >
                 {sending ? (
                   <>
@@ -496,34 +481,34 @@ Quanto mais detalhes, melhor poderemos avaliar sua sugestão!`}
 
         {/* Stats & Incentive */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-xl p-4 text-center relative overflow-hidden">
-            <div className="absolute inset-0 opacity-30 pointer-events-none">
-              <div className="absolute top-0 left-0 w-20 h-20 bg-[#04F5A0]/30 rounded-full blur-xl animate-pulse"></div>
-            </div>
+          {/* MODIFICADO: Card de stat (sem borda, sem blur, com SVG) */}
+          <div className="bg-[#111111] rounded-2xl p-4 text-center">
             <div className="relative z-10">
-              <div className="text-3xl mb-2">🚀</div>
-              <div className="text-2xl font-bold text-[#04F5A0]">127</div>
+              <div className="text-3xl mb-2">
+                <svg className="w-8 h-8 inline-block text-[#00FF99]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.63 2.25c-5.508 0-10.099 3.21-12.12 7.75h4.8m2.58 5.84l2.61-2.61m0 0l2.61 2.61m-2.61-2.61V21m0 0l2.61 2.61m-2.61-2.61l-2.61 2.61" /></svg>
+              </div>
+              <div className="text-2xl font-bold text-[#00FF99]">127</div>
               <div className="text-sm text-gray-400">Sugestões recebidas</div>
             </div>
           </div>
           
-          <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-xl p-4 text-center relative overflow-hidden">
-            <div className="absolute inset-0 opacity-30 pointer-events-none">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/30 rounded-full blur-xl animate-pulse" style={{animationDelay: '0.5s'}}></div>
-            </div>
+          {/* MODIFICADO: Card de stat (sem borda, sem blur, com SVG) */}
+          <div className="bg-[#111111] rounded-2xl p-4 text-center">
             <div className="relative z-10">
-              <div className="text-3xl mb-2">✅</div>
+              <div className="text-3xl mb-2">
+                <svg className="w-8 h-8 inline-block text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
               <div className="text-2xl font-bold text-green-400">43</div>
               <div className="text-sm text-gray-400">Features implementadas</div>
             </div>
           </div>
           
-          <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-xl p-4 text-center relative overflow-hidden">
-            <div className="absolute inset-0 opacity-30 pointer-events-none">
-              <div className="absolute bottom-0 left-0 w-20 h-20 bg-yellow-500/30 rounded-full blur-xl animate-pulse" style={{animationDelay: '1s'}}></div>
-            </div>
+          {/* MODIFICADO: Card de stat (sem borda, sem blur, com SVG) */}
+          <div className="bg-[#111111] rounded-2xl p-4 text-center">
             <div className="relative z-10">
-              <div className="text-3xl mb-2">⏳</div>
+              <div className="text-3xl mb-2">
+                <svg className="w-8 h-8 inline-block text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
               <div className="text-2xl font-bold text-yellow-400">18</div>
               <div className="text-sm text-gray-400">Em desenvolvimento</div>
             </div>
@@ -533,3 +518,25 @@ Quanto mais detalhes, melhor poderemos avaliar sua sugestão!`}
     </div>
   )
 }
+
+// ADICIONADO: Componente helper para os botões de sugestão (para incluir os SVGs)
+const SuggestionButton = ({ type, label, desc, icon, formData, setFormData }) => (
+  <button
+    type="button"
+    onClick={() => setFormData({...formData, type: type})}
+    // MODIFICADO: Estilo dos botões de tipo
+    className={`p-4 rounded-xl transition-all duration-300 text-left ${
+      formData.type === type
+        ? 'bg-[#0A0A0A] ring-2 ring-purple-500'
+        : 'bg-[#0A0A0A] hover:bg-[#1C1C1C]'
+    }`}
+  >
+    <div className="flex items-start">
+      <div className="text-3xl mr-3 text-purple-400">{icon}</div>
+      <div>
+        <div className="text-white font-medium mb-1">{label}</div>
+        <div className="text-gray-400 text-sm">{desc}</div>
+      </div>
+    </div>
+  </button>
+)

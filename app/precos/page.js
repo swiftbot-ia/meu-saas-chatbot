@@ -3,23 +3,21 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
+import Header from '../components/Header'
 
 export default function Precos() {
   const router = useRouter()
-  const [billingPeriod, setBillingPeriod] = useState('monthly')
+  const [billingPeriod, setBillingPeriod] = useState('annual')
   const [connections, setConnections] = useState(1)
-  const [isDragging, setIsDragging] = useState(false)
-  const sliderRef = useRef(null)
 
-  // Intersection Observer para animações que reanimam
+  // Intersection Observer (anima uma vez)
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             entry.target.classList.add('animate-in')
-          } else {
-            entry.target.classList.remove('animate-in')
+            observer.unobserve(entry.target)
           }
         })
       },
@@ -66,110 +64,210 @@ export default function Precos() {
   }
 
   const features = [
-    { icon: '🤖', text: 'IA Conversacional Avançada' },
-    { icon: '📊', text: 'Dashboard Completo' },
-    { icon: '🔄', text: 'Sincronização em Tempo Real' },
-    { icon: '📈', text: 'Relatórios e Analytics' },
-    { icon: '🔐', text: 'Segurança de Nível Bancário' },
-    { icon: '🌐', text: 'API e Webhooks' },
-    { icon: '📱', text: 'Multi-dispositivos' },
-    { icon: '🎯', text: 'Personalização de Respostas' },
-    { icon: '⚡', text: 'Respostas Instantâneas' },
-    { icon: '🛡️', text: 'Backup Automático' },
-    { icon: '📞', text: 'Suporte de Segunda a Sexta' },
-    { icon: '🔄', text: 'Atualizações Contínuas' }
+    { 
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="url(#gradientFeature1)" viewBox="0 0 24 24">
+          <defs>
+            <linearGradient id="gradientFeature1" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#ec4899" />
+              <stop offset="100%" stopColor="#a855f7" />
+            </linearGradient>
+          </defs>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+      ),
+      text: 'IA Conversacional Avançada' 
+    },
+    { 
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="url(#gradientFeature2)" viewBox="0 0 24 24">
+          <defs>
+            <linearGradient id="gradientFeature2" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#3b82f6" />
+              <stop offset="100%" stopColor="#06b6d4" />
+            </linearGradient>
+          </defs>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      ),
+      text: 'Dashboard Completo' 
+    },
+    { 
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="url(#gradientFeature3)" viewBox="0 0 24 24">
+          <defs>
+            <linearGradient id="gradientFeature3" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#10b981" />
+              <stop offset="100%" stopColor="#059669" />
+            </linearGradient>
+          </defs>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      ),
+      text: 'Sincronização em Tempo Real' 
+    },
+    { 
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="url(#gradientFeature4)" viewBox="0 0 24 24">
+          <defs>
+            <linearGradient id="gradientFeature4" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#f59e0b" />
+              <stop offset="100%" stopColor="#ef4444" />
+            </linearGradient>
+          </defs>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      ),
+      text: 'Relatórios e Analytics' 
+    },
+    { 
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="url(#gradientFeature5)" viewBox="0 0 24 24">
+          <defs>
+            <linearGradient id="gradientFeature5" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#8b5cf6" />
+              <stop offset="100%" stopColor="#ec4899" />
+            </linearGradient>
+          </defs>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+      ),
+      text: 'Segurança de Nível Bancário' 
+    },
+    { 
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="url(#gradientFeature6)" viewBox="0 0 24 24">
+          <defs>
+            <linearGradient id="gradientFeature6" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#6366f1" />
+              <stop offset="100%" stopColor="#8b5cf6" />
+            </linearGradient>
+          </defs>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+        </svg>
+      ),
+      text: 'API e Webhooks' 
+    },
+    { 
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="url(#gradientFeature7)" viewBox="0 0 24 24">
+          <defs>
+            <linearGradient id="gradientFeature7" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#ec4899" />
+              <stop offset="100%" stopColor="#f43f5e" />
+            </linearGradient>
+          </defs>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+        </svg>
+      ),
+      text: 'Multi-dispositivos' 
+    },
+    { 
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="url(#gradientFeature8)" viewBox="0 0 24 24">
+          <defs>
+            <linearGradient id="gradientFeature8" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#22d3ee" />
+              <stop offset="100%" stopColor="#3b82f6" />
+            </linearGradient>
+          </defs>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+      ),
+      text: 'Personalização de Respostas' 
+    },
+    { 
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="url(#gradientFeature9)" viewBox="0 0 24 24">
+          <defs>
+            <linearGradient id="gradientFeature9" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#fbbf24" />
+              <stop offset="100%" stopColor="#f59e0b" />
+            </linearGradient>
+          </defs>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      ),
+      text: 'Respostas Instantâneas' 
+    },
+    { 
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="url(#gradientFeature10)" viewBox="0 0 24 24">
+          <defs>
+            <linearGradient id="gradientFeature10" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#10b981" />
+              <stop offset="100%" stopColor="#14b8a6" />
+            </linearGradient>
+          </defs>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+      ),
+      text: 'Backup Automático' 
+    },
+    { 
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="url(#gradientFeature11)" viewBox="0 0 24 24">
+          <defs>
+            <linearGradient id="gradientFeature11" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#a855f7" />
+              <stop offset="100%" stopColor="#6366f1" />
+            </linearGradient>
+          </defs>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      ),
+      text: 'Suporte de Segunda a Sexta' 
+    },
+    { 
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="url(#gradientFeature12)" viewBox="0 0 24 24">
+          <defs>
+            <linearGradient id="gradientFeature12" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#ec4899" />
+              <stop offset="100%" stopColor="#a855f7" />
+            </linearGradient>
+          </defs>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      ),
+      text: 'Atualizações Contínuas' 
+    }
   ]
 
   return (
     <div className="min-h-screen bg-black relative overflow-x-hidden">
-      {/* Header FIXO - IGUAL À LANDING PAGE */}
-      <header className="fixed top-0 left-0 right-0 z-[200] bg-black/60 backdrop-blur-xl border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center group cursor-pointer" onClick={() => router.push('/')}>
-              <div className="w-8 h-8 mr-3 flex items-center justify-center">
-                <div 
-                  className="w-6 h-6 bg-[#00FF99] rounded-sm opacity-90 group-hover:opacity-100 transition-all duration-300"
-                  style={{
-                    clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)'
-                  }}
-                />
-              </div>
-              <span className="text-xl font-bold text-white group-hover:text-[#00FF99] transition-colors duration-300">
-                SwiftBot
-              </span>
-            </div>
-            
-            <nav className="hidden md:flex items-center space-x-8">
-              <a href="/#solucao" className="text-gray-300 hover:text-[#00FF99] transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(0,255,153,0.8)]">
-                Solução
-              </a>
-              <a href="/#funcionalidades" className="text-gray-300 hover:text-[#00FF99] transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(0,255,153,0.8)]">
-                Funcionalidades
-              </a>
-              <a href="/#depoimentos" className="text-gray-300 hover:text-[#00FF99] transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(0,255,153,0.8)]">
-                Depoimentos
-              </a>
-              <a href="/#segmentos" className="text-gray-300 hover:text-[#00FF99] transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(0,255,153,0.8)]">
-                Segmentos
-              </a>
-              <a href="/precos" className="text-[#00FF99] font-semibold hover:drop-shadow-[0_0_8px_rgba(0,255,153,0.8)]">
-                Preços
-              </a>
-              <a href="/faq" className="text-gray-300 hover:text-[#00FF99] transition-all duration-300 hover:drop-shadow-[0_0_8px_rgba(0,255,153,0.8)]">
-                FAQ
-              </a>
-            </nav>
-
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => router.push('/login')}
-                className="text-gray-300 hover:text-[#00FF99] transition-colors duration-300 font-medium"
-              >
-                Login
-              </button>
-              <button
-                onClick={() => router.push('/login')}
-                className="px-6 py-2 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black rounded-lg font-bold transition-all duration-300 hover:shadow-[0_0_25px_rgba(0,255,153,0.5)] hover:scale-105"
-              >
-                Testar Grátis
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Espaço para compensar o header fixo */}
-      <div className="h-16"></div>
+      {/* Header Importado */}
+      <Header />
 
       <main className="relative z-10">
-        {/* SEÇÃO UNIFICADA: HERO + BILLING + SLIDER + PREÇO */}
-        <section className="py-24 bg-black relative overflow-hidden">
-          {/* Gradiente roxo/rosa único para toda a seção */}
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-700/30 via-black to-pink-700/30" />
+        {/* SEÇÃO 1: HERO + BILLING + SLIDER + PREÇO (COMPACTA) */}
+        {/* CORREÇÃO 1: 'bg-black' removido daqui */}
+        <section className="py-20 relative overflow-hidden">
+          {/* CORREÇÃO 1: 'bg-black' adicionado aqui para ser o fundo principal */}
+          <div className="absolute inset-0 bg-black bg-gradient-to-b from-purple-900/20 via-black/50 to-black" />
           
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {/* Hero Text */}
-            <div className="text-center mb-16 animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
-              <h1 className="text-5xl md:text-7xl font-black text-white mb-6">
-                Planos que <span className="text-[#00FF99]">escalam</span> com você
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+            {/* Hero Text (mais compacto) */}
+            <div className="text-center mb-12 animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
+              <h1 className="text-5xl md:text-7xl font-light text-white mb-4 leading-tight">
+                Planos que <span className="font-normal bg-gradient-to-r from-[#00FF99] via-[#00E88C] to-[#00D97F] bg-clip-text text-transparent">escalam</span> com você
               </h1>
-              <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto mb-4">
+              <p className="text-lg md:text-xl text-gray-300 max-w-3xl mx-auto mb-2 font-light">
                 Comece grátis por 4 dias. Sem compromisso, sem surpresas.
               </p>
-              <p className="text-sm text-gray-500">
-                Cancele quando quiser. Upgrade ou downgrade a qualquer momento.
+              <p className="text-sm text-gray-500 font-light">
+                Cancele quando quiser • Upgrade ou downgrade a qualquer momento
               </p>
             </div>
 
-            {/* Billing Toggle */}
-            <div className="flex justify-center mb-16 animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
-              <div className="bg-black/50 backdrop-blur-sm border border-white/5 rounded-2xl p-2 flex">
+            {/* Billing Toggle (mais compacto) */}
+            <div className="flex justify-center mb-10 animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
+              <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-full p-1.5 flex">
                 <button
                   onClick={() => setBillingPeriod('monthly')}
-                  className={`px-8 py-3 rounded-xl font-bold transition-all duration-300 ${
+                  className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all duration-300 ${
                     billingPeriod === 'monthly' 
-                      ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black shadow-[0_0_20px_rgba(0,255,153,0.6)]' 
+                      ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black shadow-[0_0_20px_rgba(0,255,153,0.4)]' 
                       : 'text-gray-400 hover:text-white'
                   }`}
                 >
@@ -177,91 +275,77 @@ export default function Precos() {
                 </button>
                 <button
                   onClick={() => setBillingPeriod('annual')}
-                  className={`px-8 py-3 rounded-xl font-bold transition-all duration-300 flex items-center ${
+                  className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all duration-300 flex items-center ${
                     billingPeriod === 'annual' 
-                      ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black shadow-[0_0_20px_rgba(0,255,153,0.6)]' 
+                      ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black shadow-[0_0_20px_rgba(0,255,153,0.4)]' 
                       : 'text-gray-400 hover:text-white'
                   }`}
                 >
                   Anual
-                  <span className="ml-2 bg-black/30 text-[#00FF99] px-2 py-1 rounded-lg text-xs font-bold">
+                  <span className={`ml-2 px-2 py-0.5 rounded-lg text-xs font-semibold ${
+                    billingPeriod === 'annual' ? 'bg-black/30 text-[#00FF99]' : 'bg-white/10 text-gray-400'
+                  }`}>
                     -10%
                   </span>
                 </button>
               </div>
             </div>
 
-            {/* Connections Slider + Price */}
-            <div className="max-w-4xl mx-auto">
-              <div className="bg-black/50 backdrop-blur-sm border border-white/5 rounded-3xl p-8 animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
+            {/* Connections Slider + Price (CARD MENOR) */}
+            <div className="max-w-3xl mx-auto">
+              <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-8 animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
                 <div className="text-center mb-8">
-                  <h3 className="text-3xl font-bold text-white mb-2">
+                  <h3 className="text-2xl md:text-3xl font-light text-white mb-2">
                     Quantas conexões você precisa?
                   </h3>
-                  <p className="text-gray-400">
+                  <p className="text-gray-400 text-sm font-light">
                     Deslize para escolher o número ideal para seu negócio
                   </p>
                 </div>
 
-                {/* Número de Conexões Display */}
+                {/* Número de Conexões Display (menor) */}
                 <div className="text-center mb-8">
-                  <div className="text-7xl font-black text-[#00FF99] mb-2">
+                  <div className="text-6xl font-light text-[#00FF99] mb-2">
                     {connections}
                   </div>
-                  <p className="text-gray-300 text-lg">
+                  <p className="text-gray-300 text-lg font-light">
                     {connections === 1 ? 'Conexão' : 'Conexões'} WhatsApp
                   </p>
                 </div>
 
-                {/* Slider */}
-                <div className="relative px-4 mb-12">
+                {/* Slider (mais compacto) */}
+                <div className="relative px-4 mb-10">
                   <input
                     type="range"
                     min="1"
                     max="7"
                     value={connections}
                     onChange={(e) => handleSliderChange(parseInt(e.target.value))}
-                    className="w-full h-3 bg-gray-800 rounded-lg appearance-none cursor-pointer slider-thumb"
+                    className="w-full h-2 bg-gray-800 rounded-full appearance-none cursor-pointer slider-thumb"
                     style={{
                       background: `linear-gradient(to right, #00FF99 0%, #00FF99 ${(connections - 1) * 16.66}%, #1f2937 ${(connections - 1) * 16.66}%, #1f2937 100%)`
                     }}
                   />
                   
-                  {/* Marcadores */}
-                  <div className="flex justify-between mt-4 px-1">
-                    {[1, 2, 3, 4, 5, 6, 7].map((num) => (
-                      <div
-                        key={num}
-                        onClick={() => handleSliderChange(num)}
-                        className={`w-12 h-12 rounded-full flex items-center justify-center font-bold cursor-pointer transition-all duration-300 ${
-                          connections === num
-                            ? 'bg-[#00FF99] text-black scale-110 shadow-[0_0_20px_rgba(0,255,153,0.6)]'
-                            : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                        }`}
-                      >
-                        {num}
-                      </div>
-                    ))}
-                  </div>
                 </div>
 
-                {/* Price Display */}
-                <div className="text-center border-t border-white/5 pt-8">
+                {/* Price Display (mais compacto) */}
+                <div className="text-center border-t border-white/10 pt-6">
                   {billingPeriod === 'monthly' ? (
                     <>
-                      <div className="text-6xl font-black text-white mb-2">
+                      <div className="text-5xl font-light text-white mb-2">
                         R$ {getCurrentPricing().price}
-                        <span className="text-2xl text-gray-400 font-normal">/mês</span>
+                        <span className="text-xl text-gray-400 font-light">/mês</span>
                       </div>
                     </>
                   ) : (
                     <>
-                      <div className="text-6xl font-black text-white mb-3">
-                        <span className="text-2xl text-gray-400 font-normal">equivalente a </span>
+                      <div className="text-5xl font-light text-white mb-2">
+                        <span className="text-lg text-gray-400 font-light">equivalente a </span>
                         R$ {getCurrentPricing().monthlyEquivalent}
-                        <span className="text-2xl text-gray-400 font-normal">/mês</span>
+                        <span className="text-xl text-gray-400 font-light">/mês</span>
                       </div>
-                      <div className="text-2xl text-gray-400">
+                      <div className="text-lg text-gray-400 font-light mb-2">
                         R$ {getCurrentPricing().price}/ano
                       </div>
                     </>
@@ -269,11 +353,11 @@ export default function Precos() {
                   
                   <button
                     onClick={() => router.push('/login')}
-                    className="mt-8 px-12 py-5 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black rounded-xl font-bold text-xl transition-all duration-300 hover:shadow-[0_0_40px_rgba(0,255,153,0.7)] hover:scale-105"
+                    className="mt-6 px-10 py-4 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black rounded-full font-semibold text-base transition-all duration-300 hover:shadow-[0_0_40px_rgba(0,255,153,0.6)] hover:scale-105"
                   >
                     Começar Teste Grátis
                   </button>
-                  <p className="text-sm text-gray-500 mt-4">
+                  <p className="text-xs text-gray-500 mt-4 font-light">
                     4 dias grátis • Cancele quando quiser • Sem taxas escondidas
                   </p>
                 </div>
@@ -282,129 +366,190 @@ export default function Precos() {
           </div>
         </section>
 
-        {/* TUDO QUE ESTÁ INCLUÍDO */}
-<section className="py-24 bg-black relative overflow-hidden">
-          {/* A linha abaixo foi removida
-          <div className="absolute inset-0 bg-gradient-to-tr from-purple-700/30 via-black to-indigo-700/30" /> 
-          */}
+        {/* SEÇÃO 2: FEATURES (FUNDO BEGE COM ARREDONDAMENTO CORRETO) */}
+        <section className="py-24 bg-[#E1DFDB] rounded-t-[40px] md:rounded-t-[80px] relative overflow-visible -mt-1">
+          <div className="absolute -top-20 left-0 right-0 h-20 bg-black bg-gradient-to-br from-purple-900/20 via-black to-pink-900/20 -z-10" />
+          {/* CORREÇÃO 2: Este 'div' (patch) agora é IDÊNTICO ao fundo da Seção 1 */}
           
-          <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16 animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
-              <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
-                Tudo que está <span className="text-[#00FF99]">incluído</span>
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-20 animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
+              <h2 className="text-5xl md:text-6xl font-light text-black mb-6 leading-tight">
+                Tudo que está <span className="font-normal text-black">incluído</span>
               </h2>
-              <p className="text-xl text-gray-400">
+              <p className="text-xl text-gray-600 font-light">
                 Todos os recursos. Todos os planos. Sem surpresas.
               </p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
               {features.map((feature, idx) => (
                 <div
                   key={idx}
-                  className="bg-black/50 backdrop-blur-sm border border-white/5 rounded-2xl p-6 hover:border-white/10 transition-all duration-300 animate-on-scroll opacity-0 translate-y-10"
+                  className="bg-white/70 backdrop-blur-sm rounded-3xl p-8 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500 animate-on-scroll opacity-0 translate-y-10"
                   style={{ transitionDelay: `${idx * 50}ms` }}
                 >
-                  <div className="text-4xl mb-4">{feature.icon}</div>
-                  <h3 className="text-lg font-bold text-white">{feature.text}</h3>
+                  <div className="w-16 h-16 mb-6 flex items-center justify-center">
+                    {feature.icon}
+                  </div>
+                  <h3 className="text-lg font-normal text-black">{feature.text}</h3>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* CTA FINAL COM VÍDEO DE FUNDO */}
-        <section className="py-24 bg-black relative overflow-hidden">
-          {/* Video Background */}
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover opacity-30"
-          >
-            <source src="/cta-preco.mp4" type="video/mp4" />
-          </video>
+{/* SEÇÃO 3: CTA FINAL COM VÍDEO (COM ARREDONDAMENTO CORRETO) */}
+<div className="h-20 md:h-32 bg-[#E1DFDB]" />
+<section className="py-32 bg-black rounded-t-[40px] md:rounded-t-[80px] relative overflow-hidden -mt-20 md:-mt-32">
 
-          {/* Overlay escuro */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/80" />
-          
-          <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="bg-black/50 backdrop-blur-sm rounded-3xl p-12 md:p-16 text-center border border-white/5 animate-on-scroll opacity-0 scale-95 transition-all duration-1000">
-              <h2 className="text-4xl md:text-5xl font-bold text-white mb-6 leading-tight">
-                Pronto para <span className="text-[#00FF99]">escalar</span> seu atendimento?
-              </h2>
-              <p className="text-xl text-gray-300 mb-8">
-                Teste grátis por 4 dias. Sem compromisso. Sem cartão de crédito (brincadeira, precisa sim, mas não cobramos nada nos primeiros 4 dias 😉)
-              </p>
-              <button
-                onClick={() => router.push('/login')}
-                className="px-12 py-5 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black rounded-xl font-bold text-xl transition-all duration-300 hover:shadow-[0_0_50px_rgba(0,255,153,0.7)] hover:scale-110"
-              >
-                Começar Agora
-              </button>
-            </div>
+  {/* Video Background com arredondamento */}
+  <video
+    autoPlay
+    loop
+    muted
+    playsInline
+    className="absolute inset-0 w-full h-full object-cover opacity-30 rounded-t-[40px] md:rounded-t-[80px]"
+  >
+    <source src="/cta-background.mp4" type="video/mp4" />
+  </video>
+
+  {/* Overlay com arredondamento */}
+  <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/90 rounded-t-[40px] md:rounded-t-[80px]" />
+  
+  <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="text-center animate-on-scroll opacity-0 scale-95 transition-all duration-1000">
+      
+      {/* Badge superior */}
+      <div className="inline-flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-6 py-2 mb-8">
+        <div className="w-2 h-2 bg-[#00FF99] rounded-full animate-pulse" />
+        <span className="text-sm text-gray-300 font-light">Mais de 5.000 empresas já escalaram sua expertise</span>
+      </div>
+
+      <h2 className="text-5xl md:text-7xl font-light text-white mb-6 leading-tight">
+        Pronto para <span className="font-normal bg-gradient-to-r from-[#00FF99] via-[#00E88C] to-[#00D97F] bg-clip-text text-transparent">escalar</span> seu atendimento?
+      </h2>
+      
+      <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto mb-12 font-light leading-relaxed">
+        Teste grátis por 4 dias. Sem compromisso. Cancele quando quiser.
+      </p>
+
+      <button
+        onClick={() => router.push('/login')}
+        className="group relative px-12 py-5 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black rounded-full font-semibold text-lg transition-all duration-300 hover:shadow-[0_0_60px_rgba(0,255,153,0.6)] hover:scale-105 mb-10"
+      >
+        <span className="relative z-10">Começar Agora</span>
+        <div className="absolute inset-0 bg-white/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      </button>
+
+      {/* Features badges */}
+      <div className="flex flex-wrap items-center justify-center gap-8 text-sm">
+        {[
+          { icon: "M5 13l4 4L19 7", text: "4 dias de teste grátis" },
+          { icon: "M6 18L18 6M6 6l12 12", text: "Cancele quando quiser" },
+          { icon: "M13 10V3L4 14h7v7l9-11h-7z", text: "Configuração em 5 minutos" }
+        ].map((item, idx) => (
+          <div key={idx} className="flex items-center gap-3 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-6 py-3">
+            <svg className="w-5 h-5 text-[#00FF99] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
+            </svg>
+            <span className="text-gray-300 font-light">{item.text}</span>
           </div>
-        </section>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
       </main>
 
-      {/* FOOTER - IGUAL À LANDING PAGE */}
-      <footer className="relative z-10 bg-black border-t border-white/5 py-12">
+      {/* Footer (mesmo da home) */}
+      <footer className="relative z-10 bg-black border-t border-white/10 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <div className="flex items-center mb-4">
-                <div className="w-6 h-6 mr-2 flex items-center justify-center">
+          <div className="grid md:grid-cols-5 gap-12 mb-12">
+            
+            {/* Coluna 1: Logo e descrição */}
+            <div className="md:col-span-2">
+              <div className="flex items-center mb-6">
+                <div className="w-8 h-8 mr-3 flex items-center justify-center">
                   <div 
-                    className="w-5 h-5 bg-[#00FF99] rounded-sm"
+                    className="w-6 h-6 bg-gradient-to-br from-[#00FF99] to-[#00E88C] rounded-sm"
                     style={{
                       clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)'
                     }}
                   />
                 </div>
-                <span className="text-lg font-bold text-white">SwiftBot</span>
+                <span className="text-xl font-semibold text-white">SwiftBot</span>
               </div>
-              <p className="text-gray-400 text-sm">
-                Clone seu atendimento e escale sua expertise infinitamente.
+              <p className="text-gray-400 leading-relaxed mb-6 font-light max-w-sm">
+                Clone seu atendimento e escale sua expertise infinitamente. 
+                Transforme seu WhatsApp em uma máquina de crescimento autônoma.
               </p>
+              <div className="flex space-x-4">
+                {/* Social Icons */}
+                <a href="#" className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center transition-all duration-300 hover:border-[#00FF99]">
+                  <svg className="w-5 h-5 text-gray-400 hover:text-[#00FF99]" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  </svg>
+                </a>
+                <a href="#" className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center transition-all duration-300 hover:border-[#00FF99]">
+                  <svg className="w-5 h-5 text-gray-400 hover:text-[#00FF99]" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8.29 20.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.012-.53A8.348 8.348 0 0022 5.92a8.19 8.19 0 01-2.357.646 4.118 4.118 0 001.804-2.27 8.224 8.224 0 01-2.605.996 4.107 4.107 0 00-6.993 3.743 11.65 11.65 0 01-8.457-4.287 4.106 4.106 0 001.27 5.477A4.072 4.072 0 012.8 9.713v.052a4.105 4.105 0 003.292 4.022 4.095 4.095 0 01-1.853.07 4.108 4.108 0 003.834 2.85A8.233 8.233 0 012 18.407a11.616 11.616 0 006.29 1.84"/>
+                  </svg>
+                </a>
+                <a href="#" className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center transition-all duration-300 hover:border-[#00FF99]">
+                  <svg className="w-5 h-5 text-gray-400 hover:text-[#00FF99]" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                  </svg>
+                </a>
+                <a href="#" className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center transition-all duration-300 hover:border-[#00FF99]">
+                  <svg className="w-5 h-5 text-gray-400 hover:text-[#00FF99]" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                  </svg>
+                </a>
+              </div>
             </div>
 
+            {/* Colunas 2-5 */}
             <div>
-              <h4 className="text-white font-bold mb-4">Produto</h4>
-              <ul className="space-y-2">
-                <li><a href="/#funcionalidades" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm">Funcionalidades</a></li>
-                <li><a href="/#segmentos" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm">Segmentos</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm">Segurança</a></li>
+              <h4 className="text-white font-semibold mb-4">Produto</h4>
+              <ul className="space-y-3">
+                <li><a href="/#funcionalidades" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Funcionalidades</a></li>
+                <li><a href="/#segmentos" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Segmentos</a></li>
+                <li><a href="/precos" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Preços</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Integrações</a></li>
               </ul>
             </div>
 
             <div>
-              <h4 className="text-white font-bold mb-4">Empresa</h4>
-              <ul className="space-y-2">
-                <li><a href="#" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm">Sobre</a></li>
-                <li><a href="/#depoimentos" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm">Depoimentos</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm">Blog</a></li>
+              <h4 className="text-white font-semibold mb-4">Empresa</h4>
+              <ul className="space-y-3">
+                <li><a href="#" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Sobre Nós</a></li>
+                <li><a href="/#depoimentos" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Depoimentos</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Blog</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Carreiras</a></li>
               </ul>
             </div>
 
             <div>
-              <h4 className="text-white font-bold mb-4">Suporte</h4>
-              <ul className="space-y-2">
-                <li><a href="#" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm">Central de Ajuda</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm">Contato</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm">Status</a></li>
+              <h4 className="text-white font-semibold mb-4">Suporte</h4>
+              <ul className="space-y-3">
+                <li><a href="#" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Central de Ajuda</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Documentação</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Contato</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Status da Plataforma</a></li>
               </ul>
             </div>
           </div>
 
-          <div className="border-t border-white/5 pt-8 flex flex-col md:flex-row justify-between items-center">
-            <p className="text-gray-400 text-sm mb-4 md:mb-0">
+          {/* Bottom Footer */}
+          <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-gray-400 text-sm font-light">
               © 2025 SwiftBot. Todos os direitos reservados.
             </p>
-            <div className="flex space-x-6">
-              <a href="#" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm">Privacidade</a>
-              <a href="#" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm">Termos</a>
-              <a href="#" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm">LGPD</a>
+            <div className="flex flex-wrap items-center justify-center gap-6">
+              <a href="/privacidade" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Privacidade</a>
+              <a href="/termos" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Termos de Uso</a>
+              <a href="/cookies" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Política de Cookies</a>
+              <a href="#" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">LGPD</a>
             </div>
           </div>
         </div>
@@ -425,34 +570,34 @@ export default function Precos() {
         /* Custom slider styles */
         .slider-thumb::-webkit-slider-thumb {
           appearance: none;
-          width: 28px;
-          height: 28px;
+          width: 24px;
+          height: 24px;
           border-radius: 50%;
           background: #00FF99;
           cursor: pointer;
-          box-shadow: 0 0 20px rgba(0, 255, 153, 0.6);
+          box-shadow: 0 0 20px rgba(0, 255, 153, 0.5);
           transition: all 0.3s;
         }
 
         .slider-thumb::-webkit-slider-thumb:hover {
           transform: scale(1.2);
-          box-shadow: 0 0 30px rgba(0, 255, 153, 0.8);
+          box-shadow: 0 0 30px rgba(0, 255, 153, 0.7);
         }
 
         .slider-thumb::-moz-range-thumb {
-          width: 28px;
-          height: 28px;
+          width: 24px;
+          height: 24px;
           border-radius: 50%;
           background: #00FF99;
           cursor: pointer;
           border: none;
-          box-shadow: 0 0 20px rgba(0, 255, 153, 0.6);
+          box-shadow: 0 0 20px rgba(0, 255, 153, 0.5);
           transition: all 0.3s;
         }
 
         .slider-thumb::-moz-range-thumb:hover {
           transform: scale(1.2);
-          box-shadow: 0 0 30px rgba(0, 255, 153, 0.8);
+          box-shadow: 0 0 30px rgba(0, 255, 153, 0.7);
         }
       `}</style>
     </div>
