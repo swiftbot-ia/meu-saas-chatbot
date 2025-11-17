@@ -9,49 +9,29 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [errors, setErrors] = useState({})
-  const [tokenFound, setTokenFound] = useState(false)
-  const [checkingToken, setCheckingToken] = useState(true)
+  const [isReady, setIsReady] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
-    const checkRecoveryToken = async () => {
-      try {
-        // Verifica se há um hash na URL
-        const hashParams = new URLSearchParams(window.location.hash.substring(1))
-        const accessToken = hashParams.get('access_token')
-        const type = hashParams.get('type')
-
-        if (!accessToken || type !== 'recovery') {
-          setMessage('Link de recuperação inválido ou expirado.')
-          setCheckingToken(false)
-          return
-        }
-
-        // Define a sessão com o token de recuperação
-        const { error } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: hashParams.get('refresh_token') || ''
-        })
-
-        if (error) {
-          setMessage(`Erro: ${error.message}`)
-          setCheckingToken(false)
-          return
-        }
-
-        // Token válido
-        setTokenFound(true)
+    // O Supabase Auth automaticamente detecta o código na URL e troca por sessão
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsReady(true)
         setMessage('✅ Link verificado. Crie sua nova senha.')
-        setCheckingToken(false)
-
-      } catch (error) {
-        console.error('Erro ao verificar token:', error)
-        setMessage('Erro ao processar o link de recuperação.')
-        setCheckingToken(false)
       }
-    }
+    })
 
-    checkRecoveryToken()
+    // Verifica se já existe uma sessão de recuperação ativa
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setIsReady(true)
+        setMessage('✅ Link verificado. Crie sua nova senha.')
+      }
+    })
+
+    return () => {
+      authListener?.subscription.unsubscribe()
+    }
   }, [])
 
   const handlePasswordUpdate = async (e) => {
@@ -117,15 +97,16 @@ export default function ResetPasswordPage() {
                 Redefinir <span className="font-normal bg-gradient-to-r from-[#00FF99] to-[#00E88C] bg-clip-text text-transparent">Senha</span>
               </h1>
               <p className="text-gray-400 font-light">
-                {checkingToken ? 'Verificando seu link...' : tokenFound ? 'Digite sua nova senha abaixo.' : 'Link inválido ou expirado.'}
+                {!isReady ? 'Verificando seu link...' : 'Digite sua nova senha abaixo.'}
               </p>
             </div>
 
-            {checkingToken ? (
+            {!isReady ? (
               <div className="text-center space-y-4">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto"></div>
+                <p className="text-gray-400 text-sm font-light">Processando link de recuperação...</p>
               </div>
-            ) : tokenFound ? (
+            ) : (
               <form onSubmit={handlePasswordUpdate} className="space-y-4">
                 <div>
                   <label className="block text-sm font-light text-gray-300 mb-2">
@@ -187,10 +168,6 @@ export default function ResetPasswordPage() {
                   )}
                 </button>
               </form>
-            ) : (
-              <div className={`p-3 rounded-xl text-sm border backdrop-blur-sm font-light bg-red-900/20 text-red-400 border-red-800/50`}>
-                {message}
-              </div>
             )}
 
             <div className="mt-8 text-center">
