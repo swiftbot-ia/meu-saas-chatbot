@@ -1,12 +1,11 @@
 // app/api/subscription/upgrade/route.js
-// Rota para processar UPGRADE (cobra imediato com proration)
+// VERSÃO CORRIGIDA - Apenas chama Stripe, Webhook atualiza DB
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { 
   processUpgrade, 
-  determineChangeType,
-  PLAN_PRICES 
+  determineChangeType 
 } from '@/lib/stripe-plan-changes'
 
 const supabase = createClient(
@@ -16,7 +15,7 @@ const supabase = createClient(
 
 export async function POST(request) {
   try {
-    console.log('🚀 Iniciando processo de UPGRADE...')
+    console.log('🚀 [UPGRADE] Iniciando processo...')
 
     const body = await request.json()
     const { userId, newPlan } = body
@@ -124,7 +123,7 @@ export async function POST(request) {
     console.log('✅ Confirmado como UPGRADE')
 
     // ============================================
-    // 6. PROCESSAR UPGRADE NA STRIPE
+    // 6. PROCESSAR UPGRADE NA STRIPE (SEM ATUALIZAR DB!)
     // ============================================
 
     const upgradeResult = await processUpgrade(
@@ -142,44 +141,26 @@ export async function POST(request) {
       }, { status: 500 })
     }
 
-    console.log('✅ Upgrade processado na Stripe:', upgradeResult)
+    console.log('✅ Upgrade processado na Stripe (aguardando webhook para atualizar DB)')
 
     // ============================================
-    // 7. ATUALIZAR BANCO DE DADOS
+    // 7. MARCAR DATA DA ÚLTIMA MUDANÇA (apenas para validação de 1x/mês)
     // ============================================
 
     const now = new Date().toISOString()
     
-    const updateData = {
-      connections_purchased: newPlan.connections,
-      billing_period: newPlan.billing_period,
-      last_plan_change_date: now,
-      updated_at: now,
-      // Limpar campos de mudança pendente (se houver)
-      pending_change_type: null,
-      pending_connections: null,
-      pending_billing_period: null
-    }
-
-    // Se estava em trial, atualizar para active
-    if (subscription.status === 'trial') {
-      updateData.status = 'active'
-      updateData.trial_end_date = null
-    }
-
-    const { error: updateError } = await supabase
+    await supabase
       .from('user_subscriptions')
-      .update(updateData)
+      .update({ 
+        last_plan_change_date: now,
+        updated_at: now
+      })
       .eq('id', subscription.id)
 
-    if (updateError) {
-      console.error('⚠️ Erro ao atualizar banco (mas upgrade na Stripe OK):', updateError)
-    } else {
-      console.log('✅ Banco de dados atualizado')
-    }
+    console.log('✅ Data de última mudança atualizada (validação 1x/mês)')
 
     // ============================================
-    // 8. REGISTRAR LOG
+    // 8. REGISTRAR LOG DE TENTATIVA (não de conclusão)
     // ============================================
 
     await supabase
@@ -187,36 +168,36 @@ export async function POST(request) {
       .insert([{
         user_id: userId,
         subscription_id: subscription.id,
-        event_type: 'plan_upgrade',
-        amount: upgradeResult.charged_amount || 0,
+        event_type: 'plan_upgrade_requested',
+        amount: 0, // Valor real virá do webhook
         payment_method: 'credit_card',
-        stripe_transaction_id: upgradeResult.invoice?.id || null,
-        status: 'completed',
+        stripe_transaction_id: subscription.stripe_subscription_id,
+        status: 'processing',
         metadata: {
           from: currentPlan,
           to: newPlan,
-          charged_amount: upgradeResult.charged_amount,
-          next_billing_date: upgradeResult.next_billing_date,
+          message: 'Upgrade solicitado, aguardando confirmação via webhook',
           gateway: 'stripe'
         },
         created_at: now
       }])
 
-    console.log('✅ Log registrado')
+    console.log('✅ Log de solicitação registrado')
 
     // ============================================
-    // 9. RETORNAR SUCESSO
+    // 9. RETORNAR SUCESSO (PROCESSANDO)
     // ============================================
 
     return NextResponse.json({
       success: true,
-      message: 'Upgrade realizado com sucesso!',
+      message: 'Upgrade sendo processado! A atualização será refletida em alguns segundos.',
       data: {
         new_plan: newPlan,
-        charged_amount: upgradeResult.charged_amount,
-        next_billing_date: upgradeResult.next_billing_date,
+        status: 'processing',
+        estimated_charge: upgradeResult.charged_amount || 0,
         invoice_id: upgradeResult.invoice?.id
-      }
+      },
+      warning: 'A mudança será confirmada via webhook. Atualize a página em alguns segundos.'
     })
 
   } catch (error) {

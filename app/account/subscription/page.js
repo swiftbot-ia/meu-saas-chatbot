@@ -95,19 +95,37 @@ export default function AccountSubscription() {
     return subscription.status
   }
 
-  const getRemainingDays = () => {
-    if (!subscription) return 0
-    
-    const endDate = subscription.status === 'trial' 
-      ? new Date(subscription.trial_end_date)
-      : new Date(subscription.next_billing_date)
-    
+const calculateRemainingDays = () => {
+  // ❌ NÃO MOSTRAR DIAS RESTANTES SE CANCELADO/EXPIRADO
+  if (subscriptionStatus === 'canceled' || 
+      subscriptionStatus === 'cancelled' || 
+      subscriptionStatus === 'expired') {
+    return 0
+  }
+
+  // ✅ Para TRIAL ATIVO: usar trial_end_date
+  if (subscriptionStatus === 'trial' && subscription.trial_end_date) {
+    const trialEndDate = new Date(subscription.trial_end_date)
     const now = new Date()
-    const diffTime = endDate - now
+    const diffTime = trialEndDate - now
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     
     return Math.max(0, diffDays)
   }
+
+  // ✅ Para PLANO ATIVO: usar next_billing_date
+  if (subscriptionStatus === 'active' && subscription.next_billing_date) {
+    const nextBilling = new Date(subscription.next_billing_date)
+    const now = new Date()
+    const diffTime = nextBilling - now
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    
+    return Math.max(0, diffDays)
+  }
+
+  // ✅ Caso contrário, não há dias restantes
+  return 0
+}
 
   const calculatePrice = (connections, billingPeriod) => {
     const pricing = {
@@ -337,7 +355,7 @@ export default function AccountSubscription() {
   }
 
   const subscriptionStatus = getSubscriptionStatus()
-  const remainingDays = getRemainingDays()
+  const remainingDays = calculateRemainingDays()
 
   const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'Usuário'
   const initials = displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
@@ -487,15 +505,19 @@ export default function AccountSubscription() {
                         </div>
                       </div>
                       
-                      {remainingDays > 0 && subscriptionStatus !== 'canceled' && (
-                        <div className="text-right relative">
-                          {/* MODIFICADO: Estilo do contador (removida borda) */}
-                          <div className="relative bg-[#0A0A0A] rounded-xl p-4">
-                            <div className="text-3xl font-bold text-[#00FF99]">{remainingDays}</div>
-                            <div className="text-sm text-gray-400">dias restantes</div>
-                          </div>
-                        </div>
-                      )}
+{remainingDays > 0 && 
+ subscriptionStatus !== 'canceled' && 
+ subscriptionStatus !== 'cancelled' &&
+ subscriptionStatus !== 'expired' && (
+  <div className="text-right relative">
+    <div className="relative bg-[#0A0A0A] rounded-xl p-4">
+      <div className="text-3xl font-bold text-[#00FF99]">{remainingDays}</div>
+      <div className="text-sm text-gray-400">
+        {subscriptionStatus === 'trial' ? 'dias de trial' : 'dias restantes'}
+      </div>
+    </div>
+  </div>
+)}
                     </div>
 
                     {subscriptionStatus === 'canceled' && (
@@ -697,32 +719,46 @@ export default function AccountSubscription() {
                     Ações Rápidas
                   </h3>
                   
-                  <div className="space-y-3">
-                    
-                    {/* ============================================
-                    // 3. BOTÃO SUBSTITUÍDO (onClick alterado)
-                    // ============================================ */}
-                    <button
-                      onClick={handleOpenPlanChange}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center"
-                    >
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                      </svg>
-                      Alterar Plano
-                    </button>
-                    
-                    <button
-                      onClick={() => setShowCancelModal(true)}
-                      disabled={canceling}
-                      className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center"
-                    >
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                      {canceling ? 'Cancelando...' : 'Cancelar Assinatura'}
-                    </button>
-                  </div>
+<div className="space-y-3">
+  {/* ✅ BOTÃO CONDICIONAL: Alterar ou Reativar */}
+  {subscriptionStatus === 'expired' || subscriptionStatus === 'canceled' ? (
+    // ASSINATURA EXPIRADA/CANCELADA → REATIVAR
+    <button
+      onClick={() => router.push('/dashboard')}
+      className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black py-3 px-4 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] flex items-center justify-center"
+    >
+      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      </svg>
+      Reativar Assinatura
+    </button>
+  ) : (
+    // ASSINATURA ATIVA/TRIAL → ALTERAR
+    <button
+      onClick={() => setShowUpgradeModal(true)}
+      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center"
+    >
+      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+      </svg>
+      Alterar Plano
+    </button>
+  )}
+  
+  {/* BOTÃO DE CANCELAR - Só aparece se ativo/trial */}
+  {(subscriptionStatus === 'active' || subscriptionStatus === 'trial') && (
+    <button
+      onClick={() => setShowCancelModal(true)}
+      disabled={canceling}
+      className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center"
+    >
+      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+      </svg>
+      {canceling ? 'Cancelando...' : 'Cancelar Assinatura'}
+    </button>
+  )}
+</div>
                 </div>
               </div>
             )}

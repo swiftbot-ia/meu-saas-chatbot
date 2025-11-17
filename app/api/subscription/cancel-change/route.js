@@ -1,5 +1,5 @@
 // app/api/subscription/cancel-change/route.js
-// Rota para CANCELAR uma mudança de plano agendada
+// VERSÃO CORRIGIDA - Apenas chama Stripe, Webhook atualiza DB
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -12,7 +12,7 @@ const supabase = createClient(
 
 export async function POST(request) {
   try {
-    console.log('🔄 Cancelando mudança de plano agendada...')
+    console.log('🔄 [CANCEL CHANGE] Cancelando mudança agendada...')
 
     const body = await request.json()
     const { userId } = body
@@ -65,11 +65,9 @@ export async function POST(request) {
     }
 
     console.log(`📅 Mudança pendente encontrada: ${subscription.pending_change_type}`)
-    console.log(`📊 Plano atual: ${subscription.connections_purchased} conexões`)
-    console.log(`📊 Plano agendado: ${subscription.pending_connections} conexões`)
 
     // ============================================
-    // 4. CANCELAR NA STRIPE
+    // 4. CANCELAR NA STRIPE (release schedule)
     // ============================================
 
     const cancelResult = await cancelScheduledChange(
@@ -85,31 +83,25 @@ export async function POST(request) {
       }, { status: 500 })
     }
 
-    console.log('✅ Mudança cancelada na Stripe')
+    console.log('✅ Mudança cancelada na Stripe (aguardando webhook para limpar DB)')
 
     // ============================================
-    // 5. ATUALIZAR BANCO DE DADOS
+    // 5. LIMPAR FLAGS NO DB (webhook confirma, mas limpamos flag temporária)
     // ============================================
 
     const now = new Date().toISOString()
     
-    const updateData = {
-      pending_change_type: null,
-      pending_connections: null,
-      pending_billing_period: null,
-      updated_at: now
-    }
-
-    const { error: updateError } = await supabase
+    await supabase
       .from('user_subscriptions')
-      .update(updateData)
+      .update({
+        pending_change_type: null,
+        pending_connections: null,
+        pending_billing_period: null,
+        updated_at: now
+      })
       .eq('id', subscription.id)
 
-    if (updateError) {
-      console.error('⚠️ Erro ao atualizar banco:', updateError)
-    } else {
-      console.log('✅ Banco de dados atualizado')
-    }
+    console.log('✅ Flags de mudança pendente limpas')
 
     // ============================================
     // 6. REGISTRAR LOG

@@ -10,6 +10,7 @@ export default function Dashboard() {
   const [user, setUser] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
   const [subscription, setSubscription] = useState(null)
+  const [hasUsedTrialBefore, setHasUsedTrialBefore] = useState(false)
   const [subscriptionStatus, setSubscriptionStatus] = useState('loading')
   const [connections, setConnections] = useState([])
   const [activeConnection, setActiveConnection] = useState(null)
@@ -102,7 +103,25 @@ const loadSubscription = async (userId) => {
       console.log('Nenhuma assinatura encontrada')
       setSubscriptionStatus('none')
       setSubscription(null)
+      // ⚠️ VERIFICAR SE JÁ EXISTE HISTÓRICO DE TRIAL (mesmo sem assinatura ativa)
+      const { data: historyData } = await supabase
+        .from('user_subscriptions')
+        .select('trial_start_date')
+        .eq('user_id', userId)
+        .not('trial_start_date', 'is', null)
+        .limit(1)
+        .single()
+      
+      if (historyData) {
+        console.log('🔒 Usuário já usou trial no passado')
+        setHasUsedTrialBefore(true)
+      }
+      
       return
+    }
+    if (data && data.trial_start_date) {
+      console.log('🔒 Usuário já usou trial anteriormente')
+      setHasUsedTrialBefore(true)
     }
 
     console.log('📊 Assinatura carregada:', data)
@@ -111,7 +130,25 @@ const loadSubscription = async (userId) => {
     // ✅ LÓGICA CORRETA DE STATUS
     if (data.stripe_subscription_id === 'super_account_bypass') {
       setSubscriptionStatus('super_account')
-    } else if (data.status === 'trial' || data.status === 'trialing') {
+} else if (data.status === 'trial' || data.status === 'trialing') {
+      // ✅ VERIFICAR SE TRIAL EXPIROU
+      if (data.trial_end_date) {
+        const trialEndDate = new Date(data.trial_end_date)
+        const now = new Date()
+        
+        if (now > trialEndDate) {
+          console.log('⚠️ Trial expirado detectado')
+          setSubscriptionStatus('expired')
+          
+          // Atualizar no banco
+          await supabase
+            .from('user_subscriptions')
+            .update({ status: 'expired', updated_at: new Date().toISOString() })
+            .eq('id', data.id)
+          
+          return
+        }
+      }
       setSubscriptionStatus('trial')
     } else if (data.status === 'active') {
       setSubscriptionStatus('active')
@@ -208,9 +245,38 @@ const loadSubscription = async (userId) => {
       return
     }
 
-    if (subscriptionStatus === 'none' || subscriptionStatus === 'expired') {
+    // ============================================================================
+    // 🔒 VALIDAÇÃO RIGOROSA DE ASSINATURA NO FRONTEND
+    // ============================================================================
+    const blockedStatuses = [
+      'none',
+      'expired', 
+      'canceled',
+      'cancelled',
+      'incomplete',
+      'incomplete_expired',
+      'unpaid',
+      'paused',
+      'past_due'
+    ]
+
+    if (blockedStatuses.includes(subscriptionStatus)) {
+      console.log(`❌ Status bloqueado no frontend: ${subscriptionStatus}`)
       setShowCheckoutModal(true)
       return
+    }
+
+    // Verificar se trial expirou
+    if (subscriptionStatus === 'trial' && subscription?.trial_end_date) {
+      const trialEndDate = new Date(subscription.trial_end_date)
+      const now = new Date()
+      
+      if (now > trialEndDate) {
+        console.log('❌ Trial expirado detectado no frontend')
+        alert('Seu período de teste expirou. Por favor, assine um plano para continuar.')
+        setShowCheckoutModal(true)
+        return
+      }
     }
 
     setConnecting(true)
@@ -238,7 +304,15 @@ const loadSubscription = async (userId) => {
           await loadConnections(user.id)
         }
       } else {
-        alert(data.error || 'Erro ao conectar WhatsApp')
+        // Tratamento de erros específicos
+        if (data.subscription_status) {
+          console.log(`❌ Erro de assinatura: ${data.subscription_status}`)
+          alert(data.error || 'Problema com sua assinatura. Verifique seu plano.')
+          setShowCheckoutModal(true)
+        } else {
+          alert(data.error || 'Erro ao conectar WhatsApp')
+        }
+        return
       }
     } catch (error) {
       console.error('Erro ao conectar WhatsApp:', error)
@@ -898,7 +972,7 @@ const handleConfirmPayment = async (e) => {
         {/* Fim da Linha Welcome+Header */}
 
         {/* Subscription Alert - FUNDO PRETO COM BORDA GRADIENTE */}
-        {(subscriptionStatus === 'none' || subscriptionStatus === 'expired' || subscriptionStatus === 'past_due') && (
+        {(subscriptionStatus === 'none' || subscriptionStatus === 'expired' || subscriptionStatus === 'past_due') && !hasUsedTrialBefore && (
           <div 
             className="mb-12 bg-black rounded-2xl p-8 relative"
             style={{
@@ -954,7 +1028,48 @@ const handleConfirmPayment = async (e) => {
             </div>
           </div>
         )}
-
+{/* Card para usuários que JÁ USARAM trial */}
+{(subscriptionStatus === 'none' || subscriptionStatus === 'expired' || subscriptionStatus === 'past_due') && hasUsedTrialBefore && (
+  <div 
+    className="mb-12 bg-black rounded-2xl p-8 relative"
+    style={{
+      border: '2px solid transparent',
+      backgroundImage: 'linear-gradient(black, black), linear-gradient(to right, #FF6B6B, #FF8E53)',
+      backgroundOrigin: 'border-box',
+      backgroundClip: 'padding-box, border-box'
+    }}
+  >
+    <div className="flex items-start justify-between">
+      <div className="flex-1">
+        <div className="flex items-center gap-3 mb-3">
+          <div 
+            className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)' }}
+          >
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h3 className="text-2xl font-bold text-white">
+            Assinatura Necessária
+          </h3>
+        </div>
+        <p className="text-[#B0B0B0] mb-5 text-lg">
+          Assine um plano para continuar automatizando seu atendimento
+        </p>
+        <button
+          onClick={() => setShowCheckoutModal(true)}
+          className="inline-flex items-center gap-2 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold px-8 py-4 rounded-xl hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] transition-all duration-300"
+        >
+          Ver Planos
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+)}
         {/* ================================================================= */}
         {/* INÍCIO DO BANNER ADICIONADO (DE banner-mudanca-agendada.txt)       */}
         {/* ================================================================= */}
