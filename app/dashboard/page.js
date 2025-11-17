@@ -10,6 +10,7 @@ export default function Dashboard() {
   const [user, setUser] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
   const [subscription, setSubscription] = useState(null)
+  const [hasUsedTrialBefore, setHasUsedTrialBefore] = useState(false)
   const [subscriptionStatus, setSubscriptionStatus] = useState('loading')
   const [connections, setConnections] = useState([])
   const [activeConnection, setActiveConnection] = useState(null)
@@ -102,7 +103,25 @@ const loadSubscription = async (userId) => {
       console.log('Nenhuma assinatura encontrada')
       setSubscriptionStatus('none')
       setSubscription(null)
+      // ⚠️ VERIFICAR SE JÁ EXISTE HISTÓRICO DE TRIAL (mesmo sem assinatura ativa)
+      const { data: historyData } = await supabase
+        .from('user_subscriptions')
+        .select('trial_start_date')
+        .eq('user_id', userId)
+        .not('trial_start_date', 'is', null)
+        .limit(1)
+        .single()
+      
+      if (historyData) {
+        console.log('🔒 Usuário já usou trial no passado')
+        setHasUsedTrialBefore(true)
+      }
+      
       return
+    }
+    if (data && data.trial_start_date) {
+      console.log('🔒 Usuário já usou trial anteriormente')
+      setHasUsedTrialBefore(true)
     }
 
     console.log('📊 Assinatura carregada:', data)
@@ -111,7 +130,25 @@ const loadSubscription = async (userId) => {
     // ✅ LÓGICA CORRETA DE STATUS
     if (data.stripe_subscription_id === 'super_account_bypass') {
       setSubscriptionStatus('super_account')
-    } else if (data.status === 'trial' || data.status === 'trialing') {
+} else if (data.status === 'trial' || data.status === 'trialing') {
+      // ✅ VERIFICAR SE TRIAL EXPIROU
+      if (data.trial_end_date) {
+        const trialEndDate = new Date(data.trial_end_date)
+        const now = new Date()
+        
+        if (now > trialEndDate) {
+          console.log('⚠️ Trial expirado detectado')
+          setSubscriptionStatus('expired')
+          
+          // Atualizar no banco
+          await supabase
+            .from('user_subscriptions')
+            .update({ status: 'expired', updated_at: new Date().toISOString() })
+            .eq('id', data.id)
+          
+          return
+        }
+      }
       setSubscriptionStatus('trial')
     } else if (data.status === 'active') {
       setSubscriptionStatus('active')
@@ -208,9 +245,38 @@ const loadSubscription = async (userId) => {
       return
     }
 
-    if (subscriptionStatus === 'none' || subscriptionStatus === 'expired') {
+    // ============================================================================
+    // 🔒 VALIDAÇÃO RIGOROSA DE ASSINATURA NO FRONTEND
+    // ============================================================================
+    const blockedStatuses = [
+      'none',
+      'expired', 
+      'canceled',
+      'cancelled',
+      'incomplete',
+      'incomplete_expired',
+      'unpaid',
+      'paused',
+      'past_due'
+    ]
+
+    if (blockedStatuses.includes(subscriptionStatus)) {
+      console.log(`❌ Status bloqueado no frontend: ${subscriptionStatus}`)
       setShowCheckoutModal(true)
       return
+    }
+
+    // Verificar se trial expirou
+    if (subscriptionStatus === 'trial' && subscription?.trial_end_date) {
+      const trialEndDate = new Date(subscription.trial_end_date)
+      const now = new Date()
+      
+      if (now > trialEndDate) {
+        console.log('❌ Trial expirado detectado no frontend')
+        alert('Seu período de teste expirou. Por favor, assine um plano para continuar.')
+        setShowCheckoutModal(true)
+        return
+      }
     }
 
     setConnecting(true)
@@ -238,7 +304,15 @@ const loadSubscription = async (userId) => {
           await loadConnections(user.id)
         }
       } else {
-        alert(data.error || 'Erro ao conectar WhatsApp')
+        // Tratamento de erros específicos
+        if (data.subscription_status) {
+          console.log(`❌ Erro de assinatura: ${data.subscription_status}`)
+          alert(data.error || 'Problema com sua assinatura. Verifique seu plano.')
+          setShowCheckoutModal(true)
+        } else {
+          alert(data.error || 'Erro ao conectar WhatsApp')
+        }
+        return
       }
     } catch (error) {
       console.error('Erro ao conectar WhatsApp:', error)
@@ -631,7 +705,7 @@ const handleConfirmPayment = async (e) => {
     await loadConnections(user.id)
 
     const message = subscriptionData.is_trial 
-      ? `🎉 Trial de ${subscriptionData.trial_days} dias ativado!`
+      ? `🎉 Teste Grátis de ${subscriptionData.trial_days} dias ativado!`
       : '💳 Plano ativado!'
 
     alert(message)
@@ -898,7 +972,7 @@ const handleConfirmPayment = async (e) => {
         {/* Fim da Linha Welcome+Header */}
 
         {/* Subscription Alert - FUNDO PRETO COM BORDA GRADIENTE */}
-        {(subscriptionStatus === 'none' || subscriptionStatus === 'expired' || subscriptionStatus === 'past_due') && (
+        {(subscriptionStatus === 'none' || subscriptionStatus === 'expired' || subscriptionStatus === 'past_due') && !hasUsedTrialBefore && (
           <div 
             className="mb-12 bg-black rounded-2xl p-8 relative"
             style={{
@@ -954,6 +1028,161 @@ const handleConfirmPayment = async (e) => {
             </div>
           </div>
         )}
+{/* Card para usuários que JÁ USARAM trial */}
+{(subscriptionStatus === 'none' || subscriptionStatus === 'expired' || subscriptionStatus === 'past_due') && hasUsedTrialBefore && (
+  <div 
+    className="mb-12 bg-black rounded-2xl p-8 relative"
+    style={{
+      border: '2px solid transparent',
+      backgroundImage: 'linear-gradient(black, black), linear-gradient(to right, #FF6B6B, #FF8E53)',
+      backgroundOrigin: 'border-box',
+      backgroundClip: 'padding-box, border-box'
+    }}
+  >
+    <div className="flex items-start justify-between">
+      <div className="flex-1">
+        <div className="flex items-center gap-3 mb-3">
+          <div 
+            className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)' }}
+          >
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h3 className="text-2xl font-bold text-white">
+            Assinatura Necessária
+          </h3>
+        </div>
+        <p className="text-[#B0B0B0] mb-5 text-lg">
+          Assine um plano para continuar automatizando seu atendimento
+        </p>
+        <button
+          onClick={() => setShowCheckoutModal(true)}
+          className="inline-flex items-center gap-2 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold px-8 py-4 rounded-xl hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] transition-all duration-300"
+        >
+          Ver Planos
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+        {/* ================================================================= */}
+        {/* INÍCIO DO BANNER ADICIONADO (DE banner-mudanca-agendada.txt)       */}
+        {/* ================================================================= */}
+        
+        {/* Banner de Mudança Agendada (Downgrade ou Cancelamento) - FUNDO PRETO COM BORDA VERMELHA */}
+        {subscription && (subscription.pending_change_type || subscription.canceled_at) && subscription.status !== 'canceled' && (
+          <div 
+            className="mb-12 bg-black rounded-2xl p-8 relative"
+            style={{
+              border: '2px solid transparent',
+              backgroundImage: 'linear-gradient(black, black), linear-gradient(to right, #EF4444, #DC2626)',
+              backgroundOrigin: 'border-box',
+              backgroundClip: 'padding-box, border-box'
+            }}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-3">
+                  {/* Ícone de Alerta com Vermelho */}
+                  <div 
+                    className="w-10 h-10 rounded-xl flex items-center justify-center"
+                    style={{ background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)' }}
+                  >
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-2xl font-bold text-white">
+                    ⚠️ Mudança de Plano Agendada
+                  </h3>
+                </div>
+                
+                {/* Conteúdo do Banner */}
+                <div className="space-y-2 mb-5">
+                  <p className="text-[#B0B0B0] text-lg">
+                    <strong className="text-white">Plano atual:</strong> {subscription.connections_purchased} {subscription.connections_purchased === 1 ? 'conexão' : 'conexões'} - R$ {
+                      subscription.billing_period === 'monthly' 
+                        ? {1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875}[subscription.connections_purchased]
+                        : {1: 1776, 2: 3294, 3: 4806, 4: 6318, 5: 6750, 6: 8100, 7: 9450}[subscription.connections_purchased]
+                    }/{subscription.billing_period === 'monthly' ? 'mês' : 'ano'}
+                  </p>
+                  
+                  {subscription.pending_change_type === 'downgrade' && (
+                    <>
+                      <p className="text-[#B0B0B0] text-lg">
+                        <strong className="text-orange-400">A partir de {new Date(subscription.next_billing_date).toLocaleDateString('pt-BR')}:</strong> {subscription.pending_connections} {subscription.pending_connections === 1 ? 'conexão' : 'conexões'} - R$ {
+                          subscription.pending_billing_period === 'monthly' 
+                            ? {1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875}[subscription.pending_connections]
+                            : {1: 1776, 2: 3294, 3: 4806, 4: 6318, 5: 6750, 6: 8100, 7: 9450}[subscription.pending_connections]
+                        }/{subscription.pending_billing_period === 'monthly' ? 'mês' : 'ano'}
+                      </p>
+                      {subscription.pending_connections < subscription.connections_purchased && (
+                        <p className="text-orange-400 text-sm">
+                          ℹ️ {subscription.connections_purchased - subscription.pending_connections} {subscription.connections_purchased - subscription.pending_connections === 1 ? 'conexão será desconectada' : 'conexões serão desconectadas'} automaticamente na renovação
+                        </p>
+                      )}
+                    </>
+                  )}
+                  
+                  {subscription.canceled_at && !subscription.pending_change_type && (
+                    <p className="text-[#B0B0B0] text-lg">
+                      <strong className="text-red-400">Cancelamento agendado para:</strong> {new Date(subscription.next_billing_date).toLocaleDateString('pt-BR')}
+                    </p>
+                  )}
+                </div>
+
+                {/* Botão para cancelar mudança */}
+                <button
+                  onClick={async () => {
+                    if (!confirm('Tem certeza que deseja cancelar a mudança agendada?')) return
+                    
+                    try {
+                      const response = await fetch('/api/subscription/cancel-change', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId: user.id })
+                      })
+                      
+                      const data = await response.json()
+                      
+                      if (data.success) {
+                        alert('✅ Mudança cancelada com sucesso!')
+                        await loadSubscription(user.id)
+                      } else {
+                        alert(`❌ Erro: ${data.error}`)
+                      }
+                    } catch (error) {
+                      console.error('Erro:', error)
+                      alert('❌ Erro ao cancelar mudança')
+                    }
+                  }}
+                  className="bg-gradient-to-r from-[#00FF99] to-[#00E88C] hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] text-black py-3 px-8 rounded-xl font-bold transition-all duration-300 flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Cancelar Mudança Agendada
+                </button>
+              </div>
+
+              {/* Ícone grande no lado direito (opcional) */}
+              <div className="hidden md:block ml-8">
+                <svg className="w-24 h-24 text-red-500/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* FIM DO BANNER ADICIONADO                                          */}
+        {/* ================================================================= */}
 
         {/* Main Grid - CARDS COM BORDAS GRADIENTES */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
@@ -1306,7 +1535,7 @@ const handleConfirmPayment = async (e) => {
                     {/* Ícone (simulando o do código 2) */}
                   </div>
                   <h2 className="text-2xl font-bold text-white mb-2">
-                    {shouldShowTrial() ? 'Trial Grátis' : '💳 Ativar ou Fazer Upgrade'}
+                    {shouldShowTrial() ? 'Teste Grátis' : '💳 Ativar ou Fazer Upgrade'}
                   </h2>
                   <p className="text-gray-400">
                     {shouldShowTrial() 
@@ -1429,7 +1658,7 @@ const handleConfirmPayment = async (e) => {
                     
                     {!shouldShowTrial() && (
                       <div className="text-red-400 text-sm font-medium mt-2">
-                        ⚠️ Trial já utilizado ou modo de upgrade - Cobrança imediata
+                        ⚠️ Teste Grátis já utilizado ou modo de upgrade - Cobrança imediata
                       </div>
                     )}
                   </div>
@@ -1437,13 +1666,13 @@ const handleConfirmPayment = async (e) => {
                   <div className="text-center">
                     <div className="text-yellow-400 text-sm font-medium mb-2">
                       {shouldShowTrial() 
-                        ? ' Trial completo e sem compromisso' 
+                        ? ' Teste Grátis completo e sem compromisso' 
                         : '💎 Acesso completo aos recursos'
                       }
                     </div>
                     <div className="text-xs text-gray-500">
                       {shouldShowTrial() 
-                        ? 'Cancele a qualquer momento durante o trial'
+                        ? 'Cancele a qualquer momento durante o teste grátis'
                         : 'Cancele a qualquer momento'
                       }
                     </div>
@@ -1592,7 +1821,7 @@ const handleConfirmPayment = async (e) => {
                         ? 'Processando...' 
                         : !isPaymentElementReady 
                           ? 'Carregando formulário...'
-                          : (shouldShowTrial() ? 'Ativar Trial Grátis' : 'Pagar e Ativar')
+                          : (shouldShowTrial() ? 'Ativar Teste Grátis' : 'Pagar e Ativar')
                       }
                     </button>
                   </div>

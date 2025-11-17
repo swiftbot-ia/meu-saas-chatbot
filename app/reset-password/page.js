@@ -13,7 +13,6 @@ export default function ResetPasswordPage() {
   const router = useRouter()
 
   useEffect(() => {
-    // O Supabase Auth automaticamente detecta o código na URL e troca por sessão
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         setIsReady(true)
@@ -21,7 +20,6 @@ export default function ResetPasswordPage() {
       }
     })
 
-    // Verifica se já existe uma sessão de recuperação ativa
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setIsReady(true)
@@ -33,6 +31,22 @@ export default function ResetPasswordPage() {
       authListener?.subscription.unsubscribe()
     }
   }, [])
+
+  const translateError = (errorMessage) => {
+    const translations = {
+      'New password should be different from the old password': 'A nova senha deve ser diferente da senha anterior',
+      'Password should be at least 6 characters': 'A senha deve ter pelo menos 6 caracteres',
+      'Unable to validate email address: invalid format': 'Email inválido',
+      'Invalid login credentials': 'Credenciais inválidas',
+      'Email not confirmed': 'Email não confirmado',
+      'User not found': 'Usuário não encontrado',
+      'Invalid email or password': 'Email ou senha inválidos',
+      'Password is too weak': 'Senha muito fraca',
+      'Signup requires a valid password': 'É necessário uma senha válida'
+    }
+
+    return translations[errorMessage] || errorMessage
+  }
 
   const handlePasswordUpdate = async (e) => {
     e.preventDefault()
@@ -66,7 +80,8 @@ export default function ResetPasswordPage() {
 
     } catch (error) {
       console.error('Erro ao atualizar senha:', error)
-      setMessage(`❌ Erro: ${error.message}`)
+      const translatedError = translateError(error.message)
+      setMessage(`❌ Erro: ${translatedError}`)
     } finally {
       setLoading(false)
     }
