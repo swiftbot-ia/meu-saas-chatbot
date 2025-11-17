@@ -10,49 +10,55 @@ export default function ResetPasswordPage() {
   const [message, setMessage] = useState('')
   const [errors, setErrors] = useState({})
   const [tokenFound, setTokenFound] = useState(false)
+  const [checkingToken, setCheckingToken] = useState(true)
   const router = useRouter()
 
-  // Este useEffect é crucial. Ele roda UMA VEZ quando a página carrega
-  // para detectar o token de acesso que o Supabase coloca na URL.
   useEffect(() => {
-    const handlePasswordRecovery = async (access_token) => {
-      // 1. Define o token na sessão do Supabase
-      const { error } = await supabase.auth.setSession({
-        access_token,
-        refresh_token: '', // Não precisamos de refresh token aqui
-      })
-      
-      if (error) {
-        setMessage(`❌ Erro: ${error.message}`)
-        console.error("Erro ao definir sessão:", error)
-      } else {
-        // 2. Se o token for válido, mostra o formulário
+    const checkRecoveryToken = async () => {
+      try {
+        // Verifica se há um hash na URL
+        const hashParams = new URLSearchParams(window.location.hash.substring(1))
+        const accessToken = hashParams.get('access_token')
+        const type = hashParams.get('type')
+
+        if (!accessToken || type !== 'recovery') {
+          setMessage('Link de recuperação inválido ou expirado.')
+          setCheckingToken(false)
+          return
+        }
+
+        // Define a sessão com o token de recuperação
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: hashParams.get('refresh_token') || ''
+        })
+
+        if (error) {
+          setMessage(`Erro: ${error.message}`)
+          setCheckingToken(false)
+          return
+        }
+
+        // Token válido
         setTokenFound(true)
-        setMessage('✅ Token verificado. Por favor, crie sua nova senha.')
+        setMessage('✅ Link verificado. Crie sua nova senha.')
+        setCheckingToken(false)
+
+      } catch (error) {
+        console.error('Erro ao verificar token:', error)
+        setMessage('Erro ao processar o link de recuperação.')
+        setCheckingToken(false)
       }
     }
 
-    // O Supabase envia o token no "fragment" da URL (depois do #)
-    const hash = window.location.hash
-    if (hash) {
-      const params = new URLSearchParams(hash.substring(1))
-      const accessToken = params.get('access_token')
+    checkRecoveryToken()
+  }, [])
 
-      if (accessToken) {
-        handlePasswordRecovery(accessToken)
-      } else {
-        setMessage("Token de recuperação não encontrado na URL.")
-      }
-    }
-  }, []) // O array vazio [] garante que isso rode apenas uma vez
-
-  // Função para enviar a nova senha
   const handlePasswordUpdate = async (e) => {
     e.preventDefault()
     setErrors({})
     setMessage('')
 
-    // Validação
     if (password.length < 6) {
       setErrors({ password: 'Senha deve ter pelo menos 6 caracteres' })
       return
@@ -65,23 +71,18 @@ export default function ResetPasswordPage() {
     setLoading(true)
 
     try {
-      // A sessão já foi definida no useEffect,
-      // então o updateUser sabe quem é o usuário.
       const { error } = await supabase.auth.updateUser({
         password: password
       })
 
-      if (error) {
-        throw error
-      }
+      if (error) throw error
 
-      setMessage('✅ Senha atualizada com sucesso! Redirecionando para o login...')
+      setMessage('✅ Senha atualizada com sucesso! Redirecionando...')
       
-      // Limpa a sessão e redireciona
       await supabase.auth.signOut()
       setTimeout(() => {
         router.push('/login')
-      }, 3000)
+      }, 2000)
 
     } catch (error) {
       console.error('Erro ao atualizar senha:', error)
@@ -95,7 +96,6 @@ export default function ResetPasswordPage() {
     <>
       <div className="min-h-screen bg-black relative overflow-hidden flex items-center justify-center px-4 pt-24 pb-16">
         
-        {/* Backgrounds (mesmo estilo) */}
         <div className="absolute inset-0 opacity-10">
           <div 
             className="absolute inset-0" 
@@ -109,24 +109,24 @@ export default function ResetPasswordPage() {
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1.5s'}} />
 
-        {/* Auth Card */}
         <div className="relative w-full max-w-md">
           <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-8 md:p-10 shadow-2xl">
             
-            {/* Título */}
             <div className="text-center mb-8">
               <h1 className="text-4xl font-light text-white mb-3">
                 Redefinir <span className="font-normal bg-gradient-to-r from-[#00FF99] to-[#00E88C] bg-clip-text text-transparent">Senha</span>
               </h1>
               <p className="text-gray-400 font-light">
-                {tokenFound ? 'Digite sua nova senha abaixo.' : 'Verificando seu link...'}
+                {checkingToken ? 'Verificando seu link...' : tokenFound ? 'Digite sua nova senha abaixo.' : 'Link inválido ou expirado.'}
               </p>
             </div>
 
-            {/* Mostra o formulário APENAS se o token foi validado */}
-            {tokenFound ? (
+            {checkingToken ? (
+              <div className="text-center space-y-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto"></div>
+              </div>
+            ) : tokenFound ? (
               <form onSubmit={handlePasswordUpdate} className="space-y-4">
-                {/* Nova Senha */}
                 <div>
                   <label className="block text-sm font-light text-gray-300 mb-2">
                     Nova Senha *
@@ -145,7 +145,6 @@ export default function ResetPasswordPage() {
                   {errors.password && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.password}</p>}
                 </div>
 
-                {/* Confirmar Nova Senha */}
                 <div>
                   <label className="block text-sm font-light text-gray-300 mb-2">
                     Confirmar Nova Senha *
@@ -163,7 +162,6 @@ export default function ResetPasswordPage() {
                   {errors.confirmPassword && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.confirmPassword}</p>}
                 </div>
 
-                {/* Message */}
                 {message && (
                   <div className={`p-3 rounded-xl text-sm border backdrop-blur-sm font-light ${
                     message.includes('✅') 
@@ -174,7 +172,6 @@ export default function ResetPasswordPage() {
                   </div>
                 )}
                 
-                {/* Submit Button */}
                 <button
                   type="submit"
                   disabled={loading}
@@ -186,29 +183,16 @@ export default function ResetPasswordPage() {
                       <span className="font-light">Salvando...</span>
                     </div>
                   ) : (
-                    <span className="font-medium">
-                      Salvar Nova Senha
-                    </span>
+                    <span className="font-medium">Salvar Nova Senha</span>
                   )}
                 </button>
               </form>
             ) : (
-              // Mostra o loading ou mensagem de erro enquanto o token é verificado
-              <div className="text-center space-y-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto"></div>
-                {message && (
-                  <div className={`p-3 rounded-xl text-sm border backdrop-blur-sm font-light ${
-                    message.includes('✅') 
-                      ? 'bg-green-900/20 text-green-400 border-green-800/50' 
-                      : 'bg-red-900/20 text-red-400 border-red-800/50'
-                  }`}>
-                    {message}
-                  </div>
-                )}
+              <div className={`p-3 rounded-xl text-sm border backdrop-blur-sm font-light bg-red-900/20 text-red-400 border-red-800/50`}>
+                {message}
               </div>
             )}
 
-            {/* Back to Home */}
             <div className="mt-8 text-center">
               <button
                 onClick={() => router.push('/login')}
