@@ -271,52 +271,62 @@ const calculateRemainingDays = () => {
   }
 
   // Processar upgrade ou downgrade
-  const processPlanChange = async () => {
-    setChangingPlan(true)
+const processPlanChange = async () => {
+  setChangingPlan(true)
+  
+  try {
+    const endpoint = changeType === 'upgrade' 
+      ? '/api/subscription/upgrade'
+      : '/api/subscription/downgrade'
     
-    try {
-      const endpoint = changeType === 'upgrade' 
-        ? '/api/subscription/upgrade'
-        : '/api/subscription/downgrade'
-      
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          newPlan: selectedNewPlan
-        })
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: user.id,
+        newPlan: selectedNewPlan
       })
-      
-      const data = await response.json()
-      
-      if (!data.success) {
-        alert(`❌ Erro: ${data.error}`)
-        return
-      }
-      
-      // Sucesso!
-      if (changeType === 'upgrade') {
-        alert(`✅ Upgrade realizado! Você foi cobrado R$ ${data.data.charged_amount.toFixed(2)}`)
-      } else {
-        alert(`✅ Downgrade agendado para ${new Date(data.data.effective_date).toLocaleDateString('pt-BR')}`)
-      }
-      
-      // Recarregar dados
-      await loadSubscriptionData(user.id)
-      
-      // Fechar modais
-      setShowPlanChangeModal(false)
-      setShowConfirmDowngradeModal(false)
-      
-    } catch (error) {
-      console.error('Erro ao mudar plano:', error)
-      alert('❌ Erro ao processar mudança de plano')
+    })
     
-    } finally {
-      setChangingPlan(false)
+    const data = await response.json()
+    
+    if (!data.success) {
+      alert(`❌ Erro: ${data.error}`)
+      return
     }
+    
+    // ✅ CORREÇÃO: Acessar dados corretos da resposta
+    if (changeType === 'upgrade') {
+      const chargedAmount = data.data?.estimated_charge || 0
+      alert(`✅ Upgrade realizado! Você foi cobrado aproximadamente R$ ${chargedAmount.toFixed(2)}`)
+    } else {
+      // ✅ CORREÇÃO: Validar se effective_date existe antes de usar
+      if (data.data?.effective_date) {
+        const effectiveDate = new Date(data.data.effective_date)
+        if (!isNaN(effectiveDate.getTime())) {
+          alert(`✅ Downgrade agendado para ${effectiveDate.toLocaleDateString('pt-BR')}`)
+        } else {
+          alert(`✅ Downgrade agendado com sucesso!`)
+        }
+      } else {
+        alert(`✅ Downgrade agendado com sucesso!`)
+      }
+    }
+    
+    // Recarregar dados
+    await loadSubscriptionData(user.id)
+    
+    // Fechar modais
+    setShowPlanChangeModal(false)
+    setShowConfirmDowngradeModal(false)
+    
+  } catch (error) {
+    console.error('Erro ao mudar plano:', error)
+    alert('❌ Erro ao processar mudança de plano: ' + error.message)
+  } finally {
+    setChangingPlan(false)
   }
+}
 
   // Cancelar mudança agendada
   const handleCancelScheduledChange = async () => {
