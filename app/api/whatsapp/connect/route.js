@@ -75,16 +75,25 @@ export async function GET(request) {
     const instanceInfo = statusData.instance || {}
     const instanceStatus = instanceInfo.status || 'disconnected'
 
-    // Atualizar status no banco se mudou
-    if (instanceStatus !== connection.status) {
-      await supabase
-        .from('whatsapp_connections')
-        .update({
-          status: instanceStatus === 'open' ? 'connected' : 'connecting',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', connectionId)
+    // ✅ ATUALIZAR SUPABASE: Status + Dados do Perfil
+    const updateData = {
+      status: instanceStatus === 'open' ? 'connected' : 'connecting',
+      updated_at: new Date().toISOString()
     }
+
+    // Se conectado, salvar dados do perfil
+    if (instanceStatus === 'open' && instanceInfo.profileName) {
+      updateData.profile_name = instanceInfo.profileName
+      updateData.profile_pic_url = instanceInfo.profilePicUrl || null
+      updateData.phone_number = instanceInfo.owner || null
+    }
+
+    await supabase
+      .from('whatsapp_connections')
+      .update(updateData)
+      .eq('id', connectionId)
+
+    console.log('✅ Supabase atualizado:', updateData)
 
     return NextResponse.json({
       success: true,
@@ -436,14 +445,30 @@ export async function POST(request) {
         console.log('✅ QR Code encontrado em base64')
       }
 
-      // Atualizar status no banco
+      // ✅ ATUALIZAR SUPABASE: Status + Dados do Perfil
+      const updateData = {
+        status: instanceStatus === 'open' ? 'connected' : 'connecting',
+        updated_at: new Date().toISOString()
+      }
+
+      // Se conectado, salvar dados do perfil
+      if (instanceStatus === 'open' && instanceInfo.profileName) {
+        updateData.profile_name = instanceInfo.profileName
+        updateData.profile_pic_url = instanceInfo.profilePicUrl || null
+        updateData.phone_number = instanceInfo.owner || null
+
+        console.log('✅ Perfil WhatsApp detectado:', {
+          name: instanceInfo.profileName,
+          phone: instanceInfo.owner
+        })
+      }
+
       await supabase
         .from('whatsapp_connections')
-        .update({
-          status: instanceStatus === 'open' ? 'connected' : 'connecting',
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', connectionId)
+
+      console.log('✅ Supabase atualizado no POST:', updateData)
     } else {
       console.warn('⚠️ Não foi possível obter status da instância')
       const errorText = await statusResponse.text()

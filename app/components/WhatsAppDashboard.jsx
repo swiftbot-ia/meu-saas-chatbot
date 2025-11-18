@@ -23,6 +23,8 @@ export default function WhatsAppDashboard({ userId, connectionId }) {
 
   const loadConnectionStatus = async () => {
     try {
+      console.log('📥 Carregando status da conexão:', connectionId)
+
       const response = await fetch(
         `/api/whatsapp/connect?connectionId=${connectionId}`,
         { method: 'GET' }
@@ -30,38 +32,55 @@ export default function WhatsAppDashboard({ userId, connectionId }) {
 
       const data = await response.json()
 
+      console.log('📊 Status recebido:', data)
+
       if (response.ok) {
         setConnectionStatus(data.status)
-        if (data.connected) {
+
+        // Sempre atualizar instanceData se houver dados
+        if (data.instanceName) {
           setInstanceData({
             instanceName: data.instanceName,
             profileName: data.profileName,
             profilePicUrl: data.profilePicUrl,
             owner: data.owner,
-            status: data.status
+            status: data.status,
+            connected: data.connected
+          })
+
+          console.log('✅ Dados da instância atualizados:', {
+            profileName: data.profileName,
+            status: data.status,
+            connected: data.connected
           })
         }
       }
     } catch (error) {
-      console.error('Erro ao carregar status:', error)
+      console.error('❌ Erro ao carregar status:', error)
     }
   }
 
   // ============================================================================
   // CALLBACK: Quando WhatsApp conecta com sucesso
   // ============================================================================
-  const handleConnectionSuccess = (data) => {
-    console.log('✅ WhatsApp conectado! Dados:', data)
+  const handleConnectionSuccess = async (data) => {
+    console.log('✅ WhatsApp conectado! Dados recebidos:', data)
 
-    // Atualizar estado do dashboard
+    // Atualizar estado do dashboard imediatamente
     setInstanceData(data)
     setConnectionStatus(data.status)
 
+    // ✅ RECARREGAR dados do servidor para garantir sincronização
+    console.log('🔄 Recarregando dados do servidor...')
+    await loadConnectionStatus()
+
     // Aqui você pode:
     // - Atualizar estado global (Redux, Zustand, etc)
-    // - Revalidar dados do servidor
     // - Mostrar notificação de sucesso
+    // - Disparar analytics events
     // - Etc.
+
+    console.log('✅ Dashboard atualizado com sucesso!')
   }
 
   // ============================================================================
