@@ -75,17 +75,35 @@ export async function GET(request) {
     const instanceInfo = statusData.instance || {}
     const instanceStatus = instanceInfo.status || 'disconnected'
 
-    // ✅ ATUALIZAR SUPABASE: Status + Dados do Perfil
+    // ✅ ATUALIZAR SUPABASE: Status + Dados Completos em api_credentials
     const updateData = {
       status: instanceStatus === 'open' ? 'connected' : 'connecting',
+      is_connected: instanceStatus === 'open',
       updated_at: new Date().toISOString()
     }
 
-    // Se conectado, salvar dados do perfil
-    if (instanceStatus === 'open' && instanceInfo.profileName) {
-      updateData.profile_name = instanceInfo.profileName
-      updateData.profile_pic_url = instanceInfo.profilePicUrl || null
-      updateData.phone_number = instanceInfo.owner || null
+    // Salvar dados completos em api_credentials (JSON)
+    if (instanceStatus === 'open') {
+      updateData.api_credentials = JSON.stringify({
+        token: connection.instance_token,
+        profileName: instanceInfo.profileName || null,
+        profilePicUrl: instanceInfo.profilePicUrl || null,
+        owner: instanceInfo.owner || null,
+        status: instanceStatus,
+        lastUpdated: new Date().toISOString()
+      })
+
+      // Também salvar em colunas específicas (se existirem)
+      if (instanceInfo.profileName) {
+        updateData.profile_name = instanceInfo.profileName
+        updateData.profile_pic_url = instanceInfo.profilePicUrl || null
+        updateData.phone_number = instanceInfo.owner || null
+      }
+
+      console.log('✅ Perfil WhatsApp detectado:', {
+        name: instanceInfo.profileName,
+        phone: instanceInfo.owner
+      })
     }
 
     await supabase
@@ -93,7 +111,7 @@ export async function GET(request) {
       .update(updateData)
       .eq('id', connectionId)
 
-    console.log('✅ Supabase atualizado:', updateData)
+    console.log('✅ Supabase atualizado (GET):', updateData)
 
     return NextResponse.json({
       success: true,
@@ -353,18 +371,25 @@ export async function POST(request) {
 
       console.log('✅ Nova instância criada:', { instanceId, hasToken: !!instanceApiKey })
 
-      // Salvar token no banco
+      // ✅ Salvar token e dados iniciais no banco
       await supabase
         .from('whatsapp_connections')
         .update({
           instance_name: instanceName,
           instance_token: instanceApiKey,
-          api_credentials: instanceApiKey,
+          api_credentials: JSON.stringify({
+            token: instanceApiKey,
+            instanceId: instanceId,
+            createdAt: new Date().toISOString()
+          }),
           waba_id: instanceId || instanceName,
           status: 'connecting',
+          is_connected: false,
           updated_at: new Date().toISOString()
         })
         .eq('id', connectionId)
+
+      console.log('✅ Token salvo no Supabase')
     }
 
     // ============================================================================
@@ -445,17 +470,30 @@ export async function POST(request) {
         console.log('✅ QR Code encontrado em base64')
       }
 
-      // ✅ ATUALIZAR SUPABASE: Status + Dados do Perfil
+      // ✅ ATUALIZAR SUPABASE: Status + Dados Completos em api_credentials
       const updateData = {
         status: instanceStatus === 'open' ? 'connected' : 'connecting',
+        is_connected: instanceStatus === 'open',
         updated_at: new Date().toISOString()
       }
 
-      // Se conectado, salvar dados do perfil
-      if (instanceStatus === 'open' && instanceInfo.profileName) {
-        updateData.profile_name = instanceInfo.profileName
-        updateData.profile_pic_url = instanceInfo.profilePicUrl || null
-        updateData.phone_number = instanceInfo.owner || null
+      // Salvar dados completos em api_credentials (JSON)
+      if (instanceStatus === 'open') {
+        updateData.api_credentials = JSON.stringify({
+          token: instanceApiKey,
+          profileName: instanceInfo.profileName || null,
+          profilePicUrl: instanceInfo.profilePicUrl || null,
+          owner: instanceInfo.owner || null,
+          status: instanceStatus,
+          lastUpdated: new Date().toISOString()
+        })
+
+        // Também salvar em colunas específicas (se existirem)
+        if (instanceInfo.profileName) {
+          updateData.profile_name = instanceInfo.profileName
+          updateData.profile_pic_url = instanceInfo.profilePicUrl || null
+          updateData.phone_number = instanceInfo.owner || null
+        }
 
         console.log('✅ Perfil WhatsApp detectado:', {
           name: instanceInfo.profileName,
@@ -468,7 +506,7 @@ export async function POST(request) {
         .update(updateData)
         .eq('id', connectionId)
 
-      console.log('✅ Supabase atualizado no POST:', updateData)
+      console.log('✅ Supabase atualizado (POST):', updateData)
     } else {
       console.warn('⚠️ Não foi possível obter status da instância')
       const errorText = await statusResponse.text()

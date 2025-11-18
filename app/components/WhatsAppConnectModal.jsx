@@ -140,20 +140,21 @@ export default function WhatsAppConnectModal({
   }
 
   // ============================================================================
-  // 4. POLLING: Verificar status a cada 30 segundos
+  // 4. POLLING: Verificar status a cada 5 segundos (eficiente)
   // ============================================================================
   const startPolling = () => {
-    console.log('⏰ Iniciando polling de 30 segundos')
+    console.log('⏰ Iniciando polling de 5 segundos')
 
     // Limpar timer anterior se existir
     if (pollingTimerRef.current) {
       clearInterval(pollingTimerRef.current)
     }
 
-    // Verificar status a cada 30 segundos
+    // ✅ Verificar status a cada 5 segundos (mais responsivo)
     pollingTimerRef.current = setInterval(() => {
+      console.log('🔄 Polling: Verificando status...')
       checkStatus()
-    }, 30000) // 30 segundos
+    }, 5000) // 5 segundos
   }
 
   const stopPolling = () => {
@@ -258,7 +259,10 @@ export default function WhatsAppConnectModal({
 
             <div className="mt-4 p-3 bg-blue-50 rounded-lg">
               <p className="text-xs text-blue-800">
-                ⏰ Verificando conexão automaticamente a cada 30 segundos
+                ⏰ Verificando conexão automaticamente a cada 5 segundos
+              </p>
+              <p className="text-xs text-gray-600 mt-1">
+                O modal fechará automaticamente quando conectado
               </p>
             </div>
 
