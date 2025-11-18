@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '../../../../lib/supabase'
 
-const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL
-const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY
+const EVOLUTION_API_URL = process.env.UAZAPI_BASE_URL || process.env.EVOLUTION_API_URL
+const EVOLUTION_API_KEY = process.env.UAZAPI_ADMIN_TOKEN || process.env.EVOLUTION_API_KEY
 
 export async function POST(request) {
   try {

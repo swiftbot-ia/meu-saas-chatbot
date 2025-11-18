@@ -2,8 +2,15 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '../../../../lib/supabase'
 
-const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL
-const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY
+// ⚠️ DEPRECATED: Esta rota usa variáveis antigas
+// Migre para: POST /api/whatsapp/instance/manage
+const EVOLUTION_API_URL = process.env.UAZAPI_BASE_URL || process.env.EVOLUTION_API_URL
+const EVOLUTION_API_KEY = process.env.UAZAPI_ADMIN_TOKEN || process.env.EVOLUTION_API_KEY
+
+// Warning se usar variáveis antigas
+if (!process.env.UAZAPI_BASE_URL && process.env.EVOLUTION_API_URL) {
+  console.warn('⚠️ USANDO VARIÁVEIS DEPRECADAS! Atualize para UAZAPI_BASE_URL e UAZAPI_ADMIN_TOKEN')
+}
 
 export async function POST(request) {
   try {
