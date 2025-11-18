@@ -12,6 +12,103 @@ if (!process.env.UAZAPI_BASE_URL && process.env.EVOLUTION_API_URL) {
   console.warn('⚠️ USANDO VARIÁVEIS DEPRECADAS! Atualize para UAZAPI_BASE_URL e UAZAPI_ADMIN_TOKEN')
 }
 
+// ============================================================================
+// GET: Verificar status da conexão (usado para polling do frontend)
+// ============================================================================
+export async function GET(request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const connectionId = searchParams.get('connectionId')
+
+    if (!connectionId) {
+      return NextResponse.json(
+        { success: false, error: 'connectionId é obrigatório' },
+        { status: 400 }
+      )
+    }
+
+    console.log('🔍 Verificando status da conexão:', connectionId)
+
+    // Buscar conexão no banco
+    const { data: connection, error } = await supabase
+      .from('whatsapp_connections')
+      .select('*')
+      .eq('id', connectionId)
+      .single()
+
+    if (error || !connection) {
+      return NextResponse.json({
+        success: false,
+        error: 'Conexão não encontrada'
+      }, { status: 404 })
+    }
+
+    // Se não tiver token, retornar status do banco
+    if (!connection.instance_token) {
+      return NextResponse.json({
+        success: true,
+        status: connection.status,
+        connected: false,
+        message: 'Instância ainda não criada'
+      })
+    }
+
+    // Verificar status na UAZAPI
+    const statusResponse = await fetch(
+      `${EVOLUTION_API_URL}/instance/status`,
+      {
+        method: 'GET',
+        headers: { 'token': connection.instance_token }
+      }
+    )
+
+    if (!statusResponse.ok) {
+      return NextResponse.json({
+        success: true,
+        status: connection.status,
+        connected: false,
+        message: 'Não foi possível verificar status na UAZAPI'
+      })
+    }
+
+    const statusData = await statusResponse.json()
+    const instanceInfo = statusData.instance || {}
+    const instanceStatus = instanceInfo.status || 'disconnected'
+
+    // Atualizar status no banco se mudou
+    if (instanceStatus !== connection.status) {
+      await supabase
+        .from('whatsapp_connections')
+        .update({
+          status: instanceStatus === 'open' ? 'connected' : 'connecting',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', connectionId)
+    }
+
+    return NextResponse.json({
+      success: true,
+      status: instanceStatus,
+      connected: instanceStatus === 'open',
+      profileName: instanceInfo.profileName || null,
+      profilePicUrl: instanceInfo.profilePicUrl || null,
+      owner: instanceInfo.owner || null,
+      instanceName: connection.instance_name,
+      message: instanceStatus === 'open' ? 'Conectado' : 'Aguardando conexão'
+    })
+
+  } catch (error) {
+    console.error('❌ Erro ao verificar status:', error)
+    return NextResponse.json({
+      success: false,
+      error: 'Erro ao verificar status'
+    }, { status: 500 })
+  }
+}
+
+// ============================================================================
+// POST: Criar/conectar instância WhatsApp
+// ============================================================================
 export async function POST(request) {
   try {
     const { connectionId } = await request.json()
@@ -220,7 +317,8 @@ export async function POST(request) {
         body: JSON.stringify({
           name: instanceName,
           qrcode: true,
-          integration: 'WHATSAPP-BAILEYS'
+          integration: 'WHATSAPP-BAILEYS',
+          systemName: 'Swiftbot 1.0'  // ✅ Identifica o sistema no WhatsApp
         })
       })
 
@@ -302,20 +400,25 @@ export async function POST(request) {
 
     let qrCode = null
     let instanceStatus = 'connecting'
+    let statusData = null
+    let instanceInfo = {}
 
     if (statusResponse.ok) {
-      const statusData = await statusResponse.json()
+      statusData = await statusResponse.json()
 
       // Log completo da resposta para debug
       console.log('📦 Resposta completa da UAZAPI:', JSON.stringify(statusData, null, 2))
 
+      // Extrair dados da instância
+      instanceInfo = statusData.instance || {}
+
       // Extrair status do objeto aninhado 'instance'
-      instanceStatus = statusData.instance?.status || statusData.status || 'connecting'
+      instanceStatus = instanceInfo.status || statusData.status || 'connecting'
       console.log('📊 Status da instância:', instanceStatus)
 
       // ✅ EXTRAÇÃO CORRETA: QR Code está em statusData.instance.qrcode
-      if (statusData.instance?.qrcode) {
-        qrCode = statusData.instance.qrcode
+      if (instanceInfo.qrcode) {
+        qrCode = instanceInfo.qrcode
         console.log('✅ QR Code encontrado em instance.qrcode')
       }
       // Fallback: tentar outras localizações possíveis
@@ -352,9 +455,13 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       instanceName,
-      instanceApiKey,
+      instanceToken: instanceApiKey,
       status: instanceStatus,
       qrCode: qrCode,
+      profileName: instanceInfo.profileName || null,
+      profilePicUrl: instanceInfo.profilePicUrl || null,
+      owner: instanceInfo.owner || null,
+      connected: instanceStatus === 'open',
       message: qrCode
         ? 'QR Code gerado com sucesso'
         : instanceStatus === 'open'
