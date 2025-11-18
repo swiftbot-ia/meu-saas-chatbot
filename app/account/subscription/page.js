@@ -735,7 +735,7 @@ const calculateRemainingDays = () => {
   ) : (
     // ASSINATURA ATIVA/TRIAL → ALTERAR
     <button
-      onClick={() => setShowUpgradeModal(true)}
+      onClick={handleOpenPlanChange} 
       className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center"
     >
       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -952,38 +952,6 @@ const calculateRemainingDays = () => {
                       Confirmar Cancelamento
                     </>
                   )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Modal de Upgrade */}
-      {showUpgradeModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          {/* MODIFICADO: Modal sem borda */}
-          <div className="relative bg-[#111111] rounded-2xl p-8 max-w-md w-full shadow-2xl z-[70]">
-            <div className="relative z-10">
-              <div className="text-center mb-6">
-                {/* MODIFICADO: Ícone do modal sem borda */}
-                <div className="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-bold text-white mb-2">Alterar Plano</h3>
-                <p className="text-gray-400">
-                  Funcionalidade em desenvolvimento. Em breve você poderá alterar seu plano diretamente aqui.
-                </p>
-              </div>
-
-              <div className="flex justify-center">
-                <button
-                  onClick={() => setShowUpgradeModal(false)}
-                  className="bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black py-3 px-8 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,255,153,0.4)]"
-                >
-                  OK, Entendi
                 </button>
               </div>
             </div>
