@@ -180,14 +180,17 @@ export async function POST(request) {
 
         if (statusResponse.ok) {
           const statusData = await statusResponse.json()
-          console.log('✅ Status obtido com sucesso:', statusData.status)
+
+          // ✅ CORREÇÃO: Status está em statusData.instance.status
+          const currentStatus = statusData.instance?.status || statusData.status
+          console.log('✅ Status obtido com sucesso:', currentStatus)
 
           // Se status for 'close' ou 'disconnected', precisa reconectar
-          if (statusData.status === 'close' || statusData.status === 'disconnected') {
+          if (currentStatus === 'close' || currentStatus === 'disconnected') {
             console.log('🔄 Instância desconectada, iniciando nova conexão...')
             needsInit = false // Não precisa criar, só reconectar
           } else {
-            console.log('✅ Instância já ativa, apenas retornando status')
+            console.log('✅ Instância já ativa, retornando status atual')
           }
         } else {
           console.log('⚠️ Token inválido ou instância não existe mais na UAZAPI')
@@ -302,18 +305,32 @@ export async function POST(request) {
 
     if (statusResponse.ok) {
       const statusData = await statusResponse.json()
-      console.log('📊 Status da instância:', statusData.status)
-      instanceStatus = statusData.status
 
-      // Extrair QR Code da resposta de status
-      if (statusData.qrcode?.base64) {
+      // Log completo da resposta para debug
+      console.log('📦 Resposta completa da UAZAPI:', JSON.stringify(statusData, null, 2))
+
+      // Extrair status do objeto aninhado 'instance'
+      instanceStatus = statusData.instance?.status || statusData.status || 'connecting'
+      console.log('📊 Status da instância:', instanceStatus)
+
+      // ✅ EXTRAÇÃO CORRETA: QR Code está em statusData.instance.qrcode
+      if (statusData.instance?.qrcode) {
+        qrCode = statusData.instance.qrcode
+        console.log('✅ QR Code encontrado em instance.qrcode')
+      }
+      // Fallback: tentar outras localizações possíveis
+      else if (statusData.qrcode?.base64) {
         qrCode = statusData.qrcode.base64
+        console.log('✅ QR Code encontrado em qrcode.base64')
       } else if (statusData.qrcode) {
         qrCode = statusData.qrcode
+        console.log('✅ QR Code encontrado em qrcode')
       } else if (statusData.qr) {
         qrCode = statusData.qr
+        console.log('✅ QR Code encontrado em qr')
       } else if (statusData.base64) {
         qrCode = statusData.base64
+        console.log('✅ QR Code encontrado em base64')
       }
 
       // Atualizar status no banco
@@ -326,6 +343,8 @@ export async function POST(request) {
         .eq('id', connectionId)
     } else {
       console.warn('⚠️ Não foi possível obter status da instância')
+      const errorText = await statusResponse.text()
+      console.error('❌ Erro no status:', errorText)
     }
 
     console.log('✅ QR Code disponível:', qrCode ? 'SIM' : 'NÃO')
