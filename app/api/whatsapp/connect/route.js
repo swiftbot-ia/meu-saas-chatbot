@@ -148,86 +148,119 @@ export async function POST(request) {
     }
 
     // ============================================================================
-    // 4. ✅ VALIDAÇÃO PASSOU - PROSSEGUIR COM CONEXÃO
+    // 4. ✅ VALIDAÇÃO PASSOU - VERIFICAR INSTÂNCIA EXISTENTE
     // ============================================================================
-    const instanceName = `swiftbot_${userId.replace(/-/g, '_')}`
+    const instanceName = connection.instance_name || `swiftbot_${userId.replace(/-/g, '_')}`
 
-    console.log(`✅ Iniciando conexão para instância: ${instanceName}`)
+    let instanceApiKey = connection.instance_token
+    let needsInit = false
 
-    // Verificar se instância já existe
-    let instanceExists = false
-    try {
-      const checkResponse = await fetch(
-        `${EVOLUTION_API_URL}/instance/connectionState/${instanceName}`,
-        {
-          method: 'GET',
-          headers: { 'admintoken': EVOLUTION_API_KEY }
-        }
-      )
-      instanceExists = checkResponse.ok
-    } catch (error) {
-      console.log('Instância não existe ainda')
-    }
-
-    // Se instância existe, deletar para criar nova
-    if (instanceExists) {
-      console.log('Deletando instância existente...')
-      await fetch(`${EVOLUTION_API_URL}/instance/delete/${instanceName}`, {
-        method: 'DELETE',
-        headers: { 'admintoken': EVOLUTION_API_KEY }
-      })
-      await new Promise(resolve => setTimeout(resolve, 2000))
-    }
-
-    // Criar nova instância
-    console.log('Criando nova instância...')
-    const createResponse = await fetch(`${EVOLUTION_API_URL}/instance/init`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'admintoken': EVOLUTION_API_KEY
-      },
-      body: JSON.stringify({
-        name: instanceName,
-        qrcode: true,
-        integration: 'WHATSAPP-BAILEYS'
-      })
+    console.log('🔍 Verificando instância existente:', {
+      instanceName,
+      hasToken: !!instanceApiKey,
+      currentStatus: connection.status
     })
 
-    if (!createResponse.ok) {
-      const errorText = await createResponse.text()
-      console.error('Erro ao criar instância:', errorText)
-      return NextResponse.json({
-        success: false,
-        error: 'Erro ao criar instância do WhatsApp'
-      }, { status: 500 })
+    // ============================================================================
+    // 4.1 LÓGICA CONDICIONAL: Instância existe no Supabase?
+    // ============================================================================
+    if (instanceApiKey && instanceApiKey.length > 0) {
+      console.log('✅ Instância encontrada no banco com token válido')
+      console.log('📊 Verificando status atual na UAZAPI...')
+
+      // Tentar obter status com o token existente
+      try {
+        const statusResponse = await fetch(
+          `${EVOLUTION_API_URL}/instance/status`,
+          {
+            method: 'GET',
+            headers: { 'token': instanceApiKey }
+          }
+        )
+
+        if (statusResponse.ok) {
+          const statusData = await statusResponse.json()
+          console.log('✅ Status obtido com sucesso:', statusData.status)
+
+          // Se status for 'close' ou 'disconnected', precisa reconectar
+          if (statusData.status === 'close' || statusData.status === 'disconnected') {
+            console.log('🔄 Instância desconectada, iniciando nova conexão...')
+            needsInit = false // Não precisa criar, só reconectar
+          } else {
+            console.log('✅ Instância já ativa, apenas retornando status')
+          }
+        } else {
+          console.log('⚠️ Token inválido ou instância não existe mais na UAZAPI')
+          needsInit = true
+        }
+      } catch (error) {
+        console.error('❌ Erro ao verificar status:', error.message)
+        needsInit = true
+      }
+    } else {
+      console.log('🆕 Nenhuma instância encontrada no banco, será criada')
+      needsInit = true
     }
 
-    const instanceData = await createResponse.json()
-    const instanceApiKey = instanceData.token || instanceData.hash // UAZAPI usa 'token', Evolution usa 'hash'
-    const instanceId = instanceData.id
+    // ============================================================================
+    // 4.2 CRIAR NOVA INSTÂNCIA (se necessário)
+    // ============================================================================
+    if (needsInit) {
+      console.log('📝 Criando nova instância na UAZAPI...')
 
-    if (!instanceApiKey) {
-      return NextResponse.json({
-        success: false,
-        error: 'API Key da instância não foi gerada'
-      }, { status: 500 })
-    }
-
-    // Salvar API Key e ID no banco
-    await supabase
-      .from('whatsapp_connections')
-      .update({
-        api_credentials: instanceApiKey,
-        instance_token: instanceApiKey,
-        waba_id: instanceId || instanceName,
-        status: 'connecting',
-        updated_at: new Date().toISOString()
+      const createResponse = await fetch(`${EVOLUTION_API_URL}/instance/init`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'admintoken': EVOLUTION_API_KEY
+        },
+        body: JSON.stringify({
+          name: instanceName,
+          qrcode: true,
+          integration: 'WHATSAPP-BAILEYS'
+        })
       })
-      .eq('id', connectionId)
 
-    // Conectar (iniciar processo de conexão)
-    console.log('Iniciando conexão...')
+      if (!createResponse.ok) {
+        const errorText = await createResponse.text()
+        console.error('❌ Erro ao criar instância:', errorText)
+        return NextResponse.json({
+          success: false,
+          error: 'Erro ao criar instância do WhatsApp'
+        }, { status: 500 })
+      }
+
+      const instanceData = await createResponse.json()
+      instanceApiKey = instanceData.token || instanceData.hash
+      const instanceId = instanceData.id
+
+      if (!instanceApiKey) {
+        return NextResponse.json({
+          success: false,
+          error: 'Token da instância não foi gerado'
+        }, { status: 500 })
+      }
+
+      console.log('✅ Nova instância criada:', { instanceId, hasToken: !!instanceApiKey })
+
+      // Salvar token no banco
+      await supabase
+        .from('whatsapp_connections')
+        .update({
+          instance_name: instanceName,
+          instance_token: instanceApiKey,
+          api_credentials: instanceApiKey,
+          waba_id: instanceId || instanceName,
+          status: 'connecting',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', connectionId)
+    }
+
+    // ============================================================================
+    // 4.3 INICIAR CONEXÃO (para instâncias novas ou desconectadas)
+    // ============================================================================
+    console.log('🔌 Iniciando processo de conexão...')
     const connectResponse = await fetch(
       `${EVOLUTION_API_URL}/instance/connect`,
       {
@@ -242,7 +275,7 @@ export async function POST(request) {
 
     if (!connectResponse.ok) {
       const errorText = await connectResponse.text()
-      console.error('Erro ao conectar:', errorText)
+      console.error('❌ Erro ao conectar:', errorText)
       return NextResponse.json({
         success: false,
         error: 'Erro ao iniciar conexão WhatsApp'
@@ -252,22 +285,25 @@ export async function POST(request) {
     const connectData = await connectResponse.json()
     console.log('✅ Conexão iniciada:', connectData)
 
-    // Obter QR Code do endpoint /instance/status (padrão UAZAPI)
-    console.log('Obtendo QR Code do status da instância...')
+    // ============================================================================
+    // 4.4 OBTER QR CODE (endpoint /instance/status)
+    // ============================================================================
+    console.log('📱 Obtendo QR Code do status da instância...')
     const statusResponse = await fetch(
       `${EVOLUTION_API_URL}/instance/status`,
       {
         method: 'GET',
-        headers: {
-          'token': instanceApiKey
-        }
+        headers: { 'token': instanceApiKey }
       }
     )
 
     let qrCode = null
+    let instanceStatus = 'connecting'
+
     if (statusResponse.ok) {
       const statusData = await statusResponse.json()
-      console.log('Status da instância:', statusData)
+      console.log('📊 Status da instância:', statusData.status)
+      instanceStatus = statusData.status
 
       // Extrair QR Code da resposta de status
       if (statusData.qrcode?.base64) {
@@ -279,20 +315,32 @@ export async function POST(request) {
       } else if (statusData.base64) {
         qrCode = statusData.base64
       }
+
+      // Atualizar status no banco
+      await supabase
+        .from('whatsapp_connections')
+        .update({
+          status: instanceStatus === 'open' ? 'connected' : 'connecting',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', connectionId)
     } else {
       console.warn('⚠️ Não foi possível obter status da instância')
     }
 
-    console.log('✅ QR Code gerado:', qrCode ? 'SIM' : 'NÃO')
+    console.log('✅ QR Code disponível:', qrCode ? 'SIM' : 'NÃO')
 
     return NextResponse.json({
       success: true,
       instanceName,
       instanceApiKey,
+      status: instanceStatus,
       qrCode: qrCode,
-      message: qrCode 
-        ? 'QR Code gerado com sucesso' 
-        : 'Instância criada, mas QR Code não disponível'
+      message: qrCode
+        ? 'QR Code gerado com sucesso'
+        : instanceStatus === 'open'
+          ? 'Instância já conectada'
+          : 'Aguardando QR Code...'
     })
 
   } catch (error) {
