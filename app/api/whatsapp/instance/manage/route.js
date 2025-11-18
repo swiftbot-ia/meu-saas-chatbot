@@ -1,15 +1,12 @@
 // app/api/whatsapp/instance/manage/route.js
 /**
  * ============================================================================
- * API Route: Gerenciamento Completo de Instâncias WhatsApp
+ * API Route: Gerenciamento Completo de Instâncias WhatsApp (UAZAPI)
  * ============================================================================
- * Esta API centraliza todas as operações de gerenciamento de instâncias:
- * - Criar instância
- * - Conectar/Gerar QR Code
- * - Verificar status
- * - Atualizar campos administrativos
- * - Desconectar
- * - Deletar
+ * Esta API centraliza todas as operações de gerenciamento de instâncias UAZAPI:
+ * - POST: Criar instância e iniciar conexão
+ * - GET: Verificar status e obter QR Code/Pairing Code
+ * - DELETE: Desconectar instância
  * ============================================================================
  */
 
@@ -19,6 +16,16 @@ import { uazapi } from '../../../../../lib/uazapi-client'
 
 /**
  * POST - Criar e conectar uma nova instância
+ *
+ * Request Body:
+ * {
+ *   "userId": "uuid-do-usuario",
+ *   "connectionId": "uuid-conexao-existente" (opcional),
+ *   "adminFields": {
+ *     "adminField01": "client_id",
+ *     "adminField02": "metadata"
+ *   }
+ * }
  */
 export async function POST(request) {
   try {
@@ -31,7 +38,7 @@ export async function POST(request) {
       )
     }
 
-    console.log('🔄 Iniciando criação de instância WhatsApp:', { userId, connectionId })
+    console.log('🔄 Iniciando criação de instância WhatsApp (UAZAPI):', { userId, connectionId })
 
     // ========================================================================
     // 1. VALIDAR ASSINATURA DO USUÁRIO
@@ -79,35 +86,34 @@ export async function POST(request) {
     }
 
     // ========================================================================
-    // 3. CRIAR INSTÂNCIA NA EVOLUTION API
+    // 3. CRIAR INSTÂNCIA NA UAZAPI (Endpoint: POST /instance/init)
     // ========================================================================
     const instanceName = uazapi.generateInstanceName(userId)
     console.log(`📱 Criando instância: ${instanceName}`)
 
-    // Verificar se instância já existe e deletar
-    const isConnected = await uazapi.isInstanceConnected(instanceName)
-    if (isConnected) {
-      console.log('⚠️ Instância já existe, deletando...')
-      await uazapi.deleteInstance(instanceName)
-      await new Promise(resolve => setTimeout(resolve, 2000))
-    }
+    // Criar nova instância com campos administrativos
+    const instanceData = await uazapi.createInstance(
+      instanceName,
+      adminFields?.adminField01 || userId,
+      adminFields?.adminField02 || 'nextjs_app'
+    )
 
-    // Criar nova instância
-    const instanceData = await uazapi.createInstance(instanceName, {
-      qrcode: true,
-      integration: 'WHATSAPP-BAILEYS'
-    })
+    // UAZAPI retorna { id, name, token, adminField01, adminField02, status }
+    const instanceId = instanceData.id
+    const instanceToken = instanceData.token
 
-    const instanceToken = instanceData.hash
-
-    if (!instanceToken) {
+    if (!instanceId || !instanceToken) {
       return NextResponse.json({
         success: false,
-        error: 'Token da instância não foi gerado'
+        error: 'ID ou Token da instância não foi gerado pela UAZAPI'
       }, { status: 500 })
     }
 
-    console.log('✅ Instância criada com token:', instanceToken.substring(0, 20) + '...')
+    console.log('✅ Instância criada:', {
+      id: instanceId,
+      name: instanceName,
+      token: instanceToken.substring(0, 20) + '...'
+    })
 
     // ========================================================================
     // 4. SALVAR/ATUALIZAR NO SUPABASE
@@ -117,16 +123,12 @@ export async function POST(request) {
       instance_name: instanceName,
       instance_token: instanceToken,
       api_credentials: instanceToken,
-      waba_id: instanceName,
+      waba_id: instanceId, // Salvar o ID da instância UAZAPI
       status: 'connecting',
       is_connected: false,
+      admin_field_01: adminFields?.adminField01 || userId,
+      admin_field_02: adminFields?.adminField02 || 'nextjs_app',
       updated_at: new Date().toISOString()
-    }
-
-    // Atualizar campos administrativos se fornecidos
-    if (adminFields) {
-      if (adminFields.adminField01) connectionData.admin_field_01 = adminFields.adminField01
-      if (adminFields.adminField02) connectionData.admin_field_02 = adminFields.adminField02
     }
 
     let dbConnection
@@ -139,7 +141,10 @@ export async function POST(request) {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Erro ao atualizar conexão:', error)
+        throw error
+      }
       dbConnection = data
     } else {
       // Criar nova conexão
@@ -149,63 +154,65 @@ export async function POST(request) {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Erro ao criar conexão:', error)
+        throw error
+      }
       dbConnection = data
     }
 
     console.log('✅ Conexão salva no banco:', dbConnection.id)
 
     // ========================================================================
-    // 5. ATUALIZAR CAMPOS ADMINISTRATIVOS NA EVOLUTION API
+    // 5. INICIAR PROCESSO DE CONEXÃO (Endpoint: POST /instance/connect)
     // ========================================================================
-    if (adminFields && (adminFields.adminField01 || adminFields.adminField02)) {
+    console.log('📲 Iniciando processo de conexão...')
+    await uazapi.connectInstance(instanceToken) // Sem phoneNumber = QR Code mode
+
+    // ========================================================================
+    // 6. OBTER QR CODE (Endpoint: GET /instance/status)
+    // ========================================================================
+    console.log('📲 Obtendo QR Code...')
+    const statusData = await uazapi.getInstanceStatus(instanceToken)
+
+    const qrCode = uazapi.extractQRCode(statusData)
+    const pairCode = uazapi.extractPairingCode(statusData)
+
+    console.log('✅ Status:', {
+      status: statusData.status,
+      hasQRCode: !!qrCode,
+      hasPairCode: !!pairCode
+    })
+
+    // ========================================================================
+    // 7. CONFIGURAR WEBHOOK GLOBAL (Uma vez, se não configurado)
+    // ========================================================================
+    if (process.env.UAZAPI_WEBHOOK_URL) {
       try {
-        await uazapi.updateAdminFields(instanceName, {
-          adminField01: adminFields.adminField01 || userId,
-          adminField02: adminFields.adminField02 || dbConnection.id
-        })
-        console.log('✅ Campos administrativos atualizados na Evolution API')
+        await uazapi.configureGlobalWebhook(
+          process.env.UAZAPI_WEBHOOK_URL,
+          ['messages', 'connection'],
+          ['wasSentByApi']
+        )
+        console.log('✅ Webhook global configurado')
       } catch (error) {
-        console.warn('⚠️ Erro ao atualizar campos admin:', error.message)
+        console.warn('⚠️ Erro ao configurar webhook (pode já estar configurado):', error.message)
       }
     }
-
-    // ========================================================================
-    // 6. CONFIGURAR WEBHOOK (opcional)
-    // ========================================================================
-    if (process.env.N8N_WEBHOOK_URL) {
-      try {
-        await uazapi.setInstanceWebhook(instanceName, {
-          url: process.env.N8N_WEBHOOK_URL,
-          enabled: true,
-          events: ['MESSAGES_UPSERT', 'CONNECTION_UPDATE']
-        })
-        console.log('✅ Webhook configurado')
-      } catch (error) {
-        console.warn('⚠️ Erro ao configurar webhook:', error.message)
-      }
-    }
-
-    // ========================================================================
-    // 7. CONECTAR E GERAR QR CODE
-    // ========================================================================
-    console.log('📲 Gerando QR Code...')
-    const connectData = await uazapi.connectInstance(instanceName)
-    const qrCode = uazapi.extractQRCode(connectData)
-
-    console.log('✅ QR Code gerado:', qrCode ? 'SIM' : 'NÃO')
 
     return NextResponse.json({
       success: true,
       data: {
         connectionId: dbConnection.id,
+        instanceId,
         instanceName,
-        instanceToken,
+        instanceToken, // Retornar para o frontend poder fazer polling
         qrCode,
-        status: 'connecting',
+        pairCode,
+        status: statusData.status,
         message: qrCode
           ? 'QR Code gerado com sucesso. Escaneie com seu WhatsApp.'
-          : 'Instância criada, mas QR Code não disponível'
+          : 'Instância criada. Aguardando conexão...'
       }
     })
 
@@ -219,7 +226,11 @@ export async function POST(request) {
 }
 
 /**
- * GET - Verificar status da instância
+ * GET - Verificar status da instância e obter QR Code/Pairing Code
+ *
+ * Query Params:
+ * - userId=uuid (buscar por user_id)
+ * - connectionId=uuid (buscar por connection_id)
  */
 export async function GET(request) {
   try {
@@ -240,7 +251,7 @@ export async function GET(request) {
     if (connectionId) {
       query = query.eq('id', connectionId)
     } else {
-      query = query.eq('user_id', userId)
+      query = query.eq('user_id', userId).order('created_at', { ascending: false }).limit(1)
     }
 
     const { data: connection, error } = await query.single()
@@ -254,44 +265,47 @@ export async function GET(request) {
       })
     }
 
-    // Verificar status na Evolution API
+    // Verificar status na UAZAPI
     try {
-      const statusData = await uazapi.getInstanceStatus(connection.instance_name)
-      const isConnected = statusData.instance?.state === 'open'
+      const statusData = await uazapi.getInstanceStatus(connection.instance_token)
 
-      // Buscar informações adicionais se conectado
-      let phoneNumber = connection.phone_number_id
-      if (isConnected && !phoneNumber) {
-        const instanceInfo = await uazapi.fetchInstanceInfo(connection.instance_name)
-        if (instanceInfo?.ownerJid) {
-          phoneNumber = instanceInfo.ownerJid.replace('@s.whatsapp.net', '')
+      const isConnected = uazapi.isConnected(statusData)
+      const isConnecting = uazapi.isConnecting(statusData)
+      const qrCode = uazapi.extractQRCode(statusData)
+      const pairCode = uazapi.extractPairingCode(statusData)
 
-          // Atualizar no banco
-          await supabase
-            .from('whatsapp_connections')
-            .update({
-              phone_number_id: phoneNumber,
-              status: 'connected',
-              is_connected: true,
-              last_connected_at: new Date().toISOString()
-            })
-            .eq('id', connection.id)
-        }
+      // Atualizar banco se status mudou
+      if (isConnected && connection.status !== 'connected') {
+        await supabase
+          .from('whatsapp_connections')
+          .update({
+            phone_number_id: statusData.phoneNumber || null,
+            status: 'connected',
+            is_connected: true,
+            last_connected_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', connection.id)
       }
 
       return NextResponse.json({
         success: true,
         connected: isConnected,
-        status: statusData.instance?.state || 'disconnected',
+        connecting: isConnecting,
+        status: statusData.status,
+        qrCode,
+        pairCode,
         data: {
           instanceName: connection.instance_name,
-          phoneNumber,
+          phoneNumber: statusData.phoneNumber || connection.phone_number_id,
           lastConnected: connection.last_connected_at
         }
       })
 
     } catch (apiError) {
-      // Instância não existe na API
+      // Instância não existe ou erro na API
+      console.warn('⚠️ Erro ao buscar status na UAZAPI:', apiError.message)
+
       return NextResponse.json({
         success: true,
         connected: false,
@@ -313,72 +327,15 @@ export async function GET(request) {
 }
 
 /**
- * PUT - Atualizar campos administrativos
- */
-export async function PUT(request) {
-  try {
-    const { connectionId, adminFields } = await request.json()
-
-    if (!connectionId) {
-      return NextResponse.json(
-        { success: false, error: 'connectionId é obrigatório' },
-        { status: 400 }
-      )
-    }
-
-    // Buscar conexão
-    const { data: connection, error } = await supabase
-      .from('whatsapp_connections')
-      .select('*')
-      .eq('id', connectionId)
-      .single()
-
-    if (error || !connection) {
-      return NextResponse.json({
-        success: false,
-        error: 'Conexão não encontrada'
-      }, { status: 404 })
-    }
-
-    // Atualizar no Supabase
-    const updates = {}
-    if (adminFields?.adminField01) updates.admin_field_01 = adminFields.adminField01
-    if (adminFields?.adminField02) updates.admin_field_02 = adminFields.adminField02
-
-    if (Object.keys(updates).length > 0) {
-      updates.updated_at = new Date().toISOString()
-
-      await supabase
-        .from('whatsapp_connections')
-        .update(updates)
-        .eq('id', connectionId)
-    }
-
-    // Atualizar na Evolution API
-    await uazapi.updateAdminFields(connection.instance_name, adminFields)
-
-    return NextResponse.json({
-      success: true,
-      message: 'Campos administrativos atualizados com sucesso'
-    })
-
-  } catch (error) {
-    console.error('❌ Erro ao atualizar campos:', error)
-    return NextResponse.json({
-      success: false,
-      error: error.message
-    }, { status: 500 })
-  }
-}
-
-/**
- * DELETE - Desconectar/Deletar instância
+ * DELETE - Desconectar instância
+ *
+ * Query Params:
+ * - connectionId=uuid
  */
 export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url)
     const connectionId = searchParams.get('connectionId')
-    const deleteCompletely = searchParams.get('delete') === 'true'
 
     if (!connectionId) {
       return NextResponse.json(
@@ -401,45 +358,31 @@ export async function DELETE(request) {
       }, { status: 404 })
     }
 
-    // Desconectar/Deletar na Evolution API
+    // Desconectar na UAZAPI (Endpoint: POST /instance/disconnect)
     try {
-      if (deleteCompletely) {
-        await uazapi.deleteInstance(connection.instance_name)
-        console.log('✅ Instância deletada da Evolution API')
-      } else {
-        await uazapi.disconnectInstance(connection.instance_name)
-        console.log('✅ Instância desconectada da Evolution API')
-      }
+      await uazapi.disconnectInstance(connection.instance_token)
+      console.log('✅ Instância desconectada na UAZAPI')
     } catch (apiError) {
-      console.warn('⚠️ Erro na Evolution API:', apiError.message)
+      console.warn('⚠️ Erro ao desconectar na UAZAPI:', apiError.message)
     }
 
-    // Atualizar/Deletar no banco
-    if (deleteCompletely) {
-      await supabase
-        .from('whatsapp_connections')
-        .delete()
-        .eq('id', connectionId)
-    } else {
-      await supabase
-        .from('whatsapp_connections')
-        .update({
-          status: 'disconnected',
-          is_connected: false,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', connectionId)
-    }
+    // Atualizar no banco
+    await supabase
+      .from('whatsapp_connections')
+      .update({
+        status: 'disconnected',
+        is_connected: false,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', connectionId)
 
     return NextResponse.json({
       success: true,
-      message: deleteCompletely
-        ? 'Instância deletada com sucesso'
-        : 'Instância desconectada com sucesso'
+      message: 'Instância desconectada com sucesso'
     })
 
   } catch (error) {
-    console.error('❌ Erro ao desconectar/deletar:', error)
+    console.error('❌ Erro ao desconectar:', error)
     return NextResponse.json({
       success: false,
       error: error.message
