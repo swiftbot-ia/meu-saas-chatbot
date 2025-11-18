@@ -1,9 +1,9 @@
 // app/api/webhooks/evolution/route.js
 /**
  * ============================================================================
- * Webhook Handler: Evolution API / UAZAPI
+ * Webhook Handler: UAZAPI / UAZAPI
  * ============================================================================
- * Recebe e processa eventos da Evolution API:
+ * Recebe e processa eventos da UAZAPI:
  * - MESSAGES_UPSERT: Novas mensagens recebidas
  * - CONNECTION_UPDATE: Mudanças no status de conexão
  * - E outros eventos do WhatsApp
@@ -20,7 +20,7 @@ export async function POST(request) {
   try {
     const payload = await request.json()
 
-    console.log('📨 Webhook recebido da Evolution API:', {
+    console.log('📨 Webhook recebido da UAZAPI:', {
       event: payload.event,
       instance: payload.instance,
       timestamp: new Date().toISOString()
@@ -298,7 +298,7 @@ function extractMessageContent(messageInfo) {
 export async function GET() {
   return NextResponse.json({
     status: 'online',
-    message: 'Evolution API Webhook is running',
+    message: 'UAZAPI Webhook is running',
     timestamp: new Date().toISOString()
   })
 }

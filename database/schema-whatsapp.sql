@@ -1,7 +1,7 @@
 -- ============================================================================
 -- SCHEMA SUPABASE: WhatsApp Instances Management
 -- ============================================================================
--- Este schema gerencia as instâncias do WhatsApp dos usuários via Evolution/UAZAPI
+-- Este schema gerencia as instâncias do WhatsApp dos usuários via UAZAPI
 -- ============================================================================
 
 -- Tabela: whatsapp_connections
@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS whatsapp_connections (
 
   -- Identificadores da instância
   instance_name VARCHAR(255) UNIQUE NOT NULL, -- Nome único da instância (ex: swiftbot_user123)
-  instance_token TEXT, -- Token/API Key da instância gerado pela Evolution API
+  instance_token TEXT, -- Token/API Key da instância gerado pela UAZAPI
   waba_id VARCHAR(255), -- WhatsApp Business Account ID (opcional)
   phone_number_id VARCHAR(50), -- Número do WhatsApp conectado (formato: 5511999999999)
 
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS whatsapp_connections (
   last_connected_at TIMESTAMPTZ,
 
   -- Credenciais e Configuração
-  api_credentials TEXT, -- API Key específica da instância (hash retornado pela Evolution API)
+  api_credentials TEXT, -- API Key específica da instância (hash retornado pela UAZAPI)
   webhook_url TEXT, -- URL do webhook configurado para esta instância
 
   -- Campos Administrativos (para integração com outros sistemas)
