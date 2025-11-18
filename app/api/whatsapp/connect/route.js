@@ -161,7 +161,7 @@ export async function POST(request) {
         `${EVOLUTION_API_URL}/instance/connectionState/${instanceName}`,
         {
           method: 'GET',
-          headers: { 'apikey': EVOLUTION_API_KEY }
+          headers: { 'admintoken': EVOLUTION_API_KEY }
         }
       )
       instanceExists = checkResponse.ok
@@ -174,21 +174,21 @@ export async function POST(request) {
       console.log('Deletando instância existente...')
       await fetch(`${EVOLUTION_API_URL}/instance/delete/${instanceName}`, {
         method: 'DELETE',
-        headers: { 'apikey': EVOLUTION_API_KEY }
+        headers: { 'admintoken': EVOLUTION_API_KEY }
       })
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
 
     // Criar nova instância
     console.log('Criando nova instância...')
-    const createResponse = await fetch(`${EVOLUTION_API_URL}/instance/create`, {
+    const createResponse = await fetch(`${EVOLUTION_API_URL}/instance/init`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': EVOLUTION_API_KEY
+        'admintoken': EVOLUTION_API_KEY
       },
       body: JSON.stringify({
-        instanceName: instanceName,
+        name: instanceName,
         qrcode: true,
         integration: 'WHATSAPP-BAILEYS'
       })
@@ -204,7 +204,8 @@ export async function POST(request) {
     }
 
     const instanceData = await createResponse.json()
-    const instanceApiKey = instanceData.hash
+    const instanceApiKey = instanceData.token || instanceData.hash // UAZAPI usa 'token', Evolution usa 'hash'
+    const instanceId = instanceData.id
 
     if (!instanceApiKey) {
       return NextResponse.json({
@@ -213,24 +214,29 @@ export async function POST(request) {
       }, { status: 500 })
     }
 
-    // Salvar API Key no banco
+    // Salvar API Key e ID no banco
     await supabase
       .from('whatsapp_connections')
       .update({
         api_credentials: instanceApiKey,
-        waba_id: instanceName,
+        instance_token: instanceApiKey,
+        waba_id: instanceId || instanceName,
         status: 'connecting',
         updated_at: new Date().toISOString()
       })
       .eq('id', connectionId)
 
-    // Conectar e gerar QR Code
-    console.log('Gerando QR Code...')
+    // Conectar (iniciar processo de conexão)
+    console.log('Iniciando conexão...')
     const connectResponse = await fetch(
-      `${EVOLUTION_API_URL}/instance/connect/${instanceName}`,
+      `${EVOLUTION_API_URL}/instance/connect`,
       {
-        method: 'GET',
-        headers: { 'apikey': EVOLUTION_API_KEY }
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'token': instanceApiKey
+        },
+        body: JSON.stringify({})
       }
     )
 
@@ -244,17 +250,37 @@ export async function POST(request) {
     }
 
     const connectData = await connectResponse.json()
+    console.log('✅ Conexão iniciada:', connectData)
 
-    // Extrair QR Code
+    // Obter QR Code do endpoint /instance/status (padrão UAZAPI)
+    console.log('Obtendo QR Code do status da instância...')
+    const statusResponse = await fetch(
+      `${EVOLUTION_API_URL}/instance/status`,
+      {
+        method: 'GET',
+        headers: {
+          'token': instanceApiKey
+        }
+      }
+    )
+
     let qrCode = null
-    if (connectData.qrcode?.base64) {
-      qrCode = connectData.qrcode.base64
-    } else if (connectData.qrcode) {
-      qrCode = connectData.qrcode
-    } else if (connectData.qr) {
-      qrCode = connectData.qr
-    } else if (connectData.base64) {
-      qrCode = connectData.base64
+    if (statusResponse.ok) {
+      const statusData = await statusResponse.json()
+      console.log('Status da instância:', statusData)
+
+      // Extrair QR Code da resposta de status
+      if (statusData.qrcode?.base64) {
+        qrCode = statusData.qrcode.base64
+      } else if (statusData.qrcode) {
+        qrCode = statusData.qrcode
+      } else if (statusData.qr) {
+        qrCode = statusData.qr
+      } else if (statusData.base64) {
+        qrCode = statusData.base64
+      }
+    } else {
+      console.warn('⚠️ Não foi possível obter status da instância')
     }
 
     console.log('✅ QR Code gerado:', qrCode ? 'SIM' : 'NÃO')
