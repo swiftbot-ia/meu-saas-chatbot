@@ -1,6 +1,7 @@
 // app/api/whatsapp/connect/route.js
 import { NextResponse } from 'next/server'
-import { supabase } from '../../../../lib/supabase'
+import { supabase, supabaseAdmin } from '../../../../lib/supabase'
+import { fetchAndSyncInstance } from '../helpers/syncUazapiToSupabase.js'
 
 // ⚠️ DEPRECATED: Esta rota usa variáveis antigas
 // Migre para: POST /api/whatsapp/instance/manage
@@ -27,10 +28,17 @@ export async function GET(request) {
       )
     }
 
-    console.log('🔍 Verificando status da conexão:', connectionId)
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { success: false, error: 'Configuração do servidor incompleta' },
+        { status: 500 }
+      )
+    }
 
-    // Buscar conexão no banco
-    const { data: connection, error } = await supabase
+    console.log('🔍 [Polling] Verificando status da conexão:', connectionId)
+
+    // Buscar conexão no banco usando supabaseAdmin
+    const { data: connection, error } = await supabaseAdmin
       .from('whatsapp_connections')
       .select('*')
       .eq('id', connectionId)
@@ -45,83 +53,60 @@ export async function GET(request) {
 
     // Se não tiver token, retornar status do banco
     if (!connection.instance_token) {
+      console.log('⚠️ [Polling] Instância ainda não tem token')
       return NextResponse.json({
         success: true,
-        status: connection.status,
+        status: connection.status || 'connecting',
         connected: false,
         message: 'Instância ainda não criada'
       })
     }
 
-    // Verificar status na UAZAPI
-    const statusResponse = await fetch(
-      `${EVOLUTION_API_URL}/instance/status`,
-      {
-        method: 'GET',
-        headers: { 'token': connection.instance_token }
+    // Extrair API token da UAZAPI do campo api_credentials
+    let apiToken = connection.instance_token
+    if (connection.api_credentials) {
+      try {
+        const credentials = JSON.parse(connection.api_credentials)
+        apiToken = credentials.token || apiToken
+      } catch (e) {
+        // Usar token direto se não for JSON
       }
+    }
+
+    // Buscar e sincronizar dados da UAZAPI
+    const syncResult = await fetchAndSyncInstance(
+      connectionId,
+      connection.instance_name,
+      apiToken
     )
 
-    if (!statusResponse.ok) {
+    if (!syncResult.success) {
+      console.error('❌ [Polling] Falha na sincronização:', syncResult.error)
       return NextResponse.json({
         success: true,
         status: connection.status,
         connected: false,
-        message: 'Não foi possível verificar status na UAZAPI'
+        message: 'Erro ao sincronizar com UAZAPI'
       })
     }
 
-    const statusData = await statusResponse.json()
-    const instanceInfo = statusData.instance || {}
-    const instanceStatus = instanceInfo.status || 'disconnected'
+    // Retornar dados atualizados
+    const isConnected = syncResult.status === 'connected'
 
-    // ✅ ATUALIZAR SUPABASE: Status + Dados Completos em api_credentials
-    const updateData = {
-      status: instanceStatus === 'open' ? 'connected' : 'connecting',
-      is_connected: instanceStatus === 'open',
-      updated_at: new Date().toISOString()
-    }
-
-    // Salvar dados completos em api_credentials (JSON)
-    if (instanceStatus === 'open') {
-      updateData.api_credentials = JSON.stringify({
-        token: connection.instance_token,
-        profileName: instanceInfo.profileName || null,
-        profilePicUrl: instanceInfo.profilePicUrl || null,
-        owner: instanceInfo.owner || null,
-        status: instanceStatus,
-        lastUpdated: new Date().toISOString()
-      })
-
-      // Também salvar em colunas específicas (se existirem)
-      if (instanceInfo.profileName) {
-        updateData.profile_name = instanceInfo.profileName
-        updateData.profile_pic_url = instanceInfo.profilePicUrl || null
-        updateData.phone_number = instanceInfo.owner || null
-      }
-
-      console.log('✅ Perfil WhatsApp detectado:', {
-        name: instanceInfo.profileName,
-        phone: instanceInfo.owner
-      })
-    }
-
-    await supabase
-      .from('whatsapp_connections')
-      .update(updateData)
-      .eq('id', connectionId)
-
-    console.log('✅ Supabase atualizado (GET):', updateData)
+    console.log('✅ [Polling] Status atualizado:', {
+      status: syncResult.status,
+      isConnected
+    })
 
     return NextResponse.json({
       success: true,
-      status: instanceStatus,
-      connected: instanceStatus === 'open',
-      profileName: instanceInfo.profileName || null,
-      profilePicUrl: instanceInfo.profilePicUrl || null,
-      owner: instanceInfo.owner || null,
+      status: syncResult.status,
+      connected: isConnected,
+      profileName: syncResult.data?.profile_name || null,
+      profilePicUrl: syncResult.data?.profile_pic_url || null,
+      phoneNumber: syncResult.data?.phone_number || null,
       instanceName: connection.instance_name,
-      message: instanceStatus === 'open' ? 'Conectado' : 'Aguardando conexão'
+      message: isConnected ? 'Conectado' : 'Aguardando conexão'
     })
 
   } catch (error) {

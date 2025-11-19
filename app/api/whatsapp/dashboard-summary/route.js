@@ -39,6 +39,14 @@ export async function GET(request) {
       )
     }
 
+    if (!supabaseAdmin) {
+      console.error('❌ supabaseAdmin não está configurado. Verifique SUPABASE_SERVICE_ROLE_KEY')
+      return NextResponse.json(
+        { success: false, error: 'Configuração do servidor incompleta' },
+        { status: 500 }
+      )
+    }
+
     console.log('📊 [Dashboard] Carregando resumo para user_id:', userId)
 
     // ========================================================================

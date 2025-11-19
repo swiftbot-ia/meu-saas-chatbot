@@ -1,504 +1,411 @@
+// app/components/WhatsAppConnectModal.tsx
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-
-/**
- * ============================================================================
- * COMPONENTE: WhatsApp Connect Modal (TypeScript)
- * ============================================================================
- *
- * Features Implementadas:
- * - ✅ Polling automático a cada 5 segundos
- * - ✅ Timeout de 30 segundos com auto-close
- * - ✅ Cleanup de timers em todos os cenários
- * - ✅ TypeScript com tipos completos
- * - ✅ Estados de UI: loading, error, qrcode, connected
- * - ✅ Callback de sucesso com dados da instância
- *
- * @author Claude Code
- * @version 2.0
- */
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 
 // ============================================================================
-// TYPES & INTERFACES
+// TIPOS
 // ============================================================================
-
-interface ConnectModalProps {
-  /** Se o modal está visível */
+interface WhatsAppConnectModalProps {
   isOpen: boolean
-  /** Callback ao fechar modal */
   onClose: () => void
-  /** ID da conexão no Supabase */
-  connectionId: string
-  /** QR Code inicial (opcional - será obtido via API se null) */
-  initialQrCode?: string | null
-  /** Token inicial (opcional - será obtido via API se null) */
-  initialToken?: string | null
-  /** Callback ao conectar com sucesso */
-  onSuccess?: (data: InstanceData) => void
+  onSuccess: () => void
+  userId: string
 }
 
-interface InstanceData {
-  instanceName?: string
-  profileName?: string | null
-  profilePicUrl?: string | null
-  owner?: string | null
-  status: string
-  connected: boolean
-}
-
-interface APIResponse {
-  success: boolean
-  status: string
-  connected: boolean
+interface ConnectionStatus {
+  status: 'connecting' | 'connected' | 'disconnected' | 'error' | 'timeout'
+  message: string
   qrCode?: string
-  instanceName?: string
-  instanceToken?: string
-  profileName?: string | null
-  profilePicUrl?: string | null
-  owner?: string | null
-  message?: string
-  error?: string
+  profileName?: string
+  profilePicUrl?: string
+  phoneNumber?: string
 }
 
 // ============================================================================
-// COMPONENT
+// CONSTANTES
 // ============================================================================
+const POLLING_INTERVAL = 5000 // 5 segundos
+const TIMEOUT_DURATION = 30000 // 30 segundos
 
+// ============================================================================
+// COMPONENTE PRINCIPAL
+// ============================================================================
 export default function WhatsAppConnectModal({
   isOpen,
   onClose,
-  connectionId,
-  initialQrCode = null,
-  initialToken = null,
-  onSuccess
-}: ConnectModalProps) {
-  // ==========================================================================
-  // 1. STATE
-  // ==========================================================================
+  onSuccess,
+  userId
+}: WhatsAppConnectModalProps) {
+  // Estados
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({
+    status: 'connecting',
+    message: 'Iniciando conexão...'
+  })
+  const [connectionId, setConnectionId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [qrCode, setQrCode] = useState<string | null>(initialQrCode)
-  const [status, setStatus] = useState<string>('disconnected')
-  const [error, setError] = useState<string | null>(null)
-  const [instanceData, setInstanceData] = useState<InstanceData | null>(null)
-  const [timeLeft, setTimeLeft] = useState<number>(30)
 
-  // ==========================================================================
-  // 2. REFS (para timers)
-  // ==========================================================================
+  // Refs para controle de intervalos e timeouts
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const timeoutTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const qrCodeTimestampRef = useRef<number>(Date.now())
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const hasCompletedRef = useRef(false)
 
-  // ==========================================================================
-  // 3. CLEANUP DE TIMERS
-  // ==========================================================================
-  const cleanupTimers = useCallback(() => {
-    console.log('🧹 Limpando todos os timers')
-
+  // ========================================================================
+  // FUNÇÃO: Limpar Intervalos e Timeouts
+  // ========================================================================
+  const clearAllTimers = useCallback(() => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current)
       pollingIntervalRef.current = null
     }
-
-    if (timeoutTimerRef.current) {
-      clearTimeout(timeoutTimerRef.current)
-      timeoutTimerRef.current = null
-    }
-
-    if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current)
-      countdownIntervalRef.current = null
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
     }
   }, [])
 
-  // ==========================================================================
-  // 4. VERIFICAR STATUS (usado no polling)
-  // ==========================================================================
-  const checkStatus = useCallback(async () => {
+  // ========================================================================
+  // FUNÇÃO: Polling - Verificar Status da Conexão
+  // ========================================================================
+  const checkConnectionStatus = useCallback(async (connId: string) => {
+    if (hasCompletedRef.current) {
+      return
+    }
+
     try {
-      console.log('🔍 [Polling] Verificando status da conexão...')
+      console.log('🔍 [Polling] Verificando status da conexão:', connId)
 
       const response = await fetch(
-        `/api/whatsapp/connect?connectionId=${connectionId}`,
-        { method: 'GET' }
-      )
-
-      const data: APIResponse = await response.json()
-
-      if (!response.ok) {
-        console.warn('⚠️ Erro ao verificar status:', data.error)
-        return
-      }
-
-      console.log('📊 [Polling] Status atual:', data.status, '| Conectado:', data.connected)
-
-      setStatus(data.status)
-      setInstanceData({
-        instanceName: data.instanceName,
-        profileName: data.profileName,
-        profilePicUrl: data.profilePicUrl,
-        owner: data.owner,
-        status: data.status,
-        connected: data.connected
-      })
-
-      // ======================================================================
-      // 5. FECHAR MODAL se conectado
-      // ======================================================================
-      if (data.connected || data.status === 'open') {
-        console.log('✅ WhatsApp conectado com sucesso!')
-        cleanupTimers()
-
-        // Callback com dados da instância
-        if (onSuccess) {
-          onSuccess({
-            instanceName: data.instanceName,
-            profileName: data.profileName,
-            profilePicUrl: data.profilePicUrl,
-            owner: data.owner,
-            status: data.status,
-            connected: data.connected
-          })
-        }
-
-        // Fechar modal após 2 segundos
-        setTimeout(() => {
-          onClose()
-        }, 2000)
-      }
-      // Fechar se desconectado/fechado
-      else if (data.status === 'disconnected' || data.status === 'close') {
-        console.log('❌ Conexão fechada/desconectada')
-        cleanupTimers()
-        setError('Conexão foi encerrada. Tente novamente.')
-      }
-
-    } catch (err) {
-      console.error('❌ Erro ao verificar status:', err)
-    }
-  }, [connectionId, onSuccess, onClose, cleanupTimers])
-
-  // ==========================================================================
-  // 6. INICIAR POLLING (5 segundos)
-  // ==========================================================================
-  const startPolling = useCallback(() => {
-    console.log('⏰ Iniciando polling de 5 segundos')
-
-    // Limpar polling anterior se existir
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current)
-    }
-
-    // ✅ Verificar status a cada 5 segundos
-    pollingIntervalRef.current = setInterval(() => {
-      console.log('🔄 [Polling] Tick...')
-      checkStatus()
-    }, 5000) // 5 segundos
-
-  }, [checkStatus])
-
-  // ==========================================================================
-  // 7. INICIAR TIMEOUT (30 segundos)
-  // ==========================================================================
-  const startTimeout = useCallback(() => {
-    console.log('⏰ Iniciando timeout de 30 segundos')
-
-    // Reset contador
-    setTimeLeft(30)
-    qrCodeTimestampRef.current = Date.now()
-
-    // Limpar timeout anterior se existir
-    if (timeoutTimerRef.current) {
-      clearTimeout(timeoutTimerRef.current)
-    }
-
-    if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current)
-    }
-
-    // ✅ Countdown visual (atualizar a cada 1 segundo)
-    countdownIntervalRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        const newTime = prev - 1
-        if (newTime <= 0) {
-          if (countdownIntervalRef.current) {
-            clearInterval(countdownIntervalRef.current)
+        `/api/whatsapp/connect?connectionId=${connId}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
           }
         }
-        return Math.max(0, newTime)
-      })
-    }, 1000)
-
-    // ✅ Timeout principal (30 segundos)
-    timeoutTimerRef.current = setTimeout(() => {
-      console.log('⏱️ Timeout de 30s atingido')
-
-      const elapsedTime = Math.floor((Date.now() - qrCodeTimestampRef.current) / 1000)
-      console.log(`⏱️ Tempo decorrido: ${elapsedTime}s`)
-
-      // Parar polling
-      cleanupTimers()
-
-      // Se ainda não conectou, mostrar mensagem e fechar
-      if (status !== 'open') {
-        console.log('❌ Conexão não estabelecida após 30s')
-        setError('Tempo limite de 30 segundos atingido. Tente novamente.')
-
-        // Fechar modal após 2 segundos
-        setTimeout(() => {
-          onClose()
-        }, 2000)
-      }
-    }, 30000) // 30 segundos
-
-  }, [status, onClose, cleanupTimers])
-
-  // ==========================================================================
-  // 8. INICIAR CONEXÃO (quando modal abre)
-  // ==========================================================================
-  const handleConnect = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      console.log('🔌 Iniciando conexão WhatsApp...')
-
-      const response = await fetch('/api/whatsapp/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ connectionId })
-      })
-
-      const data: APIResponse = await response.json()
+      )
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erro ao conectar')
+        throw new Error('Erro ao verificar status da conexão')
       }
 
-      console.log('✅ Resposta da API:', data)
+      const data = await response.json()
+      console.log('📥 [Polling] Resposta recebida:', data)
 
-      // Salvar dados da instância
-      setInstanceData({
-        instanceName: data.instanceName,
-        profileName: data.profileName,
-        profilePicUrl: data.profilePicUrl,
-        owner: data.owner,
-        status: data.status,
-        connected: data.connected
+      // Verificar se conectou com sucesso
+      if (data.connected && data.status === 'connected') {
+        console.log('✅ [Polling] Conexão estabelecida com sucesso!')
+
+        hasCompletedRef.current = true
+        clearAllTimers()
+
+        setConnectionStatus({
+          status: 'connected',
+          message: 'WhatsApp conectado com sucesso!',
+          profileName: data.profileName,
+          profilePicUrl: data.profilePicUrl,
+          phoneNumber: data.phoneNumber
+        })
+
+        // Aguardar 2 segundos para mostrar sucesso antes de fechar
+        setTimeout(() => {
+          onSuccess()
+          onClose()
+        }, 2000)
+      } else {
+        // Ainda aguardando conexão
+        setConnectionStatus({
+          status: 'connecting',
+          message: data.message || 'Aguardando leitura do QR Code...'
+        })
+      }
+    } catch (error) {
+      console.error('❌ [Polling] Erro ao verificar status:', error)
+      // Não parar o polling por erro temporário
+    }
+  }, [onSuccess, onClose, clearAllTimers])
+
+  // ========================================================================
+  // FUNÇÃO: Iniciar Polling
+  // ========================================================================
+  const startPolling = useCallback((connId: string) => {
+    console.log('🔄 [Polling] Iniciando polling a cada 5 segundos')
+
+    // Primeira verificação imediata
+    checkConnectionStatus(connId)
+
+    // Configurar polling a cada 5 segundos
+    pollingIntervalRef.current = setInterval(() => {
+      checkConnectionStatus(connId)
+    }, POLLING_INTERVAL)
+
+    // Configurar timeout de 30 segundos
+    timeoutRef.current = setTimeout(() => {
+      if (!hasCompletedRef.current) {
+        console.log('⏰ [Timeout] 30 segundos sem conexão')
+
+        hasCompletedRef.current = true
+        clearAllTimers()
+
+        setConnectionStatus({
+          status: 'timeout',
+          message: 'Tempo esgotado. Por favor, tente novamente.'
+        })
+
+        // Fechar modal após 3 segundos
+        setTimeout(() => {
+          onClose()
+        }, 3000)
+      }
+    }, TIMEOUT_DURATION)
+  }, [checkConnectionStatus, clearAllTimers, onClose])
+
+  // ========================================================================
+  // FUNÇÃO: Criar Conexão Inicial
+  // ========================================================================
+  const createConnection = useCallback(async () => {
+    if (loading || !userId) return
+
+    setLoading(true)
+    hasCompletedRef.current = false
+
+    try {
+      console.log('📝 [Create] Criando conexão WhatsApp para userId:', userId)
+
+      // Primeiro, criar registro no Supabase
+      const createResponse = await fetch('/api/whatsapp/connections', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId,
+          instanceName: `swiftbot_${userId.replace(/-/g, '_')}`
+        })
       })
-      setStatus(data.status)
-      setQrCode(data.qrCode || null)
 
-      // Se já está conectado, não precisa de QR Code
-      if (data.connected || data.status === 'open') {
-        console.log('✅ Instância já conectada!')
-        if (onSuccess) {
-          onSuccess({
-            instanceName: data.instanceName,
-            profileName: data.profileName,
-            profilePicUrl: data.profilePicUrl,
-            owner: data.owner,
-            status: data.status,
-            connected: data.connected
+      if (!createResponse.ok) {
+        throw new Error('Erro ao criar registro da conexão')
+      }
+
+      const createData = await createResponse.json()
+      const newConnectionId = createData.connectionId || createData.id
+
+      if (!newConnectionId) {
+        throw new Error('ID da conexão não foi retornado')
+      }
+
+      console.log('✅ [Create] Conexão criada:', newConnectionId)
+      setConnectionId(newConnectionId)
+
+      // Agora, iniciar a conexão na UAZAPI
+      setConnectionStatus({
+        status: 'connecting',
+        message: 'Conectando com WhatsApp...'
+      })
+
+      const connectResponse = await fetch('/api/whatsapp/connect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          connectionId: newConnectionId
+        })
+      })
+
+      if (!connectResponse.ok) {
+        const errorData = await connectResponse.json()
+        throw new Error(errorData.error || 'Erro ao conectar WhatsApp')
+      }
+
+      const connectData = await connectResponse.json()
+      console.log('✅ [Connect] Resposta da conexão:', connectData)
+
+      // Se já veio conectado
+      if (connectData.connected) {
+        hasCompletedRef.current = true
+
+        setConnectionStatus({
+          status: 'connected',
+          message: 'WhatsApp já está conectado!',
+          profileName: connectData.profileName,
+          profilePicUrl: connectData.profilePicUrl,
+          phoneNumber: connectData.phoneNumber
+        })
+
+        setTimeout(() => {
+          onSuccess()
+          onClose()
+        }, 2000)
+      } else {
+        // Se tem QR Code, mostrar
+        if (connectData.qrCode) {
+          setConnectionStatus({
+            status: 'connecting',
+            message: 'Leia o QR Code com seu WhatsApp',
+            qrCode: connectData.qrCode
           })
         }
-        setTimeout(() => onClose(), 2000)
-        return
+
+        // Iniciar polling
+        startPolling(newConnectionId)
       }
 
-      // Se tem QR Code, iniciar polling + timeout
-      if (data.qrCode) {
-        console.log('📱 QR Code recebido, iniciando polling e timeout')
-        startPolling()
-        startTimeout()
-      }
+    } catch (error: any) {
+      console.error('❌ [Create] Erro ao criar conexão:', error)
 
-    } catch (err) {
-      console.error('❌ Erro ao conectar:', err)
-      setError(err instanceof Error ? err.message : 'Erro desconhecido')
+      setConnectionStatus({
+        status: 'error',
+        message: error.message || 'Erro ao conectar WhatsApp. Tente novamente.'
+      })
     } finally {
       setLoading(false)
     }
-  }, [connectionId, onSuccess, onClose, startPolling, startTimeout])
+  }, [userId, loading, startPolling, onSuccess, onClose])
 
-  // ==========================================================================
-  // 9. LIFECYCLE: Iniciar quando modal abre
-  // ==========================================================================
+  // ========================================================================
+  // EFEITO: Criar Conexão Quando Modal Abre
+  // ========================================================================
   useEffect(() => {
-    if (isOpen && connectionId) {
-      console.log('🚀 Modal aberto, iniciando conexão...')
-      handleConnect()
+    if (isOpen && !connectionId) {
+      createConnection()
     }
 
-    // Cleanup: parar todos os timers quando modal fecha ou unmount
+    // Cleanup ao fechar modal
     return () => {
-      console.log('🧹 Modal fechado/desmontado, limpando recursos')
-      cleanupTimers()
+      if (!isOpen) {
+        clearAllTimers()
+        hasCompletedRef.current = false
+        setConnectionId(null)
+        setConnectionStatus({
+          status: 'connecting',
+          message: 'Iniciando conexão...'
+        })
+      }
     }
-  }, [isOpen, connectionId, handleConnect, cleanupTimers])
+  }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ==========================================================================
-  // 10. RENDER
-  // ==========================================================================
+  // ========================================================================
+  // FUNÇÃO: Fechar Modal
+  // ========================================================================
+  const handleClose = useCallback(() => {
+    clearAllTimers()
+    hasCompletedRef.current = false
+    onClose()
+  }, [clearAllTimers, onClose])
 
-  // Não renderizar se modal não estiver aberto
+  // ========================================================================
+  // RENDERIZAÇÃO
+  // ========================================================================
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
-
-        {/* ================================================================ */}
-        {/* HEADER */}
-        {/* ================================================================ */}
-        <div className="flex justify-between items-center mb-6">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold text-gray-800">
             Conectar WhatsApp
           </h2>
           <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 transition-colors"
-            aria-label="Fechar modal"
+            onClick={handleClose}
+            className="text-gray-500 hover:text-gray-700 text-2xl"
+            disabled={loading}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            ×
           </button>
         </div>
 
-        {/* ================================================================ */}
-        {/* LOADING STATE */}
-        {/* ================================================================ */}
+        {/* Status Icon */}
+        <div className="flex justify-center mb-4">
+          {connectionStatus.status === 'connecting' && (
+            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-green-500"></div>
+          )}
+          {connectionStatus.status === 'connected' && (
+            <div className="text-green-500 text-6xl">✓</div>
+          )}
+          {connectionStatus.status === 'error' && (
+            <div className="text-red-500 text-6xl">✗</div>
+          )}
+          {connectionStatus.status === 'timeout' && (
+            <div className="text-orange-500 text-6xl">⏰</div>
+          )}
+        </div>
+
+        {/* QR Code */}
+        {connectionStatus.qrCode && connectionStatus.status === 'connecting' && (
+          <div className="flex justify-center mb-4">
+            <img
+              src={connectionStatus.qrCode}
+              alt="QR Code WhatsApp"
+              className="w-64 h-64 border-4 border-gray-300 rounded-lg"
+            />
+          </div>
+        )}
+
+        {/* Mensagem de Status */}
+        <p className="text-center text-gray-700 mb-4">
+          {connectionStatus.message}
+        </p>
+
+        {/* Informações do Perfil (quando conectado) */}
+        {connectionStatus.status === 'connected' && connectionStatus.profileName && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+            <div className="flex items-center">
+              {connectionStatus.profilePicUrl && (
+                <img
+                  src={connectionStatus.profilePicUrl}
+                  alt="Foto de perfil"
+                  className="w-12 h-12 rounded-full mr-3"
+                />
+              )}
+              <div>
+                <p className="font-semibold text-gray-800">
+                  {connectionStatus.profileName}
+                </p>
+                {connectionStatus.phoneNumber && (
+                  <p className="text-sm text-gray-600">
+                    {connectionStatus.phoneNumber}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Instruções */}
+        {connectionStatus.status === 'connecting' && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <p className="text-sm text-gray-700">
+              <strong>Como conectar:</strong>
+            </p>
+            <ol className="text-sm text-gray-700 list-decimal list-inside mt-2">
+              <li>Abra o WhatsApp no seu celular</li>
+              <li>Toque em <strong>Mais opções</strong> ou <strong>Configurações</strong></li>
+              <li>Toque em <strong>Aparelhos conectados</strong></li>
+              <li>Toque em <strong>Conectar um aparelho</strong></li>
+              <li>Aponte seu celular para esta tela para ler o QR Code</li>
+            </ol>
+          </div>
+        )}
+
+        {/* Botão de Fechar (erro ou timeout) */}
+        {(connectionStatus.status === 'error' || connectionStatus.status === 'timeout') && (
+          <button
+            onClick={handleClose}
+            className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg transition-colors"
+          >
+            Fechar
+          </button>
+        )}
+
+        {/* Loading Indicator */}
         {loading && (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Gerando QR Code...</p>
+          <div className="text-center text-sm text-gray-500">
+            Carregando...
           </div>
         )}
-
-        {/* ================================================================ */}
-        {/* ERROR STATE */}
-        {/* ================================================================ */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-            <p className="text-red-800 font-medium">❌ {error}</p>
-          </div>
-        )}
-
-        {/* ================================================================ */}
-        {/* CONNECTED STATE */}
-        {/* ================================================================ */}
-        {status === 'open' && (
-          <div className="text-center py-8">
-            <div className="text-6xl mb-4 animate-bounce">✅</div>
-            <h3 className="text-xl font-bold text-green-600 mb-2">
-              Conectado com sucesso!
-            </h3>
-            {instanceData?.profileName && (
-              <p className="text-gray-600">
-                Bem-vindo, <strong>{instanceData.profileName}</strong>
-              </p>
-            )}
-            {instanceData?.owner && (
-              <p className="text-sm text-gray-500 mt-1">
-                {instanceData.owner}
-              </p>
-            )}
-            <p className="text-sm text-gray-500 mt-4">
-              Fechando automaticamente...
-            </p>
-          </div>
-        )}
-
-        {/* ================================================================ */}
-        {/* QR CODE STATE */}
-        {/* ================================================================ */}
-        {qrCode && status !== 'open' && (
-          <div className="text-center">
-            {/* QR Code Image */}
-            <div className="bg-gray-50 rounded-lg p-4 mb-4">
-              <img
-                src={qrCode}
-                alt="QR Code WhatsApp"
-                className="mx-auto w-64 h-64 object-contain"
-              />
-            </div>
-
-            {/* Instructions */}
-            <div className="space-y-2 text-sm text-gray-600 mb-4">
-              <p className="font-medium text-base">📱 Escaneie o QR Code com seu WhatsApp:</p>
-              <ol className="text-left list-decimal list-inside space-y-1 pl-4">
-                <li>Abra o WhatsApp no seu telefone</li>
-                <li>Toque em <strong>Mais opções</strong> ou <strong>Configurações</strong></li>
-                <li>Toque em <strong>Aparelhos conectados</strong></li>
-                <li>Toque em <strong>Conectar um aparelho</strong></li>
-                <li>Aponte seu telefone para esta tela</li>
-              </ol>
-            </div>
-
-            {/* Status Info */}
-            <div className="space-y-2">
-              {/* Polling Info */}
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <p className="text-xs text-blue-800 font-medium">
-                  ⏰ Verificando conexão automaticamente a cada 5 segundos
-                </p>
-                <p className="text-xs text-gray-600 mt-1">
-                  O modal fechará automaticamente quando conectado
-                </p>
-              </div>
-
-              {/* Timeout Countdown */}
-              <div className={`p-3 rounded-lg ${timeLeft <= 10 ? 'bg-red-50' : 'bg-orange-50'}`}>
-                <p className={`text-sm font-bold ${timeLeft <= 10 ? 'text-red-700' : 'text-orange-700'}`}>
-                  ⏱️ Tempo restante: {timeLeft} segundos
-                </p>
-                <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                  <div
-                    className={`h-2 rounded-full transition-all duration-1000 ${
-                      timeLeft <= 10 ? 'bg-red-600' : 'bg-orange-500'
-                    }`}
-                    style={{ width: `${(timeLeft / 30) * 100}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Manual Check Button */}
-            <button
-              onClick={checkStatus}
-              className="mt-4 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium"
-            >
-              🔄 Verificar Status Agora
-            </button>
-          </div>
-        )}
-
-        {/* ================================================================ */}
-        {/* CONNECTING STATE (sem QR Code ainda) */}
-        {/* ================================================================ */}
-        {!loading && !qrCode && status === 'connecting' && (
-          <div className="text-center py-8">
-            <div className="animate-pulse text-4xl mb-4">⏳</div>
-            <p className="text-gray-600">Aguardando QR Code...</p>
-            <p className="text-sm text-gray-500 mt-2">
-              Isso pode levar alguns segundos
-            </p>
-          </div>
-        )}
-
-        {/* ================================================================ */}
-        {/* DISCONNECTED STATE (fallback) */}
-        {/* ================================================================ */}
-        {!loading && !qrCode && status === 'disconnected' && !error && (
-          <div className="text-center py-8">
-            <div className="text-4xl mb-4">📱</div>
-            <p className="text-gray-600">Preparando conexão...</p>
-          </div>
-        )}
-
       </div>
     </div>
   )
