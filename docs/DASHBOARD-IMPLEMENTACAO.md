@@ -32,7 +32,7 @@ Exibe o status mais importante das conexões:
 Exibe: **`X de Y ativas`**
 
 - **X**: Conexões ativas (`instance_token` não nulo E `status` ≠ `disconnected`)
-- **Y**: Limite comprado (`user_subscriptions.connections_purchased` ou `connection_limit`)
+- **Y**: Limite comprado (`user_subscriptions.connections_purchased`)
 
 **Exemplo**: `2 de 5 ativas`
 
@@ -106,7 +106,7 @@ GET /api/whatsapp/dashboard-summary?userId=xxx
   "canAddNew": true,
   "subscription": {
     "status": "active",
-    "connectionLimit": 5
+    "connectionsPurchased": 5
   },
   "connections": [
     {
@@ -131,16 +131,14 @@ GET /api/whatsapp/dashboard-summary?userId=xxx
 ```javascript
 const { data: subscription } = await supabase
   .from('user_subscriptions')
-  .select('connections_purchased, connection_limit, status')
+  .select('connections_purchased, status')
   .eq('user_id', userId)
   .order('created_at', { ascending: false })
   .limit(1)
   .single()
 
-// Priorizar connection_limit, senão connections_purchased
-const totalConnectionsPurchased = subscription.connection_limit ||
-                                  subscription.connections_purchased ||
-                                  1 // padrão
+// Usar connections_purchased do plano
+const totalConnectionsPurchased = subscription?.connections_purchased || 1 // padrão
 ```
 
 #### **2. Buscar Conexões**
@@ -238,7 +236,7 @@ export default function Dashboard() {
 **Dados de Teste**:
 ```sql
 -- user_subscriptions
-connection_limit = 5
+connections_purchased = 5
 
 -- whatsapp_connections (para user_id)
 Conexão 1: status='connected', instance_token='xxx'
@@ -262,7 +260,7 @@ Conexão 3: status='disconnected', instance_token='zzz'
 **Dados de Teste**:
 ```sql
 -- user_subscriptions
-connection_limit = 2
+connections_purchased = 2
 
 -- whatsapp_connections
 Conexão 1: status='connected', instance_token='xxx'
@@ -326,7 +324,6 @@ Execute no SQL Editor do Supabase:
 ```sql
 -- Ver limite do usuário
 SELECT
-  connection_limit,
   connections_purchased,
   status
 FROM user_subscriptions

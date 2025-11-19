@@ -260,7 +260,7 @@ export async function POST(request) {
 
     if (!countError && allConnections) {
       const connectedCount = allConnections.filter(c => c.status === 'connected').length
-      const planLimit = subscription.connection_limit || 1
+      const planLimit = subscription.connections_purchased || 1
 
       if (connectedCount >= planLimit) {
         console.log(`❌ Limite de conexões atingido: ${connectedCount}/${planLimit}`)

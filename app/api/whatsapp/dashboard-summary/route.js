@@ -46,7 +46,7 @@ export async function GET(request) {
     // ========================================================================
     const { data: subscription, error: subError } = await supabase
       .from('user_subscriptions')
-      .select('connections_purchased, connection_limit, status')
+      .select('connections_purchased, status')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -56,8 +56,8 @@ export async function GET(request) {
     let totalConnectionsPurchased = 1
 
     if (subscription && !subError) {
-      // Priorizar connection_limit, senão usar connections_purchased
-      totalConnectionsPurchased = subscription.connection_limit || subscription.connections_purchased || 1
+      // Usar connections_purchased do plano
+      totalConnectionsPurchased = subscription.connections_purchased || 1
       console.log('✅ Limite de conexões:', totalConnectionsPurchased)
       console.log('📋 Status da assinatura:', subscription.status)
     } else {

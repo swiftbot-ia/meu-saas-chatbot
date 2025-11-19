@@ -76,7 +76,7 @@ export async function POST(request) {
       .eq('user_id', userId)
 
     const connectedCount = connections?.filter(c => c.status === 'connected').length || 0
-    const planLimit = subscription.connection_limit || 1
+    const planLimit = subscription.connections_purchased || 1
 
     if (connectedCount >= planLimit) {
       return NextResponse.json({
