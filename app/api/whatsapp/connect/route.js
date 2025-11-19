@@ -153,18 +153,24 @@ export async function POST(request) {
     if (!currentToken || !uazapiData) {
       console.log('🆕 [Connect-POST] Criando nova instância:', instanceName)
 
+      // Payload ideal conforme documentação UAZAPI
+      const payload = {
+        name: instanceName,                    // Nome único da instância
+        systemName: "Swiftbot SaaS",          // Nome do sistema
+        adminField01: userId,                  // Rastreabilidade: userId do Supabase
+        adminField02: connectionId             // Vinculação: connectionId em whatsapp_connections
+      }
+
+      console.log('📝 [Connect-POST] Payload UAZAPI:', payload)
+
       const createRes = await fetch(`${UAZAPI_URL}/instance/init`, {
         method: 'POST',
         headers: {
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
-          'admintoken': UAZAPI_ADMIN_TOKEN
+          'admintoken': UAZAPI_ADMIN_TOKEN   // ⚠️ Usado APENAS aqui para criar instância
         },
-        body: JSON.stringify({
-          name: instanceName,
-          qrcode: true,
-          integration: 'WHATSAPP-BAILEYS',
-          systemName: 'Swiftbot 1.0'
-        })
+        body: JSON.stringify(payload)
       })
 
       if (!createRes.ok) {
@@ -194,13 +200,16 @@ export async function POST(request) {
         .from('whatsapp_connections')
         .update({
           instance_token: currentToken,
+          admin_field_01: userId,              // ✅ Rastreabilidade
+          admin_field_02: connectionId,        // ✅ Vinculação
           api_credentials: JSON.stringify({
             token: currentToken,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            uazapiResponse: newInstanceData    // Salvar resposta completa
           }),
           status: 'connecting',
-          is_connected: false,
-          updated_at: new Date().toISOString()
+          is_connected: false
+          // updated_at é gerenciado automaticamente pelo trigger
         })
         .eq('id', connectionId)
 
@@ -220,13 +229,11 @@ export async function POST(request) {
     // ========================================================================
     console.log('🔌 [Connect-POST] Iniciando conexão WhatsApp...')
 
-    const connectRes = await fetch(`${UAZAPI_URL}/instance/connect`, {
-      method: 'POST',
+    const connectRes = await fetch(`${UAZAPI_URL}/instance/connect/${instanceName}`, {
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
-        'token': currentToken
-      },
-      body: JSON.stringify({})
+        'apitoken': currentToken  // ✅ Usar 'apitoken' (não 'token' nem 'admintoken')
+      }
     })
 
     if (!connectRes.ok) {
