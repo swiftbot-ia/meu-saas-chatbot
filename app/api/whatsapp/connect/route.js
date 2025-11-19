@@ -274,25 +274,49 @@ export async function POST(request) {
     // ============================================================================
     // 4. ✅ VALIDAÇÃO PASSOU - VERIFICAR INSTÂNCIA EXISTENTE
     // ============================================================================
-    const instanceName = connection.instance_name || `swiftbot_${userId.replace(/-/g, '_')}`
 
-    let instanceApiKey = connection.instance_token
+    // 🔍 IMPORTANTE: Verificar se JÁ EXISTE uma instância para este user_id
+    console.log('🔍 Verificando instâncias existentes para user_id:', userId)
+
+    const { data: existingInstances, error: existingError } = await supabase
+      .from('whatsapp_connections')
+      .select('*')
+      .eq('user_id', userId)
+      .not('instance_token', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    let instanceApiKey = null
+    let instanceName = null
     let needsInit = false
+    let existingConnection = null
 
-    console.log('🔍 Verificando instância existente:', {
-      instanceName,
-      hasToken: !!instanceApiKey,
-      currentStatus: connection.status
-    })
+    if (existingInstances && existingInstances.length > 0) {
+      existingConnection = existingInstances[0]
+      instanceApiKey = existingConnection.instance_token
+      instanceName = existingConnection.instance_name
 
-    // ============================================================================
-    // 4.1 LÓGICA CONDICIONAL: Instância existe no Supabase?
-    // ============================================================================
-    if (instanceApiKey && instanceApiKey.length > 0) {
-      console.log('✅ Instância encontrada no banco com token válido')
-      console.log('📊 Verificando status atual na UAZAPI...')
+      console.log('✅ Instância existente encontrada:', {
+        connectionId: existingConnection.id,
+        instanceName,
+        hasToken: !!instanceApiKey,
+        status: existingConnection.status
+      })
 
-      // Tentar obter status com o token existente
+      // Atualizar o connectionId atual para apontar para a instância existente
+      if (existingConnection.id !== connectionId) {
+        console.log('⚠️ Detectado connectionId diferente, atualizando referência')
+
+        // Deletar o registro duplicado (connectionId sem token)
+        await supabase
+          .from('whatsapp_connections')
+          .delete()
+          .eq('id', connectionId)
+
+        console.log('✅ Registro duplicado removido')
+      }
+
+      // Verificar se token ainda é válido na UAZAPI
       try {
         const statusResponse = await fetch(
           `${EVOLUTION_API_URL}/instance/status`,
@@ -304,34 +328,49 @@ export async function POST(request) {
 
         if (statusResponse.ok) {
           const statusData = await statusResponse.json()
-
-          // ✅ CORREÇÃO: Status está em statusData.instance.status
           const currentStatus = statusData.instance?.status || statusData.status
-          console.log('✅ Status obtido com sucesso:', currentStatus)
 
-          // Se status for 'close' ou 'disconnected', precisa reconectar
-          if (currentStatus === 'close' || currentStatus === 'disconnected') {
-            console.log('🔄 Instância desconectada, iniciando nova conexão...')
-            needsInit = false // Não precisa criar, só reconectar
-          } else {
-            console.log('✅ Instância já ativa, retornando status atual')
+          console.log('✅ Token válido na UAZAPI, status:', currentStatus)
+          needsInit = false
+
+          // Se já está conectado, retornar imediatamente
+          if (currentStatus === 'open') {
+            console.log('✅ Instância já conectada, retornando dados')
+
+            return NextResponse.json({
+              success: true,
+              instanceName,
+              instanceToken: instanceApiKey,
+              status: 'open',
+              connected: true,
+              profileName: statusData.instance?.profileName || null,
+              profilePicUrl: statusData.instance?.profilePicUrl || null,
+              owner: statusData.instance?.owner || null,
+              message: 'Instância já conectada'
+            })
           }
+
         } else {
-          console.log('⚠️ Token inválido ou instância não existe mais na UAZAPI')
+          console.log('⚠️ Token inválido na UAZAPI, será criada nova instância')
           needsInit = true
         }
       } catch (error) {
-        console.error('❌ Erro ao verificar status:', error.message)
+        console.error('❌ Erro ao verificar token:', error.message)
         needsInit = true
       }
+
     } else {
-      console.log('🆕 Nenhuma instância encontrada no banco, será criada')
+      console.log('🆕 Nenhuma instância válida encontrada para este usuário')
+      instanceName = `swiftbot_${userId.replace(/-/g, '_')}`
       needsInit = true
     }
 
     // ============================================================================
     // 4.2 CRIAR NOVA INSTÂNCIA (se necessário)
     // ============================================================================
+    // Usar connectionId correto (pode ter sido atualizado se encontrou instância existente)
+    const activeConnectionId = existingConnection?.id || connectionId
+
     if (needsInit) {
       console.log('📝 Criando nova instância na UAZAPI...')
 
@@ -387,9 +426,9 @@ export async function POST(request) {
           is_connected: false,
           updated_at: new Date().toISOString()
         })
-        .eq('id', connectionId)
+        .eq('id', activeConnectionId)
 
-      console.log('✅ Token salvo no Supabase')
+      console.log('✅ Token salvo no Supabase (connectionId:', activeConnectionId, ')')
     }
 
     // ============================================================================
@@ -504,9 +543,9 @@ export async function POST(request) {
       await supabase
         .from('whatsapp_connections')
         .update(updateData)
-        .eq('id', connectionId)
+        .eq('id', activeConnectionId)
 
-      console.log('✅ Supabase atualizado (POST):', updateData)
+      console.log('✅ Supabase atualizado (POST) - connectionId:', activeConnectionId, updateData)
     } else {
       console.warn('⚠️ Não foi possível obter status da instância')
       const errorText = await statusResponse.text()
