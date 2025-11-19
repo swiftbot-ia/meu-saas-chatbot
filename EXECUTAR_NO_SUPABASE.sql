@@ -1,23 +1,18 @@
 -- ============================================================================
--- Script de Correção: Remover Constraint UNIQUE de user_id
+-- SCRIPT DE CORREÇÃO: Permitir Múltiplas Conexões por Usuário
 -- ============================================================================
--- EXECUTE ESTE SCRIPT NO SQL EDITOR DO SUPABASE
--- Dashboard → SQL Editor → New Query → Cole e Execute
+-- COPIE E EXECUTE NO SUPABASE SQL EDITOR
 -- ============================================================================
 
--- 1. Remover a constraint única que está bloqueando múltiplas conexões
+-- 1. Remover o constraint UNIQUE que está bloqueando múltiplas conexões
 ALTER TABLE public.whatsapp_connections
 DROP CONSTRAINT IF EXISTS unique_user_instance;
 
--- Remover também se houver este nome alternativo
-ALTER TABLE public.whatsapp_connections
-DROP CONSTRAINT IF EXISTS whatsapp_connections_user_id_unique;
-
--- 2. Adicionar índice para manter performance (sem bloquear múltiplas conexões)
+-- 2. Adicionar índice não-único para manter performance nas consultas por user_id
 CREATE INDEX IF NOT EXISTS idx_whatsapp_connections_user_id
 ON public.whatsapp_connections(user_id);
 
--- 3. Verificar se foi removido corretamente
+-- 3. Verificar que o constraint foi removido
 SELECT
     constraint_name,
     constraint_type
@@ -27,6 +22,5 @@ WHERE table_name = 'whatsapp_connections'
   AND constraint_type = 'UNIQUE';
 
 -- RESULTADO ESPERADO:
--- Deve aparecer APENAS "whatsapp_connections_instance_name_key"
+-- Deve aparecer APENAS "whatsapp_connections_instance_name_key" (que é correto manter)
 -- NÃO deve aparecer "unique_user_instance"
--- ============================================================================

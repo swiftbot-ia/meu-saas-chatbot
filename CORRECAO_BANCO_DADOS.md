@@ -2,11 +2,11 @@
 
 ## 🔴 Problema Identificado
 
-O banco de dados tem uma **UNIQUE constraint** na coluna `user_id` que está impedindo que um usuário crie múltiplas conexões WhatsApp.
+O banco de dados tem uma **UNIQUE constraint** chamada `unique_user_instance` que está impedindo que um usuário crie múltiplas conexões WhatsApp.
 
 ### Erro nos Logs:
 ```
-❌ duplicate key value violates unique constraint "whatsapp_connections_user_id_unique"
+❌ duplicate key value violates unique constraint "unique_user_instance"
 ```
 
 ---
@@ -30,7 +30,7 @@ Cole o seguinte SQL e clique em **RUN**:
 
 -- 1. Remover a constraint que está bloqueando múltiplas conexões
 ALTER TABLE public.whatsapp_connections
-DROP CONSTRAINT IF EXISTS whatsapp_connections_user_id_unique;
+DROP CONSTRAINT IF EXISTS unique_user_instance;
 
 -- 2. Adicionar índice para manter performance (sem bloquear múltiplas conexões)
 CREATE INDEX IF NOT EXISTS idx_whatsapp_connections_user_id
@@ -42,22 +42,23 @@ SELECT
     constraint_type
 FROM information_schema.table_constraints
 WHERE table_name = 'whatsapp_connections'
-  AND table_schema = 'public';
+  AND table_schema = 'public'
+  AND constraint_type = 'UNIQUE';
 ```
 
 ### **Passo 3: Verificar Resultado**
 
-Após executar, você deve ver uma lista de constraints **SEM** `whatsapp_connections_user_id_unique`.
+Após executar, você deve ver uma lista de constraints UNIQUE **SEM** `unique_user_instance`.
 
-**Exemplo de resultado correto**:
+**Exemplo de resultado correto** (filtrando apenas UNIQUE):
 ```
 constraint_name                           | constraint_type
 ------------------------------------------|----------------
-whatsapp_connections_pkey                 | PRIMARY KEY
-whatsapp_connections_user_id_fkey         | FOREIGN KEY
+whatsapp_connections_instance_name_key    | UNIQUE
 ```
 
-✅ Se `whatsapp_connections_user_id_unique` **NÃO aparece** na lista, está correto!
+✅ Se `unique_user_instance` **NÃO aparece** na lista, está correto!
+✅ O constraint `whatsapp_connections_instance_name_key` DEVE permanecer (garante instanceName único)
 
 ---
 
