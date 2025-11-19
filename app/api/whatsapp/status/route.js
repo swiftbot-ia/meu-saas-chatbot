@@ -63,14 +63,15 @@ export async function POST(request) {
             // Salvar/atualizar o número no Supabase
             console.log('Tentando salvar para user_id:', userId)
             
-            const { data, error: updateError } = await supabase
+            const { data, error: updateError} = await supabase
               .from('whatsapp_connections')
               .insert({
                 user_id: userId,
+                instance_name: instanceName,  // ✅ CAMPO OBRIGATÓRIO ADICIONADO
                 phone_number_id: cleanNumber,
                 status: 'connected',
-                is_connected: true,
-                updated_at: new Date().toISOString()
+                is_connected: true
+                // updated_at é gerenciado automaticamente pelo banco
               })
 
             if (updateError) {

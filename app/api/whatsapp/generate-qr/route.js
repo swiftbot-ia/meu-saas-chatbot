@@ -118,6 +118,7 @@ export async function POST(request) {
           .from('whatsapp_connections')
           .insert({
             user_id: userId,
+            instance_name: instanceName,  // ✅ CAMPO OBRIGATÓRIO ADICIONADO
             api_credentials: instanceApiKey,
             waba_id: instanceName,
             status: 'connecting',
