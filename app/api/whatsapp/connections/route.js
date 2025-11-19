@@ -1,0 +1,101 @@
+// app/api/whatsapp/connections/route.js
+// ============================================================================
+// ROTA: Criar Registro Inicial de Conexão WhatsApp
+// ============================================================================
+
+import { NextResponse } from 'next/server'
+import { supabaseAdmin } from '../../../../lib/supabase/server.js'
+
+// ============================================================================
+// POST: Criar registro inicial de conexão no Supabase
+// ============================================================================
+export async function POST(request) {
+  try {
+    const { userId, instanceName } = await request.json()
+
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, error: 'userId é obrigatório' },
+        { status: 400 }
+      )
+    }
+
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { success: false, error: 'Configuração do servidor incompleta' },
+        { status: 500 }
+      )
+    }
+
+    console.log('📝 [CreateConnection] Criando registro para userId:', userId)
+
+    // ========================================================================
+    // 1. VERIFICAR SE JÁ EXISTE CONEXÃO PARA ESTE USUÁRIO
+    // ========================================================================
+    const { data: existingConnections } = await supabaseAdmin
+      .from('whatsapp_connections')
+      .select('id, instance_name, instance_token, status')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    // Se já existe, retornar a conexão existente
+    if (existingConnections && existingConnections.length > 0) {
+      const existing = existingConnections[0]
+      console.log('✅ [CreateConnection] Conexão existente encontrada:', existing.id)
+
+      return NextResponse.json({
+        success: true,
+        connectionId: existing.id,
+        instanceName: existing.instance_name,
+        message: 'Conexão existente reutilizada'
+      })
+    }
+
+    // ========================================================================
+    // 2. CRIAR NOVO REGISTRO
+    // ========================================================================
+    const finalInstanceName = instanceName || `swiftbot_${userId.replace(/-/g, '_')}`
+
+    console.log('🆕 [CreateConnection] Criando novo registro:', finalInstanceName)
+
+    const { data: newConnection, error: insertError } = await supabaseAdmin
+      .from('whatsapp_connections')
+      .insert([
+        {
+          user_id: userId,
+          instance_name: finalInstanceName,
+          status: 'disconnected',
+          is_connected: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      ])
+      .select()
+      .single()
+
+    if (insertError) {
+      console.error('❌ [CreateConnection] Erro ao criar registro:', insertError)
+      return NextResponse.json({
+        success: false,
+        error: 'Erro ao criar registro no banco de dados'
+      }, { status: 500 })
+    }
+
+    console.log('✅ [CreateConnection] Registro criado com sucesso:', newConnection.id)
+
+    return NextResponse.json({
+      success: true,
+      connectionId: newConnection.id,
+      instanceName: newConnection.instance_name,
+      message: 'Conexão criada com sucesso'
+    })
+
+  } catch (error) {
+    console.error('❌ [CreateConnection] Erro:', error)
+    return NextResponse.json({
+      success: false,
+      error: 'Erro ao criar conexão: ' + error.message
+    }, { status: 500 })
+  }
+}

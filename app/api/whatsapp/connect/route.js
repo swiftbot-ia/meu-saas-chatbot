@@ -97,7 +97,7 @@ export async function GET(request) {
       hasProfile: !!instanceData?.instance?.profileName
     })
 
-    // Sincronizar com Supabase
+    // Sincronizar com Supabase (UPDATE forçado)
     const syncResult = await syncUazapiToSupabase(connectionId, instanceData)
 
     if (!syncResult.success) {
@@ -141,7 +141,7 @@ export async function GET(request) {
 }
 
 // ============================================================================
-// POST: Criar/Conectar instância WhatsApp (Idempotente)
+// POST: Conectar instância WhatsApp (Apenas UPDATE, nunca INSERT)
 // ============================================================================
 export async function POST(request) {
   try {
@@ -164,7 +164,7 @@ export async function POST(request) {
     console.log('🔄 [Connect] Iniciando conexão para connectionId:', connectionId)
 
     // ========================================================================
-    // 1. BUSCAR CONEXÃO NO BANCO
+    // 1. BUSCAR CONEXÃO NO BANCO (DEVE EXISTIR)
     // ========================================================================
     const { data: connection, error: connError } = await supabaseAdmin
       .from('whatsapp_connections')
@@ -176,12 +176,20 @@ export async function POST(request) {
       console.error('❌ [Connect] Conexão não encontrada:', connError)
       return NextResponse.json({
         success: false,
-        error: 'Conexão não encontrada'
+        error: 'Conexão não encontrada. Crie o registro primeiro.'
       }, { status: 404 })
     }
 
     const userId = connection.user_id
-    const instanceName = connection.instance_name || `swiftbot_${userId.replace(/-/g, '_')}`
+    const instanceName = connection.instance_name
+
+    if (!instanceName || !userId) {
+      console.error('❌ [Connect] Registro incompleto:', { instanceName, userId })
+      return NextResponse.json({
+        success: false,
+        error: 'Registro de conexão está incompleto'
+      }, { status: 400 })
+    }
 
     // ========================================================================
     // 2. VALIDAR ASSINATURA
@@ -277,9 +285,8 @@ export async function POST(request) {
         instanceToken = testToken
         needsNewInstance = false
 
-        // Se já está conectado, retornar imediatamente
+        // Se já está conectado, sincronizar e retornar
         if (currentStatus === 'open') {
-          // Sincronizar dados
           await syncUazapiToSupabase(connectionId, statusData)
 
           return NextResponse.json({
@@ -296,12 +303,12 @@ export async function POST(request) {
           })
         }
       } else {
-        console.warn('⚠️ [Connect] Token inválido (status:', testResponse.status, ') - Criando nova instância')
+        console.warn('⚠️ [Connect] Token inválido - Criando nova instância')
       }
     }
 
     // ========================================================================
-    // 5. CRIAR NOVA INSTÂNCIA (se necessário)
+    // 5. CRIAR NOVA INSTÂNCIA NA UAZAPI (se necessário)
     // ========================================================================
     if (needsNewInstance) {
       console.log('🆕 [Connect] Criando nova instância na UAZAPI...')
@@ -341,11 +348,10 @@ export async function POST(request) {
 
       console.log('✅ [Connect] Nova instância criada com token')
 
-      // Atualizar banco com novo token (REUSA connectionId existente)
-      await supabaseAdmin
+      // ATUALIZAR (UPDATE) registro existente com novo token
+      const { error: updateError } = await supabaseAdmin
         .from('whatsapp_connections')
         .update({
-          instance_name: instanceName,
           instance_token: instanceToken,
           api_credentials: JSON.stringify({
             token: instanceToken,
@@ -357,7 +363,15 @@ export async function POST(request) {
         })
         .eq('id', connectionId)
 
-      console.log('✅ [Connect] Token salvo no Supabase')
+      if (updateError) {
+        console.error('❌ [Connect] Erro ao atualizar token:', updateError)
+        return NextResponse.json({
+          success: false,
+          error: 'Erro ao salvar token'
+        }, { status: 500 })
+      }
+
+      console.log('✅ [Connect] Token salvo no Supabase (UPDATE)')
     }
 
     // ========================================================================
@@ -426,7 +440,7 @@ export async function POST(request) {
         hasProfile: !!profileData.profileName
       })
 
-      // Sincronizar com Supabase
+      // Sincronizar com Supabase (UPDATE)
       await syncUazapiToSupabase(connectionId, statusData)
     } else {
       console.warn('⚠️ [Connect] Não foi possível obter status')
