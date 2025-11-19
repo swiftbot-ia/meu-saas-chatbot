@@ -13,21 +13,20 @@ const UAZAPI_ADMIN_TOKEN = process.env.UAZAPI_ADMIN_TOKEN
 
 /**
  * Tenta obter o status de uma instância
- * @param {string} instanceName - Nome da instância
  * @param {string} token - Token da instância
  * @returns {Promise<object | null>} - Dados da UAZAPI ou null em caso de falha
  */
-async function fetchUazapiStatus(instanceName, token) {
-  if (!token || !instanceName) return null
+async function fetchUazapiStatus(token) {
+  if (!token) return null
 
   try {
-    const url = `${UAZAPI_URL}/instance/connectionState/${instanceName}`
-    console.log('🔍 [UAZAPI] Buscando status:', { instanceName, url })
+    const url = `${UAZAPI_URL}/instance/status`
+    console.log('🔍 [UAZAPI] Buscando status:', { url })
 
     const res = await fetch(url, {
       method: 'GET',
       headers: {
-        'apitoken': token,
+        'token': token,
         'Content-Type': 'application/json'
       }
     })
@@ -118,7 +117,7 @@ export async function POST(request) {
     // ========================================================================
     if (currentToken) {
       console.log('🔍 [Connect-POST] Testando token existente...')
-      uazapiData = await fetchUazapiStatus(instanceName, currentToken)
+      uazapiData = await fetchUazapiStatus(currentToken)
 
       if (uazapiData) {
         const currentStatus = uazapiData?.instance?.status
@@ -233,11 +232,13 @@ export async function POST(request) {
     // ========================================================================
     console.log('🔌 [Connect-POST] Iniciando conexão WhatsApp...')
 
-    const connectRes = await fetch(`${UAZAPI_URL}/instance/connect/${instanceName}`, {
-      method: 'GET',
+    const connectRes = await fetch(`${UAZAPI_URL}/instance/connect`, {
+      method: 'POST',
       headers: {
-        'apitoken': currentToken  // ✅ Usar 'apitoken' (não 'token' nem 'admintoken')
-      }
+        'token': currentToken,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({})
     })
 
     if (!connectRes.ok) {
@@ -253,7 +254,7 @@ export async function POST(request) {
     // ========================================================================
     console.log('📱 [Connect-POST] Obtendo QR Code...')
 
-    uazapiData = await fetchUazapiStatus(instanceName, currentToken)
+    uazapiData = await fetchUazapiStatus(currentToken)
 
     if (!uazapiData) {
       console.warn('⚠️ [Connect-POST] Não foi possível obter status da UAZAPI')
@@ -366,10 +367,7 @@ export async function GET(request) {
     // ========================================================================
     // 2. BUSCAR STATUS REAL NA UAZAPI
     // ========================================================================
-    const uazapiData = await fetchUazapiStatus(
-      connection.instance_name,
-      connection.instance_token
-    )
+    const uazapiData = await fetchUazapiStatus(connection.instance_token)
 
     if (!uazapiData) {
       console.warn('⚠️ [Polling] Token inválido ou instância não encontrada')
