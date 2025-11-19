@@ -1,124 +1,127 @@
+// app/api/whatsapp/status/route.js
+// ============================================================================
+// ROTA: Verificar Status de uma Conexão WhatsApp (UAZAPI)
+// ============================================================================
+
 import { NextResponse } from 'next/server'
-import { supabase } from '../../../../lib/supabase'
+import { supabaseAdmin } from '../../../../lib/supabase/server.js'
 
-const EVOLUTION_API_URL = process.env.UAZAPI_BASE_URL || process.env.EVOLUTION_API_URL
-const EVOLUTION_API_KEY = process.env.UAZAPI_ADMIN_TOKEN || process.env.EVOLUTION_API_KEY
+// Configurações da UAZAPI
+const UAZAPI_URL = process.env.UAZAPI_BASE_URL || 'https://swiftbot.uazapi.com'
 
+// ============================================================================
+// POST: Verificar status de uma conexão específica
+// ============================================================================
 export async function POST(request) {
   try {
-    const { userId } = await request.json()
-    
-    if (!userId) {
+    const { connectionId, userId } = await request.json()
+
+    // Aceitar tanto connectionId quanto userId (para compatibilidade com frontend antigo)
+    if (!connectionId && !userId) {
       return NextResponse.json(
-        { error: 'User ID é obrigatório' },
+        {
+          success: false,
+          error: 'connectionId ou userId é obrigatório',
+          connected: false,
+          status: 'disconnected'
+        },
         { status: 400 }
       )
     }
 
-    const instanceName = `swiftbot_${userId.replace(/-/g, '_')}`
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { success: false, error: 'Configuração do servidor incompleta' },
+        { status: 500 }
+      )
+    }
 
-    // Verificar status da instância
-    const statusResponse = await fetch(`${EVOLUTION_API_URL}/instance/connectionState/${instanceName}`, {
-      method: 'GET',
-      headers: {
-        'apikey': EVOLUTION_API_KEY,
-      },
-    })
+    // ========================================================================
+    // 1. BUSCAR CONEXÃO NO SUPABASE
+    // ========================================================================
+    let query = supabaseAdmin.from('whatsapp_connections').select('*')
 
-    if (!statusResponse.ok) {
+    if (connectionId) {
+      query = query.eq('id', connectionId)
+    } else if (userId) {
+      query = query.eq('user_id', userId).order('created_at', { ascending: false }).limit(1)
+    }
+
+    const { data: connections, error: fetchError } = await query
+
+    if (fetchError || !connections || connections.length === 0) {
       return NextResponse.json({
+        success: false,
         connected: false,
         status: 'disconnected',
-        message: 'Instância não encontrada'
+        message: 'Conexão não encontrada'
       })
     }
 
-    const statusData = await statusResponse.json()
-    const isConnected = statusData.instance?.state === 'open'
+    const connection = Array.isArray(connections) ? connections[0] : connections
 
-    // Se conectado, buscar informações do WhatsApp
-    if (isConnected) {
+    // ========================================================================
+    // 2. VERIFICAR STATUS NA UAZAPI (se tiver token)
+    // ========================================================================
+    if (connection.instance_token) {
       try {
-        // Buscar informações da instância para pegar o número
-        const infoResponse = await fetch(`${EVOLUTION_API_URL}/instance/fetchInstances`, {
+        const statusRes = await fetch(`${UAZAPI_URL}/instance/status`, {
           method: 'GET',
           headers: {
-            'apikey': EVOLUTION_API_KEY,
-          },
+            'token': connection.instance_token,
+            'Content-Type': 'application/json'
+          }
         })
 
-        if (infoResponse.ok) {
-          const instances = await infoResponse.json()
-          console.log('Todas as instâncias:', JSON.stringify(instances, null, 2))
-          console.log('Procurando por:', instanceName)
-          
-          const instance = instances.find(i => i.name === instanceName) // CAMPO CORRETO: 'name'
-          console.log('Instância encontrada:', instance)
-          
-          if (instance && instance.ownerJid) { // CAMPO CORRETO: 'ownerJid'
-            // Limpar o número (remover @s.whatsapp.net se existir)
-            const cleanNumber = instance.ownerJid.replace('@s.whatsapp.net', '')
-            console.log('Número limpo:', cleanNumber)
-            
-            // Salvar/atualizar o número no Supabase
-            console.log('Tentando salvar para user_id:', userId)
-            
-            const { data, error: updateError} = await supabase
-              .from('whatsapp_connections')
-              .insert({
-                user_id: userId,
-                instance_name: instanceName,  // ✅ CAMPO OBRIGATÓRIO ADICIONADO
-                phone_number_id: cleanNumber,
-                status: 'connected',
-                is_connected: true
-                // updated_at é gerenciado automaticamente pelo banco
-              })
+        if (statusRes.ok) {
+          const uazapiData = await statusRes.json()
+          const instanceStatus = uazapiData?.instance?.status || 'disconnected'
+          const isConnected = instanceStatus === 'open' || instanceStatus === 'connected'
 
-            if (updateError) {
-              console.error('Erro ao salvar número:', updateError)
-              
-              // Tentar sem a constraint
-              console.log('Tentando inserir direto via SQL...')
-              const { data: sqlData, error: sqlError } = await supabase
-                .rpc('insert_whatsapp_connection', {
-                  p_user_id: userId,
-                  p_phone_number_id: cleanNumber,
-                  p_status: 'connected'
-                })
-              
-              if (sqlError) {
-                console.error('Erro no SQL também:', sqlError)
-              } else {
-                console.log('Sucesso via SQL!')
-              }
-            } else {
-              console.log('Número salvo com sucesso:', cleanNumber)
-            }
-          } else {
-            console.log('OwnerJid não encontrado na instância')
-            console.log('Dados da instância:', instance)
-          }
-        } else {
-          console.log('Erro ao buscar instâncias:', infoResponse.status)
+          // Atualizar Supabase com status real da UAZAPI
+          await supabaseAdmin
+            .from('whatsapp_connections')
+            .update({
+              status: isConnected ? 'connected' : 'disconnected',
+              is_connected: isConnected
+            })
+            .eq('id', connection.id)
+
+          return NextResponse.json({
+            success: true,
+            connected: isConnected,
+            status: instanceStatus,
+            instanceName: connection.instance_name,
+            profileName: uazapiData?.instance?.profileName || connection.profile_name,
+            phoneNumber: uazapiData?.instance?.owner || connection.phone_number,
+            message: 'Status verificado com sucesso'
+          })
         }
       } catch (error) {
-        console.log('Erro ao buscar info da instância:', error)
+        console.error('❌ [Status] Erro ao verificar UAZAPI:', error.message)
       }
     }
 
+    // ========================================================================
+    // 3. RETORNAR STATUS DO SUPABASE (se UAZAPI falhou)
+    // ========================================================================
     return NextResponse.json({
-      connected: isConnected,
-      status: statusData.instance?.state || 'disconnected',
-      instanceName,
-      message: 'Status verificado com sucesso'
+      success: true,
+      connected: connection.is_connected || false,
+      status: connection.status || 'disconnected',
+      instanceName: connection.instance_name,
+      profileName: connection.profile_name,
+      phoneNumber: connection.phone_number,
+      message: 'Status do banco de dados'
     })
 
   } catch (error) {
-    console.error('Erro na API status:', error)
+    console.error('❌ [Status] Erro interno:', error)
     return NextResponse.json({
+      success: false,
       connected: false,
       status: 'error',
-      message: 'Erro ao verificar status'
+      message: 'Erro ao verificar status: ' + error.message
     })
   }
 }
