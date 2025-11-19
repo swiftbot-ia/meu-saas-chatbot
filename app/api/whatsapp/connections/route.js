@@ -11,9 +11,13 @@ import { supabaseAdmin } from '../../../../lib/supabase/server.js'
 // ============================================================================
 export async function POST(request) {
   try {
-    const { userId, instanceName } = await request.json()
+    const body = await request.json()
+    console.log('📥 [CreateConnection] Request body recebido:', JSON.stringify(body, null, 2))
+
+    const { userId, instanceName } = body
 
     if (!userId) {
+      console.error('❌ [CreateConnection] userId não fornecido')
       return NextResponse.json(
         { success: false, error: 'userId é obrigatório' },
         { status: 400 }
@@ -21,6 +25,7 @@ export async function POST(request) {
     }
 
     if (!supabaseAdmin) {
+      console.error('❌ [CreateConnection] supabaseAdmin não configurado')
       return NextResponse.json(
         { success: false, error: 'Configuração do servidor incompleta' },
         { status: 500 }
@@ -28,6 +33,7 @@ export async function POST(request) {
     }
 
     console.log('📝 [CreateConnection] Criando registro para userId:', userId)
+    console.log('📝 [CreateConnection] instanceName recebido:', instanceName || 'undefined (será gerado)')
 
     // ========================================================================
     // 1. VERIFICAR SE JÁ EXISTE CONEXÃO PARA ESTE USUÁRIO
@@ -59,6 +65,16 @@ export async function POST(request) {
 
     console.log('🆕 [CreateConnection] Dados recebidos:', { userId, instanceName })
     console.log('🆕 [CreateConnection] Criando novo registro:', finalInstanceName)
+
+    // VALIDAÇÃO CRÍTICA: Garantir que instance_name nunca seja null/undefined
+    if (!finalInstanceName || finalInstanceName.trim() === '') {
+      console.error('❌ [CreateConnection] ERRO CRÍTICO: finalInstanceName está vazio!')
+      console.error('Debug info:', { userId, instanceName, finalInstanceName })
+      return NextResponse.json({
+        success: false,
+        error: 'Erro ao gerar nome da instância'
+      }, { status: 500 })
+    }
 
     const insertData = {
       user_id: userId,
