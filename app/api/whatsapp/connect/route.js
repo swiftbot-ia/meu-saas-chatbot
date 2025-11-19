@@ -293,7 +293,22 @@ export async function POST(request) {
 
     if (existingInstances && existingInstances.length > 0) {
       existingConnection = existingInstances[0]
-      instanceApiKey = existingConnection.instance_token
+
+      // ✅ EXTRAIR TOKEN de api_credentials (JSON)
+      if (existingConnection.api_credentials) {
+        try {
+          const credentials = JSON.parse(existingConnection.api_credentials)
+          instanceApiKey = credentials.token || credentials.instanceToken
+          console.log('✅ Token extraído de api_credentials (JSON)')
+        } catch (e) {
+          // Fallback: se não for JSON, pode ser string direta
+          instanceApiKey = existingConnection.instance_token
+          console.log('⚠️ api_credentials não é JSON, usando instance_token')
+        }
+      } else {
+        instanceApiKey = existingConnection.instance_token
+      }
+
       instanceName = existingConnection.instance_name
 
       console.log('✅ Instância existente encontrada:', {

@@ -31,6 +31,7 @@ export default function WhatsAppConnectModal({
 
   const pollingTimerRef = useRef(null)
   const qrCodeTimestampRef = useRef(null)
+  const timeoutTimerRef = useRef(null)
 
   // ============================================================================
   // 1. INICIAR CONEXÃO (quando modal abre)
@@ -69,10 +70,11 @@ export default function WhatsAppConnectModal({
         return
       }
 
-      // Se tem QR Code, iniciar polling de 30s
+      // Se tem QR Code, iniciar polling de 5s + timeout de 30s
       if (data.qrCode) {
         qrCodeTimestampRef.current = Date.now()
         startPolling()
+        startTimeout()  // ✅ Inicia timeout de 30s
       }
 
     } catch (err) {
@@ -113,6 +115,7 @@ export default function WhatsAppConnectModal({
       if (data.connected || data.status === 'open') {
         console.log('✅ WhatsApp conectado com sucesso!')
         stopPolling()
+        stopTimeout()  // ✅ Parar timeout também
 
         // Callback com dados da instância
         onConnectionSuccess?.({
@@ -131,6 +134,7 @@ export default function WhatsAppConnectModal({
       else if (data.status === 'disconnected' || data.status === 'close') {
         console.log('❌ Conexão fechada/desconectada')
         stopPolling()
+        stopTimeout()  // ✅ Parar timeout também
         setError('Conexão foi encerrada. Tente novamente.')
       }
 
@@ -166,16 +170,59 @@ export default function WhatsAppConnectModal({
   }
 
   // ============================================================================
-  // 5. LIFECYCLE: Iniciar conexão quando modal abre
+  // 5. TIMEOUT: Fechar modal automaticamente após 30 segundos
+  // ============================================================================
+  const startTimeout = () => {
+    console.log('⏰ Iniciando timeout de 30 segundos')
+
+    // Limpar timer anterior se existir
+    if (timeoutTimerRef.current) {
+      clearTimeout(timeoutTimerRef.current)
+    }
+
+    // ✅ Após 30 segundos, parar polling e fechar modal
+    timeoutTimerRef.current = setTimeout(() => {
+      console.log('⏱️ Timeout de 30s atingido')
+
+      const elapsedTime = Math.floor((Date.now() - qrCodeTimestampRef.current) / 1000)
+      console.log(`⏱️ Tempo decorrido: ${elapsedTime}s`)
+
+      // Parar polling
+      stopPolling()
+
+      // Se ainda não conectou, mostrar mensagem e fechar
+      if (status !== 'open') {
+        console.log('❌ Conexão não estabelecida após 30s')
+        setError('Tempo limite de 30 segundos atingido. Tente novamente.')
+
+        // Fechar modal após 2 segundos
+        setTimeout(() => {
+          onClose()
+        }, 2000)
+      }
+    }, 30000) // 30 segundos
+  }
+
+  const stopTimeout = () => {
+    console.log('⏹️ Parando timeout')
+    if (timeoutTimerRef.current) {
+      clearTimeout(timeoutTimerRef.current)
+      timeoutTimerRef.current = null
+    }
+  }
+
+  // ============================================================================
+  // 6. LIFECYCLE: Iniciar conexão quando modal abre
   // ============================================================================
   useEffect(() => {
     if (isOpen && connectionId) {
       handleConnect()
     }
 
-    // Cleanup: parar polling quando modal fecha
+    // Cleanup: parar polling e timeout quando modal fecha
     return () => {
       stopPolling()
+      stopTimeout()
     }
   }, [isOpen, connectionId])
 
@@ -183,7 +230,7 @@ export default function WhatsAppConnectModal({
   if (!isOpen) return null
 
   // ============================================================================
-  // 6. RENDER: UI do Modal
+  // 7. RENDER: UI do Modal
   // ============================================================================
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
@@ -263,6 +310,9 @@ export default function WhatsAppConnectModal({
               </p>
               <p className="text-xs text-gray-600 mt-1">
                 O modal fechará automaticamente quando conectado
+              </p>
+              <p className="text-xs text-orange-600 mt-1 font-medium">
+                ⏱️ Tempo limite: 30 segundos
               </p>
             </div>
 
