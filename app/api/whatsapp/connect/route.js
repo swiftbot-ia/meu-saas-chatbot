@@ -8,6 +8,17 @@ const UAZAPI_URL = process.env.UAZAPI_BASE_URL || 'https://swiftbot.uazapi.com'
 const UAZAPI_ADMIN_TOKEN = process.env.UAZAPI_ADMIN_TOKEN
 
 // ============================================================================
+// FUNÇÃO AUXILIAR: Delay (para aguardar propagação do token na UAZAPI)
+// ============================================================================
+
+/**
+ * Aguarda um tempo específico (em milissegundos)
+ * @param {number} ms - Tempo em milissegundos
+ * @returns {Promise<void>}
+ */
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+// ============================================================================
 // FUNÇÃO AUXILIAR: Chamada à UAZAPI (Com tratamento de erro 401/404)
 // ============================================================================
 
@@ -226,6 +237,11 @@ export async function POST(request) {
       }
 
       console.log('✅ [Connect-POST] Token salvo no Supabase (UPDATE)')
+
+      // ⏱️ CRÍTICO: Aguardar 2 segundos para a UAZAPI processar o token recém-criado
+      console.log('⏱️ [Connect-POST] Aguardando 2s para propagação do token na UAZAPI...')
+      await delay(2000)
+      console.log('✅ [Connect-POST] Delay concluído - token deve estar ativo agora')
     }
 
     // ========================================================================
