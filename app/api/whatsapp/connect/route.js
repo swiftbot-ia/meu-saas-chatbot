@@ -115,13 +115,20 @@ export async function POST(request) {
       )
     }
 
-    // ✅ CRÍTICO: instanceName baseado no connectionId, não no userId
-    const instanceName = `swiftbot_${connectionId.replace(/-/g, '_')}`
+    // ✅ REGRA: Usar instanceName do banco (se válido), ou gerar baseado em connectionId
+    let instanceName = connection.instance_name
+
+    // Se instanceName não existe ou é temporário, gerar baseado no connectionId
+    if (!instanceName || instanceName === 'temp_pending') {
+      instanceName = `swiftbot_${connectionId.replace(/-/g, '_')}`
+      console.log('🔄 [Connect-POST] instanceName não encontrado no banco, gerando:', instanceName)
+    } else {
+      console.log('✅ [Connect-POST] instanceName do banco:', instanceName)
+    }
+
     const userId = connection.user_id
     let currentToken = connection.instance_token
     let uazapiData = null
-
-    console.log('📌 [Connect-POST] instanceName gerado:', instanceName)
 
     // ========================================================================
     // 2. TENTAR USAR TOKEN EXISTENTE

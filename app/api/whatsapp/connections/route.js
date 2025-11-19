@@ -61,21 +61,19 @@ export async function POST(request) {
     // ========================================================================
     // 2. CRIAR NOVO REGISTRO
     // ========================================================================
-    // IMPORTANTE: instance_name será definido pela API /connect baseado no connectionId
-    // Aqui criamos apenas o registro inicial
+    // REGRA DE NEGÓCIO: instanceName SEMPRE baseado no ID do registro (UUID)
+    // Padrão: swiftbot_{connectionId}
 
-    console.log('🆕 [CreateConnection] Dados recebidos:', { userId, instanceName })
-    console.log('🆕 [CreateConnection] Criando novo registro (instance_name será definido depois)')
+    console.log('🆕 [CreateConnection] Criando novo registro para userId:', userId)
 
+    // Passo 2.1: Criar registro inicial (sem instance_name ainda)
     const insertData = {
       user_id: userId,
-      instance_name: 'temp_pending', // Temporário - será atualizado pelo /connect
+      instance_name: 'temp_pending', // Temporário - será atualizado imediatamente
       status: 'disconnected',
       is_connected: false
       // created_at e updated_at são gerados automaticamente pelo banco
     }
-
-    console.log('📝 [CreateConnection] Dados para inserir:', JSON.stringify(insertData, null, 2))
 
     const { data: newConnection, error: insertError } = await supabaseAdmin
       .from('whatsapp_connections')
@@ -91,12 +89,30 @@ export async function POST(request) {
       }, { status: 500 })
     }
 
-    console.log('✅ [CreateConnection] Registro criado com sucesso:', newConnection.id)
+    // Passo 2.2: Gerar instanceName baseado no ID do registro
+    const connectionId = newConnection.id
+    const instanceName = `swiftbot_${connectionId.replace(/-/g, '_')}`
+
+    console.log('🔄 [CreateConnection] Gerando instanceName:', instanceName)
+
+    // Passo 2.3: Atualizar registro com instanceName correto
+    const { error: updateError } = await supabaseAdmin
+      .from('whatsapp_connections')
+      .update({ instance_name: instanceName })
+      .eq('id', connectionId)
+
+    if (updateError) {
+      console.error('❌ [CreateConnection] Erro ao atualizar instanceName:', updateError)
+      // Não falhar aqui - o /connect vai corrigir depois
+    }
+
+    console.log('✅ [CreateConnection] Registro criado com sucesso:', connectionId)
+    console.log('✅ [CreateConnection] instanceName definido:', instanceName)
 
     return NextResponse.json({
       success: true,
-      connectionId: newConnection.id,
-      instanceName: newConnection.instance_name,
+      connectionId: connectionId,
+      instanceName: instanceName,
       message: 'Conexão criada com sucesso'
     })
 
