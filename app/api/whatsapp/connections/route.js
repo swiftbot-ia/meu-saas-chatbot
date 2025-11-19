@@ -32,31 +32,47 @@ export async function POST(request) {
       )
     }
 
-    console.log('📝 [CreateConnection] Criando registro para userId:', userId)
-    console.log('📝 [CreateConnection] instanceName recebido:', instanceName || 'undefined (será gerado)')
+    console.log('📝 [CreateConnection] Iniciando criação de nova conexão para userId:', userId)
 
     // ========================================================================
-    // 1. VERIFICAR SE JÁ EXISTE CONEXÃO PARA ESTE USUÁRIO
+    // 1. VERIFICAR LIMITE DE CONEXÕES DO USUÁRIO
     // ========================================================================
-    const { data: existingConnections } = await supabaseAdmin
+    // Passo 1.1: Contar conexões existentes
+    const { count: existingCount, error: countError } = await supabaseAdmin
       .from('whatsapp_connections')
-      .select('id, instance_name, instance_token, status')
+      .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1)
 
-    // Se já existe, retornar a conexão existente
-    if (existingConnections && existingConnections.length > 0) {
-      const existing = existingConnections[0]
-      console.log('✅ [CreateConnection] Conexão existente encontrada:', existing.id)
-
-      return NextResponse.json({
-        success: true,
-        connectionId: existing.id,
-        instanceName: existing.instance_name,
-        message: 'Conexão existente reutilizada'
-      })
+    if (countError) {
+      console.error('❌ [CreateConnection] Erro ao contar conexões:', countError)
     }
+
+    const currentConnectionsCount = existingCount || 0
+    console.log('📊 [CreateConnection] Conexões atuais:', currentConnectionsCount)
+
+    // Passo 1.2: Buscar limite de conexões do usuário
+    const { data: subscription } = await supabaseAdmin
+      .from('user_subscriptions')
+      .select('connections_purchased')
+      .eq('user_id', userId)
+      .single()
+
+    const connectionLimit = subscription?.connections_purchased || 2 // Padrão: 2 conexões
+
+    console.log('📊 [CreateConnection] Limite de conexões:', connectionLimit)
+
+    // Passo 1.3: Verificar se pode criar nova conexão
+    if (currentConnectionsCount >= connectionLimit) {
+      console.warn('⚠️ [CreateConnection] Limite de conexões atingido')
+      return NextResponse.json({
+        success: false,
+        error: `Limite de conexões atingido. Você tem ${currentConnectionsCount} de ${connectionLimit} conexões.`,
+        currentCount: currentConnectionsCount,
+        limit: connectionLimit
+      }, { status: 403 })
+    }
+
+    console.log('✅ [CreateConnection] Pode criar nova conexão:', `${currentConnectionsCount + 1}/${connectionLimit}`)
 
     // ========================================================================
     // 2. CRIAR NOVO REGISTRO
