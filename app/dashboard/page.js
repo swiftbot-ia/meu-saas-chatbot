@@ -381,25 +381,41 @@ const loadSubscription = async (userId) => {
 
   const handleAddConnection = async () => {
     try {
-      const nextNumber = connections.length + 1
-      
-      const { data, error } = await supabase
-        .from('whatsapp_connections')
-        .insert({
-          user_id: user.id,
-          status: 'disconnected'
-        })
-        .select()
-        .single()
+      const instanceName = `swiftbot_${user.id.replace(/-/g, '_')}`
 
-      if (error) throw error
+      // ✅ Usar a nova API que garante instance_name não-null
+      const response = await fetch('/api/whatsapp/connections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          instanceName: instanceName
+        })
+      })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao criar conexão')
+      }
 
       await loadConnections(user.id)
-      setActiveConnection(data)
+
+      // Buscar a conexão recém-criada para definir como ativa
+      const { data: newConnection } = await supabase
+        .from('whatsapp_connections')
+        .select('*')
+        .eq('id', result.connectionId)
+        .single()
+
+      if (newConnection) {
+        setActiveConnection(newConnection)
+      }
+
       alert('Nova conexão criada com sucesso!')
     } catch (error) {
       console.error('Erro ao criar conexão:', error)
-      alert('Erro ao criar nova conexão')
+      alert('Erro ao criar nova conexão: ' + error.message)
     }
   }
 
