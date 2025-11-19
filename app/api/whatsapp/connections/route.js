@@ -61,24 +61,15 @@ export async function POST(request) {
     // ========================================================================
     // 2. CRIAR NOVO REGISTRO
     // ========================================================================
-    const finalInstanceName = instanceName || `swiftbot_${userId.replace(/-/g, '_')}`
+    // IMPORTANTE: instance_name será definido pela API /connect baseado no connectionId
+    // Aqui criamos apenas o registro inicial
 
     console.log('🆕 [CreateConnection] Dados recebidos:', { userId, instanceName })
-    console.log('🆕 [CreateConnection] Criando novo registro:', finalInstanceName)
-
-    // VALIDAÇÃO CRÍTICA: Garantir que instance_name nunca seja null/undefined
-    if (!finalInstanceName || finalInstanceName.trim() === '') {
-      console.error('❌ [CreateConnection] ERRO CRÍTICO: finalInstanceName está vazio!')
-      console.error('Debug info:', { userId, instanceName, finalInstanceName })
-      return NextResponse.json({
-        success: false,
-        error: 'Erro ao gerar nome da instância'
-      }, { status: 500 })
-    }
+    console.log('🆕 [CreateConnection] Criando novo registro (instance_name será definido depois)')
 
     const insertData = {
       user_id: userId,
-      instance_name: finalInstanceName,
+      instance_name: 'temp_pending', // Temporário - será atualizado pelo /connect
       status: 'disconnected',
       is_connected: false
       // created_at e updated_at são gerados automaticamente pelo banco

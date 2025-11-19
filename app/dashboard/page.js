@@ -381,15 +381,12 @@ const loadSubscription = async (userId) => {
 
   const handleAddConnection = async () => {
     try {
-      const instanceName = `swiftbot_${user.id.replace(/-/g, '_')}`
-
-      // ✅ Usar a nova API que garante instance_name não-null
+      // ✅ NÃO enviar instanceName - será gerado baseado no connectionId
       const response = await fetch('/api/whatsapp/connections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: user.id,
-          instanceName: instanceName
+          userId: user.id
         })
       })
 

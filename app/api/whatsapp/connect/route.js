@@ -96,21 +96,21 @@ export async function POST(request) {
       )
     }
 
-    if (!connection.instance_name || !connection.user_id) {
-      console.error('❌ [Connect-POST] Registro incompleto:', {
-        hasInstanceName: !!connection.instance_name,
-        hasUserId: !!connection.user_id
-      })
+    if (!connection.user_id) {
+      console.error('❌ [Connect-POST] Registro incompleto: userId ausente')
       return NextResponse.json(
         { success: false, error: 'Registro de conexão está incompleto' },
         { status: 400 }
       )
     }
 
-    const instanceName = connection.instance_name
+    // ✅ CRÍTICO: instanceName baseado no connectionId, não no userId
+    const instanceName = `swiftbot_${connectionId.replace(/-/g, '_')}`
     const userId = connection.user_id
     let currentToken = connection.instance_token
     let uazapiData = null
+
+    console.log('📌 [Connect-POST] instanceName gerado:', instanceName)
 
     // ========================================================================
     // 2. TENTAR USAR TOKEN EXISTENTE
@@ -198,10 +198,11 @@ export async function POST(request) {
 
       console.log('✅ [Connect-POST] Nova instância criada com token:', currentToken?.substring(0, 20) + '...')
 
-      // UPDATE do token no Supabase (nunca INSERT)
+      // UPDATE do token E instance_name no Supabase (nunca INSERT)
       const { error: updateError } = await supabaseAdmin
         .from('whatsapp_connections')
         .update({
+          instance_name: instanceName,         // ✅ CRÍTICO: Atualizar com nome baseado em connectionId
           instance_token: currentToken,
           admin_field_01: userId,              // ✅ Rastreabilidade
           admin_field_02: connectionId,        // ✅ Vinculação
