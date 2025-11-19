@@ -183,6 +183,10 @@ export async function POST(request) {
       }
 
       const newInstanceData = await createRes.json()
+
+      // 🔍 LOG COMPLETO DA RESPOSTA UAZAPI
+      console.log('📦 [Connect-POST] Resposta completa da UAZAPI:', JSON.stringify(newInstanceData, null, 2))
+
       currentToken = newInstanceData.token || newInstanceData.hash
 
       if (!currentToken) {
@@ -193,7 +197,7 @@ export async function POST(request) {
         )
       }
 
-      console.log('✅ [Connect-POST] Nova instância criada com token')
+      console.log('✅ [Connect-POST] Nova instância criada com token:', currentToken?.substring(0, 20) + '...')
 
       // UPDATE do token no Supabase (nunca INSERT)
       const { error: updateError } = await supabaseAdmin
