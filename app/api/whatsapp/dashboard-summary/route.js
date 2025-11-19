@@ -4,7 +4,7 @@
 // ============================================================================
 
 import { NextResponse } from 'next/server'
-import { supabase } from '../../../../lib/supabase'
+import { supabaseAdmin } from '../../../../lib/supabase'
 
 /**
  * ============================================================================
@@ -44,7 +44,7 @@ export async function GET(request) {
     // ========================================================================
     // 1. BUSCAR LIMITE DE CONEXÕES (connections_purchased)
     // ========================================================================
-    const { data: subscription, error: subError } = await supabase
+    const { data: subscription, error: subError } = await supabaseAdmin
       .from('user_subscriptions')
       .select('connections_purchased, status')
       .eq('user_id', userId)
@@ -67,7 +67,7 @@ export async function GET(request) {
     // ========================================================================
     // 2. BUSCAR TODAS AS CONEXÕES DO USUÁRIO
     // ========================================================================
-    const { data: connections, error: connError } = await supabase
+    const { data: connections, error: connError } = await supabaseAdmin
       .from('whatsapp_connections')
       .select('*')
       .eq('user_id', userId)
