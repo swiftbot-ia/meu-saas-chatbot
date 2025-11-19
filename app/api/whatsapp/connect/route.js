@@ -1,6 +1,7 @@
 // app/api/whatsapp/connect/route.js
 import { NextResponse } from 'next/server'
-import { supabase, supabaseAdmin } from '../../../../lib/supabase'
+import { supabase } from '../../../../lib/supabase/client.js'
+import { supabaseAdmin } from '../../../../lib/supabase/server.js'
 import { fetchAndSyncInstance } from '../helpers/syncUazapiToSupabase.js'
 
 // ⚠️ DEPRECATED: Esta rota usa variáveis antigas

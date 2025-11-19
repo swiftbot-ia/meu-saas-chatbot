@@ -3,7 +3,7 @@
 // FUNÇÃO: Sincronizar Dados UAZAPI → Supabase
 // ============================================================================
 
-import { supabaseAdmin } from '../../../../lib/supabase'
+import { supabaseAdmin } from '../../../../lib/supabase/server.js'
 
 /**
  * Sincroniza os dados da instância UAZAPI com o Supabase
