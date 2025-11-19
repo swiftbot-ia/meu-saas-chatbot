@@ -57,20 +57,22 @@ export async function POST(request) {
     // ========================================================================
     const finalInstanceName = instanceName || `swiftbot_${userId.replace(/-/g, '_')}`
 
+    console.log('🆕 [CreateConnection] Dados recebidos:', { userId, instanceName })
     console.log('🆕 [CreateConnection] Criando novo registro:', finalInstanceName)
+
+    const insertData = {
+      user_id: userId,
+      instance_name: finalInstanceName,
+      status: 'disconnected',
+      is_connected: false
+      // created_at e updated_at são gerados automaticamente pelo banco
+    }
+
+    console.log('📝 [CreateConnection] Dados para inserir:', JSON.stringify(insertData, null, 2))
 
     const { data: newConnection, error: insertError } = await supabaseAdmin
       .from('whatsapp_connections')
-      .insert([
-        {
-          user_id: userId,
-          instance_name: finalInstanceName,
-          status: 'disconnected',
-          is_connected: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ])
+      .insert([insertData])
       .select()
       .single()
 
