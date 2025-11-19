@@ -190,3 +190,57 @@ export async function fetchAndSyncInstance(connectionId, instanceName, apiToken)
     }
   }
 }
+
+/**
+ * Extrai dados formatados da resposta UAZAPI para uso no frontend
+ *
+ * @param {object} uazapiData - Resposta da UAZAPI
+ * @returns {object} Dados formatados
+ */
+export function extractInstanceData(uazapiData) {
+  if (!uazapiData) {
+    return {
+      status: 'disconnected',
+      connected: false,
+      qrCode: null,
+      profileName: null,
+      profilePicUrl: null,
+      phoneNumber: null
+    }
+  }
+
+  const instance = uazapiData?.instance || {}
+  const connectionStatus = instance.status || 'connecting'
+
+  // Determinar status
+  let status = 'connecting'
+  let connected = false
+
+  if (connectionStatus === 'open' || connectionStatus === 'connected') {
+    status = 'connected'
+    connected = true
+  } else if (connectionStatus === 'close' || connectionStatus === 'disconnected') {
+    status = 'disconnected'
+    connected = false
+  } else if (connectionStatus === 'connecting') {
+    status = 'connecting'
+    connected = false
+  }
+
+  // Extrair QR Code
+  const qrCode = instance.qrcode || instance.qr || null
+
+  // Extrair dados do perfil
+  const profileName = instance.profileName || instance.profile_name || null
+  const profilePicUrl = instance.profilePicUrl || instance.profile_pic_url || null
+  const phoneNumber = instance.phoneNumber || instance.phone_number || instance.owner || null
+
+  return {
+    status,
+    connected,
+    qrCode,
+    profileName,
+    profilePicUrl,
+    phoneNumber
+  }
+}
