@@ -14,7 +14,7 @@ export async function POST(request) {
     const body = await request.json()
     console.log('📥 [CreateConnection] Request body recebido:', JSON.stringify(body, null, 2))
 
-    const { userId, instanceName } = body
+    const { userId } = body  // instanceName será gerado automaticamente baseado no UUID
 
     if (!userId) {
       console.error('❌ [CreateConnection] userId não fornecido')
