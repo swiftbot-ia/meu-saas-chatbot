@@ -1284,8 +1284,13 @@ const handleConfirmPayment = async (e) => {
                     </svg>
                     <div className="text-left">
                       <p className="text-sm font-semibold text-white">
-                        {activeConnection ? `Conexão ${activeConnection.connection_number}` : 'Selecionar Conexão'}
+                        {activeConnection ? (activeConnection.profile_name || activeConnection.instance_name || 'Conexão Sem Nome') : 'Selecionar Conexão'}
                       </p>
+                      {activeConnection?.phone_number && (
+                        <p className="text-xs text-gray-400">
+                          {activeConnection.phone_number}
+                        </p>
+                      )}
                       <p className="text-xs text-[#B0B0B0]">
                         {connectedCount} de {totalSlots} ativas
                       </p>
@@ -1316,9 +1321,16 @@ const handleConfirmPayment = async (e) => {
                           }`}
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-white font-semibold text-sm">
-                              Conexão {conn.connection_number}
-                            </span>
+                            <div className="flex flex-col">
+                              <span className="text-white font-semibold text-sm">
+                                {conn.profile_name || conn.instance_name || 'Conexão Sem Nome'}
+                              </span>
+                              {conn.phone_number && (
+                                <span className="text-xs text-gray-400 mt-1">
+                                  {conn.phone_number}
+                                </span>
+                              )}
+                            </div>
                             <div className="flex items-center gap-2">
                               {getStatusIcon(conn.status)}
                               <span className="text-xs text-[#B0B0B0]">
@@ -1326,9 +1338,6 @@ const handleConfirmPayment = async (e) => {
                               </span>
                             </div>
                           </div>
-                          {conn.phone_number && (
-                            <p className="text-xs text-[#B0B0B0]">{conn.phone_number}</p>
-                          )}
                         </button>
                       ))
                     )}
@@ -1485,7 +1494,7 @@ const handleConfirmPayment = async (e) => {
         <div className="bg-[#111111] rounded-2xl p-8">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-              Estatísticas da Conexão {activeConnection?.connection_number || ''}
+              Estatísticas {activeConnection ? `- ${activeConnection.profile_name || 'Conexão'}` : ''}
               {statsLoading && (
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#00FF99]" />
               )}
