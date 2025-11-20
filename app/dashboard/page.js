@@ -208,9 +208,23 @@ const loadSubscription = async (userId) => {
     }
   }
 
+  // ============================================================================
+  // FECHAR MODAL QR CODE (com refresh automático)
+  // ============================================================================
+  const handleCloseQRModal = async () => {
+    setShowQRModal(false)
+    setQrCode(null)
+
+    // Recarregar conexões para pegar status atualizado
+    if (user) {
+      console.log('🔄 [Dashboard] Recarregando conexões após fechar modal...')
+      await loadConnections(user.id)
+    }
+  }
+
   const loadDashboardStats = async (connection) => {
     if (!connection || connection.status !== 'connected') return
-    
+
     setStatsLoading(true)
     try {
       const response = await fetch('/api/whatsapp/stats', {
@@ -346,9 +360,7 @@ const loadSubscription = async (userId) => {
           .eq('id', connection.id)
 
         if (data.status === 'connected') {
-          setShowQRModal(false)
-          setQrCode(null)
-          await loadConnections(user.id)
+          await handleCloseQRModal()
           await loadDashboardStats(connection)
         } else if (data.qrCode) {
           setQrCode(data.qrCode)
@@ -470,10 +482,52 @@ const loadSubscription = async (userId) => {
       const statsInterval = setInterval(() => {
         loadDashboardStats(activeConnection)
       }, 30000)
-      
+
       return () => clearInterval(statsInterval)
     }
   }, [activeConnection, whatsappStatus])
+
+  // ============================================================================
+  // VERIFICAÇÃO AUTOMÁTICA DE STATUS DAS CONEXÕES
+  // ============================================================================
+  useEffect(() => {
+    if (!user || !connections || connections.length === 0) return
+
+    // Verificar status inicial ao carregar
+    const checkConnectionsStatus = async () => {
+      for (const connection of connections) {
+        if (!connection.instance_token) continue
+
+        try {
+          const response = await fetch('/api/whatsapp/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ connectionId: connection.id })
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+
+            // Atualizar estado local se mudou
+            if (data.connected && connection.status !== 'connected') {
+              console.log('✅ [Dashboard] Conexão agora está conectada:', connection.id)
+              await loadConnections(user.id)
+            }
+          }
+        } catch (error) {
+          console.error('❌ [Dashboard] Erro ao verificar status:', error)
+        }
+      }
+    }
+
+    // Verificar imediatamente
+    checkConnectionsStatus()
+
+    // Verificar a cada 15 segundos
+    const interval = setInterval(checkConnectionsStatus, 15000)
+
+    return () => clearInterval(interval)
+  }, [user, connections])
 
   // <-- [MERGE] Bloco de setup do Stripe (3 useEffects) substituído pelo do código 2
   // ============================================================================
@@ -1462,11 +1516,11 @@ const handleConfirmPayment = async (e) => {
       {/* QR Code Modal */}
       {showQRModal && qrCode && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setShowQRModal(false)} />
-          
+          <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={handleCloseQRModal} />
+
           <div className="relative backdrop-blur-md bg-[#111111]/95 border border-white/10 rounded-2xl p-8 max-w-md w-full shadow-2xl z-10">
             <button
-              onClick={() => setShowQRModal(false)}
+              onClick={handleCloseQRModal}
               className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full transition-all duration-300"
             >
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
