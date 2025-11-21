@@ -43,13 +43,13 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="pt-BR" className="dark">
+    <html lang="pt-BR" className="dark" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" />
         <meta name="msapplication-TileColor" content="#04F5A0" />
       </head>
-      <body className={`${inter.variable} font-sans antialiased bg-black text-white`}>
+      <body className={`${inter.variable} font-sans antialiased bg-black text-white`} suppressHydrationWarning>
         <div className="min-h-screen">
           {children}
           <CookieConsent />
