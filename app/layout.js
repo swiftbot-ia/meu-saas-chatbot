@@ -1,5 +1,7 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
+import CookieConsent from '../components/CookieConsent'
+
 
 const inter = Inter({
   subsets: ["latin"],
@@ -44,6 +46,7 @@ export default function RootLayout({ children }) {
       <body className={`${inter.variable} font-sans antialiased bg-black text-white`}>
         <div className="min-h-screen">
           {children}
+          <CookieConsent />
         </div>
       </body>
     </html>

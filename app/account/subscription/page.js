@@ -5,24 +5,24 @@ import { useRouter } from 'next/navigation'
 
 export default function AccountSubscription() {
   const [user, setUser] = useState(null)
+  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false) 
   const [subscription, setSubscription] = useState(null)
   const [paymentLogs, setPaymentLogs] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [canceling, setCanceling] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   
-  const router = useRouter()
+  // ============================================
+  // 1. ESTADOS ADICIONADOS
+  // ============================================
+  const [showPlanChangeModal, setShowPlanChangeModal] = useState(false)
+  const [selectedNewPlan, setSelectedNewPlan] = useState({ connections: 1, billing_period: 'monthly' })
+  const [changeType, setChangeType] = useState(null) // 'upgrade' ou 'downgrade'
+  const [changingPlan, setChangingPlan] = useState(false)
+  const [showConfirmDowngradeModal, setShowConfirmDowngradeModal] = useState(false)
 
-  // Mouse tracking para efeitos visuais
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      setMousePosition({ x: e.clientX, y: e.clientY })
-    }
-    window.addEventListener('mousemove', handleMouseMove)
-    return () => window.removeEventListener('mousemove', handleMouseMove)
-  }, [])
+  const router = useRouter()
 
   useEffect(() => {
     checkUser()
@@ -35,14 +35,30 @@ export default function AccountSubscription() {
       router.push('/login')
     } else {
       setUser(user)
+      await loadUserProfile(user.id) 
       await loadSubscriptionData(user.id)
     }
     setLoading(false)
   }
 
+  const [userProfile, setUserProfile] = useState(null)
+  const loadUserProfile = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single()
+
+      if (error) throw error
+      setUserProfile(data)
+    } catch (error) {
+      console.error('Erro ao carregar perfil:', error)
+    }
+  }
+
   const loadSubscriptionData = async (userId) => {
     try {
-      // Carregar assinatura atual
       const { data: subscriptionData } = await supabase
         .from('user_subscriptions')
         .select('*')
@@ -55,7 +71,6 @@ export default function AccountSubscription() {
         setSubscription(subscriptionData)
       }
 
-      // Carregar histórico de pagamentos
       const { data: logsData } = await supabase
         .from('payment_logs')
         .select('*')
@@ -80,24 +95,42 @@ export default function AccountSubscription() {
     return subscription.status
   }
 
-  const getRemainingDays = () => {
-    if (!subscription) return 0
-    
-    const endDate = subscription.status === 'trial' 
-      ? new Date(subscription.trial_end_date)
-      : new Date(subscription.next_billing_date)
-    
+const calculateRemainingDays = () => {
+  // ❌ NÃO MOSTRAR DIAS RESTANTES SE CANCELADO/EXPIRADO
+  if (subscriptionStatus === 'canceled' || 
+      subscriptionStatus === 'cancelled' || 
+      subscriptionStatus === 'expired') {
+    return 0
+  }
+
+  // ✅ Para TRIAL ATIVO: usar trial_end_date
+  if (subscriptionStatus === 'trial' && subscription.trial_end_date) {
+    const trialEndDate = new Date(subscription.trial_end_date)
     const now = new Date()
-    const diffTime = endDate - now
+    const diffTime = trialEndDate - now
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     
     return Math.max(0, diffDays)
   }
 
+  // ✅ Para PLANO ATIVO: usar next_billing_date
+  if (subscriptionStatus === 'active' && subscription.next_billing_date) {
+    const nextBilling = new Date(subscription.next_billing_date)
+    const now = new Date()
+    const diffTime = nextBilling - now
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    
+    return Math.max(0, diffDays)
+  }
+
+  // ✅ Caso contrário, não há dias restantes
+  return 0
+}
+
   const calculatePrice = (connections, billingPeriod) => {
     const pricing = {
       monthly: { 1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875 },
-      annual: { 1: 150, 2: 275, 3: 400, 4: 525, 5: 525, 6: 630, 7: 735 }
+      annual: { 1: 150, 2: 275, 3: 400, 4: 525, 5: 525, 6: 630, 7: 735 } // Nota: Os preços anuais do patch parecem diferentes, mantive os originais do page.js. Se precisar, ajuste esta linha.
     }
     return pricing[billingPeriod][connections] || 0
   }
@@ -134,141 +167,372 @@ export default function AccountSubscription() {
     setCanceling(false)
   }
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
+  const getDaysSinceCreation = () => {
+    if (!subscription?.created_at) return 0
+    const createdAt = new Date(subscription.created_at)
+    const now = new Date()
+    return Math.floor((now - createdAt) / (1000 * 60 * 60 * 24))
+  }
+
+  const isWithin7Days = () => {
+    return getDaysSinceCreation() <= 7
+  }
+
   const formatEventType = (eventType) => {
     const types = {
-      'trial_started': 'Trial Iniciado',
+      'trial_started': 'Teste Iniciado',
       'payment_success': 'Pagamento Realizado',
       'payment_failed': 'Falha no Pagamento',
       'subscription_canceled': 'Assinatura Cancelada',
       'subscription_canceled_manual': 'Assinatura Cancelada',
       'subscription_canceled_webhook': 'Assinatura Cancelada (Auto)',
-      'subscription_renewed': 'Assinatura Renovada'
+      'subscription_renewed': 'Assinatura Renovada',
+      'subscription_canceled_with_refund': 'Assinatura Cancelada com Reembolso'
     }
     return types[eventType] || eventType
   }
 
+  // MODIFICADO: Estilo das badges de status (removida borda)
   const getStatusColor = (status) => {
     switch (status) {
-      case 'active': return 'bg-[#04F5A0]/20 text-[#04F5A0] border-[#04F5A0]/30'
-      case 'trial': return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-      case 'canceled': return 'bg-red-500/20 text-red-400 border-red-500/30'
-      case 'expired': return 'bg-gray-500/20 text-gray-400 border-gray-500/30'
-      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+      case 'active': return 'bg-green-500/10 text-[#00FF99]'
+      case 'trial': return 'bg-blue-500/10 text-blue-400'
+      case 'canceled': return 'bg-red-500/10 text-red-400'
+      case 'expired': return 'bg-gray-500/10 text-gray-400'
+      default: return 'bg-gray-500/10 text-gray-400'
     }
   }
 
+  // ============================================
+  // 2. FUNÇÕES ADICIONADAS
+  // ============================================
+
+  // Determinar se é upgrade ou downgrade
+  const determineChangeType = (current, newPlan) => {
+    // Nota: Usei os preços anuais do ARQUIVO DE PATCH (fonte 2)
+    const prices = {
+      monthly: { 1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875 },
+      annual: { 1: 1776, 2: 3294, 3: 4806, 4: 6318, 5: 6750, 6: 8100, 7: 9450 }
+    }
+    
+    const currentValue = prices[current.billing_period][current.connections]
+    const newValue = prices[newPlan.billing_period][newPlan.connections]
+    
+    return newValue > currentValue ? 'upgrade' : 'downgrade'
+  }
+
+  // Abrir modal de mudança de plano
+  const handleOpenPlanChange = () => {
+    if (!subscription) return
+    
+    // Inicializar com plano atual
+    setSelectedNewPlan({
+      connections: subscription.connections_purchased,
+      billing_period: subscription.billing_period
+    })
+    setChangeType(null)
+    setShowUpgradeModal(false) // Fecha o modal antigo
+    setShowPlanChangeModal(true)
+  }
+
+  // Selecionar novo plano
+  const handleSelectNewPlan = (connections, period) => {
+    const newPlan = { connections, billing_period: period }
+    setSelectedNewPlan(newPlan)
+    
+    const currentPlan = {
+      connections: subscription.connections_purchased,
+      billing_period: subscription.billing_period
+    }
+    
+    const type = determineChangeType(currentPlan, newPlan)
+    setChangeType(type)
+  }
+
+  // Confirmar mudança
+  const handleConfirmPlanChange = async () => {
+    if (!changeType) {
+      alert('Por favor, selecione um plano diferente do atual')
+      return
+    }
+    
+    if (changeType === 'downgrade') {
+      setShowConfirmDowngradeModal(true)
+      return
+    }
+    
+    // Se for upgrade, processar direto
+    await processPlanChange()
+  }
+
+  // Processar upgrade ou downgrade
+const processPlanChange = async () => {
+  setChangingPlan(true)
+  
+  try {
+    const endpoint = changeType === 'upgrade' 
+      ? '/api/subscription/upgrade'
+      : '/api/subscription/downgrade'
+    
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: user.id,
+        newPlan: selectedNewPlan
+      })
+    })
+    
+    const data = await response.json()
+    
+    if (!data.success) {
+      alert(`❌ Erro: ${data.error}`)
+      return
+    }
+    
+    // ✅ CORREÇÃO: Acessar dados corretos da resposta
+    if (changeType === 'upgrade') {
+      const chargedAmount = data.data?.estimated_charge || 0
+      alert(`✅ Upgrade realizado! Você foi cobrado aproximadamente R$ ${chargedAmount.toFixed(2)}`)
+    } else {
+      // ✅ CORREÇÃO: Validar se effective_date existe antes de usar
+      if (data.data?.effective_date) {
+        const effectiveDate = new Date(data.data.effective_date)
+        if (!isNaN(effectiveDate.getTime())) {
+          alert(`✅ Downgrade agendado para ${effectiveDate.toLocaleDateString('pt-BR')}`)
+        } else {
+          alert(`✅ Downgrade agendado com sucesso!`)
+        }
+      } else {
+        alert(`✅ Downgrade agendado com sucesso!`)
+      }
+    }
+    
+    // Recarregar dados
+    await loadSubscriptionData(user.id)
+    
+    // Fechar modais
+    setShowPlanChangeModal(false)
+    setShowConfirmDowngradeModal(false)
+    
+  } catch (error) {
+    console.error('Erro ao mudar plano:', error)
+    alert('❌ Erro ao processar mudança de plano: ' + error.message)
+  } finally {
+    setChangingPlan(false)
+  }
+}
+
+  // Cancelar mudança agendada
+  const handleCancelScheduledChange = async () => {
+    if (!confirm('Tem certeza que deseja cancelar a mudança agendada?')) return
+    
+    try {
+      const response = await fetch('/api/subscription/cancel-change', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id })
+      })
+      
+      const data = await response.json()
+      
+      if (!data.success) {
+        alert(`❌ Erro: ${data.error}`)
+        return
+      }
+      
+      alert('✅ Mudança cancelada com sucesso!')
+      await loadSubscriptionData(user.id)
+      
+    } catch (error) {
+      console.error('Erro ao cancelar mudança:', error)
+      alert('❌ Erro ao cancelar mudança')
+    }
+  }
+
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative">
-            <div className="w-16 h-16 bg-[#04F5A0] rounded-2xl flex items-center justify-center mx-auto animate-pulse mb-4">
-              <div className="w-8 h-8 bg-black rounded-sm"
-                   style={{
-                     clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)'
-                   }}
-              />
-            </div>
-            <div className="absolute inset-0 bg-[#04F5A0]/30 rounded-2xl blur-xl animate-pulse mx-auto w-16 h-16" />
-          </div>
-          <p className="text-gray-300">Carregando assinatura...</p>
-        </div>
+      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00FF99]" />
       </div>
     )
   }
 
   const subscriptionStatus = getSubscriptionStatus()
-  const remainingDays = getRemainingDays()
+  const remainingDays = calculateRemainingDays()
+
+  const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'Usuário'
+  const initials = displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
 
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden">
-      {/* Background Effects */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute inset-0" 
-             style={{
-               backgroundImage: `radial-gradient(circle at 1px 1px, rgba(4, 245, 160, 0.15) 1px, transparent 0)`,
-               backgroundSize: '50px 50px'
-             }}
-        />
-      </div>
-
-      {/* Dynamic Gradient */}
-      <div 
-        className="absolute inset-0 opacity-20 pointer-events-none"
-        style={{
-          background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(4, 245, 160, 0.08), transparent 40%)`
-        }}
-      />
-
-      {/* Header */}
-      <header className="relative z-10 bg-black/30 backdrop-blur-xl border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+    <div className="min-h-screen bg-[#0A0A0A]">
+      
+      <main className="relative z-10 max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
+        
+        {/* Header Padrão (igual ao dashboard) */}
+        <div className="mb-12 flex justify-between items-start gap-4">
+          
+          <div className="flex-1">
             <button
               onClick={() => router.push('/dashboard')}
-              className="flex items-center text-gray-400 hover:text-[#04F5A0] transition-colors duration-300"
+              className="flex items-center gap-2 text-sm text-[#B0B0B0] hover:text-white transition-colors duration-200 mb-4"
             >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
               Voltar ao Dashboard
             </button>
-            <h1 className="text-xl font-bold text-white">Gerenciar Assinatura</h1>
+            
+            <h1 className="text-5xl font-bold text-white">
+              Gerenciar Assinatura
+            </h1>
+            <p className="text-[#B0B0B0] text-lg mt-3">
+              Veja os detalhes do seu plano e histórico
+            </p>
+          </div>
+
+          {/* Menu da Conta */}
+          <div className="relative">
+            <button
+              onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
+              className="flex items-center justify-center p-2 rounded-xl hover:opacity-80 transition-opacity duration-200"
+              style={{ backgroundColor: '#272727' }}
+            >
+              
+              <div className="hidden lg:flex items-center gap-3">
+                <div 
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-black font-bold text-sm"
+                  style={{
+                    background: 'linear-gradient(135deg, #00FF99 0%, #00E88C 100%)',
+                    boxShadow: '0 0 0 2px rgba(0, 255, 153, 0.2)'
+                  }}
+                >
+                  {initials}
+                </div>
+                <svg className="w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+
+              <div className="lg:hidden w-9 h-9 flex items-center justify-center">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 8h16M4 16h16" />
+                </svg>
+              </div>
+            </button>
+
+            {accountDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setAccountDropdownOpen(false)} />
+                <div 
+                  className="absolute right-0 mt-3 w-64 shadow-2xl rounded-2xl overflow-hidden z-50"
+                  style={{ backgroundColor: '#272727' }}
+                >
+                  <div className="py-2">
+                    <button
+                      onClick={() => { setAccountDropdownOpen(false); router.push('/account/profile'); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#B0B0B0] hover:text-white hover:bg-white/5 transition-all"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                      Configurar Conta
+                    </button>
+                    <button
+                      onClick={() => { setAccountDropdownOpen(false); router.push('/account/subscription'); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#B0B0B0] hover:text-white hover:bg-white/5 transition-all"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                      Gerenciar Assinatura
+                    </button>
+                    <button
+                      onClick={() => { setAccountDropdownOpen(false); router.push('/sugestao'); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#B0B0B0] hover:text-white hover:bg-white/5 transition-all"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" /></svg>
+                      Central de Sugestões
+                    </button>
+                    <button
+                      onClick={() => { setAccountDropdownOpen(false); router.push('/suporte'); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#B0B0B0] hover:text-white hover:bg-white/5 transition-all"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                      Central de Ajuda
+                    </button>
+                    <div className="border-t border-white/10 mt-2 pt-2">
+                      <button
+                        onClick={() => { setAccountDropdownOpen(false); handleLogout(); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:text-red-300 hover:bg-red-900/10 transition-all"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                        Sair da Conta
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
-      </header>
 
-      {/* Conteúdo */}
-      <main className="relative z-10 max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* Coluna Principal - Detalhes da Assinatura */}
           <div className="lg:col-span-2 space-y-8">
             
             {/* Status da Assinatura */}
-            <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-8 relative overflow-hidden">
-              {/* Animated Background Effects */}
-              <div className="absolute inset-0 opacity-30 pointer-events-none">
-                <div className="absolute top-0 left-0 w-40 h-40 bg-[#04F5A0]/30 rounded-full blur-3xl animate-pulse"></div>
-                <div className="absolute bottom-0 right-0 w-32 h-32 bg-blue-500/25 rounded-full blur-2xl animate-pulse" style={{animationDelay: '1s'}}></div>
-              </div>
-              
-              {/* Glass Effect Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-              
-              {/* Content */}
+            {/* MODIFICADO: Card principal com borda gradiente e fundo #111111 */}
+            <div 
+              className="rounded-2xl p-8"
+              style={{
+                border: '2px solid transparent',
+                backgroundImage: 'linear-gradient(#111111, #111111), linear-gradient(to right, #8A2BE2, #00BFFF)',
+                backgroundOrigin: 'border-box',
+                backgroundClip: 'padding-box, border-box'
+              }}
+            >
               <div className="relative z-10">
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-white via-[#04F5A0] to-white bg-clip-text text-transparent mb-6">
-                  💎 Status da Assinatura
+                {/* MODIFICADO: Título branco e com SVG */}
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                  <svg className="w-6 h-6 text-[#00FF99]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>
+                  Status da Assinatura
                 </h2>
                 
                 {subscription ? (
                   <div className="space-y-6">
-                    {/* Badge de Status com contador */}
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium border backdrop-blur-sm ${getStatusColor(subscriptionStatus)}`}>
-                          {subscriptionStatus === 'active' && '💎 Plano Ativo'}
-                          {subscriptionStatus === 'trial' && '🔥 Trial Ativo'}
-                          {subscriptionStatus === 'canceled' && '❌ Cancelado'}
-                          {subscriptionStatus === 'expired' && '⚠️ Expirado'}
+                        {/* MODIFICADO: Badge sem emoji */}
+                        <div className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium ${getStatusColor(subscriptionStatus)}`}>
+                          {subscriptionStatus === 'active' && 'Plano Ativo'}
+                          {subscriptionStatus === 'trial' && 'Trial Ativo'}
+                          {subscriptionStatus === 'canceled' && 'Cancelado'}
+                          {subscriptionStatus === 'expired' && 'Expirado'}
                         </div>
                       </div>
                       
-                      {remainingDays > 0 && subscriptionStatus !== 'canceled' && (
-                        <div className="text-right relative">
-                          <div className="absolute inset-0 bg-[#04F5A0]/20 rounded-xl blur-xl animate-pulse"></div>
-                          <div className="relative bg-black/30 backdrop-blur-sm border border-[#04F5A0]/30 rounded-xl p-4">
-                            <div className="text-3xl font-bold text-[#04F5A0]">{remainingDays}</div>
-                            <div className="text-sm text-gray-400">dias restantes</div>
-                          </div>
-                        </div>
-                      )}
+{remainingDays > 0 && 
+ subscriptionStatus !== 'canceled' && 
+ subscriptionStatus !== 'cancelled' &&
+ subscriptionStatus !== 'expired' && (
+  <div className="text-right relative">
+    <div className="relative bg-[#0A0A0A] rounded-xl p-4">
+      <div className="text-3xl font-bold text-[#00FF99]">{remainingDays}</div>
+      <div className="text-sm text-gray-400">
+        {subscriptionStatus === 'trial' ? 'dias de trial' : 'dias restantes'}
+      </div>
+    </div>
+  </div>
+)}
                     </div>
 
-                    {/* Aviso para cancelados */}
                     {subscriptionStatus === 'canceled' && (
-                      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 backdrop-blur-sm">
+                      // MODIFICADO: Aviso sem borda
+                      <div className="bg-red-500/10 rounded-xl p-4">
                         <div className="flex items-start text-red-400 text-sm">
                           <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
@@ -283,54 +547,52 @@ export default function AccountSubscription() {
                       </div>
                     )}
 
-                    {/* Detalhes do Plano */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-xl p-4 hover:border-[#04F5A0]/30 transition-all duration-300 group relative overflow-hidden">
-                        {/* Mini Animated Background */}
-                        <div className="absolute inset-0 opacity-20 pointer-events-none">
-                          <div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/30 rounded-full blur-lg animate-pulse"></div>
-                        </div>
+                      {/* MODIFICADO: Sub-card sem borda, com SVG, com hover de bg */}
+                      <div className="bg-[#0A0A0A] rounded-xl p-4 hover:bg-[#1C1C1C] transition-colors duration-300 group">
                         <div className="relative z-10">
-                          <div className="text-gray-400 text-sm mb-1">📱 Conexões</div>
-                          <div className="text-3xl font-bold text-white group-hover:text-[#04F5A0] transition-colors duration-300">
+                          <div className="text-gray-400 text-sm mb-1 flex items-center gap-2">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                            Conexões
+                          </div>
+                          <div className="text-3xl font-bold text-white group-hover:text-[#00FF99] transition-colors duration-300">
                             {subscription.connections_purchased}
                           </div>
                         </div>
                       </div>
                       
-                      <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-xl p-4 hover:border-[#04F5A0]/30 transition-all duration-300 group relative overflow-hidden">
-                        {/* Mini Animated Background */}
-                        <div className="absolute inset-0 opacity-20 pointer-events-none">
-                          <div className="absolute bottom-0 left-0 w-16 h-16 bg-purple-500/30 rounded-full blur-lg animate-pulse"></div>
-                        </div>
+                      {/* MODIFICADO: Sub-card sem borda, com SVG, com hover de bg */}
+                      <div className="bg-[#0A0A0A] rounded-xl p-4 hover:bg-[#1C1C1C] transition-colors duration-300 group">
                         <div className="relative z-10">
-                          <div className="text-gray-400 text-sm mb-1">📅 Período</div>
-                          <div className="text-lg font-semibold text-white group-hover:text-[#04F5A0] transition-colors duration-300 capitalize">
+                          <div className="text-gray-400 text-sm mb-1 flex items-center gap-2">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                            Período
+                          </div>
+                          <div className="text-lg font-semibold text-white group-hover:text-[#00FF99] transition-colors duration-300 capitalize">
                             {subscription.billing_period === 'monthly' ? 'Mensal' : 'Anual'}
                           </div>
                         </div>
                       </div>
                       
-                      <div className="bg-black/20 backdrop-blur-sm border border-white/10 rounded-xl p-4 hover:border-[#04F5A0]/30 transition-all duration-300 group relative overflow-hidden">
-                        {/* Mini Animated Background */}
-                        <div className="absolute inset-0 opacity-20 pointer-events-none">
-                          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-green-500/30 rounded-full blur-lg animate-pulse"></div>
-                        </div>
+                      {/* MODIFICADO: Sub-card sem borda, com SVG, com hover de bg */}
+                      <div className="bg-[#0A0A0A] rounded-xl p-4 hover:bg-[#1C1C1C] transition-colors duration-300 group">
                         <div className="relative z-10">
-                          <div className="text-gray-400 text-sm mb-1">💰 Valor</div>
-                          <div className="text-lg font-semibold text-white group-hover:text-[#04F5A0] transition-colors duration-300">
+                          <div className="text-gray-400 text-sm mb-1 flex items-center gap-2">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0c-1.657 0-3-.895-3-2s1.343-2 3-2 3-.895 3-2-1.343-2-3-2m0 8c1.11 0 2.08-.402 2.599-1M12 16v1m0-1v-8" /></svg>
+                            Valor
+                          </div>
+                          <div className="text-lg font-semibold text-white group-hover:text-[#00FF99] transition-colors duration-300">
                             R$ {calculatePrice(subscription.connections_purchased, subscription.billing_period)}
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* Datas Importantes */}
                     <div className="border-t border-white/10 pt-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                         {subscription.trial_start_date && (
                           <div className="flex items-center space-x-2">
-                            <svg className="w-4 h-4 text-[#04F5A0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 text-[#00FF99]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <span className="text-gray-400">Trial iniciado:</span>
@@ -380,7 +642,8 @@ export default function AccountSubscription() {
                   </div>
                 ) : (
                   <div className="text-center py-12">
-                    <div className="w-16 h-16 bg-gray-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    {/* MODIFICADO: Empty state sem borda */}
+                    <div className="w-16 h-16 bg-[#0A0A0A] rounded-full flex items-center justify-center mx-auto mb-4">
                       <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                       </svg>
@@ -388,9 +651,10 @@ export default function AccountSubscription() {
                     <div className="text-gray-400 mb-4">Você não possui nenhuma assinatura ativa.</div>
                     <button
                       onClick={() => router.push('/dashboard')}
-                      className="bg-[#04F5A0] hover:bg-[#03E691] text-black px-8 py-3 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_30px_rgba(4,245,160,0.5)]"
+                      className="inline-flex items-center gap-2 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold px-8 py-4 rounded-xl hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] transition-all duration-300"
                     >
-                      🚀 Iniciar Trial Gratuito
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                      Iniciar Trial Gratuito
                     </button>
                   </div>
                 )}
@@ -398,35 +662,29 @@ export default function AccountSubscription() {
             </div>
 
             {/* Histórico de Pagamentos */}
-            <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-8 relative overflow-hidden">
-              {/* Animated Background Effects */}
-              <div className="absolute inset-0 opacity-30 pointer-events-none">
-                <div className="absolute top-0 right-0 w-36 h-36 bg-purple-500/30 rounded-full blur-3xl animate-pulse"></div>
-                <div className="absolute bottom-0 left-0 w-28 h-28 bg-pink-500/25 rounded-full blur-xl animate-pulse" style={{animationDelay: '1.5s'}}></div>
-              </div>
-              
-              {/* Glass Effect Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-              
-              {/* Content */}
+            {/* MODIFICADO: Card principal sem borda */}
+            <div className="bg-[#111111] rounded-2xl p-8">
               <div className="relative z-10">
-                <h3 className="text-xl font-semibold text-purple-400 mb-6 flex items-center">
-                  📊 Histórico de Transações
+                {/* MODIFICADO: Título com SVG */}
+                <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                  Histórico de Transações
                 </h3>
                 
                 {paymentLogs.length > 0 ? (
                   <div className="space-y-3">
                     {paymentLogs.map((log) => (
-                      <div key={log.id} className="flex items-center justify-between p-4 bg-black/20 backdrop-blur-sm border border-white/10 rounded-xl hover:border-[#04F5A0]/30 transition-all duration-300 group">
+                      // MODIFICADO: Item do log sem borda e com hover de bg
+                      <div key={log.id} className="flex items-center justify-between p-4 bg-[#0A0A0A] rounded-xl hover:bg-[#1C1C1C] transition-colors duration-300 group">
                         <div className="flex items-center space-x-4">
                           <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
-                            log.status === 'success' ? 'bg-green-400 shadow-[0_0_10px_rgba(74,222,128,0.5)]' :
-                            log.status === 'failed' ? 'bg-red-400 shadow-[0_0_10px_rgba(248,113,113,0.5)]' :
-                            log.status === 'canceled' ? 'bg-red-400 shadow-[0_0_10px_rgba(248,113,113,0.5)]' :
-                            'bg-yellow-400 shadow-[0_0_10px_rgba(251,191,36,0.5)]'
-                          } animate-pulse`}></div>
+                            log.status === 'success' ? 'bg-green-400' :
+                            log.status === 'failed' ? 'bg-red-400' :
+                            log.status === 'canceled' ? 'bg-red-400' :
+                            'bg-yellow-400'
+                          }`}></div>
                           <div>
-                            <div className="text-white font-medium group-hover:text-[#04F5A0] transition-colors duration-300">
+                            <div className="text-white font-medium group-hover:text-[#00FF99] transition-colors duration-300">
                               {formatEventType(log.event_type)}
                             </div>
                             <div className="text-gray-400 text-sm">
@@ -445,7 +703,8 @@ export default function AccountSubscription() {
                   </div>
                 ) : (
                   <div className="text-center py-12">
-                    <div className="w-16 h-16 bg-gray-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    {/* MODIFICADO: Empty state sem borda */}
+                    <div className="w-16 h-16 bg-[#0A0A0A] rounded-full flex items-center justify-center mx-auto mb-4">
                       <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                       </svg>
@@ -460,70 +719,74 @@ export default function AccountSubscription() {
           {/* Coluna Lateral - Ações */}
           <div className="space-y-6">
             
-            {/* Ações da Assinatura */}
             {subscription && subscriptionStatus !== 'canceled' && (
-              <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-6 relative overflow-hidden">
-                {/* Animated Background Effects */}
-                <div className="absolute inset-0 opacity-30 pointer-events-none">
-                  <div className="absolute top-0 left-0 w-28 h-28 bg-blue-500/30 rounded-full blur-2xl animate-pulse"></div>
-                </div>
-                
-                {/* Glass Effect Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-                
-                {/* Content */}
+              // MODIFICADO: Card sem borda
+              <div className="bg-[#111111] rounded-2xl p-6">
                 <div className="relative z-10">
-                  <h3 className="text-lg font-bold text-white mb-4 flex items-center">
-                    ⚡ Ações Rápidas
+                  {/* MODIFICADO: Título com SVG */}
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-3">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    Ações Rápidas
                   </h3>
                   
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => setShowUpgradeModal(true)}
-                      className="w-full bg-blue-600/60 backdrop-blur-sm hover:bg-blue-600/80 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 border border-blue-500/30 hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] flex items-center justify-center"
-                    >
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                      </svg>
-                      Alterar Plano
-                    </button>
-                    
-                    <button
-                      onClick={() => setShowCancelModal(true)}
-                      disabled={canceling}
-                      className="w-full bg-red-600/60 backdrop-blur-sm hover:bg-red-600/80 disabled:bg-gray-600 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 border border-red-500/30 hover:shadow-[0_0_20px_rgba(239,68,68,0.3)] flex items-center justify-center"
-                    >
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                      {canceling ? 'Cancelando...' : 'Cancelar Assinatura'}
-                    </button>
-                  </div>
+<div className="space-y-3">
+  {/* ✅ BOTÃO CONDICIONAL: Alterar ou Reativar */}
+  {subscriptionStatus === 'expired' || subscriptionStatus === 'canceled' ? (
+    // ASSINATURA EXPIRADA/CANCELADA → REATIVAR
+    <button
+      onClick={() => router.push('/dashboard')}
+      className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black py-3 px-4 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] flex items-center justify-center"
+    >
+      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      </svg>
+      Reativar Assinatura
+    </button>
+  ) : (
+    // ASSINATURA ATIVA/TRIAL → ALTERAR
+    <button
+      onClick={handleOpenPlanChange} 
+      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center"
+    >
+      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+      </svg>
+      Alterar Plano
+    </button>
+  )}
+  
+  {/* BOTÃO DE CANCELAR - Só aparece se ativo/trial */}
+  {(subscriptionStatus === 'active' || subscriptionStatus === 'trial') && (
+    <button
+      onClick={() => setShowCancelModal(true)}
+      disabled={canceling}
+      className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center"
+    >
+      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+      </svg>
+      {canceling ? 'Cancelando...' : 'Cancelar Assinatura'}
+    </button>
+  )}
+</div>
                 </div>
               </div>
             )}
 
-            {/* Reativar Serviço */}
             {subscription && subscriptionStatus === 'canceled' && (
-              <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-6 relative overflow-hidden">
-                {/* Animated Background Effects */}
-                <div className="absolute inset-0 opacity-30 pointer-events-none">
-                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-[#04F5A0]/30 rounded-full blur-3xl animate-pulse"></div>
-                </div>
-                
-                {/* Glass Effect Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-                
-                {/* Content */}
+              // MODIFICADO: Card sem borda
+              <div className="bg-[#111111] rounded-2xl p-6">
                 <div className="relative z-10">
-                  <h3 className="text-lg font-bold text-white mb-4 flex items-center">
-                    🔄 Reativar Serviço
+                  {/* MODIFICADO: Título com SVG */}
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-3">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    Reativar Serviço
                   </h3>
                   
                   <div className="space-y-3">
                     <button
                       onClick={() => router.push('/dashboard')}
-                      className="w-full bg-[#04F5A0] hover:bg-[#03E691] text-black py-3 px-4 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_30px_rgba(4,245,160,0.5)] flex items-center justify-center"
+                      className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black py-3 px-4 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] flex items-center justify-center"
                     >
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -535,35 +798,30 @@ export default function AccountSubscription() {
               </div>
             )}
 
-            {/* Informações de Suporte */}
-            <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-6 relative overflow-hidden">
-              {/* Animated Background Effects */}
-              <div className="absolute inset-0 opacity-30 pointer-events-none">
-                <div className="absolute bottom-0 right-0 w-28 h-28 bg-orange-500/30 rounded-full blur-2xl animate-pulse"></div>
-              </div>
-              
-              {/* Glass Effect Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-              
-              {/* Content */}
+            {/* MODIFICADO: Card sem borda */}
+            <div className="bg-[#111111] rounded-2xl p-6">
               <div className="relative z-10">
-                <h3 className="text-lg font-bold text-white mb-4 flex items-center">
-                  💬 Precisa de Ajuda?
+                {/* MODIFICADO: Título com SVG */}
+                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-3">
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                  Precisa de Ajuda?
                 </h3>
                 
                 <div className="space-y-4 text-sm text-gray-400">
                   <p>Entre em contato conosco se tiver dúvidas sobre sua assinatura.</p>
                   
                   <div className="space-y-3">
-                    <div className="flex items-center p-3 bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg hover:border-[#04F5A0]/30 transition-all duration-300">
-                      <svg className="w-5 h-5 mr-3 text-[#04F5A0] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {/* MODIFICADO: Item de suporte sem borda e com hover de bg */}
+                    <div className="flex items-center p-3 bg-[#0A0A0A] rounded-lg hover:bg-[#1C1C1C] transition-colors duration-300">
+                      <svg className="w-5 h-5 mr-3 text-[#00FF99] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                       </svg>
                       <span className="text-gray-300">suporte@swiftbot.com.br</span>
                     </div>
                     
-                    <div className="flex items-center p-3 bg-black/20 backdrop-blur-sm border border-white/10 rounded-lg hover:border-[#04F5A0]/30 transition-all duration-300">
-                      <svg className="w-5 h-5 mr-3 text-[#04F5A0] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {/* MODIFICADO: Item de suporte sem borda e com hover de bg */}
+                    <div className="flex items-center p-3 bg-[#0A0A0A] rounded-lg hover:bg-[#1C1C1C] transition-colors duration-300">
+                      <svg className="w-5 h-5 mr-3 text-[#00FF99] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                       </svg>
                       <span className="text-gray-300">Chat ao vivo (9h às 18h)</span>
@@ -578,82 +836,118 @@ export default function AccountSubscription() {
 
       {/* Modal de Cancelamento */}
       {showCancelModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="absolute inset-0 opacity-20 pointer-events-none">
-            <div className="absolute inset-0"
-                 style={{
-                   backgroundImage: `radial-gradient(circle at 1px 1px, rgba(4, 245, 160, 0.15) 1px, transparent 0)`,
-                   backgroundSize: '50px 50px'
-                 }}
-            />
-          </div>
-          
-          <div
-            className="absolute inset-0 opacity-30 pointer-events-none"
-            style={{
-              background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(4, 245, 160, 0.1), transparent 40%)`
-            }}
-          />
-          
-          <div className="relative bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-8 max-w-md w-full mx-4 shadow-[0_0_50px_rgba(4,245,160,0.15)] z-[70]">
-            {/* Animated Background Effects */}
-            <div className="absolute inset-0 opacity-40 pointer-events-none">
-              <div className="absolute top-0 left-0 w-32 h-32 bg-red-500/40 rounded-full blur-3xl animate-pulse"></div>
-              <div className="absolute bottom-0 right-0 w-24 h-24 bg-orange-500/35 rounded-full blur-xl animate-pulse" style={{animationDelay: '1s'}}></div>
-            </div>
-            
-            {/* Glass Effect Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-            
-            {/* Content */}
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          {/* MODIFICADO: Modal sem borda */}
+          <div className="relative bg-[#111111] rounded-2xl p-8 max-w-md w-full shadow-2xl z-[70]">
             <div className="relative z-10">
               <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-red-500/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-4 border border-red-500/30">
+                {/* MODIFICADO: Ícone do modal sem borda */}
+                <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-white mb-2">Cancelar Assinatura</h3>
                 <p className="text-gray-400">
-                  Tem certeza que deseja cancelar sua assinatura? Você perderá acesso a todos os recursos do SwiftBot.
+                  {isWithin7Days() 
+                    ? 'Você está nos primeiros 7 dias - Lei do Arrependimento'
+                    : 'Seu plano será cancelado mas você mantém acesso'
+                  }
                 </p>
               </div>
 
               <div className="space-y-3 mb-6">
-                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 backdrop-blur-sm">
-                  <p className="text-yellow-400 text-sm flex items-start">
-                    <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    <span>
-                      <strong>Atenção:</strong> O cancelamento será processado e o WhatsApp será desconectado automaticamente.
-                    </span>
-                  </p>
-                </div>
-                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 backdrop-blur-sm">
-                  <p className="text-red-400 text-sm flex items-start">
-                    <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                    <span>
-                      <strong>Importante:</strong> O cancelamento será efetivo imediatamente e você não receberá mais cobranças.
-                    </span>
-                  </p>
+                {isWithin7Days() ? (
+                  <>
+                    {/* MODIFICADO: Aviso sem borda */}
+                    <div className="bg-yellow-500/10 rounded-xl p-4">
+                      <p className="text-yellow-400 text-sm flex items-start">
+                        <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        <span>
+                          <strong>Lei do Arrependimento (7 dias)</strong><br/>
+                          Você está nos primeiros {getDaysSinceCreation()} dias da sua primeira assinatura.
+                        </span>
+                      </p>
+                    </div>
+                    {/* MODIFICADO: Aviso sem borda */}
+                    <div className="bg-red-500/10 rounded-xl p-4">
+                      <p className="text-red-400 text-sm">
+                        <strong>⚠️ Cancelamento IMEDIATO:</strong>
+                      </p>
+                      <ul className="text-sm text-red-300 mt-2 space-y-1 ml-4">
+                        <li>• Reembolso total será processado</li>
+                        <li>• WhatsApp desconectado agora</li>
+                        <li>• Perda de acesso imediata</li>
+                        <li>• Valor estornado em até 7 dias úteis</li>
+                      </ul>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* MODIFICADO: Aviso sem borda */}
+                    <div className="bg-blue-500/10 rounded-xl p-4">
+                      <p className="text-blue-400 text-sm flex items-start">
+                        <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                        <span>
+                          <strong>Cancelamento no fim do período</strong><br/>
+                          Você pode usar até {subscription?.next_billing_date 
+                            ? new Date(subscription.next_billing_date).toLocaleDateString('pt-BR')
+                            : 'o fim do período'
+                          }
+                        </span>
+                      </p>
+                    </div>
+                    {/* MODIFICADO: Aviso sem borda */}
+                    <div className="bg-[#0A0A0A] rounded-xl p-4">
+                      <p className="text-gray-300 text-sm">
+                        <strong>ℹ️ O que acontece:</strong>
+                      </p>
+                      <ul className="text-sm text-gray-400 mt-2 space-y-1 ml-4">
+                        <li>• Renovação cancelada</li>
+                        <li>• Acesso mantido até o fim</li>
+                        <li>• WhatsApp continua conectado</li>
+                        <li>• Sem reembolso do período atual</li>
+                      </ul>
+                    </div>
+                  </>
+                )}
+
+                <div className="flex items-start space-x-3 pt-4">
+                  <input 
+                    type="checkbox" 
+                    id="confirmCancel"
+                    className="mt-1 w-5 h-5 rounded border-gray-600 text-red-500 focus:ring-red-500 bg-gray-800"
+                  />
+                  <label htmlFor="confirmCancel" className="text-sm text-gray-300">
+                    Eu entendo as consequências e quero cancelar minha assinatura
+                  </label>
                 </div>
               </div>
 
               <div className="flex space-x-3">
+                {/* MODIFICADO: Botão "Manter" com novo estilo */}
                 <button
                   onClick={() => setShowCancelModal(false)}
                   disabled={canceling}
-                  className="flex-1 bg-white/10 backdrop-blur-sm hover:bg-white/20 disabled:bg-gray-800 border border-white/20 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300"
+                  className="flex-1 bg-[#272727] hover:bg-[#333333] disabled:opacity-50 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300"
                 >
                   Manter Assinatura
                 </button>
                 <button
-                  onClick={handleCancelSubscription}
+                  onClick={() => {
+                    const checkbox = document.getElementById('confirmCancel')
+                    if (!checkbox.checked) {
+                      alert('Por favor, confirme que você entende as consequências')
+                      return
+                    }
+                    handleCancelSubscription()
+                  }}
                   disabled={canceling}
-                  className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white py-3 px-4 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_25px_rgba(239,68,68,0.4)] flex items-center justify-center"
+                  className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white py-3 px-4 rounded-xl font-bold transition-all duration-300 flex items-center justify-center"
                 >
                   {canceling ? (
                     <div className="flex items-center">
@@ -665,7 +959,7 @@ export default function AccountSubscription() {
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
-                      Confirmar
+                      Confirmar Cancelamento
                     </>
                   )}
                 </button>
@@ -675,61 +969,220 @@ export default function AccountSubscription() {
         </div>
       )}
 
-      {/* Modal de Upgrade */}
-      {showUpgradeModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="absolute inset-0 opacity-20 pointer-events-none">
-            <div className="absolute inset-0"
-                 style={{
-                   backgroundImage: `radial-gradient(circle at 1px 1px, rgba(4, 245, 160, 0.15) 1px, transparent 0)`,
-                   backgroundSize: '50px 50px'
-                 }}
-            />
-          </div>
-          
-          <div
-            className="absolute inset-0 opacity-30 pointer-events-none"
-            style={{
-              background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(4, 245, 160, 0.1), transparent 40%)`
-            }}
-          />
-          
-          <div className="relative bg-black/30 backdrop-blur-xl border border-white/10 rounded-3xl p-8 max-w-md w-full mx-4 shadow-[0_0_50px_rgba(4,245,160,0.15)] z-[70]">
-            {/* Animated Background Effects */}
-            <div className="absolute inset-0 opacity-40 pointer-events-none">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/40 rounded-full blur-3xl animate-pulse"></div>
-              <div className="absolute bottom-0 left-0 w-24 h-24 bg-purple-500/35 rounded-full blur-xl animate-pulse" style={{animationDelay: '1s'}}></div>
-            </div>
-            
-            {/* Glass Effect Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none"></div>
-            
-            {/* Content */}
+      {/* ============================================
+      // 4. MODAIS ADICIONADOS
+      // ============================================ */}
+
+      {/* Modal de Seleção de Plano */}
+      {showPlanChangeModal && subscription && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="relative bg-[#111111] rounded-2xl p-8 max-w-4xl w-full shadow-2xl z-[70] my-8">
             <div className="relative z-10">
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-blue-500/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-4 border border-blue-500/30">
-                  <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
+              {/* Header */}
+              <div className="flex items-start justify-between mb-6">
+                <div>
+                  <h3 className="text-2xl font-bold text-white mb-2">Alterar Plano</h3>
+                  <p className="text-gray-400">
+                    Plano atual: {subscription.connections_purchased} {subscription.connections_purchased === 1 ? 'conexão' : 'conexões'} - {subscription.billing_period === 'monthly' ? 'Mensal' : 'Anual'}
+                  </p>
                 </div>
-                <h3 className="text-xl font-bold text-white mb-2">Alterar Plano</h3>
-                <p className="text-gray-400">
-                  Funcionalidade em desenvolvimento. Em breve você poderá alterar seu plano diretamente aqui.
-                </p>
+                <button
+                  onClick={() => setShowPlanChangeModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
 
-              <div className="flex justify-center">
+              {/* Tabs Mensal/Anual */}
+              <div className="flex justify-center mb-6">
+                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-full p-1.5 flex">
+                  <button
+                    onClick={() => handleSelectNewPlan(selectedNewPlan.connections, 'monthly')}
+                    className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all duration-300 ${
+                      selectedNewPlan.billing_period === 'monthly'
+                        ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Mensal
+                  </button>
+                  <button
+                    onClick={() => handleSelectNewPlan(selectedNewPlan.connections, 'annual')}
+                    className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all duration-300 ${
+                      selectedNewPlan.billing_period === 'annual'
+                        ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Anual
+                  </button>
+                </div>
+              </div>
+
+              {/* Grid de Planos */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                {[1, 2, 3, 4, 5, 6, 7].map(connections => {
+                  const prices = {
+                    monthly: { 1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875 },
+                    annual: { 1: 1776, 2: 3294, 3: 4806, 4: 6318, 5: 6750, 6: 8100, 7: 9450 }
+                  }
+                  const price = prices[selectedNewPlan.billing_period][connections]
+                  const isCurrentPlan = subscription.connections_purchased === connections && subscription.billing_period === selectedNewPlan.billing_period
+                  const isSelected = selectedNewPlan.connections === connections
+
+                  return (
+                    <button
+                      key={connections}
+                      onClick={() => handleSelectNewPlan(connections, selectedNewPlan.billing_period)}
+                      disabled={isCurrentPlan}
+                      className={`p-4 rounded-xl border-2 transition-all duration-300 ${
+                        isCurrentPlan
+                          ? 'border-gray-600 bg-gray-900/50 cursor-not-allowed opacity-50'
+                          : isSelected
+                          ? 'border-[#00FF99] bg-[#00FF99]/10'
+                          : 'border-white/10 hover:border-white/30 bg-[#0A0A0A]'
+                      }`}
+                    >
+                      <div className="text-center">
+                        <div className="text-3xl font-bold text-white mb-1">{connections}</div>
+                        <div className="text-xs text-gray-400 mb-2">{connections === 1 ? 'conexão' : 'conexões'}</div>
+                        <div className="text-lg font-semibold text-[#00FF99]">
+                          R$ {price}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          /{selectedNewPlan.billing_period === 'monthly' ? 'mês' : 'ano'}
+                        </div>
+                        {isCurrentPlan && (
+                          <div className="mt-2 text-xs text-gray-500">Plano Atual</div>
+                        )}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Info sobre tipo de mudança */}
+              {changeType && (
+                <div className={`p-4 rounded-xl mb-6 ${
+                  changeType === 'upgrade' 
+                    ? 'bg-blue-500/10 border border-blue-500/30'
+                    : 'bg-orange-500/10 border border-orange-500/30'
+                }`}>
+                  <div className="flex items-start gap-3">
+                    <svg className={`w-5 h-5 mt-0.5 ${changeType === 'upgrade' ? 'text-blue-400' : 'text-orange-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div className="flex-1">
+                      <div className={`font-semibold mb-1 ${changeType === 'upgrade' ? 'text-blue-400' : 'text-orange-400'}`}>
+                        {changeType === 'upgrade' ? '⬆️ Upgrade' : '⬇️ Downgrade'}
+                      </div>
+                      <div className="text-sm text-gray-300">
+                        {changeType === 'upgrade' 
+                          ? 'Será cobrado o valor proporcional imediatamente. Seu período de renovação continua o mesmo.'
+                          : `A mudança será aplicada na próxima renovação (${new Date(subscription.next_billing_date).toLocaleDateString('pt-BR')}). Você continuará usando o plano atual até lá.`
+                        }
+                      </div>
+                      {changeType === 'downgrade' && selectedNewPlan.connections < subscription.connections_purchased && (
+                        <div className="text-sm text-orange-400 mt-2">
+                          ⚠️ As {subscription.connections_purchased - selectedNewPlan.connections} conexões excedentes serão desconectadas automaticamente na renovação.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Aviso de limite 1x/mês */}
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-6">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-yellow-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div className="flex-1 text-sm text-gray-300">
+                    Você só pode alterar o plano <strong>1 vez por mês</strong>. Após confirmar esta alteração, precisará aguardar 30 dias para fazer outra mudança.
+                  </div>
+                </div>
+              </div>
+
+              {/* Botões */}
+              <div className="flex gap-4">
                 <button
-                  onClick={() => setShowUpgradeModal(false)}
-                  className="bg-[#04F5A0] hover:bg-[#03E691] text-black py-3 px-8 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_30px_rgba(4,245,160,0.5)]"
+                  onClick={() => setShowPlanChangeModal(false)}
+                  className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300"
                 >
-                  OK, Entendi
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmPlanChange}
+                  disabled={!changeType || changingPlan}
+                  className="flex-1 bg-gradient-to-r from-[#00FF99] to-[#00E88C] hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] disabled:opacity-50 disabled:cursor-not-allowed text-black py-3 px-4 rounded-xl font-bold transition-all duration-300"
+                >
+                  {changingPlan ? (
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black mr-2"></div>
+                      Processando...
+                    </div>
+                  ) : (
+                    `Confirmar ${changeType === 'upgrade' ? 'Upgrade' : 'Downgrade'}`
+                  )}
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Modal de Confirmação de Downgrade */}
+      {showConfirmDowngradeModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="relative bg-[#111111] rounded-2xl p-8 max-w-md w-full shadow-2xl z-[80]">
+            <div className="relative z-10">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-orange-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Confirmar Downgrade</h3>
+                <p className="text-gray-400 mb-4">
+                  O downgrade será aplicado em {new Date(subscription.next_billing_date).toLocaleDateString('pt-BR')}.
+                </p>
+                <p className="text-sm text-gray-500">
+                  Você continuará usando o plano atual até a data de renovação. Após isso, o plano será alterado automaticamente.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowConfirmDowngradeModal(false)}
+                  disabled={changingPlan}
+                  className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={processPlanChange}
+                  disabled={changingPlan}
+                  className="flex-1 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center"
+                >
+                  {changingPlan ? (
+                    <div className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Processando...
+                    </div>
+                  ) : (
+                    'Confirmar Downgrade'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

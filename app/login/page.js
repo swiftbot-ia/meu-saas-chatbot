@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
 export default function AuthPage() {
@@ -11,35 +11,52 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false)
   const [socialLoading, setSocialLoading] = useState('')
   const [message, setMessage] = useState('')
-  const [isLogin, setIsLogin] = useState(true)
+  
+  // MODIFICADO: Trocamos 'isLogin' (booleano) por 'authView' (string)
+  // para acomodar 3 estados: 'login', 'register', 'forgotPassword'
+  const [authView, setAuthView] = useState('login') 
+
   const [errors, setErrors] = useState({})
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const router = useRouter()
 
-  // Mouse tracking para efeitos visuais
+  // Animação IntersectionObserver (sem alterações)
   useEffect(() => {
-    const handleMouseMove = (e) => {
-      setMousePosition({ x: e.clientX, y: e.clientY })
-    }
-    window.addEventListener('mousemove', handleMouseMove)
-    return () => window.removeEventListener('mousemove', handleMouseMove)
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('animate-in')
+            observer.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.15, rootMargin: '0px 0px -100px 0px' }
+    )
+    const elements = document.querySelectorAll('.animate-on-scroll')
+    elements.forEach((el) => observer.observe(el))
+    return () => observer.disconnect()
   }, [])
 
-  // Validações em tempo real
+  // MODIFICADO: A validação de 'isLogin' agora checa 'authView'
   const validateForm = () => {
     const newErrors = {}
-    if (!isLogin) {
+    if (authView === 'register') {
       if (!fullName.trim()) newErrors.fullName = 'Nome é obrigatório'
       if (password !== confirmPassword) newErrors.confirmPassword = 'Senhas não coincidem'
       if (password.length < 6) newErrors.password = 'Senha deve ter pelo menos 6 caracteres'
     }
     if (!email.includes('@')) newErrors.email = 'Email inválido'
-    if (!password) newErrors.password = 'Senha é obrigatória'
+    
+    // Senha só é obrigatória para login e registro
+    if (authView !== 'forgotPassword' && !password) {
+      newErrors.password = 'Senha é obrigatória'
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
-  // ✅ NOVA FUNÇÃO: Verificar se perfil está completo
+  // Verificar se perfil está completo (sem alterações)
   const checkProfileCompletion = async (userId) => {
     try {
       const { data: profile, error } = await supabase
@@ -50,14 +67,13 @@ export default function AuthPage() {
 
       console.log('Profile check:', { profile, error })
 
-      // Se não existe perfil ou está incompleto
       const needsCompletion = !profile || 
-                             !profile.company_name || 
-                             profile.company_name.trim() === '' ||
-                             !profile.full_name ||
-                             profile.full_name.trim() === '' ||
-                             !profile.phone || 
-                             profile.phone.trim() === ''
+                              !profile.company_name || 
+                              profile.company_name.trim() === '' ||
+                              !profile.full_name ||
+                              profile.full_name.trim() === '' ||
+                              !profile.phone || 
+                              profile.phone.trim() === ''
 
       console.log('Needs completion:', needsCompletion, {
         hasProfile: !!profile,
@@ -69,21 +85,26 @@ export default function AuthPage() {
       return needsCompletion
     } catch (error) {
       console.error('Erro ao verificar perfil:', error)
-      return true // Em caso de erro, assumir que precisa completar
+      return true
     }
   }
 
-  // Autenticação tradicional
+  // Autenticação tradicional (Login/Registro)
+  // MODIFICADO: A validação de 'isLogin' agora checa 'authView'
   const handleAuth = async (e) => {
     e.preventDefault()
-    if (!validateForm()) return
+    
+    // Validação de senha é diferente para 'forgotPassword'
+    // Então só validamos aqui se NÃO for 'forgotPassword'
+    if (authView !== 'forgotPassword') {
+      if (!validateForm()) return
+    }
 
     setLoading(true)
     setMessage('')
 
     try {
-      if (isLogin) {
-        // ✅ LOGIN TRADICIONAL COM VERIFICAÇÃO DE PERFIL
+      if (authView === 'login') {
         console.log('🔍 Tentando login com:', { email: email, passwordLength: password.length })
         
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -98,7 +119,6 @@ export default function AuthPage() {
           console.log('✅ Login bem-sucedido:', data)
           setMessage('✅ Login realizado com sucesso!')
           
-          // ✅ VERIFICAR SE PERFIL ESTÁ COMPLETO
           const needsCompletion = await checkProfileCompletion(data.user.id)
           
           if (needsCompletion) {
@@ -109,8 +129,7 @@ export default function AuthPage() {
             router.push('/dashboard')
           }
         }
-      } else {
-        // ✅ CADASTRO TRADICIONAL SIMPLIFICADO (sem empresa/telefone)
+      } else if (authView === 'register') { // MODIFICADO
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -125,7 +144,6 @@ export default function AuthPage() {
           setMessage(`❌ ${error.message}`)
         } else {
           setMessage('✅ Conta criada com sucesso! Verifique seu email para confirmar.')
-          // Limpar formulário após sucesso
           setEmail('')
           setPassword('')
           setConfirmPassword('')
@@ -138,7 +156,37 @@ export default function AuthPage() {
     setLoading(false)
   }
 
-  // Login social
+  // ADICIONADO: Nova função para 'Esqueceu sua senha'
+  const handlePasswordReset = async (e) => {
+    e.preventDefault()
+    if (!email) {
+      setErrors({ email: 'Email é obrigatório' })
+      return
+    }
+    setLoading(true)
+    setMessage('')
+    setErrors({})
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+         redirectTo: 'https://swiftbot.com.br/reset-password',
+      })
+
+      if (error) {
+        throw error
+      }
+      
+      setMessage('✅ Email enviado! Verifique sua caixa de entrada para o link de redefinição.')
+      
+    } catch (error) {
+      console.error('Erro ao redefinir senha:', error)
+      setMessage(`❌ Erro: ${error.message}`)
+    }
+    
+    setLoading(false)
+  }
+
+  // Login social (sem alterações)
   const handleSocialLogin = async (provider) => {
     setSocialLoading(provider)
     
@@ -153,7 +201,6 @@ export default function AuthPage() {
         setMessage(`❌ Erro no login com ${provider}: ${error.message}`)
         setSocialLoading('')
       }
-      // Se não há erro, o usuário será redirecionado automaticamente
     } catch (error) {
       setMessage(`❌ ${error.message}`)
       setSocialLoading('')
@@ -161,257 +208,388 @@ export default function AuthPage() {
   }
 
   const socialProviders = [
-    { name: 'google', icon: '🔍', label: 'Google', color: 'from-red-500 to-yellow-500' },
-    { name: 'facebook', icon: '📘', label: 'Facebook', color: 'from-blue-600 to-blue-700' }
+    { 
+      name: 'google', 
+      label: 'Google', 
+      gradient: 'from-pink-500 via-purple-500 to-indigo-500',
+      icon: (
+        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+        </svg>
+      )
+    },
+    { 
+      name: 'facebook', 
+      label: 'Facebook', 
+      gradient: 'from-cyan-400 via-blue-500 to-purple-500',
+      icon: (
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+        </svg>
+      )
+    }
   ]
 
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden flex items-center justify-center p-4">
-      {/* Background Effects */}
-      <div className="absolute inset-0 opacity-20">
-        <div className="absolute inset-0" 
-             style={{
-               backgroundImage: `radial-gradient(circle at 1px 1px, rgba(4, 245, 160, 0.15) 1px, transparent 0)`,
-               backgroundSize: '50px 50px'
-             }}
-        />
-      </div>
-
-      {/* Dynamic Gradient */}
-      <div 
-        className="absolute inset-0 opacity-30 pointer-events-none"
-        style={{
-          background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(4, 245, 160, 0.1), transparent 40%)`
-        }}
-      />
-
-      {/* Auth Card com Efeito de Pulsação */}
-      <div className="relative bg-black/20 backdrop-blur-xl rounded-3xl shadow-2xl w-full max-w-md p-8 overflow-hidden">
+    <>
+      <div className="min-h-screen bg-black relative overflow-hidden flex items-center justify-center px-4 pt-24 pb-16">
         
-        {/* Animated Background Effects - Similar ao pricing */}
-        <div className="absolute inset-0 opacity-40">
-          <div className="absolute top-0 left-0 w-48 h-48 bg-purple-500/40 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute top-1/2 right-0 w-56 h-56 bg-pink-500/35 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
-          <div className="absolute bottom-0 left-1/3 w-52 h-52 bg-violet-500/40 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
-          <div className="absolute top-1/4 left-1/2 w-44 h-44 bg-indigo-500/30 rounded-full blur-3xl animate-pulse" style={{animationDelay: '3s'}}></div>
+        {/* Backgrounds (sem alterações) */}
+        <div className="absolute inset-0 opacity-10">
+          <div 
+            className="absolute inset-0" 
+            style={{
+              backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.15) 1px, transparent 0)`,
+              backgroundSize: '50px 50px'
+            }}
+          />
         </div>
-        
-        {/* Glass Effect Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm"></div>
-        
-        {/* Content */}
-        <div className="relative z-10">
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-black to-pink-900/20" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1.5s'}} />
+
+        {/* Auth Card */}
+        <div className="animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000 relative w-full max-w-md">
           
-          {/* Logo e Título */}
-          <div className="text-center mb-8">
-            <div className="relative mb-6">
-              <div className="w-16 h-16 bg-[#04F5A0] rounded-2xl flex items-center justify-center mx-auto animate-pulse">
-                <div className="w-8 h-8 bg-black rounded-sm" 
-                     style={{
-                       clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)'
-                     }}
-                />
-              </div>
-              <div className="absolute inset-0 bg-[#04F5A0]/30 rounded-2xl blur-xl animate-pulse mx-auto w-16 h-16" />
-            </div>
+          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-8 md:p-10 shadow-2xl hover:bg-white/[0.07] transition-all duration-500">
             
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-white via-[#04F5A0] to-white bg-clip-text text-transparent mb-2">
-              SwiftBot
-            </h1>
-            <p className="text-gray-400">Sua plataforma de IA para WhatsApp</p>
-          </div>
-
-          {/* Social Login Buttons */}
-          <div className="space-y-3 mb-6">
-            {socialProviders.map((provider) => (
-              <button
-                key={provider.name}
-                onClick={() => handleSocialLogin(provider.name)}
-                disabled={socialLoading === provider.name}
-                className={`w-full flex items-center justify-center px-4 py-3 bg-gradient-to-r ${provider.color} rounded-xl text-white font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                {socialLoading === provider.name ? (
-                  <div className="flex items-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Conectando...
-                  </div>
-                ) : (
-                  <>
-                    <span className="mr-3 text-lg">{provider.icon}</span>
-                    Continuar com {provider.label}
-                  </>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Divider */}
-          <div className="relative flex items-center justify-center mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-700/50"></div>
-            </div>
-            <div className="relative bg-transparent px-4 text-sm text-gray-400">ou</div>
-          </div>
-
-          {/* Toggle Login/Register */}
-          <div className="flex bg-gray-800/30 backdrop-blur-sm rounded-xl p-1 mb-6">
-            <button
-              onClick={() => setIsLogin(true)}
-              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${
-                isLogin 
-                  ? 'bg-[#04F5A0] text-black shadow-lg' 
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Entrar
-            </button>
-            <button
-              onClick={() => setIsLogin(false)}
-              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${
-                !isLogin 
-                  ? 'bg-[#04F5A0] text-black shadow-lg' 
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Cadastrar
-            </button>
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleAuth} className="space-y-4">
+            {/* Renderização Condicional da View
+              Mostra (Login/Registro) OU (Esqueceu Senha)
+            */}
             
-            {/* Nome Completo - apenas no cadastro */}
-            {!isLogin && (
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Nome Completo *
-                </label>
-                <input
-                  type="text"
-                  required={!isLogin}
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className={`w-full px-4 py-3 bg-gray-800/30 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300 ${
-                    errors.fullName ? 'border-red-500/50' : 'border-gray-700/50'
-                  }`}
-                  placeholder="João Silva"
-                />
-                {errors.fullName && <p className="text-red-400 text-xs mt-1">{errors.fullName}</p>}
-              </div>
-            )}
-
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Email *
-              </label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={`w-full px-4 py-3 bg-gray-800/30 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300 ${
-                  errors.email ? 'border-red-500/50' : 'border-gray-700/50'
-                }`}
-                placeholder="seu@email.com"
-              />
-              {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email}</p>}
-            </div>
-
-            {/* Senha */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Senha *
-              </label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={`w-full px-4 py-3 bg-gray-800/30 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300 ${
-                  errors.password ? 'border-red-500/50' : 'border-gray-700/50'
-                }`}
-                placeholder="••••••••"
-                minLength={6}
-              />
-              {errors.password && <p className="text-red-400 text-xs mt-1">{errors.password}</p>}
-            </div>
-
-            {/* Confirmar Senha - apenas no cadastro */}
-            {!isLogin && (
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Confirmar Senha *
-                </label>
-                <input
-                  type="password"
-                  required={!isLogin}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={`w-full px-4 py-3 bg-gray-800/30 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#04F5A0] focus:border-[#04F5A0] outline-none transition-all duration-300 ${
-                    errors.confirmPassword ? 'border-red-500/50' : 'border-gray-700/50'
-                  }`}
-                  placeholder="••••••••"
-                />
-                {errors.confirmPassword && <p className="text-red-400 text-xs mt-1">{errors.confirmPassword}</p>}
-              </div>
-            )}
-
-            {/* Esqueceu senha link - apenas no login */}
-            {isLogin && (
-              <div className="text-right">
-                <button
-                  type="button"
-                  className="text-sm text-gray-400 hover:text-[#04F5A0] transition-colors duration-300"
-                >
-                  Esqueceu sua senha?
-                </button>
-              </div>
-            )}
-
-            {/* Message */}
-            {message && (
-              <div className={`p-3 rounded-xl text-sm border backdrop-blur-sm ${
-                message.includes('✅') 
-                  ? 'bg-green-900/20 text-green-400 border-green-800/50' 
-                  : 'bg-red-900/20 text-red-400 border-red-800/50'
-              }`}>
-                {message}
-              </div>
-            )}
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-[#04F5A0] hover:bg-[#03E691] disabled:bg-gray-600 text-black font-bold py-4 px-4 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-[0_0_30px_rgba(4,245,160,0.5)] flex items-center justify-center"
-            >
-              {loading ? (
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></div>
-                  {isLogin ? 'Entrando...' : 'Criando conta...'}
+            {/* ADICIONADO: View de Esqueceu Senha */}
+            {authView === 'forgotPassword' ? (
+              <>
+                {/* Título */}
+                <div className="text-center mb-8">
+                  <h1 className="text-4xl font-light text-white mb-3">
+                    Recuperar <span className="font-normal bg-gradient-to-r from-[#00FF99] to-[#00E88C] bg-clip-text text-transparent">Senha</span>
+                  </h1>
+                  <p className="text-gray-400 font-light">
+                    Digite seu email para enviarmos um link de redefinição.
+                  </p>
                 </div>
-              ) : (
-                <>
-                  <span className="mr-2">{isLogin ? '🚀' : '✨'}</span>
-                  {isLogin ? 'Entrar na Plataforma' : 'Criar Minha Conta'}
-                </>
-              )}
-            </button>
-          </form>
 
-          {/* Back to Home */}
-          <div className="mt-8 text-center">
-            <button
-              onClick={() => router.push('/')}
-              className="text-gray-500 hover:text-[#04F5A0] text-sm transition-colors duration-300 flex items-center justify-center mx-auto"
-            >
-              <span className="mr-2">←</span>
-              Voltar ao início
-            </button>
+                {/* Formulário de Esqueceu Senha */}
+                <form onSubmit={handlePasswordReset} className="space-y-4">
+                  {/* Email */}
+                  <div>
+                    <label className="block text-sm font-light text-gray-300 mb-2">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className={`w-full px-4 py-3 bg-white/5 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] focus:border-[#00FF99] outline-none transition-all duration-300 font-light ${
+                        errors.email ? 'border-red-500/50' : 'border-white/10'
+                      }`}
+                      placeholder="seu@email.com"
+                    />
+                    {errors.email && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.email}</p>}
+                  </div>
+
+                  {/* Message */}
+                  {message && (
+                    <div className={`p-3 rounded-xl text-sm border backdrop-blur-sm font-light ${
+                      message.includes('✅') 
+                        ? 'bg-green-900/20 text-green-400 border-green-800/50' 
+                        : 'bg-red-900/20 text-red-400 border-red-800/50'
+                    }`}>
+                      {message}
+                    </div>
+                  )}
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] hover:shadow-[0_0_40px_rgba(0,255,153,0.6)] disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-4 px-4 rounded-xl transition-all duration-300 hover:scale-105 flex items-center justify-center"
+                  >
+                    {loading ? (
+                      <div className="flex items-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black mr-2"></div>
+                        <span className="font-light">Enviando...</span>
+                      </div>
+                    ) : (
+                      <span className="font-medium">
+                        Enviar Link de Recuperação
+                      </span>
+                    )}
+                  </button>
+                </form>
+
+                {/* Voltar para Login */}
+                <div className="mt-8 text-center">
+                  <button
+                    onClick={() => { setAuthView('login'); setMessage(''); setErrors({}); }}
+                    className="text-gray-500 hover:text-[#00FF99] text-sm transition-colors duration-300 flex items-center justify-center mx-auto font-light group"
+                  >
+                    <span className="mr-2 group-hover:-translate-x-1 transition-transform duration-300">←</span>
+                    Voltar para o Login
+                  </button>
+                </div>
+              </>
+            
+            ) : (
+              
+              /* MODIFICADO: View de Login/Registro (todo o conteúdo anterior) */
+              <>
+                {/* Badge Trial Gratuito */}
+                <div className="flex justify-center mb-6">
+                  <div className="inline-flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-6 py-2">
+                    <div className="w-2 h-2 bg-[#00FF99] rounded-full animate-pulse" />
+                    <span className="text-sm text-gray-300 font-light">4 dias grátis • Sem cartão de crédito</span>
+                  </div>
+                </div>
+
+                {/* Título */}
+                <div className="text-center mb-8">
+                  <h1 className="text-4xl font-light text-white mb-3">
+                    Bem-vindo ao <span className="font-normal bg-gradient-to-r from-[#00FF99] to-[#00E88C] bg-clip-text text-transparent">SwiftBot</span>
+                  </h1>
+                  <p className="text-gray-400 font-light">
+                    {authView === 'login' ? 'Entre na sua conta e continue automatizando' : 'Crie sua conta e comece em segundos'}
+                  </p>
+                </div>
+
+                {/* Social Login Buttons */}
+                <div className="space-y-3 mb-6">
+                  {socialProviders.map((provider) => (
+                    <button
+                      key={provider.name}
+                      onClick={() => handleSocialLogin(provider.name)}
+                      disabled={socialLoading === provider.name}
+                      className={`group w-full flex items-center justify-center gap-3 px-4 py-3 bg-gradient-to-r ${provider.gradient} rounded-xl text-white font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden`}
+                    >
+                      <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300" />
+                      
+                      {socialLoading === provider.name ? (
+                        <div className="flex items-center relative z-10">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          <span className="font-light">Conectando...</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3 relative z-10">
+                          {provider.icon}
+                          <span className="font-light">Continuar com {provider.label}</span>
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Divider */}
+                <div className="relative flex items-center justify-center mb-6 gap-4">
+                  <div className="flex-1 border-t border-white/10"></div>
+                  <span className="text-sm text-gray-400 font-light">ou</span>
+                  <div className="flex-1 border-t border-white/10"></div>
+                </div>
+
+                {/* Toggle Login/Register */}
+                <div className="flex bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-1 mb-6">
+                  <button
+                    onClick={() => { setAuthView('login'); setMessage(''); setErrors({}); }} // MODIFICADO
+                    className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-light transition-all duration-300 ${
+                      authView === 'login' 
+                        ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black shadow-lg font-medium' 
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Entrar
+                  </button>
+                  <button
+                    onClick={() => { setAuthView('register'); setMessage(''); setErrors({}); }} // MODIFICADO
+                    className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-light transition-all duration-300 ${
+                      authView === 'register' 
+                        ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black shadow-lg font-medium' 
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Cadastrar
+                  </button>
+                </div>
+
+                {/* Form */}
+                <form onSubmit={handleAuth} className="space-y-4">
+                  
+                  {/* Nome Completo - apenas no cadastro */}
+                  {authView === 'register' && (
+                    <div>
+                      <label className="block text-sm font-light text-gray-300 mb-2">
+                        Nome Completo *
+                      </label>
+                      <input
+                        type="text"
+                        required={authView === 'register'}
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        className={`w-full px-4 py-3 bg-white/5 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] focus:border-[#00FF99] outline-none transition-all duration-300 font-light ${
+                          errors.fullName ? 'border-red-500/50' : 'border-white/10'
+                        }`}
+                        placeholder="João Silva"
+                      />
+                      {errors.fullName && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.fullName}</p>}
+                    </div>
+                  )}
+
+                  {/* Email */}
+                  <div>
+                    <label className="block text-sm font-light text-gray-300 mb-2">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className={`w-full px-4 py-3 bg-white/5 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] focus:border-[#00FF99] outline-none transition-all duration-300 font-light ${
+                        errors.email ? 'border-red-500/50' : 'border-white/10'
+                      }`}
+                      placeholder="seu@email.com"
+                    />
+                    {errors.email && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.email}</p>}
+                  </div>
+
+                  {/* Senha */}
+                  <div>
+                    <label className="block text-sm font-light text-gray-300 mb-2">
+                      Senha *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className={`w-full px-4 py-3 bg-white/5 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] focus:border-[#00FF99] outline-none transition-all duration-300 font-light ${
+                        errors.password ? 'border-red-500/50' : 'border-white/10'
+                      }`}
+                      placeholder="••••••••"
+                      minLength={6}
+                    />
+                    {errors.password && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.password}</p>}
+                  </div>
+
+                  {/* Confirmar Senha - apenas no cadastro */}
+                  {authView === 'register' && (
+                    <div>
+                      <label className="block text-sm font-light text-gray-300 mb-2">
+                        Confirmar Senha *
+                      </label>
+                      <input
+                        type="password"
+                        required={authView === 'register'}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className={`w-full px-4 py-3 bg-white/5 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] focus:border-[#00FF99] outline-none transition-all duration-300 font-light ${
+                          errors.confirmPassword ? 'border-red-500/50' : 'border-white/10'
+                        }`}
+                        placeholder="••••••••"
+                      />
+                      {errors.confirmPassword && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.confirmPassword}</p>}
+                    </div>
+                  )}
+
+                  {/* Esqueceu senha link - apenas no login */}
+                  {authView === 'login' && (
+                    <div className="text-right">
+                      <button
+                        type="button"
+                        // MODIFICADO: onClick para mudar a view
+                        onClick={() => { setAuthView('forgotPassword'); setMessage(''); setErrors({}); }}
+                        className="text-sm text-gray-400 hover:text-[#00FF99] transition-colors duration-300 font-light"
+                      >
+                        Esqueceu sua senha?
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Message */}
+                  {message && (
+                    <div className={`p-3 rounded-xl text-sm border backdrop-blur-sm font-light ${
+                      message.includes('✅') 
+                        ? 'bg-green-900/20 text-green-400 border-green-800/50' 
+                        : 'bg-red-900/20 text-red-400 border-red-800/50'
+                    }`}>
+                      {message}
+                    </div>
+                  )}
+                  {/*(Termos de Uso) */}
+                  {authView === 'register' && (
+                    <p className="text-xs text-gray-500 text-center font-light pt-2">
+                      Ao clicar em "Criar Minha Conta", você aceita nossos<br />
+                      <a 
+                        href="/termos" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-gray-400 hover:text-[#00FF99] underline transition-colors"
+                      >
+                        Termos de Uso
+                      </a> 
+                      {" e "}
+                      <a 
+                        href="/privacidade" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-gray-400 hover:text-[#00FF99] underline transition-colors"
+                      >
+                        Política de Privacidade
+                      </a>.
+                    </p>
+                  )}
+                  
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] hover:shadow-[0_0_40px_rgba(0,255,153,0.6)] disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-4 px-4 rounded-xl transition-all duration-300 hover:scale-105 flex items-center justify-center"
+                  >
+                    {loading ? (
+                      <div className="flex items-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black mr-2"></div>
+                        <span className="font-light">{authView === 'login' ? 'Entrando...' : 'Criando conta...'}</span>
+                      </div>
+                    ) : (
+                      <span className="font-medium">
+                        {authView === 'login' ? 'Entrar na Plataforma' : 'Criar Minha Conta'}
+                      </span>
+                    )}
+                  </button>
+                </form>
+
+                {/* Back to Home */}
+                <div className="mt-8 text-center">
+                  <button
+                    onClick={() => router.push('/')}
+                    className="text-gray-500 hover:text-[#00FF99] text-sm transition-colors duration-300 flex items-center justify-center mx-auto font-light group"
+                  >
+                    <span className="mr-2 group-hover:-translate-x-1 transition-transform duration-300">←</span>
+                    Voltar ao início
+                  </button>
+                </div>
+              </>
+            )} 
+            {/* Fim da renderização condicional */}
+
           </div>
         </div>
       </div>
-    </div>
+
+      {/* CSS para animações */}
+      <style jsx global>{`
+        .animate-on-scroll {
+          transition-property: opacity, transform;
+          transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .animate-on-scroll.animate-in {
+          opacity: 1 !important;
+          transform: translate(0, 0) scale(1) !important;
+        }
+      `}</style>
+    </>
   )
 }
