@@ -1,7 +1,7 @@
 // app/api/user/profile-id/route.js
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { createServerSupabaseClient } from '@/lib/supabase'
+import { createServerSupabaseClient } from '../../../../lib/supabase'
 
 export async function GET() {
   try {
