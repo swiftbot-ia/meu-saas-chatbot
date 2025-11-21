@@ -83,5 +83,5 @@ NOTES.md
 *.log
 build.log
 
-# Route configs temporários
+# Route configs temporário
 app/*/route.config.js
