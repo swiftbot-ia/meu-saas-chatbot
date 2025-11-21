@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
 export default function Dashboard() {
@@ -208,9 +208,23 @@ const loadSubscription = async (userId) => {
     }
   }
 
+  // ============================================================================
+  // FECHAR MODAL QR CODE (com refresh automático)
+  // ============================================================================
+  const handleCloseQRModal = async () => {
+    setShowQRModal(false)
+    setQrCode(null)
+
+    // Recarregar conexões para pegar status atualizado
+    if (user) {
+      console.log('🔄 [Dashboard] Recarregando conexões após fechar modal...')
+      await loadConnections(user.id)
+    }
+  }
+
   const loadDashboardStats = async (connection) => {
     if (!connection || connection.status !== 'connected') return
-    
+
     setStatsLoading(true)
     try {
       const response = await fetch('/api/whatsapp/stats', {
@@ -346,9 +360,7 @@ const loadSubscription = async (userId) => {
           .eq('id', connection.id)
 
         if (data.status === 'connected') {
-          setShowQRModal(false)
-          setQrCode(null)
-          await loadConnections(user.id)
+          await handleCloseQRModal()
           await loadDashboardStats(connection)
         } else if (data.qrCode) {
           setQrCode(data.qrCode)
@@ -381,25 +393,38 @@ const loadSubscription = async (userId) => {
 
   const handleAddConnection = async () => {
     try {
-      const nextNumber = connections.length + 1
-      
-      const { data, error } = await supabase
-        .from('whatsapp_connections')
-        .insert({
-          user_id: user.id,
-          status: 'disconnected'
+      // ✅ NÃO enviar instanceName - será gerado baseado no connectionId
+      const response = await fetch('/api/whatsapp/connections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id
         })
-        .select()
-        .single()
+      })
 
-      if (error) throw error
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao criar conexão')
+      }
 
       await loadConnections(user.id)
-      setActiveConnection(data)
+
+      // Buscar a conexão recém-criada para definir como ativa
+      const { data: newConnection } = await supabase
+        .from('whatsapp_connections')
+        .select('*')
+        .eq('id', result.connectionId)
+        .single()
+
+      if (newConnection) {
+        setActiveConnection(newConnection)
+      }
+
       alert('Nova conexão criada com sucesso!')
     } catch (error) {
       console.error('Erro ao criar conexão:', error)
-      alert('Erro ao criar nova conexão')
+      alert('Erro ao criar nova conexão: ' + error.message)
     }
   }
 
@@ -457,10 +482,52 @@ const loadSubscription = async (userId) => {
       const statsInterval = setInterval(() => {
         loadDashboardStats(activeConnection)
       }, 30000)
-      
+
       return () => clearInterval(statsInterval)
     }
   }, [activeConnection, whatsappStatus])
+
+  // ============================================================================
+  // VERIFICAÇÃO AUTOMÁTICA DE STATUS DAS CONEXÕES
+  // ============================================================================
+  useEffect(() => {
+    if (!user || !connections || connections.length === 0) return
+
+    // Verificar status inicial ao carregar
+    const checkConnectionsStatus = async () => {
+      for (const connection of connections) {
+        if (!connection.instance_token) continue
+
+        try {
+          const response = await fetch('/api/whatsapp/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ connectionId: connection.id })
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+
+            // Atualizar estado local se mudou
+            if (data.connected && connection.status !== 'connected') {
+              console.log('✅ [Dashboard] Conexão agora está conectada:', connection.id)
+              await loadConnections(user.id)
+            }
+          }
+        } catch (error) {
+          console.error('❌ [Dashboard] Erro ao verificar status:', error)
+        }
+      }
+    }
+
+    // Verificar imediatamente
+    checkConnectionsStatus()
+
+    // Verificar a cada 15 segundos
+    const interval = setInterval(checkConnectionsStatus, 15000)
+
+    return () => clearInterval(interval)
+  }, [user, connections])
 
   // <-- [MERGE] Bloco de setup do Stripe (3 useEffects) substituído pelo do código 2
   // ============================================================================
@@ -1217,8 +1284,13 @@ const handleConfirmPayment = async (e) => {
                     </svg>
                     <div className="text-left">
                       <p className="text-sm font-semibold text-white">
-                        {activeConnection ? `Conexão ${activeConnection.connection_number}` : 'Selecionar Conexão'}
+                        {activeConnection ? (activeConnection.profile_name || activeConnection.instance_name || 'Conexão Sem Nome') : 'Selecionar Conexão'}
                       </p>
+                      {activeConnection?.phone_number && (
+                        <p className="text-xs text-gray-400">
+                          {activeConnection.phone_number}
+                        </p>
+                      )}
                       <p className="text-xs text-[#B0B0B0]">
                         {connectedCount} de {totalSlots} ativas
                       </p>
@@ -1249,9 +1321,16 @@ const handleConfirmPayment = async (e) => {
                           }`}
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-white font-semibold text-sm">
-                              Conexão {conn.connection_number}
-                            </span>
+                            <div className="flex flex-col">
+                              <span className="text-white font-semibold text-sm">
+                                {conn.profile_name || conn.instance_name || 'Conexão Sem Nome'}
+                              </span>
+                              {conn.phone_number && (
+                                <span className="text-xs text-gray-400 mt-1">
+                                  {conn.phone_number}
+                                </span>
+                              )}
+                            </div>
                             <div className="flex items-center gap-2">
                               {getStatusIcon(conn.status)}
                               <span className="text-xs text-[#B0B0B0]">
@@ -1259,9 +1338,6 @@ const handleConfirmPayment = async (e) => {
                               </span>
                             </div>
                           </div>
-                          {conn.phone_number && (
-                            <p className="text-xs text-[#B0B0B0]">{conn.phone_number}</p>
-                          )}
                         </button>
                       ))
                     )}
@@ -1418,7 +1494,7 @@ const handleConfirmPayment = async (e) => {
         <div className="bg-[#111111] rounded-2xl p-8">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-              Estatísticas da Conexão {activeConnection?.connection_number || ''}
+              Estatísticas {activeConnection ? `- ${activeConnection.profile_name || 'Conexão'}` : ''}
               {statsLoading && (
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#00FF99]" />
               )}
@@ -1449,11 +1525,11 @@ const handleConfirmPayment = async (e) => {
       {/* QR Code Modal */}
       {showQRModal && qrCode && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setShowQRModal(false)} />
-          
+          <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={handleCloseQRModal} />
+
           <div className="relative backdrop-blur-md bg-[#111111]/95 border border-white/10 rounded-2xl p-8 max-w-md w-full shadow-2xl z-10">
             <button
-              onClick={() => setShowQRModal(false)}
+              onClick={handleCloseQRModal}
               className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full transition-all duration-300"
             >
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

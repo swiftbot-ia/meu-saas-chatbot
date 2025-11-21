@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 // ADICIONADO: Importar supabase para logout
-import { supabase } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase/client'
 
 export default function SupportPage() {
   const [user, setUser] = useState(null)
