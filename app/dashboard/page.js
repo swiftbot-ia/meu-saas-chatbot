@@ -28,7 +28,7 @@ export default function Dashboard() {
   const [showQRModal, setShowQRModal] = useState(false)
   // REMOVER: Estados de dropdown movidos para Sidebar
   // const [accountDropdownOpen, setAccountDropdownOpen] = useState(false)
-  // const [connectionsDropdownOpen, setConnectionsDropdownOpen] = useState(false)
+  const [connectionsDropdownOpen, setConnectionsDropdownOpen] = useState(false)
   
   // Estados do Checkout
   const [showCheckoutModal, setShowCheckoutModal] = useState(false)
