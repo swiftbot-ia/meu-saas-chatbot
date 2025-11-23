@@ -26,7 +26,8 @@ export default function Dashboard() {
   })
   const [statsLoading, setStatsLoading] = useState(false)
   const [showQRModal, setShowQRModal] = useState(false)
-  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false)
+  // REMOVER: Estados de dropdown movidos para Sidebar
+  // const [accountDropdownOpen, setAccountDropdownOpen] = useState(false)
   const [connectionsDropdownOpen, setConnectionsDropdownOpen] = useState(false)
   
   // Estados do Checkout
@@ -914,126 +915,17 @@ const handleConfirmPayment = async (e) => {
             </p>
           </div>
 
-          {/* Coluna da Direita: Novo Header (Menu da Conta) */}
-          <div className="relative">
-{/* MODIFICADO: Botão com conteúdo responsivo */}
-            <button
-              onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
-              className="flex items-center justify-center p-2 rounded-xl hover:opacity-80 transition-opacity duration-200"
-              style={{ backgroundColor: '#272727' }}
-            >
-              
-              {/* --- Conteúdo Desktop (Avatar + Seta) --- */}
-              {/* 'hidden lg:flex' = Escondido no mobile, Flex no desktop */}
-              <div className="hidden lg:flex items-center gap-3">
-                <div 
-                  className="w-9 h-9 rounded-full flex items-center justify-center text-black font-bold text-sm"
-                  style={{
-                    background: 'linear-gradient(135deg, #00FF99 0%, #00E88C 100%)',
-                    boxShadow: '0 0 0 2px rgba(0, 255, 153, 0.2)'
-                  }}
-                >
-                  {initials}
-                </div>
-                <svg className="w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
 
-              {/* --- Conteúdo Mobile (Ícone "=") --- */}
-              {/* 'lg:hidden' = Mostrado no mobile, Escondido no desktop */}
-              <div className="lg:hidden w-9 h-9 flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 8h16M4 16h16" />
-                </svg>
-              </div>
+          {/* =====================================================================
+              REMOVER: Menu de Perfil Superior
 
-            </button>
+              ⚠️ O menu de conta foi migrado para a Sidebar lateral.
+              Todas as ações de conta (Configurar Conta, Gerenciar Assinatura,
+              Central de Sugestões, Central de Ajuda, Sair da Conta) agora
+              residem exclusivamente na Sidebar.
 
-            {accountDropdownOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setAccountDropdownOpen(false)} />
-                
-                {/* MODIFICADO: Fundo #272727, borda REMOVIDA */}
-                <div 
-                  className="absolute right-0 mt-3 w-64 shadow-2xl rounded-2xl overflow-hidden z-50"
-                  style={{ backgroundColor: '#272727' }}
-                >
-                  {/* O header do dropdown (com nome e email) já tinha sido removido */}
-                  
-                  <div className="py-2">
-                    <button
-                      onClick={() => {
-                        setAccountDropdownOpen(false)
-                        router.push('/account/profile')
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#B0B0B0] hover:text-white hover:bg-white/5 transition-all"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                      Configurar Conta
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setAccountDropdownOpen(false)
-                        router.push('/account/subscription')
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#B0B0B0] hover:text-white hover:bg-white/5 transition-all"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                      </svg>
-                      Gerenciar Assinatura
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setAccountDropdownOpen(false)
-                        router.push('/sugestao')
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#B0B0B0] hover:text-white hover:bg-white/5 transition-all"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
-                      </svg>
-                      Central de Sugestões
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setAccountDropdownOpen(false)
-                        router.push('/suporte')
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#B0B0B0] hover:text-white hover:bg-white/5 transition-all"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
-                      </svg>
-                      Central de Ajuda
-                    </button>
-                    
-                    <div className="border-t border-white/10 mt-2 pt-2">
-                      <button
-                        onClick={() => {
-                          setAccountDropdownOpen(false)
-                          handleLogout()
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:text-red-300 hover:bg-red-900/10 transition-all"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3 3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                        Sair da Conta
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-          {/* Fim da Coluna da Direita */}
+              Ver: app/components/Sidebar.js
+          ===================================================================== */}
 
         </div>
         {/* Fim da Linha Welcome+Header */}
