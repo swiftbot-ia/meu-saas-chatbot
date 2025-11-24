@@ -19,9 +19,11 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 // ----------------------------------------------------------------------------
 // 1. Criar Instância na UAZAPI
 // ----------------------------------------------------------------------------
-async function createUazapiInstance(instanceName, token) {
+async function createUazapiInstance(instanceName, userId, connectionId) {
   try {
     console.log(`🔌 [Uazapi] Criando instância: ${instanceName}`)
+    console.log(`   adminField01 (user_id): ${userId}`)
+    console.log(`   adminField02 (connection_id): ${connectionId}`)
 
     const response = await fetch(`${UAZAPI_URL}/instance/init`, {
       method: 'POST',
@@ -31,9 +33,9 @@ async function createUazapiInstance(instanceName, token) {
       },
       body: JSON.stringify({
         name: instanceName,
-        qrcode: true,
-        integration: 'WHATSAPP-BAILEYS',
-        systemName: 'Swiftbot 1.0'
+        systemName: 'Swiftbot 1.0',
+        adminField01: userId,
+        adminField02: connectionId
       })
     })
 
@@ -178,7 +180,11 @@ export async function POST(request) {
       console.log('🆕 [Connect] Criando nova instância na Uazapi')
 
       // Criar instância na Uazapi (retorna o token gerado pela API)
-      const createResult = await createUazapiInstance(instanceName, null)
+      const createResult = await createUazapiInstance(
+        instanceName,
+        connection.user_id,
+        connection.id
+      )
       instanceToken = createResult.token
 
       if (!instanceToken) {
@@ -187,17 +193,19 @@ export async function POST(request) {
 
       console.log('✅ [Connect] Token recebido da Uazapi')
 
-      // Salvar instance_name e token no banco
+      // Salvar instance_name, token e adminFields no banco
       await supabaseAdmin
         .from('whatsapp_connections')
         .update({
           instance_name: instanceName,
           instance_token: instanceToken,
+          admin_field_01: connection.user_id,
+          admin_field_02: connection.id,
           updated_at: new Date().toISOString()
         })
         .eq('id', connectionId)
 
-      console.log('💾 [Connect] instance_name e token salvos no banco')
+      console.log('💾 [Connect] instance_name, token e adminFields salvos no banco')
 
       // Pequena pausa para garantir que a UAZAPI registrou a criação
       await delay(1500)
@@ -224,20 +232,26 @@ export async function POST(request) {
       }
 
       // Criar nova instância
-      const createResult = await createUazapiInstance(instanceName, null)
+      const createResult = await createUazapiInstance(
+        instanceName,
+        connection.user_id,
+        connection.id
+      )
       instanceToken = createResult.token
 
-      // Salvar novo token no banco
+      // Salvar novo token e adminFields no banco
       await supabaseAdmin
         .from('whatsapp_connections')
         .update({
           instance_name: instanceName,
           instance_token: instanceToken,
+          admin_field_01: connection.user_id,
+          admin_field_02: connection.id,
           updated_at: new Date().toISOString()
         })
         .eq('id', connectionId)
 
-      console.log('✅ [Connect] Nova instância criada com novo token')
+      console.log('✅ [Connect] Nova instância criada com novo token e adminFields')
 
       // Aguardar e tentar conectar novamente
       await delay(1500)
