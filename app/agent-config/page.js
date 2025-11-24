@@ -390,16 +390,6 @@ export default function AgentConfigPage() {
         {/* Header */}
         <div className="mb-12 flex justify-between items-start gap-4">
           <div className="flex-1">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="flex items-center gap-2 text-sm text-[#B0B0B0] hover:text-white transition-colors duration-200 mb-4"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Voltar ao Dashboard
-            </button>
-            
             <h1 className="text-5xl font-bold text-white flex items-center gap-3">
               Configurar Agente IA
             </h1>
