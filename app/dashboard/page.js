@@ -440,7 +440,7 @@ const loadSubscription = async (userId) => {
 
     // Confirmação
     const confirmed = window.confirm(
-      `Tem certeza que deseja desconectar "${connection.profile_name || connection.instance_name}"?\n\n` +
+      `Tem certeza que deseja desconectar "${getConnectionName(connection)}"?\n\n` +
       'A instância será excluída da Uazapi, mas o registro será mantido no sistema.\n' +
       'Você poderá reconectar esta instância posteriormente.'
     )
@@ -924,6 +924,34 @@ const handleConfirmPayment = async (e) => {
     }
   }
 
+  /**
+   * Retorna o nome formatado da conexão
+   * - Se conectado e com profile_name: "Nome, telefone"
+   * - Se não conectado: "Conexão N" (baseado na posição)
+   */
+  const getConnectionName = (connection, index = null) => {
+    // Se tiver profile_name (conectado)
+    if (connection.profile_name) {
+      if (connection.phone_number) {
+        return `${connection.profile_name}, ${connection.phone_number}`
+      }
+      return connection.profile_name
+    }
+
+    // Se não tiver profile_name, usar numeração
+    if (index !== null) {
+      return `Conexão ${index + 1}`
+    }
+
+    // Fallback: tentar encontrar índice na lista de conexões
+    const connectionIndex = connections.findIndex(c => c.id === connection.id)
+    if (connectionIndex >= 0) {
+      return `Conexão ${connectionIndex + 1}`
+    }
+
+    return connection.instance_name || 'Conexão'
+  }
+
   // ============================================================================
   // RENDER
   // ============================================================================
@@ -1232,13 +1260,8 @@ const handleConfirmPayment = async (e) => {
                     </svg>
                     <div className="text-left">
                       <p className="text-sm font-semibold text-white">
-                        {activeConnection ? (activeConnection.profile_name || activeConnection.instance_name || 'Conexão Sem Nome') : 'Selecionar Conexão'}
+                        {activeConnection ? getConnectionName(activeConnection) : 'Selecionar Conexão'}
                       </p>
-                      {activeConnection?.phone_number && (
-                        <p className="text-xs text-gray-400">
-                          {activeConnection.phone_number}
-                        </p>
-                      )}
                       <p className="text-xs text-[#B0B0B0]">
                         {connectedCount} de {totalSlots} ativas
                       </p>
@@ -1260,7 +1283,7 @@ const handleConfirmPayment = async (e) => {
                         Nenhuma conexão encontrada
                       </div>
                     ) : (
-                      connections.map((conn) => (
+                      connections.map((conn, index) => (
                         <button
                           key={conn.id}
                           onClick={() => handleConnectionSelect(conn)}
@@ -1271,13 +1294,8 @@ const handleConfirmPayment = async (e) => {
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex flex-col">
                               <span className="text-white font-semibold text-sm">
-                                {conn.profile_name || conn.instance_name || 'Conexão Sem Nome'}
+                                {getConnectionName(conn, index)}
                               </span>
-                              {conn.phone_number && (
-                                <span className="text-xs text-gray-400 mt-1">
-                                  {conn.phone_number}
-                                </span>
-                              )}
                             </div>
                             <div className="flex items-center gap-2">
                               {getStatusIcon(conn.status)}
