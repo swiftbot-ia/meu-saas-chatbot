@@ -84,18 +84,18 @@ async function connectUazapiInstance(instanceName, token) {
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { connectionId, instanceName } = body
+    const { connectionId } = body
 
-    if (!connectionId || !instanceName) {
-      return NextResponse.json({ success: false, error: 'ID ou Nome da instância faltando' }, { status: 400 })
+    if (!connectionId) {
+      return NextResponse.json({ success: false, error: 'ID da conexão faltando' }, { status: 400 })
     }
 
-    console.log('🚀 [Connect] Iniciando fluxo para:', instanceName)
+    console.log('🚀 [Connect] Iniciando fluxo para connectionId:', connectionId)
 
-    // 1. Buscar Token no Banco (Usando supabaseAdmin para ter permissão total)
+    // 1. Buscar Conexão completa no Banco (Usando supabaseAdmin para ter permissão total)
     const { data: connection, error: dbError } = await supabaseAdmin
       .from('whatsapp_connections')
-      .select('instance_token')
+      .select('*')
       .eq('id', connectionId)
       .single()
 
@@ -104,14 +104,33 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'Conexão não encontrada' }, { status: 404 })
     }
 
-    // Gerar token se não existir
+    // 2. Gerar/obter instance_name
+    let instanceName = connection.instance_name
+    if (!instanceName) {
+      // Gerar nome baseado no user_id (limpar caracteres especiais)
+      instanceName = `swiftbot_${connection.user_id.replace(/-/g, '_')}`
+      console.log('📝 [Connect] Gerando instance_name:', instanceName)
+    }
+
+    // 3. Gerar token se não existir
     let instanceToken = connection.instance_token
     if (!instanceToken) {
       instanceToken = crypto.randomUUID().replace(/-/g, '')
+      console.log('🔑 [Connect] Gerando instance_token')
+    }
+
+    // 4. Atualizar banco com instance_name e token (se foram gerados)
+    if (!connection.instance_name || !connection.instance_token) {
       await supabaseAdmin
         .from('whatsapp_connections')
-        .update({ instance_token: instanceToken })
+        .update({
+          instance_name: instanceName,
+          instance_token: instanceToken,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', connectionId)
+
+      console.log('💾 [Connect] instance_name e token salvos no banco')
     }
 
     // 2. Chamar UAZAPI (Criação)
