@@ -429,6 +429,62 @@ const loadSubscription = async (userId) => {
     }
   }
 
+  // ============================================================================
+  // DESCONECTAR WHATSAPP
+  // ============================================================================
+  const handleDisconnect = async (connection) => {
+    if (!connection) {
+      alert('Nenhuma conexão selecionada')
+      return
+    }
+
+    // Confirmação
+    const confirmed = window.confirm(
+      `Tem certeza que deseja desconectar "${connection.profile_name || connection.instance_name}"?\n\n` +
+      'A instância será excluída da Uazapi, mas o registro será mantido no sistema.\n' +
+      'Você poderá reconectar esta instância posteriormente.'
+    )
+
+    if (!confirmed) return
+
+    try {
+      setConnecting(true)
+      console.log('🔌 Desconectando instância:', connection.id)
+
+      const response = await fetch('/api/whatsapp/disconnect-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          connectionId: connection.id
+        })
+      })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao desconectar')
+      }
+
+      console.log('✅ Instância desconectada com sucesso')
+
+      // Atualizar lista de conexões
+      await loadConnections(user.id)
+
+      // Limpar conexão ativa se for a que foi desconectada
+      if (activeConnection?.id === connection.id) {
+        setActiveConnection(null)
+        setWhatsappStatus('disconnected')
+      }
+
+      alert('WhatsApp desconectado com sucesso!')
+    } catch (error) {
+      console.error('❌ Erro ao desconectar:', error)
+      alert('Erro ao desconectar WhatsApp: ' + error.message)
+    } finally {
+      setConnecting(false)
+    }
+  }
+
   const syncSubscriptionStatus = async () => {
     if (!subscription?.stripe_subscription_id || subscription.stripe_subscription_id === 'super_account_bypass') {
       alert('Não há assinatura para sincronizar')
@@ -1267,10 +1323,11 @@ const handleConfirmPayment = async (e) => {
             {/* Action Button - BOTÃO FANTASMA (Ghost) */}
             {whatsappStatus === 'connected' ? (
               <button
-                onClick={() => checkWhatsAppStatus(activeConnection)}
-                className="w-full bg-[#222222] hover:bg-[#333333] text-[#B0B0B0] hover:text-white font-medium py-3 px-4 rounded-xl transition-all duration-300"
+                onClick={() => handleDisconnect(activeConnection)}
+                disabled={connecting || !activeConnection}
+                className="w-full bg-red-900/20 hover:bg-red-900/30 text-red-400 hover:text-red-300 font-medium py-3 px-4 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Verificar Status
+                {connecting ? 'Desconectando...' : 'Desconectar'}
               </button>
             ) : (
               <button
