@@ -7,9 +7,10 @@ import { uazapi } from '../../../../lib/uazapi-client'
  * POST /api/whatsapp/disconnect-user
  *
  * Desconecta uma instância WhatsApp do usuário:
- * - Desconecta na Uazapi (exclui a instância)
- * - Atualiza o registro no Supabase (marca como desconectado)
- * - NÃO deleta o registro do Supabase
+ * - Deleta a instância na Uazapi (usando DELETE /instance/delete/{instanceName})
+ * - Limpa instance_name, instance_token e perfil no Supabase
+ * - Marca como 'disconnected' mas NÃO deleta o registro
+ * - Permite reconectar posteriormente (nova instância será criada)
  *
  * Body: { connectionId: string }
  */
@@ -41,24 +42,26 @@ export async function POST(request) {
       )
     }
 
-    // 2. Desconectar na Uazapi (se tiver token)
-    if (connection.instance_token) {
+    // 2. Deletar instância na Uazapi (se tiver nome da instância)
+    if (connection.instance_name) {
       try {
-        console.log('📡 Desconectando instância na Uazapi...')
-        await uazapi.disconnectInstance(connection.instance_token)
-        console.log('✅ Instância desconectada na Uazapi')
+        console.log('🗑️ Deletando instância na Uazapi:', connection.instance_name)
+        await uazapi.deleteInstance(connection.instance_name)
+        console.log('✅ Instância deletada na Uazapi')
       } catch (uazapiError) {
-        console.error('⚠️ Erro ao desconectar na Uazapi:', uazapiError.message)
+        console.error('⚠️ Erro ao deletar na Uazapi:', uazapiError.message)
         // Continua mesmo com erro na Uazapi
       }
     }
 
-    // 3. Atualizar status no Supabase (NÃO deleta o registro)
+    // 3. Atualizar status no Supabase (NÃO deleta o registro, mas limpa os dados da instância)
     const { error: updateError } = await supabase
       .from('whatsapp_connections')
       .update({
         status: 'disconnected',
         is_connected: false,
+        instance_name: null,        // Limpar instance_name
+        instance_token: null,        // Limpar instance_token
         profile_name: null,
         profile_pic_url: null,
         phone_number: null,
