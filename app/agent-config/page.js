@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { supabase } from '../../lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 
@@ -115,7 +115,8 @@ const OBJECTIVES = [
   { value: 'agendamento', label: '📅 Agendar consultas/reuniões' }
 ]
 
-export default function AgentConfigPage() {
+// Componente interno com a lógica (antigo AgentConfigPage)
+function AgentConfigContent() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -620,5 +621,20 @@ export default function AgentConfigPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+// Componente Principal (Exportado) que faz o wrap do Suspense
+export default function AgentConfigPage() {
+  return (
+    <Suspense 
+      fallback={
+        <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00FF99]" />
+        </div>
+      }
+    >
+      <AgentConfigContent />
+    </Suspense>
   )
 }
