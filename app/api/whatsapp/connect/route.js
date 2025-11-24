@@ -38,7 +38,11 @@ async function createUazapiInstance(instanceName, token) {
     })
 
     const data = await response.json()
-    
+
+    // Log completo da resposta para debug
+    console.log('📊 [Uazapi] Status HTTP:', response.status)
+    console.log('📊 [Uazapi] Resposta completa:', JSON.stringify(data, null, 2))
+
     // Se já existe (403), consideramos sucesso para tentar conectar depois
     if (response.status === 403) {
       console.log('⚠️ [Uazapi] Instância já existe, prosseguindo...')
@@ -46,7 +50,9 @@ async function createUazapiInstance(instanceName, token) {
     }
 
     if (!response.ok) {
-      throw new Error(data?.message || 'Falha ao criar instância')
+      const errorMsg = data?.message || data?.error || JSON.stringify(data) || 'Falha ao criar instância'
+      console.error('❌ [Uazapi] Erro detalhado:', errorMsg)
+      throw new Error(errorMsg)
     }
 
     return { success: true, data }
