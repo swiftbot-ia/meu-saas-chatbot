@@ -42,19 +42,30 @@ export async function POST(request) {
       )
     }
 
-    // 2. Deletar instância na Uazapi (se tiver nome da instância)
-    if (connection.instance_name) {
+    // 2. Desconectar e deletar instância na Uazapi
+    if (connection.instance_name && connection.instance_token) {
       try {
-        console.log('🗑️ Deletando instância na Uazapi:', connection.instance_name)
+        // Passo 1: Desconectar (POST /instance/disconnect)
+        console.log('📡 [Disconnect] Desconectando instância:', connection.instance_name)
+        await uazapi.disconnectInstance(connection.instance_token)
+        console.log('✅ [Disconnect] Instância desconectada')
+
+        // Passo 2: Aguardar 1 segundo
+        console.log('⏳ [Disconnect] Aguardando 1 segundo...')
+        await new Promise(resolve => setTimeout(resolve, 1000))
+
+        // Passo 3: Deletar (DELETE /instance/delete/{instanceName})
+        console.log('🗑️ [Disconnect] Deletando instância:', connection.instance_name)
         await uazapi.deleteInstance(connection.instance_name)
-        console.log('✅ Instância deletada na Uazapi')
+        console.log('✅ [Disconnect] Instância deletada')
+
       } catch (uazapiError) {
-        console.error('⚠️ Erro ao deletar na Uazapi:', uazapiError.message)
+        console.error('⚠️ [Disconnect] Erro:', uazapiError.message)
         // Continua mesmo com erro na Uazapi
       }
     }
 
-    // 3. Atualizar status no Supabase (NÃO deleta o registro, mas limpa os dados da instância)
+    // 3. Limpar dados no Supabase (NÃO deleta o registro)
     const { error: updateError } = await supabase
       .from('whatsapp_connections')
       .update({
