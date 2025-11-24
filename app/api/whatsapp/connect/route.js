@@ -152,6 +152,28 @@ export async function POST(request) {
     let instanceToken = connection.instance_token
     let needsCreation = !instanceToken
 
+    // Se o instance_name for diferente do esperado (formato antigo), forçar recriação
+    if (connection.instance_name && connection.instance_name !== instanceName) {
+      console.log('⚠️ [Connect] instance_name com formato antigo, forçando recriação')
+      console.log(`   Antigo: ${connection.instance_name}`)
+      console.log(`   Novo: ${instanceName}`)
+      needsCreation = true
+      instanceToken = null
+
+      // Deletar instância antiga se existir
+      if (connection.instance_name) {
+        try {
+          console.log('🗑️ [Connect] Deletando instância antiga:', connection.instance_name)
+          await fetch(`${UAZAPI_URL}/instance/delete/${connection.instance_name}`, {
+            method: 'DELETE',
+            headers: { 'admintoken': UAZAPI_ADMIN_TOKEN }
+          })
+        } catch (e) {
+          console.log('⚠️ [Connect] Instância antiga não existe ou já foi deletada')
+        }
+      }
+    }
+
     if (needsCreation) {
       console.log('🆕 [Connect] Criando nova instância na Uazapi')
 
@@ -183,8 +205,56 @@ export async function POST(request) {
       console.log('♻️ [Connect] Usando instância existente')
     }
 
-    // 4. Chamar UAZAPI (Conexão/QR) - agora usando POST como no código antigo
+    // 4. Chamar UAZAPI (Conexão/QR)
     const connectResult = await connectUazapiInstance(instanceName, instanceToken)
+
+    // Se receber erro 401 (token inválido), deletar instância e recriar
+    if (!connectResult.ok && connectResult.error && connectResult.error.includes('401')) {
+      console.log('⚠️ [Connect] Token inválido detectado, recriando instância...')
+
+      // Deletar instância antiga
+      try {
+        await fetch(`${UAZAPI_URL}/instance/delete/${instanceName}`, {
+          method: 'DELETE',
+          headers: { 'admintoken': UAZAPI_ADMIN_TOKEN }
+        })
+        console.log('🗑️ [Connect] Instância com token inválido deletada')
+      } catch (e) {
+        console.log('⚠️ [Connect] Erro ao deletar instância antiga:', e.message)
+      }
+
+      // Criar nova instância
+      const createResult = await createUazapiInstance(instanceName, null)
+      instanceToken = createResult.token
+
+      // Salvar novo token no banco
+      await supabaseAdmin
+        .from('whatsapp_connections')
+        .update({
+          instance_name: instanceName,
+          instance_token: instanceToken,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', connectionId)
+
+      console.log('✅ [Connect] Nova instância criada com novo token')
+
+      // Aguardar e tentar conectar novamente
+      await delay(1500)
+      const retryConnect = await connectUazapiInstance(instanceName, instanceToken)
+      return await processConnectionResult(retryConnect, connectionId, instanceName, instanceToken)
+    }
+
+    return await processConnectionResult(connectResult, connectionId, instanceName, instanceToken)
+  } catch (error) {
+    console.error('❌ Erro Fatal na Rota:', error)
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  }
+}
+
+// Helper function para processar resultado da conexão
+async function processConnectionResult(connectResult, connectionId, instanceName, instanceToken) {
+  try {
 
     let qrCode = null
     let status = 'connecting'
