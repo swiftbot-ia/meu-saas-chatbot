@@ -22,18 +22,18 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 async function createUazapiInstance(instanceName, token) {
   try {
     console.log(`🔌 [Uazapi] Criando instância: ${instanceName}`)
-    
-    const response = await fetch(`${UAZAPI_URL}/instance/create`, {
+
+    const response = await fetch(`${UAZAPI_URL}/instance/init`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': UAZAPI_ADMIN_TOKEN
+        'admintoken': UAZAPI_ADMIN_TOKEN
       },
       body: JSON.stringify({
-        instanceName: instanceName,
-        token: token,
+        name: instanceName,
         qrcode: true,
-        reconnect: true
+        integration: 'WHATSAPP-BAILEYS',
+        systemName: 'Swiftbot 1.0'
       })
     })
 
@@ -55,7 +55,11 @@ async function createUazapiInstance(instanceName, token) {
       throw new Error(errorMsg)
     }
 
-    return { success: true, data }
+    // Extrair o token gerado pela API
+    const instanceToken = data.token || data.hash
+    console.log('✅ [Uazapi] Token gerado pela API:', instanceToken ? 'SIM' : 'NÃO')
+
+    return { success: true, data, token: instanceToken }
   } catch (error) {
     console.error('❌ [Uazapi] Erro de criação:', error)
     throw error
@@ -63,24 +67,50 @@ async function createUazapiInstance(instanceName, token) {
 }
 
 // ----------------------------------------------------------------------------
-// 2. Buscar QR Code / Status
+// 2. Conectar e Buscar QR Code / Status
 // ----------------------------------------------------------------------------
 async function connectUazapiInstance(instanceName, token) {
   try {
-    console.log(`🔄 [Uazapi] Buscando QR Code para: ${instanceName}`)
-    
-    const response = await fetch(`${UAZAPI_URL}/instance/connect/${instanceName}`, {
-      method: 'GET',
+    console.log(`🔄 [Uazapi] Conectando instância: ${instanceName}`)
+
+    // Passo 1: Iniciar conexão (POST /instance/connect)
+    const connectResponse = await fetch(`${UAZAPI_URL}/instance/connect`, {
+      method: 'POST',
       headers: {
-        'apikey': UAZAPI_ADMIN_TOKEN,
-        'Authorization': `Bearer ${token}`
-      }
+        'Content-Type': 'application/json',
+        'token': token
+      },
+      body: JSON.stringify({})
     })
 
-    const data = await response.json()
-    return { ok: response.ok, data }
+    if (!connectResponse.ok) {
+      const errorText = await connectResponse.text()
+      console.error('❌ [Uazapi] Erro ao conectar:', errorText)
+      return { ok: false, error: errorText }
+    }
+
+    const connectData = await connectResponse.json()
+    console.log('✅ [Uazapi] Conexão iniciada')
+
+    // Passo 2: Buscar status e QR Code (GET /instance/status)
+    const statusResponse = await fetch(`${UAZAPI_URL}/instance/status`, {
+      method: 'GET',
+      headers: { 'token': token }
+    })
+
+    if (!statusResponse.ok) {
+      const errorText = await statusResponse.text()
+      console.error('❌ [Uazapi] Erro ao buscar status:', errorText)
+      return { ok: false, error: errorText }
+    }
+
+    const statusData = await statusResponse.json()
+    console.log('📊 [Uazapi] Status recebido:', JSON.stringify(statusData, null, 2))
+
+    return { ok: true, data: statusData }
   } catch (error) {
-    return { ok: false, error }
+    console.error('❌ [Uazapi] Erro na conexão:', error)
+    return { ok: false, error: error.message }
   }
 }
 
@@ -118,15 +148,24 @@ export async function POST(request) {
       console.log('📝 [Connect] Gerando instance_name:', instanceName)
     }
 
-    // 3. Gerar token se não existir
+    // 3. Verificar se precisa criar nova instância ou usar existente
     let instanceToken = connection.instance_token
-    if (!instanceToken) {
-      instanceToken = crypto.randomUUID().replace(/-/g, '')
-      console.log('🔑 [Connect] Gerando instance_token')
-    }
+    let needsCreation = !instanceToken
 
-    // 4. Atualizar banco com instance_name e token (se foram gerados)
-    if (!connection.instance_name || !connection.instance_token) {
+    if (needsCreation) {
+      console.log('🆕 [Connect] Criando nova instância na Uazapi')
+
+      // Criar instância na Uazapi (retorna o token gerado pela API)
+      const createResult = await createUazapiInstance(instanceName, null)
+      instanceToken = createResult.token
+
+      if (!instanceToken) {
+        throw new Error('Token não foi retornado pela API da Uazapi')
+      }
+
+      console.log('✅ [Connect] Token recebido da Uazapi')
+
+      // Salvar instance_name e token no banco
       await supabaseAdmin
         .from('whatsapp_connections')
         .update({
@@ -137,47 +176,96 @@ export async function POST(request) {
         .eq('id', connectionId)
 
       console.log('💾 [Connect] instance_name e token salvos no banco')
+
+      // Pequena pausa para garantir que a UAZAPI registrou a criação
+      await delay(1500)
+    } else {
+      console.log('♻️ [Connect] Usando instância existente')
     }
 
-    // 2. Chamar UAZAPI (Criação)
-    await createUazapiInstance(instanceName, instanceToken)
-    
-    // Pequena pausa para garantir que a UAZAPI registrou a criação
-    await delay(1500)
-
-    // 3. Chamar UAZAPI (Conexão/QR)
+    // 4. Chamar UAZAPI (Conexão/QR) - agora usando POST como no código antigo
     const connectResult = await connectUazapiInstance(instanceName, instanceToken)
 
     let qrCode = null
     let status = 'connecting'
+    let instanceInfo = {}
 
-    if (connectResult.data) {
-        // Tenta pegar o QR Code em diferentes formatos possíveis
-        if (connectResult.data.base64) qrCode = connectResult.data.base64
-        if (connectResult.data.qrcode?.base64) qrCode = connectResult.data.qrcode.base64
-        
-        // Verifica se já conectou direto (reconexão)
-        if (connectResult.data.instance?.state === 'open' || connectResult.data.state === 'open') {
-            status = 'connected'
-            qrCode = null
-        }
+    if (connectResult.ok && connectResult.data) {
+      const statusData = connectResult.data
+
+      // Extrair informações da instância
+      instanceInfo = statusData.instance || {}
+      status = instanceInfo.status || statusData.status || 'connecting'
+
+      console.log('📊 [Connect] Status da instância:', status)
+
+      // Extrair QR Code (múltiplos formatos possíveis)
+      if (instanceInfo.qrcode) {
+        qrCode = instanceInfo.qrcode
+        console.log('✅ [Connect] QR Code encontrado em instance.qrcode')
+      } else if (statusData.qrcode?.base64) {
+        qrCode = statusData.qrcode.base64
+        console.log('✅ [Connect] QR Code encontrado em qrcode.base64')
+      } else if (statusData.qrcode) {
+        qrCode = statusData.qrcode
+        console.log('✅ [Connect] QR Code encontrado em qrcode')
+      } else if (statusData.qr) {
+        qrCode = statusData.qr
+        console.log('✅ [Connect] QR Code encontrado em qr')
+      } else if (statusData.base64) {
+        qrCode = statusData.base64
+        console.log('✅ [Connect] QR Code encontrado em base64')
+      }
+
+      // Se já está conectado, limpar QR Code
+      if (status === 'open') {
+        qrCode = null
+        status = 'connected'
+        console.log('✅ [Connect] Instância já conectada!')
+      }
     }
 
-    // 4. Atualizar Status no Banco
+    // 5. Atualizar Status no Banco
+    const updateData = {
+      status: status === 'connected' || status === 'open' ? 'connected' : 'connecting',
+      is_connected: status === 'connected' || status === 'open',
+      updated_at: new Date().toISOString()
+    }
+
+    // Se já conectou, salvar informações do perfil
+    if (status === 'connected' || status === 'open') {
+      if (instanceInfo.profileName) {
+        updateData.profile_name = instanceInfo.profileName
+        updateData.profile_pic_url = instanceInfo.profilePicUrl || null
+        updateData.phone_number = instanceInfo.owner || null
+        console.log('✅ [Connect] Perfil detectado:', {
+          name: instanceInfo.profileName,
+          phone: instanceInfo.owner
+        })
+      }
+    }
+
     await supabaseAdmin
       .from('whatsapp_connections')
-      .update({ 
-        status: status === 'connected' ? 'connected' : 'pending',
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', connectionId)
+
+    console.log('💾 [Connect] Banco atualizado:', updateData)
 
     return NextResponse.json({
       success: true,
       qrCode: qrCode,
       status: status,
       instanceName: instanceName,
-      message: status === 'connected' ? 'Conectado!' : 'Escaneie o QR Code'
+      profileName: instanceInfo.profileName || null,
+      profilePicUrl: instanceInfo.profilePicUrl || null,
+      owner: instanceInfo.owner || null,
+      connected: status === 'connected' || status === 'open',
+      message: qrCode
+        ? 'QR Code gerado com sucesso'
+        : status === 'connected' || status === 'open'
+          ? 'Instância já conectada'
+          : 'Aguardando QR Code...'
     })
 
   } catch (error) {
