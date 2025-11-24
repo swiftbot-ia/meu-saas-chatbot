@@ -88,7 +88,7 @@ console.log('✅ Payment method anexado e definido como padrão')
     // ✅ DEFINIR PREÇOS
     const pricing = {
       monthly: {
-        1: 10, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875
+        1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875
       },
       annual: {
         1: 1776, 2: 3294, 3: 4806, 4: 6318, 5: 6750, 6: 8100, 7: 9450
