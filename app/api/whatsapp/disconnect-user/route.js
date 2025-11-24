@@ -54,9 +54,9 @@ export async function POST(request) {
         console.log('⏳ [Disconnect] Aguardando 1 segundo...')
         await new Promise(resolve => setTimeout(resolve, 1000))
 
-        // Passo 3: Deletar (DELETE /instance/delete/{instanceName})
+        // Passo 3: Deletar (DELETE /instance com token)
         console.log('🗑️ [Disconnect] Deletando instância:', connection.instance_name)
-        await uazapi.deleteInstance(connection.instance_name)
+        await uazapi.deleteInstance(connection.instance_token)
         console.log('✅ [Disconnect] Instância deletada')
 
       } catch (uazapiError) {
@@ -71,7 +71,7 @@ export async function POST(request) {
       .update({
         status: 'disconnected',
         is_connected: false,
-        instance_name: null,        // Limpar instance_name
+        // instance_name: mantém (NOT NULL constraint)
         instance_token: null,        // Limpar instance_token
         profile_name: null,
         profile_pic_url: null,
