@@ -7,9 +7,10 @@ import { uazapi } from '../../../../lib/uazapi-client'
  * POST /api/whatsapp/disconnect-user
  *
  * Desconecta uma instância WhatsApp do usuário:
- * - Desconecta na Uazapi (exclui a instância)
- * - Atualiza o registro no Supabase (marca como desconectado)
- * - NÃO deleta o registro do Supabase
+ * - Deleta a instância na Uazapi (usando DELETE /instance/delete/{instanceName})
+ * - Limpa instance_name, instance_token e perfil no Supabase
+ * - Marca como 'disconnected' mas NÃO deleta o registro
+ * - Permite reconectar posteriormente (nova instância será criada)
  *
  * Body: { connectionId: string }
  */
@@ -41,24 +42,37 @@ export async function POST(request) {
       )
     }
 
-    // 2. Desconectar na Uazapi (se tiver token)
-    if (connection.instance_token) {
+    // 2. Desconectar e deletar instância na Uazapi
+    if (connection.instance_name && connection.instance_token) {
       try {
-        console.log('📡 Desconectando instância na Uazapi...')
+        // Passo 1: Desconectar (POST /instance/disconnect)
+        console.log('📡 [Disconnect] Desconectando instância:', connection.instance_name)
         await uazapi.disconnectInstance(connection.instance_token)
-        console.log('✅ Instância desconectada na Uazapi')
+        console.log('✅ [Disconnect] Instância desconectada')
+
+        // Passo 2: Aguardar 1 segundo
+        console.log('⏳ [Disconnect] Aguardando 1 segundo...')
+        await new Promise(resolve => setTimeout(resolve, 1000))
+
+        // Passo 3: Deletar (DELETE /instance com token)
+        console.log('🗑️ [Disconnect] Deletando instância:', connection.instance_name)
+        await uazapi.deleteInstance(connection.instance_token)
+        console.log('✅ [Disconnect] Instância deletada')
+
       } catch (uazapiError) {
-        console.error('⚠️ Erro ao desconectar na Uazapi:', uazapiError.message)
+        console.error('⚠️ [Disconnect] Erro:', uazapiError.message)
         // Continua mesmo com erro na Uazapi
       }
     }
 
-    // 3. Atualizar status no Supabase (NÃO deleta o registro)
+    // 3. Limpar dados no Supabase (NÃO deleta o registro)
     const { error: updateError } = await supabase
       .from('whatsapp_connections')
       .update({
         status: 'disconnected',
         is_connected: false,
+        // instance_name: mantém (NOT NULL constraint)
+        instance_token: null,        // Limpar instance_token
         profile_name: null,
         profile_pic_url: null,
         phone_number: null,
