@@ -17,7 +17,7 @@ export async function POST(request) {
     }
 
     // Nome da instância (único para cada usuário)
-    const instanceName = `swiftbot_${userId.replace(/-/g, '_')}`
+    const instanceName = `swiftbot_${userId}`
     console.log(`Verificando instância: ${instanceName}`)
 
     // Primeiro, verificar se a instância já existe

@@ -14,7 +14,7 @@ export async function POST(request) {
       )
     }
 
-    const instanceName = `swiftbot_${userId.replace(/-/g, '_')}`
+    const instanceName = `swiftbot_${userId}`
 
     console.log(`Deletando instância: ${instanceName}`)
 

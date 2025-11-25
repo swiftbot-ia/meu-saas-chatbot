@@ -210,16 +210,49 @@ const loadSubscription = async (userId) => {
   }
 
   // ============================================================================
-  // FECHAR MODAL QR CODE (com refresh automático)
+  // FECHAR MODAL QR CODE (com verificação automática de conexão)
   // ============================================================================
   const handleCloseQRModal = async () => {
     setShowQRModal(false)
     setQrCode(null)
 
-    // Recarregar conexões para pegar status atualizado
+    // Recarregar conexões imediatamente para mostrar "Conectando..."
     if (user) {
       console.log('🔄 [Dashboard] Recarregando conexões após fechar modal...')
       await loadConnections(user.id)
+
+      // Aguardar 30 segundos antes de verificar se conectou
+      console.log('⏳ [Dashboard] Aguardando 30 segundos para verificar conexão...')
+      setTimeout(async () => {
+        console.log('🔍 [Dashboard] Verificando status da conexão...')
+
+        // Verificar status da conexão ativa
+        if (activeConnection?.id) {
+          try {
+            const response = await fetch('/api/whatsapp/status', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ connectionId: activeConnection.id })
+            })
+
+            const data = await response.json()
+
+            if (data.success) {
+              console.log('✅ [Dashboard] Status verificado:', data)
+
+              // Recarregar conexões para atualizar com perfil completo
+              await loadConnections(user.id)
+
+              // Se conectou, recarregar estatísticas
+              if (data.connected) {
+                console.log('🎉 [Dashboard] WhatsApp conectado com sucesso!')
+              }
+            }
+          } catch (error) {
+            console.error('❌ [Dashboard] Erro ao verificar status:', error)
+          }
+        }
+      }, 30000) // 30 segundos
     }
   }
 
