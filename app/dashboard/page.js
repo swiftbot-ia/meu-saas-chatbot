@@ -1337,15 +1337,45 @@ const handleConfirmPayment = async (e) => {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <svg className="w-5 h-5 text-[#10E57C]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    <div className="text-left">
-                      <p className="text-sm font-semibold text-white">
-                        {activeConnection ? getConnectionName(activeConnection) : 'Selecionar Conexão'}
+                    {/* Avatar */}
+                    {activeConnection ? (
+                      <div className="flex-shrink-0">
+                        {activeConnection.profile_pic_url ? (
+                          <img
+                            src={activeConnection.profile_pic_url}
+                            alt={activeConnection.profile_name || 'Conexão'}
+                            className="w-12 h-12 rounded-full object-cover bg-[#333333]"
+                            onError={(e) => {
+                              e.target.style.display = 'none'
+                              e.target.nextSibling.style.display = 'flex'
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          className={`w-12 h-12 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold text-lg ${
+                            activeConnection.profile_pic_url ? 'hidden' : 'flex'
+                          }`}
+                          style={{ display: activeConnection.profile_pic_url ? 'none' : 'flex' }}
+                        >
+                          {activeConnection.profile_name ? activeConnection.profile_name.charAt(0).toUpperCase() : '?'}
+                        </div>
+                      </div>
+                    ) : (
+                      <svg className="w-12 h-12 text-[#10E57C]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                    )}
+
+                    {/* Info */}
+                    <div className="text-left flex-1">
+                      <p className="text-[15px] font-medium text-white">
+                        {activeConnection ? (activeConnection.profile_name || 'Conexão sem nome') : 'Selecionar Conexão'}
                       </p>
-                      <p className="text-xs text-[#B0B0B0]">
-                        {connectedCount} de {totalSlots} ativas
+                      <p className="text-[13px] text-[#8696A0]">
+                        {activeConnection
+                          ? (activeConnection.phone_number ? `+${activeConnection.phone_number}` : 'Desconectado')
+                          : `${connectedCount} de ${totalSlots} ativas`
+                        }
                       </p>
                     </div>
                   </div>
@@ -1358,7 +1388,7 @@ const handleConfirmPayment = async (e) => {
               {connectionsDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setConnectionsDropdownOpen(false)} />
-                  
+
                   <div className="absolute top-full left-0 right-0 mt-2 backdrop-blur-md bg-[#111111]/95 border border-white/10 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto">
                     {connections.length === 0 ? (
                       <div className="p-8 text-center text-[#B0B0B0] text-sm">
@@ -1369,27 +1399,53 @@ const handleConfirmPayment = async (e) => {
                         <button
                           key={conn.id}
                           onClick={() => handleConnectionSelect(conn)}
-                          className={`w-full p-4 text-left hover:bg-white/5 transition-all border-b border-white/5 last:border-0 ${
+                          className={`w-full p-3 text-left hover:bg-white/5 transition-all border-b border-white/5 last:border-0 ${
                             activeConnection?.id === conn.id ? 'bg-white/5' : ''
                           }`}
                         >
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex flex-col">
-                              <span className="text-white font-semibold text-sm">
-                                {getConnectionName(conn, index)}
-                              </span>
+                          <div className="flex items-center gap-3">
+                            {/* Avatar */}
+                            <div className="flex-shrink-0">
+                              {conn.profile_pic_url ? (
+                                <img
+                                  src={conn.profile_pic_url}
+                                  alt={conn.profile_name || `Conexão ${index + 1}`}
+                                  className="w-12 h-12 rounded-full object-cover bg-[#333333]"
+                                  onError={(e) => {
+                                    e.target.style.display = 'none'
+                                    e.target.nextSibling.style.display = 'flex'
+                                  }}
+                                />
+                              ) : null}
+                              <div
+                                className={`w-12 h-12 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold text-lg ${
+                                  conn.profile_pic_url ? 'hidden' : 'flex'
+                                }`}
+                                style={{ display: conn.profile_pic_url ? 'none' : 'flex' }}
+                              >
+                                {conn.profile_name ? conn.profile_name.charAt(0).toUpperCase() : (index + 1)}
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2">
+
+                            {/* Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-white font-medium text-[15px] truncate">
+                                {conn.profile_name || `Conexão ${index + 1}`}
+                              </div>
+                              <div className="text-[#8696A0] text-[13px] truncate mt-0.5">
+                                {conn.phone_number ? `+${conn.phone_number}` : 'Desconectado'}
+                              </div>
+                            </div>
+
+                            {/* Status Badge */}
+                            <div className="flex-shrink-0">
                               {getStatusIcon(conn.status)}
-                              <span className="text-xs text-[#B0B0B0]">
-                                {getStatusText(conn.status)}
-                              </span>
                             </div>
                           </div>
                         </button>
                       ))
                     )}
-                    
+
                     <div className="border-t border-white/10 p-2">
                       {connections.length < totalSlots && (
                         <button
@@ -1426,6 +1482,7 @@ const handleConfirmPayment = async (e) => {
                 </span>
               </div>
             )}
+
 
             {/* Action Button - BOTÃO FANTASMA (Ghost) */}
             {whatsappStatus === 'connected' ? (
