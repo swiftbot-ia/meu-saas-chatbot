@@ -1320,21 +1320,47 @@ const handleConfirmPayment = async (e) => {
                         <button
                           key={conn.id}
                           onClick={() => handleConnectionSelect(conn)}
-                          className={`w-full p-4 text-left hover:bg-white/5 transition-all border-b border-white/5 last:border-0 ${
+                          className={`w-full p-3 text-left hover:bg-white/5 transition-all border-b border-white/5 last:border-0 ${
                             activeConnection?.id === conn.id ? 'bg-white/5' : ''
                           }`}
                         >
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex flex-col">
-                              <span className="text-white font-semibold text-sm">
-                                {getConnectionName(conn, index)}
-                              </span>
+                          <div className="flex items-center gap-3">
+                            {/* Avatar */}
+                            <div className="flex-shrink-0">
+                              {conn.profile_pic_url ? (
+                                <img
+                                  src={conn.profile_pic_url}
+                                  alt={conn.profile_name || `Conexão ${index + 1}`}
+                                  className="w-12 h-12 rounded-full object-cover bg-[#333333]"
+                                  onError={(e) => {
+                                    e.target.style.display = 'none'
+                                    e.target.nextSibling.style.display = 'flex'
+                                  }}
+                                />
+                              ) : null}
+                              <div
+                                className={`w-12 h-12 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold text-lg ${
+                                  conn.profile_pic_url ? 'hidden' : 'flex'
+                                }`}
+                                style={{ display: conn.profile_pic_url ? 'none' : 'flex' }}
+                              >
+                                {conn.profile_name ? conn.profile_name.charAt(0).toUpperCase() : (index + 1)}
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2">
+
+                            {/* Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-white font-medium text-[15px] truncate">
+                                {conn.profile_name || `Conexão ${index + 1}`}
+                              </div>
+                              <div className="text-[#8696A0] text-[13px] truncate mt-0.5">
+                                {conn.phone_number ? `+${conn.phone_number}` : 'Desconectado'}
+                              </div>
+                            </div>
+
+                            {/* Status Badge */}
+                            <div className="flex-shrink-0">
                               {getStatusIcon(conn.status)}
-                              <span className="text-xs text-[#B0B0B0]">
-                                {getStatusText(conn.status)}
-                              </span>
                             </div>
                           </div>
                         </button>
