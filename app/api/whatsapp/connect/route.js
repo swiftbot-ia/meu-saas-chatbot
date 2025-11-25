@@ -145,10 +145,8 @@ export async function POST(request) {
     // 2. Gerar/obter instance_name
     let instanceName = connection.instance_name
     if (!instanceName) {
-      // Gerar nome limpo baseado no ID da conexão (sem underscores)
-      // Formato: swiftbot + primeiros 8 caracteres do UUID (sem hífens)
-      const shortId = connection.id.replace(/-/g, '').substring(0, 12)
-      instanceName = `swiftbot${shortId}`
+      // Formato: swiftbot_ + UUID completo da conexão
+      instanceName = `swiftbot_${connection.id}`
       console.log('📝 [Connect] Gerando instance_name:', instanceName)
     }
 
