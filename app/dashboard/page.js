@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import StandardModal, { initialModalConfig, createModalConfig } from '../components/StandardModal'
 
 export default function Dashboard() {
   const router = useRouter()
@@ -46,6 +47,16 @@ export default function Dashboard() {
   const [paymentElement, setPaymentElement] = useState(null)
   const [stripeElements, setStripeElements] = useState(null)
   const [isPaymentElementReady, setIsPaymentElementReady] = useState(false)
+
+  // Standard Modal state
+  const [modalConfig, setModalConfig] = useState(initialModalConfig)
+  const [pendingAction, setPendingAction] = useState(null) // Para armazenar ações pendentes de confirmação
+
+  // Helper para fechar o modal
+  const closeModal = () => {
+    setModalConfig(initialModalConfig)
+    setPendingAction(null)
+  }
 
   // ============================================================================
   // CARREGAMENTO INICIAL
@@ -256,7 +267,10 @@ const loadSubscription = async (userId) => {
   // ============================================================================
   const connectWhatsApp = async (connection) => {
     if (!connection) {
-      alert('Selecione uma conexão primeiro')
+      setModalConfig(createModalConfig.warning(
+        'Selecione uma conexão',
+        'Por favor, selecione uma conexão antes de tentar conectar o WhatsApp.'
+      ))
       return
     }
 
@@ -285,11 +299,14 @@ const loadSubscription = async (userId) => {
     if (subscriptionStatus === 'trial' && subscription?.trial_end_date) {
       const trialEndDate = new Date(subscription.trial_end_date)
       const now = new Date()
-      
+
       if (now > trialEndDate) {
         console.log('❌ Trial expirado detectado no frontend')
-        alert('Seu período de teste expirou. Por favor, assine um plano para continuar.')
-        setShowCheckoutModal(true)
+        setModalConfig(createModalConfig.warning(
+          'Período de Teste Expirado',
+          'Seu período de teste expirou. Por favor, assine um plano para continuar usando a plataforma.',
+          () => setShowCheckoutModal(true)
+        ))
         return
       }
     }
@@ -322,16 +339,25 @@ const loadSubscription = async (userId) => {
         // Tratamento de erros específicos
         if (data.subscription_status) {
           console.log(`❌ Erro de assinatura: ${data.subscription_status}`)
-          alert(data.error || 'Problema com sua assinatura. Verifique seu plano.')
-          setShowCheckoutModal(true)
+          setModalConfig(createModalConfig.error(
+            'Problema com Assinatura',
+            data.error || 'Há um problema com sua assinatura. Verifique seu plano.',
+            () => setShowCheckoutModal(true)
+          ))
         } else {
-          alert(data.error || 'Erro ao conectar WhatsApp')
+          setModalConfig(createModalConfig.error(
+            'Erro ao Conectar',
+            data.error || 'Ocorreu um erro ao conectar o WhatsApp. Tente novamente.'
+          ))
         }
         return
       }
     } catch (error) {
       console.error('Erro ao conectar WhatsApp:', error)
-      alert('Erro ao conectar WhatsApp')
+      setModalConfig(createModalConfig.error(
+        'Erro ao Conectar',
+        'Ocorreu um erro ao conectar o WhatsApp. Verifique sua conexão e tente novamente.'
+      ))
     } finally {
       setConnecting(false)
     }
@@ -422,31 +448,46 @@ const loadSubscription = async (userId) => {
         setActiveConnection(newConnection)
       }
 
-      alert('Nova conexão criada com sucesso!')
+      setModalConfig(createModalConfig.success(
+        'Conexão Criada',
+        'Nova conexão criada com sucesso! Agora você pode conectar o WhatsApp.'
+      ))
     } catch (error) {
       console.error('Erro ao criar conexão:', error)
-      alert('Erro ao criar nova conexão: ' + error.message)
+      setModalConfig(createModalConfig.error(
+        'Erro ao Criar Conexão',
+        `Não foi possível criar a nova conexão: ${error.message}`
+      ))
     }
   }
 
   // ============================================================================
   // DESCONECTAR WHATSAPP
   // ============================================================================
-  const handleDisconnect = async (connection) => {
+  const handleDisconnect = (connection) => {
     if (!connection) {
-      alert('Nenhuma conexão selecionada')
+      setModalConfig(createModalConfig.error(
+        'Nenhuma conexão selecionada',
+        'Por favor, selecione uma conexão antes de tentar desconectar.'
+      ))
       return
     }
 
-    // Confirmação
-    const confirmed = window.confirm(
-      `Tem certeza que deseja desconectar "${getConnectionName(connection)}"?\n\n` +
-      'A instância será excluída da Uazapi, mas o registro será mantido no sistema.\n' +
-      'Você poderá reconectar esta instância posteriormente.'
-    )
+    // Mostrar modal de confirmação
+    setModalConfig({
+      isOpen: true,
+      title: 'Desconectar WhatsApp',
+      message: `Tem certeza que deseja desconectar "${getConnectionName(connection)}"?\n\nA instância será excluída da Uazapi, mas o registro será mantido no sistema. Você poderá reconectar esta instância posteriormente.`,
+      type: 'warning',
+      confirmText: 'Desconectar',
+      cancelText: 'Cancelar',
+      showCancelButton: true,
+      onConfirm: () => executeDisconnect(connection)
+    })
+  }
 
-    if (!confirmed) return
-
+  // Função que realmente executa a desconexão
+  const executeDisconnect = async (connection) => {
     try {
       setConnecting(true)
       console.log('🔌 Desconectando instância:', connection.id)
@@ -476,10 +517,16 @@ const loadSubscription = async (userId) => {
         setWhatsappStatus('disconnected')
       }
 
-      alert('WhatsApp desconectado com sucesso!')
+      setModalConfig(createModalConfig.success(
+        'WhatsApp Desconectado',
+        'A instância foi desconectada com sucesso. Você pode reconectá-la a qualquer momento.'
+      ))
     } catch (error) {
       console.error('❌ Erro ao desconectar:', error)
-      alert('Erro ao desconectar WhatsApp: ' + error.message)
+      setModalConfig(createModalConfig.error(
+        'Erro ao Desconectar',
+        `Não foi possível desconectar o WhatsApp: ${error.message}`
+      ))
     } finally {
       setConnecting(false)
     }
@@ -487,7 +534,10 @@ const loadSubscription = async (userId) => {
 
   const syncSubscriptionStatus = async () => {
     if (!subscription?.stripe_subscription_id || subscription.stripe_subscription_id === 'super_account_bypass') {
-      alert('Não há assinatura para sincronizar')
+      setModalConfig(createModalConfig.info(
+        'Sem Assinatura',
+        'Não há assinatura ativa para sincronizar.'
+      ))
       return
     }
 
@@ -495,7 +545,7 @@ const loadSubscription = async (userId) => {
       const response = await fetch('/api/subscription/sync-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           userId: user.id,
           subscriptionId: subscription.stripe_subscription_id
         })
@@ -504,14 +554,23 @@ const loadSubscription = async (userId) => {
       const data = await response.json()
 
       if (data.success) {
-        alert('Status sincronizado com sucesso!')
+        setModalConfig(createModalConfig.success(
+          'Sincronizado',
+          'Status da assinatura sincronizado com sucesso!'
+        ))
         await loadSubscription(user.id)
       } else {
-        alert(data.error || 'Erro ao sincronizar')
+        setModalConfig(createModalConfig.error(
+          'Erro ao Sincronizar',
+          data.error || 'Não foi possível sincronizar o status da assinatura.'
+        ))
       }
     } catch (error) {
       console.error('Erro ao sincronizar:', error)
-      alert('Erro ao sincronizar status')
+      setModalConfig(createModalConfig.error(
+        'Erro ao Sincronizar',
+        'Ocorreu um erro ao sincronizar o status. Tente novamente.'
+      ))
     }
   }
 
@@ -758,7 +817,10 @@ const handleCreateSubscription = async () => {
 
   } catch (error) {
     console.error('❌ Erro:', error)
-    alert('❌ Erro: ' + error.message)
+    setModalConfig(createModalConfig.error(
+      'Erro no Checkout',
+      error.message || 'Ocorreu um erro ao iniciar o checkout. Tente novamente.'
+    ))
   }
 
   setCheckoutLoading(false)
@@ -770,7 +832,10 @@ const handleConfirmPayment = async (e) => {
   e.preventDefault()
 
   if (!window.stripeInstance || !stripeElements || !paymentElement || !isPaymentElementReady) {
-    alert('Aguarde o formulário carregar')
+    setModalConfig(createModalConfig.info(
+      'Aguarde',
+      'O formulário de pagamento ainda está a carregar. Por favor, aguarde alguns segundos.'
+    ))
     return
   }
 
@@ -828,15 +893,21 @@ const handleConfirmPayment = async (e) => {
     await loadSubscription(user.id)
     await loadConnections(user.id)
 
-    const message = subscriptionData.is_trial 
-      ? `🎉 Teste Grátis de ${subscriptionData.trial_days} dias ativado!`
-      : '💳 Plano ativado!'
+    const isTrialMessage = subscriptionData.is_trial
+      ? `Seu teste grátis de ${subscriptionData.trial_days} dias foi ativado com sucesso!`
+      : 'Seu plano foi ativado com sucesso!'
 
-    alert(message)
+    setModalConfig(createModalConfig.success(
+      subscriptionData.is_trial ? 'Teste Grátis Ativado!' : 'Plano Ativado!',
+      isTrialMessage
+    ))
 
   } catch (error) {
     console.error('❌ Erro:', error)
-    alert('❌ Erro: ' + error.message)
+    setModalConfig(createModalConfig.error(
+      'Erro no Pagamento',
+      error.message || 'Ocorreu um erro ao processar o pagamento. Tente novamente.'
+    ))
   }
 
   setCheckoutLoading(false)
@@ -1174,28 +1245,46 @@ const handleConfirmPayment = async (e) => {
 
                 {/* Botão para cancelar mudança */}
                 <button
-                  onClick={async () => {
-                    if (!confirm('Tem certeza que deseja cancelar a mudança agendada?')) return
-                    
-                    try {
-                      const response = await fetch('/api/subscription/cancel-change', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ userId: user.id })
-                      })
-                      
-                      const data = await response.json()
-                      
-                      if (data.success) {
-                        alert('✅ Mudança cancelada com sucesso!')
-                        await loadSubscription(user.id)
-                      } else {
-                        alert(`❌ Erro: ${data.error}`)
+                  onClick={() => {
+                    setModalConfig({
+                      isOpen: true,
+                      title: 'Cancelar Mudança Agendada',
+                      message: 'Tem certeza que deseja cancelar a mudança de plano agendada? Seu plano atual será mantido.',
+                      type: 'warning',
+                      confirmText: 'Sim, Cancelar Mudança',
+                      cancelText: 'Não',
+                      showCancelButton: true,
+                      onConfirm: async () => {
+                        try {
+                          const response = await fetch('/api/subscription/cancel-change', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ userId: user.id })
+                          })
+
+                          const data = await response.json()
+
+                          if (data.success) {
+                            setModalConfig(createModalConfig.success(
+                              'Mudança Cancelada',
+                              'A mudança de plano agendada foi cancelada com sucesso. Seu plano atual será mantido.'
+                            ))
+                            await loadSubscription(user.id)
+                          } else {
+                            setModalConfig(createModalConfig.error(
+                              'Erro ao Cancelar',
+                              data.error || 'Não foi possível cancelar a mudança agendada.'
+                            ))
+                          }
+                        } catch (error) {
+                          console.error('Erro:', error)
+                          setModalConfig(createModalConfig.error(
+                            'Erro ao Cancelar',
+                            'Ocorreu um erro ao cancelar a mudança. Tente novamente.'
+                          ))
+                        }
                       }
-                    } catch (error) {
-                      console.error('Erro:', error)
-                      alert('❌ Erro ao cancelar mudança')
-                    }
+                    })
                   }}
                   className="bg-gradient-to-r from-[#00FF99] to-[#00E88C] hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] text-black py-3 px-8 rounded-xl font-bold transition-all duration-300 flex items-center gap-2"
                 >
@@ -1248,15 +1337,45 @@ const handleConfirmPayment = async (e) => {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <svg className="w-5 h-5 text-[#10E57C]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    <div className="text-left">
-                      <p className="text-sm font-semibold text-white">
-                        {activeConnection ? getConnectionName(activeConnection) : 'Selecionar Conexão'}
+                    {/* Avatar */}
+                    {activeConnection ? (
+                      <div className="flex-shrink-0">
+                        {activeConnection.profile_pic_url ? (
+                          <img
+                            src={activeConnection.profile_pic_url}
+                            alt={activeConnection.profile_name || 'Conexão'}
+                            className="w-12 h-12 rounded-full object-cover bg-[#333333]"
+                            onError={(e) => {
+                              e.target.style.display = 'none'
+                              e.target.nextSibling.style.display = 'flex'
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          className={`w-12 h-12 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold text-lg ${
+                            activeConnection.profile_pic_url ? 'hidden' : 'flex'
+                          }`}
+                          style={{ display: activeConnection.profile_pic_url ? 'none' : 'flex' }}
+                        >
+                          {activeConnection.profile_name ? activeConnection.profile_name.charAt(0).toUpperCase() : '?'}
+                        </div>
+                      </div>
+                    ) : (
+                      <svg className="w-12 h-12 text-[#10E57C]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                    )}
+
+                    {/* Info */}
+                    <div className="text-left flex-1">
+                      <p className="text-[15px] font-medium text-white">
+                        {activeConnection ? (activeConnection.profile_name || 'Conexão sem nome') : 'Selecionar Conexão'}
                       </p>
-                      <p className="text-xs text-[#B0B0B0]">
-                        {connectedCount} de {totalSlots} ativas
+                      <p className="text-[13px] text-[#8696A0]">
+                        {activeConnection
+                          ? (activeConnection.phone_number ? `+${activeConnection.phone_number}` : 'Desconectado')
+                          : `${connectedCount} de ${totalSlots} ativas`
+                        }
                       </p>
                     </div>
                   </div>
@@ -1269,7 +1388,7 @@ const handleConfirmPayment = async (e) => {
               {connectionsDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setConnectionsDropdownOpen(false)} />
-                  
+
                   <div className="absolute top-full left-0 right-0 mt-2 backdrop-blur-md bg-[#111111]/95 border border-white/10 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto">
                     {connections.length === 0 ? (
                       <div className="p-8 text-center text-[#B0B0B0] text-sm">
@@ -1280,27 +1399,53 @@ const handleConfirmPayment = async (e) => {
                         <button
                           key={conn.id}
                           onClick={() => handleConnectionSelect(conn)}
-                          className={`w-full p-4 text-left hover:bg-white/5 transition-all border-b border-white/5 last:border-0 ${
+                          className={`w-full p-3 text-left hover:bg-white/5 transition-all border-b border-white/5 last:border-0 ${
                             activeConnection?.id === conn.id ? 'bg-white/5' : ''
                           }`}
                         >
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex flex-col">
-                              <span className="text-white font-semibold text-sm">
-                                {getConnectionName(conn, index)}
-                              </span>
+                          <div className="flex items-center gap-3">
+                            {/* Avatar */}
+                            <div className="flex-shrink-0">
+                              {conn.profile_pic_url ? (
+                                <img
+                                  src={conn.profile_pic_url}
+                                  alt={conn.profile_name || `Conexão ${index + 1}`}
+                                  className="w-12 h-12 rounded-full object-cover bg-[#333333]"
+                                  onError={(e) => {
+                                    e.target.style.display = 'none'
+                                    e.target.nextSibling.style.display = 'flex'
+                                  }}
+                                />
+                              ) : null}
+                              <div
+                                className={`w-12 h-12 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold text-lg ${
+                                  conn.profile_pic_url ? 'hidden' : 'flex'
+                                }`}
+                                style={{ display: conn.profile_pic_url ? 'none' : 'flex' }}
+                              >
+                                {conn.profile_name ? conn.profile_name.charAt(0).toUpperCase() : (index + 1)}
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2">
+
+                            {/* Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-white font-medium text-[15px] truncate">
+                                {conn.profile_name || `Conexão ${index + 1}`}
+                              </div>
+                              <div className="text-[#8696A0] text-[13px] truncate mt-0.5">
+                                {conn.phone_number ? `+${conn.phone_number}` : 'Desconectado'}
+                              </div>
+                            </div>
+
+                            {/* Status Badge */}
+                            <div className="flex-shrink-0">
                               {getStatusIcon(conn.status)}
-                              <span className="text-xs text-[#B0B0B0]">
-                                {getStatusText(conn.status)}
-                              </span>
                             </div>
                           </div>
                         </button>
                       ))
                     )}
-                    
+
                     <div className="border-t border-white/10 p-2">
                       {connections.length < totalSlots && (
                         <button
@@ -1337,6 +1482,7 @@ const handleConfirmPayment = async (e) => {
                 </span>
               </div>
             )}
+
 
             {/* Action Button - BOTÃO FANTASMA (Ghost) */}
             {whatsappStatus === 'connected' ? (
@@ -1405,7 +1551,10 @@ const handleConfirmPayment = async (e) => {
                 if (activeConnection) {
                   router.push(`/agent-config?connectionId=${activeConnection.id}`)
                 } else {
-                  alert('Selecione uma conexão primeiro')
+                  setModalConfig(createModalConfig.warning(
+                    'Selecione uma Conexão',
+                    'Por favor, selecione uma conexão WhatsApp antes de configurar o agente.'
+                  ))
                 }
               }}
               disabled={!activeConnection}
@@ -1872,6 +2021,18 @@ const handleConfirmPayment = async (e) => {
   )}
       {/* --> [FIM DO MERGE] */}
 
+      {/* Standard Modal para feedback */}
+      <StandardModal
+        isOpen={modalConfig.isOpen}
+        onClose={closeModal}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        type={modalConfig.type}
+        onConfirm={modalConfig.onConfirm}
+        confirmText={modalConfig.confirmText}
+        cancelText={modalConfig.cancelText}
+        showCancelButton={modalConfig.showCancelButton}
+      />
     </div>
   )
 }
