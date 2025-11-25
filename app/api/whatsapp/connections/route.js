@@ -109,7 +109,9 @@ export async function POST(request) {
     const connectionId = newConnection.id
     const instanceName = `swiftbot_${connectionId}`
 
+    console.log('🔄 [CreateConnection] ConnectionID (com hífens):', connectionId)
     console.log('🔄 [CreateConnection] Gerando instanceName:', instanceName)
+    console.log('🔄 [CreateConnection] Verificar: instanceName tem hífens?', instanceName.includes('-'))
 
     // Passo 2.3: Atualizar registro com instanceName correto
     const { error: updateError } = await supabaseAdmin

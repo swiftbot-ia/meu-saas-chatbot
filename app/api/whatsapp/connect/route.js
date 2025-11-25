@@ -22,8 +22,18 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 async function createUazapiInstance(instanceName, userId, connectionId) {
   try {
     console.log(`🔌 [Uazapi] Criando instância: ${instanceName}`)
+    console.log(`   instanceName tem hífens? ${instanceName.includes('-')}`)
     console.log(`   adminField01 (user_id): ${userId}`)
     console.log(`   adminField02 (connection_id): ${connectionId}`)
+
+    const bodyPayload = {
+      name: instanceName,
+      systemName: 'Swiftbot 1.0',
+      adminField01: userId,
+      adminField02: connectionId
+    }
+
+    console.log(`📤 [Uazapi] Payload sendo enviado:`, JSON.stringify(bodyPayload, null, 2))
 
     const response = await fetch(`${UAZAPI_URL}/instance/init`, {
       method: 'POST',
@@ -147,7 +157,12 @@ export async function POST(request) {
     if (!instanceName) {
       // Gerar nome baseado no ID da conexão
       instanceName = `swiftbot_${connection.id}`
+      console.log('📝 [Connect] ConnectionID:', connection.id)
       console.log('📝 [Connect] Gerando instance_name:', instanceName)
+      console.log('📝 [Connect] Tem hífens?', instanceName.includes('-'))
+    } else {
+      console.log('📝 [Connect] Usando instance_name existente:', instanceName)
+      console.log('📝 [Connect] Tem hífens?', instanceName.includes('-'))
     }
 
     // 3. Verificar se precisa criar nova instância ou usar existente
