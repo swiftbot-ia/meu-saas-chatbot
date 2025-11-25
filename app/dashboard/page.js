@@ -239,24 +239,59 @@ const loadSubscription = async (userId) => {
     try {
       console.log('🔄 [Dashboard] Atualizando dados das conexões...')
 
-      const { data, error } = await supabase
+      // 1. Buscar conexões atuais do Supabase
+      const { data: currentConnections, error: fetchError } = await supabase
         .from('whatsapp_connections')
         .select('*')
         .eq('user_id', user.id)
 
-      if (error) throw error
+      if (fetchError) throw fetchError
 
-      // Atualizar lista de conexões
-      setConnections(data || [])
+      // 2. Para cada conexão conectada, chamar API de status para atualizar perfil
+      const connectedConnections = (currentConnections || []).filter(
+        c => c.status === 'connected' || c.is_connected
+      )
 
-      // Atualizar activeConnection se existir
-      if (activeConnection && data) {
-        const updatedActive = data.find(c => c.id === activeConnection.id)
+      console.log(`📡 [Dashboard] Atualizando perfil de ${connectedConnections.length} conexões...`)
+
+      for (const conn of connectedConnections) {
+        try {
+          const response = await fetch('/api/whatsapp/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ connectionId: conn.id })
+          })
+
+          const data = await response.json()
+          console.log(`✅ [Dashboard] Status atualizado para ${conn.id}:`, {
+            name: data.profileName,
+            phone: data.phoneNumber
+          })
+        } catch (err) {
+          console.error(`❌ [Dashboard] Erro ao atualizar status de ${conn.id}:`, err)
+        }
+      }
+
+      // 3. Buscar dados atualizados do Supabase
+      const { data: updatedConnections, error: refetchError } = await supabase
+        .from('whatsapp_connections')
+        .select('*')
+        .eq('user_id', user.id)
+
+      if (refetchError) throw refetchError
+
+      // 4. Atualizar lista de conexões
+      setConnections(updatedConnections || [])
+
+      // 5. Atualizar activeConnection se existir
+      if (activeConnection && updatedConnections) {
+        const updatedActive = updatedConnections.find(c => c.id === activeConnection.id)
         if (updatedActive) {
           setActiveConnection(updatedActive)
           console.log('✅ [Dashboard] Conexão ativa atualizada:', {
             name: updatedActive.profile_name,
-            phone: updatedActive.phone_number
+            phone: updatedActive.phone_number,
+            pic: updatedActive.profile_pic_url ? 'sim' : 'não'
           })
         }
       }
