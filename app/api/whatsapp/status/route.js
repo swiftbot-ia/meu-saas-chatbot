@@ -78,13 +78,38 @@ export async function POST(request) {
           const instanceStatus = uazapiData?.instance?.status || 'disconnected'
           const isConnected = instanceStatus === 'open' || instanceStatus === 'connected'
 
-          // Atualizar Supabase com status real da UAZAPI
+          // Preparar dados para actualização
+          const updateData = {
+            status: isConnected ? 'connected' : 'disconnected',
+            is_connected: isConnected,
+            updated_at: new Date().toISOString()
+          }
+
+          // Se conectado, guardar dados de perfil da UAZAPI
+          if (isConnected && uazapiData?.instance) {
+            const instance = uazapiData.instance
+
+            if (instance.profileName) {
+              updateData.profile_name = instance.profileName
+            }
+            if (instance.profilePicUrl) {
+              updateData.profile_pic_url = instance.profilePicUrl
+            }
+            if (instance.owner) {
+              // Limpar o número (remover @s.whatsapp.net se existir)
+              updateData.phone_number = instance.owner.replace('@s.whatsapp.net', '')
+            }
+
+            console.log('👤 [Status] Perfil actualizado:', {
+              name: updateData.profile_name,
+              phone: updateData.phone_number
+            })
+          }
+
+          // Atualizar Supabase com status real e dados de perfil
           await supabaseAdmin
             .from('whatsapp_connections')
-            .update({
-              status: isConnected ? 'connected' : 'disconnected',
-              is_connected: isConnected
-            })
+            .update(updateData)
             .eq('id', connection.id)
 
           return NextResponse.json({
@@ -93,7 +118,8 @@ export async function POST(request) {
             status: instanceStatus,
             instanceName: connection.instance_name,
             profileName: uazapiData?.instance?.profileName || connection.profile_name,
-            phoneNumber: uazapiData?.instance?.owner || connection.phone_number,
+            profilePicUrl: uazapiData?.instance?.profilePicUrl || connection.profile_pic_url,
+            phoneNumber: uazapiData?.instance?.owner?.replace('@s.whatsapp.net', '') || connection.phone_number,
             message: 'Status verificado com sucesso'
           })
         }

@@ -227,9 +227,11 @@ const loadSubscription = async (userId) => {
     setShowQRModal(false)
     setQrCode(null)
 
-    // Recarregar conexões para pegar status atualizado
+    // Recarregar conexões para pegar status atualizado (incluindo perfil)
     if (user) {
       console.log('🔄 [Dashboard] Recarregando conexões após fechar modal...')
+      // Aguardar um pouco para garantir que o Supabase foi atualizado
+      await new Promise(resolve => setTimeout(resolve, 500))
       await loadConnections(user.id)
     }
   }
@@ -377,14 +379,9 @@ const loadSubscription = async (userId) => {
 
       if (data.success) {
         setWhatsappStatus(data.status)
-        
-        await supabase
-          .from('whatsapp_connections')
-          .update({ 
-            status: data.status,
-            phone_number: data.phoneNumber || connection.phone_number
-          })
-          .eq('id', connection.id)
+
+        // NOTA: Não atualizar Supabase aqui - a API /api/whatsapp/status já faz isso
+        // incluindo profile_name, profile_pic_url e phone_number
 
         if (data.status === 'connected') {
           await handleCloseQRModal()
