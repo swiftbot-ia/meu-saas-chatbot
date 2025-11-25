@@ -78,14 +78,41 @@ export async function POST(request) {
           const instanceStatus = uazapiData?.instance?.status || 'disconnected'
           const isConnected = instanceStatus === 'open' || instanceStatus === 'connected'
 
-          // Atualizar Supabase com status real da UAZAPI
-          await supabaseAdmin
-            .from('whatsapp_connections')
-            .update({
-              status: isConnected ? 'connected' : 'disconnected',
-              is_connected: isConnected
+          // Preparar dados para atualização
+          const updateData = {
+            status: isConnected ? 'connected' : 'disconnected',
+            is_connected: isConnected,
+            updated_at: new Date().toISOString()
+          }
+
+          // ✅ Se conectado, salvar informações do perfil
+          if (isConnected && uazapiData?.instance) {
+            if (uazapiData.instance.profileName) {
+              updateData.profile_name = uazapiData.instance.profileName
+            }
+            if (uazapiData.instance.owner) {
+              updateData.phone_number = uazapiData.instance.owner
+            }
+            if (uazapiData.instance.profilePicUrl) {
+              updateData.profile_pic_url = uazapiData.instance.profilePicUrl
+            }
+
+            console.log('✅ [Status] Salvando perfil no Supabase:', {
+              profile_name: updateData.profile_name,
+              phone_number: updateData.phone_number,
+              has_pic: !!updateData.profile_pic_url
             })
+          }
+
+          // Atualizar Supabase com status real da UAZAPI + perfil
+          const { error: updateError } = await supabaseAdmin
+            .from('whatsapp_connections')
+            .update(updateData)
             .eq('id', connection.id)
+
+          if (updateError) {
+            console.error('❌ [Status] Erro ao atualizar Supabase:', updateError)
+          }
 
           return NextResponse.json({
             success: true,
@@ -94,6 +121,7 @@ export async function POST(request) {
             instanceName: connection.instance_name,
             profileName: uazapiData?.instance?.profileName || connection.profile_name,
             phoneNumber: uazapiData?.instance?.owner || connection.phone_number,
+            profilePicUrl: uazapiData?.instance?.profilePicUrl || connection.profile_pic_url,
             message: 'Status verificado com sucesso'
           })
         }
