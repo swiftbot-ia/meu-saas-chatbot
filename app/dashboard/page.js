@@ -1,12 +1,15 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../../lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import StandardModal, { initialModalConfig, createModalConfig } from '../components/StandardModal'
 
 export default function Dashboard() {
   const router = useRouter()
-  
+
+  // Ref para timer de atualização de perfil
+  const profileUpdateTimerRef = useRef(null)
+
   // Estados
   const [user, setUser] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
@@ -63,6 +66,13 @@ export default function Dashboard() {
   // ============================================================================
   useEffect(() => {
     checkUser()
+
+    // Cleanup: limpar timer de atualização de perfil ao desmontar
+    return () => {
+      if (profileUpdateTimerRef.current) {
+        clearTimeout(profileUpdateTimerRef.current)
+      }
+    }
   }, [])
 
   const checkUser = async () => {
@@ -221,6 +231,93 @@ const loadSubscription = async (userId) => {
   }
 
   // ============================================================================
+  // ATUALIZAR APENAS OS DADOS DAS CONEXÕES (sem recarregar página)
+  // ============================================================================
+  const refreshConnectionsData = async () => {
+    if (!user) return
+
+    try {
+      console.log('🔄 [Dashboard] Atualizando dados das conexões...')
+
+      // 1. Buscar conexões atuais do Supabase
+      const { data: currentConnections, error: fetchError } = await supabase
+        .from('whatsapp_connections')
+        .select('*')
+        .eq('user_id', user.id)
+
+      if (fetchError) throw fetchError
+
+      // 2. Para cada conexão conectada, chamar API de status para atualizar perfil
+      const connectedConnections = (currentConnections || []).filter(
+        c => c.status === 'connected' || c.is_connected
+      )
+
+      console.log(`📡 [Dashboard] Atualizando perfil de ${connectedConnections.length} conexões...`)
+
+      for (const conn of connectedConnections) {
+        try {
+          const response = await fetch('/api/whatsapp/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ connectionId: conn.id })
+          })
+
+          const data = await response.json()
+          console.log(`✅ [Dashboard] Status atualizado para ${conn.id}:`, {
+            name: data.profileName,
+            phone: data.phoneNumber
+          })
+        } catch (err) {
+          console.error(`❌ [Dashboard] Erro ao atualizar status de ${conn.id}:`, err)
+        }
+      }
+
+      // 3. Buscar dados atualizados do Supabase
+      const { data: updatedConnections, error: refetchError } = await supabase
+        .from('whatsapp_connections')
+        .select('*')
+        .eq('user_id', user.id)
+
+      if (refetchError) throw refetchError
+
+      // 4. Atualizar lista de conexões
+      setConnections(updatedConnections || [])
+
+      // 5. Atualizar activeConnection se existir
+      if (activeConnection && updatedConnections) {
+        const updatedActive = updatedConnections.find(c => c.id === activeConnection.id)
+        if (updatedActive) {
+          setActiveConnection(updatedActive)
+          console.log('✅ [Dashboard] Conexão ativa atualizada:', {
+            name: updatedActive.profile_name,
+            phone: updatedActive.phone_number,
+            pic: updatedActive.profile_pic_url ? 'sim' : 'não'
+          })
+        }
+      }
+    } catch (error) {
+      console.error('❌ [Dashboard] Erro ao atualizar conexões:', error)
+    }
+  }
+
+  // ============================================================================
+  // AGENDAR ATUALIZAÇÃO DE PERFIL (30 segundos após conexão)
+  // ============================================================================
+  const scheduleProfileUpdate = () => {
+    // Limpar timer anterior se existir
+    if (profileUpdateTimerRef.current) {
+      clearTimeout(profileUpdateTimerRef.current)
+    }
+
+    console.log('⏰ [Dashboard] Agendando atualização de perfil em 30 segundos...')
+
+    profileUpdateTimerRef.current = setTimeout(async () => {
+      console.log('⏰ [Dashboard] Executando atualização agendada de perfil...')
+      await refreshConnectionsData()
+    }, 30000) // 30 segundos
+  }
+
+  // ============================================================================
   // FECHAR MODAL QR CODE (com refresh automático)
   // ============================================================================
   const handleCloseQRModal = async () => {
@@ -233,6 +330,10 @@ const loadSubscription = async (userId) => {
       // Aguardar um pouco para garantir que o Supabase foi atualizado
       await new Promise(resolve => setTimeout(resolve, 500))
       await loadConnections(user.id)
+
+      // Agendar atualização de perfil em 30 segundos
+      // (para pegar dados de perfil que a UAZAPI pode demorar a retornar)
+      scheduleProfileUpdate()
     }
   }
 
