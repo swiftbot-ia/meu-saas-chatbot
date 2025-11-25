@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import StandardModal, { initialModalConfig, createModalConfig } from '../components/StandardModal'
 
 export default function Dashboard() {
   const router = useRouter()
@@ -46,6 +47,16 @@ export default function Dashboard() {
   const [paymentElement, setPaymentElement] = useState(null)
   const [stripeElements, setStripeElements] = useState(null)
   const [isPaymentElementReady, setIsPaymentElementReady] = useState(false)
+
+  // Standard Modal state
+  const [modalConfig, setModalConfig] = useState(initialModalConfig)
+  const [pendingAction, setPendingAction] = useState(null) // Para armazenar ações pendentes de confirmação
+
+  // Helper para fechar o modal
+  const closeModal = () => {
+    setModalConfig(initialModalConfig)
+    setPendingAction(null)
+  }
 
   // ============================================================================
   // CARREGAMENTO INICIAL
@@ -256,7 +267,10 @@ const loadSubscription = async (userId) => {
   // ============================================================================
   const connectWhatsApp = async (connection) => {
     if (!connection) {
-      alert('Selecione uma conexão primeiro')
+      setModalConfig(createModalConfig.warning(
+        'Selecione uma conexão',
+        'Por favor, selecione uma conexão antes de tentar conectar o WhatsApp.'
+      ))
       return
     }
 
@@ -285,11 +299,14 @@ const loadSubscription = async (userId) => {
     if (subscriptionStatus === 'trial' && subscription?.trial_end_date) {
       const trialEndDate = new Date(subscription.trial_end_date)
       const now = new Date()
-      
+
       if (now > trialEndDate) {
         console.log('❌ Trial expirado detectado no frontend')
-        alert('Seu período de teste expirou. Por favor, assine um plano para continuar.')
-        setShowCheckoutModal(true)
+        setModalConfig(createModalConfig.warning(
+          'Período de Teste Expirado',
+          'Seu período de teste expirou. Por favor, assine um plano para continuar usando a plataforma.',
+          () => setShowCheckoutModal(true)
+        ))
         return
       }
     }
@@ -322,16 +339,25 @@ const loadSubscription = async (userId) => {
         // Tratamento de erros específicos
         if (data.subscription_status) {
           console.log(`❌ Erro de assinatura: ${data.subscription_status}`)
-          alert(data.error || 'Problema com sua assinatura. Verifique seu plano.')
-          setShowCheckoutModal(true)
+          setModalConfig(createModalConfig.error(
+            'Problema com Assinatura',
+            data.error || 'Há um problema com sua assinatura. Verifique seu plano.',
+            () => setShowCheckoutModal(true)
+          ))
         } else {
-          alert(data.error || 'Erro ao conectar WhatsApp')
+          setModalConfig(createModalConfig.error(
+            'Erro ao Conectar',
+            data.error || 'Ocorreu um erro ao conectar o WhatsApp. Tente novamente.'
+          ))
         }
         return
       }
     } catch (error) {
       console.error('Erro ao conectar WhatsApp:', error)
-      alert('Erro ao conectar WhatsApp')
+      setModalConfig(createModalConfig.error(
+        'Erro ao Conectar',
+        'Ocorreu um erro ao conectar o WhatsApp. Verifique sua conexão e tente novamente.'
+      ))
     } finally {
       setConnecting(false)
     }
@@ -422,31 +448,46 @@ const loadSubscription = async (userId) => {
         setActiveConnection(newConnection)
       }
 
-      alert('Nova conexão criada com sucesso!')
+      setModalConfig(createModalConfig.success(
+        'Conexão Criada',
+        'Nova conexão criada com sucesso! Agora você pode conectar o WhatsApp.'
+      ))
     } catch (error) {
       console.error('Erro ao criar conexão:', error)
-      alert('Erro ao criar nova conexão: ' + error.message)
+      setModalConfig(createModalConfig.error(
+        'Erro ao Criar Conexão',
+        `Não foi possível criar a nova conexão: ${error.message}`
+      ))
     }
   }
 
   // ============================================================================
   // DESCONECTAR WHATSAPP
   // ============================================================================
-  const handleDisconnect = async (connection) => {
+  const handleDisconnect = (connection) => {
     if (!connection) {
-      alert('Nenhuma conexão selecionada')
+      setModalConfig(createModalConfig.error(
+        'Nenhuma conexão selecionada',
+        'Por favor, selecione uma conexão antes de tentar desconectar.'
+      ))
       return
     }
 
-    // Confirmação
-    const confirmed = window.confirm(
-      `Tem certeza que deseja desconectar "${getConnectionName(connection)}"?\n\n` +
-      'A instância será excluída da Uazapi, mas o registro será mantido no sistema.\n' +
-      'Você poderá reconectar esta instância posteriormente.'
-    )
+    // Mostrar modal de confirmação
+    setModalConfig({
+      isOpen: true,
+      title: 'Desconectar WhatsApp',
+      message: `Tem certeza que deseja desconectar "${getConnectionName(connection)}"?\n\nA instância será excluída da Uazapi, mas o registro será mantido no sistema. Você poderá reconectar esta instância posteriormente.`,
+      type: 'warning',
+      confirmText: 'Desconectar',
+      cancelText: 'Cancelar',
+      showCancelButton: true,
+      onConfirm: () => executeDisconnect(connection)
+    })
+  }
 
-    if (!confirmed) return
-
+  // Função que realmente executa a desconexão
+  const executeDisconnect = async (connection) => {
     try {
       setConnecting(true)
       console.log('🔌 Desconectando instância:', connection.id)
@@ -476,10 +517,16 @@ const loadSubscription = async (userId) => {
         setWhatsappStatus('disconnected')
       }
 
-      alert('WhatsApp desconectado com sucesso!')
+      setModalConfig(createModalConfig.success(
+        'WhatsApp Desconectado',
+        'A instância foi desconectada com sucesso. Você pode reconectá-la a qualquer momento.'
+      ))
     } catch (error) {
       console.error('❌ Erro ao desconectar:', error)
-      alert('Erro ao desconectar WhatsApp: ' + error.message)
+      setModalConfig(createModalConfig.error(
+        'Erro ao Desconectar',
+        `Não foi possível desconectar o WhatsApp: ${error.message}`
+      ))
     } finally {
       setConnecting(false)
     }
@@ -487,7 +534,10 @@ const loadSubscription = async (userId) => {
 
   const syncSubscriptionStatus = async () => {
     if (!subscription?.stripe_subscription_id || subscription.stripe_subscription_id === 'super_account_bypass') {
-      alert('Não há assinatura para sincronizar')
+      setModalConfig(createModalConfig.info(
+        'Sem Assinatura',
+        'Não há assinatura ativa para sincronizar.'
+      ))
       return
     }
 
@@ -495,7 +545,7 @@ const loadSubscription = async (userId) => {
       const response = await fetch('/api/subscription/sync-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           userId: user.id,
           subscriptionId: subscription.stripe_subscription_id
         })
@@ -504,14 +554,23 @@ const loadSubscription = async (userId) => {
       const data = await response.json()
 
       if (data.success) {
-        alert('Status sincronizado com sucesso!')
+        setModalConfig(createModalConfig.success(
+          'Sincronizado',
+          'Status da assinatura sincronizado com sucesso!'
+        ))
         await loadSubscription(user.id)
       } else {
-        alert(data.error || 'Erro ao sincronizar')
+        setModalConfig(createModalConfig.error(
+          'Erro ao Sincronizar',
+          data.error || 'Não foi possível sincronizar o status da assinatura.'
+        ))
       }
     } catch (error) {
       console.error('Erro ao sincronizar:', error)
-      alert('Erro ao sincronizar status')
+      setModalConfig(createModalConfig.error(
+        'Erro ao Sincronizar',
+        'Ocorreu um erro ao sincronizar o status. Tente novamente.'
+      ))
     }
   }
 
@@ -758,7 +817,10 @@ const handleCreateSubscription = async () => {
 
   } catch (error) {
     console.error('❌ Erro:', error)
-    alert('❌ Erro: ' + error.message)
+    setModalConfig(createModalConfig.error(
+      'Erro no Checkout',
+      error.message || 'Ocorreu um erro ao iniciar o checkout. Tente novamente.'
+    ))
   }
 
   setCheckoutLoading(false)
@@ -770,7 +832,10 @@ const handleConfirmPayment = async (e) => {
   e.preventDefault()
 
   if (!window.stripeInstance || !stripeElements || !paymentElement || !isPaymentElementReady) {
-    alert('Aguarde o formulário carregar')
+    setModalConfig(createModalConfig.info(
+      'Aguarde',
+      'O formulário de pagamento ainda está a carregar. Por favor, aguarde alguns segundos.'
+    ))
     return
   }
 
@@ -828,15 +893,21 @@ const handleConfirmPayment = async (e) => {
     await loadSubscription(user.id)
     await loadConnections(user.id)
 
-    const message = subscriptionData.is_trial 
-      ? `🎉 Teste Grátis de ${subscriptionData.trial_days} dias ativado!`
-      : '💳 Plano ativado!'
+    const isTrialMessage = subscriptionData.is_trial
+      ? `Seu teste grátis de ${subscriptionData.trial_days} dias foi ativado com sucesso!`
+      : 'Seu plano foi ativado com sucesso!'
 
-    alert(message)
+    setModalConfig(createModalConfig.success(
+      subscriptionData.is_trial ? 'Teste Grátis Ativado!' : 'Plano Ativado!',
+      isTrialMessage
+    ))
 
   } catch (error) {
     console.error('❌ Erro:', error)
-    alert('❌ Erro: ' + error.message)
+    setModalConfig(createModalConfig.error(
+      'Erro no Pagamento',
+      error.message || 'Ocorreu um erro ao processar o pagamento. Tente novamente.'
+    ))
   }
 
   setCheckoutLoading(false)
@@ -1174,28 +1245,46 @@ const handleConfirmPayment = async (e) => {
 
                 {/* Botão para cancelar mudança */}
                 <button
-                  onClick={async () => {
-                    if (!confirm('Tem certeza que deseja cancelar a mudança agendada?')) return
-                    
-                    try {
-                      const response = await fetch('/api/subscription/cancel-change', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ userId: user.id })
-                      })
-                      
-                      const data = await response.json()
-                      
-                      if (data.success) {
-                        alert('✅ Mudança cancelada com sucesso!')
-                        await loadSubscription(user.id)
-                      } else {
-                        alert(`❌ Erro: ${data.error}`)
+                  onClick={() => {
+                    setModalConfig({
+                      isOpen: true,
+                      title: 'Cancelar Mudança Agendada',
+                      message: 'Tem certeza que deseja cancelar a mudança de plano agendada? Seu plano atual será mantido.',
+                      type: 'warning',
+                      confirmText: 'Sim, Cancelar Mudança',
+                      cancelText: 'Não',
+                      showCancelButton: true,
+                      onConfirm: async () => {
+                        try {
+                          const response = await fetch('/api/subscription/cancel-change', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ userId: user.id })
+                          })
+
+                          const data = await response.json()
+
+                          if (data.success) {
+                            setModalConfig(createModalConfig.success(
+                              'Mudança Cancelada',
+                              'A mudança de plano agendada foi cancelada com sucesso. Seu plano atual será mantido.'
+                            ))
+                            await loadSubscription(user.id)
+                          } else {
+                            setModalConfig(createModalConfig.error(
+                              'Erro ao Cancelar',
+                              data.error || 'Não foi possível cancelar a mudança agendada.'
+                            ))
+                          }
+                        } catch (error) {
+                          console.error('Erro:', error)
+                          setModalConfig(createModalConfig.error(
+                            'Erro ao Cancelar',
+                            'Ocorreu um erro ao cancelar a mudança. Tente novamente.'
+                          ))
+                        }
                       }
-                    } catch (error) {
-                      console.error('Erro:', error)
-                      alert('❌ Erro ao cancelar mudança')
-                    }
+                    })
                   }}
                   className="bg-gradient-to-r from-[#00FF99] to-[#00E88C] hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] text-black py-3 px-8 rounded-xl font-bold transition-all duration-300 flex items-center gap-2"
                 >
@@ -1405,7 +1494,10 @@ const handleConfirmPayment = async (e) => {
                 if (activeConnection) {
                   router.push(`/agent-config?connectionId=${activeConnection.id}`)
                 } else {
-                  alert('Selecione uma conexão primeiro')
+                  setModalConfig(createModalConfig.warning(
+                    'Selecione uma Conexão',
+                    'Por favor, selecione uma conexão WhatsApp antes de configurar o agente.'
+                  ))
                 }
               }}
               disabled={!activeConnection}
@@ -1872,6 +1964,18 @@ const handleConfirmPayment = async (e) => {
   )}
       {/* --> [FIM DO MERGE] */}
 
+      {/* Standard Modal para feedback */}
+      <StandardModal
+        isOpen={modalConfig.isOpen}
+        onClose={closeModal}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        type={modalConfig.type}
+        onConfirm={modalConfig.onConfirm}
+        confirmText={modalConfig.confirmText}
+        cancelText={modalConfig.cancelText}
+        showCancelButton={modalConfig.showCancelButton}
+      />
     </div>
   )
 }
