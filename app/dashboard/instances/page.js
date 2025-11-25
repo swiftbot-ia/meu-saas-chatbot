@@ -5,7 +5,6 @@ import { supabase } from '../../../lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import InstanceCard from '../../components/InstanceCard'
 import WhatsAppConnectModal from '../../components/WhatsAppConnectModal'
-import StandardModal, { initialModalConfig, createModalConfig } from '../../components/StandardModal'
 import { Plus, Loader2 } from 'lucide-react'
 
 /**
@@ -20,19 +19,12 @@ export default function InstancesPage() {
   const [user, setUser] = useState(null)
   const [instances, setInstances] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   // Modal states
   const [showConnectModal, setShowConnectModal] = useState(false)
   const [newConnectionId, setNewConnectionId] = useState(null)
   const [creatingInstance, setCreatingInstance] = useState(false)
-
-  // Standard Modal state
-  const [modalConfig, setModalConfig] = useState(initialModalConfig)
-
-  // Helper para fechar o modal
-  const closeModal = () => {
-    setModalConfig(initialModalConfig)
-  }
 
   // Check authentication
   useEffect(() => {
@@ -52,11 +44,8 @@ export default function InstancesPage() {
       await loadInstances(user.id)
     } catch (error) {
       console.error('Erro ao verificar usuário:', error)
-      setModalConfig(createModalConfig.error(
-        'Erro de Autenticação',
-        'Não foi possível carregar os dados de autenticação. Serás redirecionado para o login.',
-        () => router.push('/login')
-      ))
+      setError('Erro ao carregar dados de autenticação')
+      router.push('/login')
     }
   }
 
@@ -64,6 +53,7 @@ export default function InstancesPage() {
   const loadInstances = async (userId) => {
     try {
       setLoading(true)
+      setError(null)
 
       const { data, error: fetchError } = await supabase
         .from('whatsapp_connections')
@@ -86,13 +76,7 @@ export default function InstancesPage() {
       setInstances(data || [])
     } catch (error) {
       console.error('Erro ao carregar instâncias:', error)
-      setModalConfig(createModalConfig.error(
-        'Erro ao Carregar Instâncias',
-        'Não foi possível carregar as tuas instâncias. Por favor, tenta novamente mais tarde.',
-        () => {
-          if (user) loadInstances(user.id)
-        }
-      ))
+      setError('Erro ao carregar suas instâncias. Tente novamente.')
     } finally {
       setLoading(false)
     }
@@ -128,10 +112,7 @@ export default function InstancesPage() {
       setShowConnectModal(true)
     } catch (error) {
       console.error('❌ Erro ao criar instância:', error)
-      setModalConfig(createModalConfig.error(
-        'Erro ao Criar Instância',
-        'Não foi possível criar uma nova instância. Por favor, verifica a tua conexão e tenta novamente.'
-      ))
+      setError('Erro ao criar nova instância. Tente novamente.')
     } finally {
       setCreatingInstance(false)
     }
@@ -141,17 +122,10 @@ export default function InstancesPage() {
   const handleConnectionSuccess = (instanceData) => {
     console.log('✅ Conexão bem-sucedida:', instanceData)
 
-    // Show success modal
-    setModalConfig(createModalConfig.success(
-      'WhatsApp Conectado!',
-      'A tua instância foi conectada com sucesso. Já podes começar a usar o WhatsApp.',
-      () => {
-        // Reload instances to show updated data
-        if (user) {
-          loadInstances(user.id)
-        }
-      }
-    ))
+    // Reload instances to show updated data
+    if (user) {
+      loadInstances(user.id)
+    }
   }
 
   // Handle modal close
@@ -205,6 +179,13 @@ export default function InstancesPage() {
             )}
           </button>
         </div>
+
+        {/* Error message */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+            <p className="text-red-500 text-sm">{error}</p>
+          </div>
+        )}
 
         {/* Loading state */}
         {loading && (
@@ -271,19 +252,6 @@ export default function InstancesPage() {
           onConnectionSuccess={handleConnectionSuccess}
         />
       )}
-
-      {/* Standard Modal para feedback */}
-      <StandardModal
-        isOpen={modalConfig.isOpen}
-        onClose={closeModal}
-        title={modalConfig.title}
-        message={modalConfig.message}
-        type={modalConfig.type}
-        onConfirm={modalConfig.onConfirm}
-        confirmText={modalConfig.confirmText}
-        cancelText={modalConfig.cancelText}
-        showCancelButton={modalConfig.showCancelButton}
-      />
     </div>
   )
 }
