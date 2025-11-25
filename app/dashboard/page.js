@@ -47,6 +47,19 @@ export default function Dashboard() {
   const [stripeElements, setStripeElements] = useState(null)
   const [isPaymentElementReady, setIsPaymentElementReady] = useState(false)
 
+  // Estado do Modal de Alerta
+  const [alertModal, setAlertModal] = useState({
+    show: false,
+    title: '',
+    message: '',
+    type: 'info' // 'success', 'error', 'warning', 'info'
+  })
+
+  // Função helper para mostrar alertas
+  const showAlert = (message, title = 'Aviso', type = 'info') => {
+    setAlertModal({ show: true, title, message, type })
+  }
+
   // ============================================================================
   // CARREGAMENTO INICIAL
   // ============================================================================
@@ -289,7 +302,7 @@ const loadSubscription = async (userId) => {
   // ============================================================================
   const connectWhatsApp = async (connection) => {
     if (!connection) {
-      alert('Selecione uma conexão primeiro')
+      showAlert('Selecione uma conexão primeiro', 'Atenção', 'warning')
       return
     }
 
@@ -321,7 +334,7 @@ const loadSubscription = async (userId) => {
       
       if (now > trialEndDate) {
         console.log('❌ Trial expirado detectado no frontend')
-        alert('Seu período de teste expirou. Por favor, assine um plano para continuar.')
+        showAlert('Seu período de teste expirou. Por favor, assine um plano para continuar.', 'Trial Expirado', 'warning')
         setShowCheckoutModal(true)
         return
       }
@@ -355,16 +368,16 @@ const loadSubscription = async (userId) => {
         // Tratamento de erros específicos
         if (data.subscription_status) {
           console.log(`❌ Erro de assinatura: ${data.subscription_status}`)
-          alert(data.error || 'Problema com sua assinatura. Verifique seu plano.')
+          showAlert(data.error || 'Problema com sua assinatura. Verifique seu plano.', 'Erro de Assinatura', 'error')
           setShowCheckoutModal(true)
         } else {
-          alert(data.error || 'Erro ao conectar WhatsApp')
+          showAlert(data.error || 'Erro ao conectar WhatsApp', 'Erro', 'error')
         }
         return
       }
     } catch (error) {
       console.error('Erro ao conectar WhatsApp:', error)
-      alert('Erro ao conectar WhatsApp')
+      showAlert('Erro ao conectar WhatsApp', 'Erro', 'error')
     } finally {
       setConnecting(false)
     }
@@ -455,10 +468,10 @@ const loadSubscription = async (userId) => {
         setActiveConnection(newConnection)
       }
 
-      alert('Nova conexão criada com sucesso!')
+      showAlert('Nova conexão criada com sucesso!', 'Sucesso', 'success')
     } catch (error) {
       console.error('Erro ao criar conexão:', error)
-      alert('Erro ao criar nova conexão: ' + error.message)
+      showAlert('Erro ao criar nova conexão: ' + error.message, 'Erro', 'error')
     }
   }
 
@@ -467,7 +480,7 @@ const loadSubscription = async (userId) => {
   // ============================================================================
   const handleDisconnect = async (connection) => {
     if (!connection) {
-      alert('Nenhuma conexão selecionada')
+      showAlert('Nenhuma conexão selecionada', 'Atenção', 'warning')
       return
     }
 
@@ -509,10 +522,10 @@ const loadSubscription = async (userId) => {
         setWhatsappStatus('disconnected')
       }
 
-      alert('WhatsApp desconectado com sucesso!')
+      showAlert('WhatsApp desconectado com sucesso!', 'Sucesso', 'success')
     } catch (error) {
       console.error('❌ Erro ao desconectar:', error)
-      alert('Erro ao desconectar WhatsApp: ' + error.message)
+      showAlert('Erro ao desconectar WhatsApp: ' + error.message, 'Erro', 'error')
     } finally {
       setConnecting(false)
     }
@@ -520,7 +533,7 @@ const loadSubscription = async (userId) => {
 
   const syncSubscriptionStatus = async () => {
     if (!subscription?.stripe_subscription_id || subscription.stripe_subscription_id === 'super_account_bypass') {
-      alert('Não há assinatura para sincronizar')
+      showAlert('Não há assinatura para sincronizar', 'Atenção', 'warning')
       return
     }
 
@@ -537,14 +550,14 @@ const loadSubscription = async (userId) => {
       const data = await response.json()
 
       if (data.success) {
-        alert('Status sincronizado com sucesso!')
+        showAlert('Status sincronizado com sucesso!', 'Sucesso', 'success')
         await loadSubscription(user.id)
       } else {
-        alert(data.error || 'Erro ao sincronizar')
+        showAlert(data.error || 'Erro ao sincronizar', 'Erro', 'error')
       }
     } catch (error) {
       console.error('Erro ao sincronizar:', error)
-      alert('Erro ao sincronizar status')
+      showAlert('Erro ao sincronizar status', 'Erro', 'error')
     }
   }
 
@@ -791,7 +804,7 @@ const handleCreateSubscription = async () => {
 
   } catch (error) {
     console.error('❌ Erro:', error)
-    alert('❌ Erro: ' + error.message)
+    showAlert('Erro: ' + error.message, 'Erro ao Processar', 'error')
   }
 
   setCheckoutLoading(false)
@@ -803,7 +816,7 @@ const handleConfirmPayment = async (e) => {
   e.preventDefault()
 
   if (!window.stripeInstance || !stripeElements || !paymentElement || !isPaymentElementReady) {
-    alert('Aguarde o formulário carregar')
+    showAlert('Aguarde o formulário carregar', 'Aguarde', 'warning')
     return
   }
 
@@ -861,15 +874,15 @@ const handleConfirmPayment = async (e) => {
     await loadSubscription(user.id)
     await loadConnections(user.id)
 
-    const message = subscriptionData.is_trial 
+    const message = subscriptionData.is_trial
       ? `🎉 Teste Grátis de ${subscriptionData.trial_days} dias ativado!`
       : '💳 Plano ativado!'
 
-    alert(message)
+    showAlert(message, 'Sucesso', 'success')
 
   } catch (error) {
     console.error('❌ Erro:', error)
-    alert('❌ Erro: ' + error.message)
+    showAlert('Erro: ' + error.message, 'Erro ao Processar', 'error')
   }
 
   setCheckoutLoading(false)
@@ -1227,14 +1240,14 @@ const handleConfirmPayment = async (e) => {
                       const data = await response.json()
                       
                       if (data.success) {
-                        alert('✅ Mudança cancelada com sucesso!')
+                        showAlert('Mudança cancelada com sucesso!', 'Sucesso', 'success')
                         await loadSubscription(user.id)
                       } else {
-                        alert(`❌ Erro: ${data.error}`)
+                        showAlert(`Erro: ${data.error}`, 'Erro', 'error')
                       }
                     } catch (error) {
                       console.error('Erro:', error)
-                      alert('❌ Erro ao cancelar mudança')
+                      showAlert('Erro ao cancelar mudança', 'Erro', 'error')
                     }
                   }}
                   className="bg-gradient-to-r from-[#00FF99] to-[#00E88C] hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] text-black py-3 px-8 rounded-xl font-bold transition-all duration-300 flex items-center gap-2"
@@ -1501,7 +1514,7 @@ const handleConfirmPayment = async (e) => {
                 if (activeConnection) {
                   router.push(`/agent-config?connectionId=${activeConnection.id}`)
                 } else {
-                  alert('Selecione uma conexão primeiro')
+                  showAlert('Selecione uma conexão primeiro', 'Atenção', 'warning')
                 }
               }}
               disabled={!activeConnection}
@@ -1967,6 +1980,69 @@ const handleConfirmPayment = async (e) => {
     </>
   )}
       {/* --> [FIM DO MERGE] */}
+
+      {/* Modal de Alerta Customizado */}
+      {alertModal.show && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={() => setAlertModal({ ...alertModal, show: false })}
+          />
+
+          {/* Modal */}
+          <div className="relative bg-[#111111] rounded-2xl border border-white/10 shadow-2xl max-w-md w-full p-6 animate-in fade-in zoom-in duration-200">
+            {/* Ícone */}
+            <div className="flex items-center justify-center mb-4">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                alertModal.type === 'success' ? 'bg-[#00FF99]/10' :
+                alertModal.type === 'error' ? 'bg-red-500/10' :
+                alertModal.type === 'warning' ? 'bg-yellow-500/10' :
+                'bg-blue-500/10'
+              }`}>
+                {alertModal.type === 'success' && (
+                  <svg className="w-8 h-8 text-[#00FF99]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+                {alertModal.type === 'error' && (
+                  <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+                {alertModal.type === 'warning' && (
+                  <svg className="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                )}
+                {alertModal.type === 'info' && (
+                  <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                )}
+              </div>
+            </div>
+
+            {/* Título */}
+            <h3 className="text-xl font-bold text-white text-center mb-2">
+              {alertModal.title}
+            </h3>
+
+            {/* Mensagem */}
+            <p className="text-[#B0B0B0] text-center mb-6">
+              {alertModal.message}
+            </p>
+
+            {/* Botão */}
+            <button
+              onClick={() => setAlertModal({ ...alertModal, show: false })}
+              className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black py-3 px-6 rounded-lg font-bold hover:shadow-lg transition-all duration-300"
+            >
+              Entendi
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   )
