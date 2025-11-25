@@ -145,8 +145,10 @@ export async function POST(request) {
     // 2. Gerar/obter instance_name
     let instanceName = connection.instance_name
     if (!instanceName) {
-      // Gerar nome baseado no ID da conexão
-      instanceName = `swiftbot_${connection.id}`
+      // Gerar nome limpo baseado no ID da conexão (sem underscores)
+      // Formato: swiftbot + primeiros 8 caracteres do UUID (sem hífens)
+      const shortId = connection.id.replace(/-/g, '').substring(0, 12)
+      instanceName = `swiftbot${shortId}`
       console.log('📝 [Connect] Gerando instance_name:', instanceName)
     }
 
@@ -321,10 +323,11 @@ async function processConnectionResult(connectResult, connectionId, instanceName
       if (instanceInfo.profileName) {
         updateData.profile_name = instanceInfo.profileName
         updateData.profile_pic_url = instanceInfo.profilePicUrl || null
-        updateData.phone_number = instanceInfo.owner || null
+        // Limpar o número (remover @s.whatsapp.net se existir)
+        updateData.phone_number = instanceInfo.owner ? instanceInfo.owner.replace('@s.whatsapp.net', '') : null
         console.log('✅ [Connect] Perfil detectado:', {
           name: instanceInfo.profileName,
-          phone: instanceInfo.owner
+          phone: updateData.phone_number
         })
       }
     }
