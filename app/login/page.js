@@ -48,10 +48,9 @@ export default function AuthPage() {
   }, [])
 
   // ==================================================================================
-  // 🗣️ TRADUTOR DE ERROS (NOVA FUNÇÃO)
+  // 🗣️ TRADUTOR DE ERROS
   // ==================================================================================
   const translateError = (errorMsg) => {
-    // Normaliza a string para evitar problemas com case sensitive
     const msg = errorMsg?.toLowerCase() || ''
 
     if (msg.includes('invalid login credentials')) {
@@ -67,7 +66,6 @@ export default function AuthPage() {
         return 'Muitas tentativas. Aguarde um momento e tente novamente.'
     }
     
-    // Fallback: se não for nenhum erro conhecido, retorna o original (ou uma mensagem genérica)
     return errorMsg
   }
 
@@ -129,7 +127,6 @@ export default function AuthPage() {
         })
 
         if (error) {
-          // AQUI: Usamos a função de tradução
           setMessage(`❌ ${translateError(error.message)}`)
         } else {
           setMessage('✅ Login realizado com sucesso!')
@@ -142,18 +139,28 @@ export default function AuthPage() {
           }
         }
       } else if (authView === 'register') {
+        
+        // ==============================================================================
+        // 🔧 AJUSTE: URL DINÂMICA PARA PRODUÇÃO
+        // ==============================================================================
+        // window.location.origin pega automaticamente "https://swiftbot.com.br" em produção
+        const origin = typeof window !== 'undefined' && window.location.origin 
+            ? window.location.origin 
+            : ''
+            
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: {
               full_name: fullName
-            }
+            },
+            // Redireciona para /login após clicar no email
+            emailRedirectTo: `${origin}/login`
           }
         })
 
         if (error) {
-          // AQUI: Usamos a função de tradução
           setMessage(`❌ ${translateError(error.message)}`)
         } else {
           setMessage('✅ Conta criada com sucesso! Verifique seu email para confirmar.')
@@ -180,8 +187,13 @@ export default function AuthPage() {
     setErrors({})
 
     try {
+      // Garante a URL correta dinamicamente
+      const origin = typeof window !== 'undefined' && window.location.origin 
+          ? window.location.origin 
+          : ''
+
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-         redirectTo: 'https://swiftbot.com.br/reset-password',
+         redirectTo: `${origin}/reset-password`,
       })
 
       if (error) throw error
@@ -196,10 +208,16 @@ export default function AuthPage() {
   const handleSocialLogin = async (provider) => {
     setSocialLoading(provider)
     try {
+      // CORREÇÃO CRÍTICA: Antes estava hardcoded para localhost, o que quebraria em produção
+      const origin = typeof window !== 'undefined' && window.location.origin 
+          ? window.location.origin 
+          : ''
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider,
         options: {
-          redirectTo: `http://localhost:3000/auth/callback`
+          // Agora aponta corretamente para swiftbot.com.br/auth/callback
+          redirectTo: `${origin}/auth/callback`
         }
       })
       if (error) {
