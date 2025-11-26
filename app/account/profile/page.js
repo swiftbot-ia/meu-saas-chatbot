@@ -2,7 +2,10 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../../lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import Sidebar from '../../components/Sidebar' // Importando o Sidebar
+import Sidebar from '../../components/Sidebar'
+// Importações para o telefone
+import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input'
+import 'react-phone-number-input/style.css'
 
 export default function AccountProfile() {
   const [user, setUser] = useState(null)
@@ -15,13 +18,19 @@ export default function AccountProfile() {
   const [emailEditMode, setEmailEditMode] = useState(false)
   const [originalEmail, setOriginalEmail] = useState('')
   
-  // REMOVIDO: accountDropdownOpen não é mais necessário com a Sidebar
-
+  // Novo estado para controlar o Modal de Resultado (Sucesso/Erro)
+  const [resultModal, setResultModal] = useState({
+    show: false,
+    type: 'success', // 'success' ou 'error'
+    title: '',
+    message: ''
+  })
+  
   // Form states
   const [formData, setFormData] = useState({
     full_name: '',
     company_name: '',
-    phone: '',
+    phone: '', 
     email: '',
     current_password: '',
     new_password: '',
@@ -80,7 +89,7 @@ export default function AccountProfile() {
         setFormData({
           full_name: profile.full_name || '',
           company_name: profile.company_name || '',
-          phone: profile.phone ? formatPhone(profile.phone) : '',
+          phone: profile.phone || '', 
           email: currentUser?.email || '',
           current_password: '',
           new_password: '',
@@ -119,20 +128,6 @@ export default function AccountProfile() {
     }
   }
 
-  const formatPhone = (value) => {
-    const numbers = value.replace(/\D/g, '')
-    if (numbers.length <= 10) {
-      return numbers.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3')
-    } else {
-      return numbers.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3')
-    }
-  }
-
-  const validatePhone = (phone) => {
-    const numbers = phone.replace(/\D/g, '')
-    return numbers.length >= 10 && numbers.length <= 11
-  }
-
   const validateForm = () => {
     const newErrors = {}
     
@@ -146,10 +141,11 @@ export default function AccountProfile() {
       }
     }
 
-    if (!formData.phone.trim()) {
+    // Validação de telefone usando a biblioteca
+    if (!formData.phone) {
       newErrors.phone = 'Telefone é obrigatório'
-    } else if (!validatePhone(formData.phone)) {
-      newErrors.phone = 'Telefone deve ter 10 ou 11 dígitos'
+    } else if (!isValidPhoneNumber(formData.phone)) {
+      newErrors.phone = 'Número de telefone inválido para o país selecionado'
     }
     
     if (formData.new_password) {
@@ -211,14 +207,14 @@ export default function AccountProfile() {
     setErrors({})
 
     try {
-      const cleanPhone = data.phone.replace(/\D/g, '')
+      const phoneToSave = data.phone
 
       const { error: profileError } = await supabase
         .from('user_profiles')
         .update({
           full_name: data.full_name,
           company_name: data.company_name,
-          phone: cleanPhone,
+          phone: phoneToSave,
           updated_at: new Date().toISOString()
         })
         .eq('user_id', user.id)
@@ -242,10 +238,21 @@ export default function AccountProfile() {
         if (passwordError) throw passwordError
       }
 
+      // UX MELHORADA: Usando o Modal em vez de Alert
       if (emailWasChanged) {
-        alert(`✅ Solicitação de mudança de email enviada para ${data.email}. Verifique seu email.`)
+        setResultModal({
+          show: true,
+          type: 'success',
+          title: 'Verifique seu Email',
+          message: `Solicitação de mudança enviada para ${data.email}. Por favor, confirme a alteração no link enviado.`
+        })
       } else {
-        alert('✅ Perfil atualizado com sucesso!')
+        setResultModal({
+          show: true,
+          type: 'success',
+          title: 'Perfil Atualizado',
+          message: 'Suas informações foram salvas com sucesso!'
+        })
       }
       
       setEmailEditMode(false)
@@ -260,7 +267,13 @@ export default function AccountProfile() {
       
     } catch (error) {
       console.error('Erro ao salvar perfil:', error)
-      alert('❌ Erro ao salvar perfil: ' + error.message)
+      // UX MELHORADA: Modal de Erro
+      setResultModal({
+        show: true,
+        type: 'error',
+        title: 'Falha ao Salvar',
+        message: error.message || 'Ocorreu um erro inesperado ao atualizar o perfil.'
+      })
     }
 
     setSaving(false)
@@ -270,6 +283,11 @@ export default function AccountProfile() {
     setEmailEditMode(false)
     setFormData({...formData, email: originalEmail})
     setErrors({...errors, email: ''})
+  }
+
+  // Função para fechar o modal de resultado
+  const closeResultModal = () => {
+    setResultModal(prev => ({ ...prev, show: false }))
   }
 
   if (loading) {
@@ -282,15 +300,54 @@ export default function AccountProfile() {
   
   return (
     <div className="min-h-screen bg-[#0A0A0A]">
-      {/* 1. Sidebar adicionado aqui */}
       <Sidebar />
 
-      {/* 2. Container principal ajustado com margem esquerda para o Sidebar */}
+      <style jsx global>{`
+        .PhoneInput {
+          display: flex;
+          align-items: center;
+          width: 100%;
+          background-color: #0A0A0A;
+          border-radius: 0.75rem; 
+          padding-left: 1rem;
+          padding-right: 1rem;
+          padding-top: 0.75rem;
+          padding-bottom: 0.75rem;
+          transition: all 300ms;
+        }
+        .PhoneInput:focus-within {
+          box-shadow: 0 0 0 2px #00FF99;
+        }
+        .PhoneInputInput {
+          flex: 1;
+          min-width: 0;
+          background-color: transparent;
+          border: none;
+          color: white;
+          outline: none;
+          font-size: 1rem;
+        }
+        .PhoneInputInput::placeholder {
+          color: #6b7280;
+        }
+        .PhoneInputCountry {
+          margin-right: 0.75rem;
+        }
+        .PhoneInputCountrySelect {
+          background-color: #0A0A0A;
+          color: white;
+        }
+        .PhoneInputCountrySelectArrow {
+          border-color: #9ca3af;
+          opacity: 0.7;
+        }
+      `}</style>
+
       <main className="transition-all duration-300 ml-0 md:ml-[80px] lg:ml-[80px]">
         <div className="min-h-screen p-4 sm:p-6 lg:p-8">
           
-          <div className="max-w-4xl mx-auto">
-            {/* Header Simplificado (sem dropdown ou botão de voltar) */}
+          <div className="max-w-7xl mx-auto">
+            
             <div className="mb-8 pt-8">
               <h1 className="text-4xl font-bold text-white">
                 Configurações da Conta
@@ -339,18 +396,15 @@ export default function AccountProfile() {
                             <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                             Telefone de Contato *
                           </label>
-                          <input
-                            type="tel"
+                          
+                          <PhoneInput
+                            international
+                            defaultCountry="BR"
                             value={formData.phone}
-                            onChange={(e) => {
-                              const formatted = formatPhone(e.target.value)
-                              if (formatted.length <= 15) {
-                                setFormData({...formData, phone: formatted})
-                              }
-                            }}
+                            onChange={(value) => setFormData({...formData, phone: value})}
                             placeholder="(11) 99999-9999"
-                            className="w-full bg-[#0A0A0A] border-0 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] outline-none transition-all duration-300"
                           />
+                          
                           {errors.phone && <p className="mt-1 text-red-400 text-sm">{errors.phone}</p>}
                         </div>
                       </div>
@@ -570,6 +624,54 @@ export default function AccountProfile() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE RESULTADO (SUCESSO/ERRO) - SUBSTITUI O ALERT */}
+      {resultModal.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div 
+            className={`bg-[#1E1E1E] p-8 rounded-3xl border shadow-[0_0_50px_rgba(0,0,0,0.5)] max-w-md w-full text-center transform transition-all scale-100 ${
+              resultModal.type === 'error' 
+                ? 'border-red-500/20 shadow-[0_0_50px_rgba(239,68,68,0.1)]' 
+                : 'border-[#00FF99]/20 shadow-[0_0_50px_rgba(0,255,153,0.1)]'
+            }`}
+          >
+            <div 
+              className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 ${
+                resultModal.type === 'error' ? 'bg-red-500/10' : 'bg-[#00FF99]/10'
+              }`}
+            >
+              {resultModal.type === 'error' ? (
+                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg className="w-8 h-8 text-[#00FF99]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </div>
+            
+            <h3 className="text-2xl font-bold text-white mb-2">
+              {resultModal.title}
+            </h3>
+            
+            <p className="text-gray-400 mb-8">
+              {resultModal.message}
+            </p>
+            
+            <button 
+              onClick={closeResultModal}
+              className={`w-full py-4 font-bold rounded-2xl transition-all ${
+                resultModal.type === 'error'
+                  ? 'bg-red-500 hover:bg-red-600 text-white shadow-[0_0_20px_rgba(239,68,68,0.3)]'
+                  : 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black hover:shadow-[0_0_20px_rgba(0,255,153,0.3)]'
+              }`}
+            >
+              Entendido
+            </button>
           </div>
         </div>
       )}
