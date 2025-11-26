@@ -232,48 +232,13 @@ Posso te ajudar com algo mais específico?`
         />
       </div>
 
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-[#0A0A0A]/80 backdrop-blur-xl border-b border-white/5">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all"
-            >
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-              </svg>
-            </button>
-            <div className="flex items-center gap-3">
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, #00FF99 0%, #8B5CF6 100%)' }}
-              >
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                </svg>
-              </div>
-              <div>
-                <h1 className="text-white font-semibold">SwiftBot Interação IA</h1>
-                <p className="text-xs text-[#B0B0B0]">Assistente inteligente</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#8B5CF6]/10 border border-[#8B5CF6]/20">
-            <div className="w-2 h-2 rounded-full bg-[#8B5CF6] animate-pulse" />
-            <span className="text-xs text-[#8B5CF6] font-medium">Modo Criativo</span>
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
-      <main className={`relative z-10 pt-20 ${chatStarted ? 'pb-32' : 'pb-8'}`}>
+      <main className={`relative z-10 ${chatStarted ? 'pb-32' : 'pb-8'}`}>
         {!chatStarted ? (
           /* ============================================
              ESTADO 1: HERO (Inicial)
              ============================================ */
-          <div className="min-h-[calc(100vh-80px)] flex flex-col items-center justify-center px-4">
+          <div className="min-h-screen flex flex-col items-center justify-center px-4">
             <div className="max-w-3xl w-full text-center">
               {/* Greeting */}
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4">
