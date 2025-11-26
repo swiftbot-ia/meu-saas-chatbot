@@ -4,6 +4,9 @@ import { supabase } from '../../lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
 export default function AuthPage() {
+  // ==================================================================================
+  // 🧠 LÓGICA DE ESTADO (MANTIDA 100% IGUAL)
+  // ==================================================================================
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -11,15 +14,22 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false)
   const [socialLoading, setSocialLoading] = useState('')
   const [message, setMessage] = useState('')
-  
-  // MODIFICADO: Trocamos 'isLogin' (booleano) por 'authView' (string)
-  // para acomodar 3 estados: 'login', 'register', 'forgotPassword'
   const [authView, setAuthView] = useState('login') 
-
   const [errors, setErrors] = useState({})
   const router = useRouter()
 
-  // Animação IntersectionObserver (sem alterações)
+  // CSS Classes extraídas do Design System da referência para consistência
+  const baseInputClass = "w-full bg-[#1E1E1E] text-white placeholder-gray-500 rounded-3xl px-6 py-4 border outline-none focus:outline-none focus:rounded-3xl focus:bg-[#282828] transition-all duration-300 ease-in-out"
+  
+  const getInputClass = (hasError) => {
+    if (hasError) {
+        return `${baseInputClass} border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]`
+    }
+    return `${baseInputClass} border-transparent focus:border-white/10 focus:shadow-[0_0_20px_rgba(255,255,255,0.05)]`
+  }
+
+  const labelClass = "block text-xs font-medium text-[#B0B0B0] mb-2 ml-4 uppercase tracking-wider"
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -37,7 +47,30 @@ export default function AuthPage() {
     return () => observer.disconnect()
   }, [])
 
-  // MODIFICADO: A validação de 'isLogin' agora checa 'authView'
+  // ==================================================================================
+  // 🗣️ TRADUTOR DE ERROS (NOVA FUNÇÃO)
+  // ==================================================================================
+  const translateError = (errorMsg) => {
+    // Normaliza a string para evitar problemas com case sensitive
+    const msg = errorMsg?.toLowerCase() || ''
+
+    if (msg.includes('invalid login credentials')) {
+      return 'Email ou senha incorretos. Tente novamente.'
+    }
+    if (msg.includes('user already registered')) {
+      return 'Este email já está cadastrado. Tente fazer login.'
+    }
+    if (msg.includes('password should be at least')) {
+        return 'A senha deve ter no mínimo 6 caracteres.'
+    }
+    if (msg.includes('rate limit exceeded')) {
+        return 'Muitas tentativas. Aguarde um momento e tente novamente.'
+    }
+    
+    // Fallback: se não for nenhum erro conhecido, retorna o original (ou uma mensagem genérica)
+    return errorMsg
+  }
+
   const validateForm = () => {
     const newErrors = {}
     if (authView === 'register') {
@@ -47,7 +80,6 @@ export default function AuthPage() {
     }
     if (!email.includes('@')) newErrors.email = 'Email inválido'
     
-    // Senha só é obrigatória para login e registro
     if (authView !== 'forgotPassword' && !password) {
       newErrors.password = 'Senha é obrigatória'
     }
@@ -56,7 +88,6 @@ export default function AuthPage() {
     return Object.keys(newErrors).length === 0
   }
 
-  // Verificar se perfil está completo (sem alterações)
   const checkProfileCompletion = async (userId) => {
     try {
       const { data: profile, error } = await supabase
@@ -64,8 +95,6 @@ export default function AuthPage() {
         .select('company_name, full_name, phone')
         .eq('user_id', userId)
         .single()
-
-      console.log('Profile check:', { profile, error })
 
       const needsCompletion = !profile || 
                               !profile.company_name || 
@@ -75,13 +104,6 @@ export default function AuthPage() {
                               !profile.phone || 
                               profile.phone.trim() === ''
 
-      console.log('Needs completion:', needsCompletion, {
-        hasProfile: !!profile,
-        hasCompanyName: !!profile?.company_name,
-        hasFullName: !!profile?.full_name,
-        hasPhone: !!profile?.phone
-      })
-
       return needsCompletion
     } catch (error) {
       console.error('Erro ao verificar perfil:', error)
@@ -89,13 +111,9 @@ export default function AuthPage() {
     }
   }
 
-  // Autenticação tradicional (Login/Registro)
-  // MODIFICADO: A validação de 'isLogin' agora checa 'authView'
   const handleAuth = async (e) => {
     e.preventDefault()
     
-    // Validação de senha é diferente para 'forgotPassword'
-    // Então só validamos aqui se NÃO for 'forgotPassword'
     if (authView !== 'forgotPassword') {
       if (!validateForm()) return
     }
@@ -105,31 +123,25 @@ export default function AuthPage() {
 
     try {
       if (authView === 'login') {
-        console.log('🔍 Tentando login com:', { email: email, passwordLength: password.length })
-        
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.toLowerCase().trim(),
           password,
         })
 
         if (error) {
-          console.error('❌ Erro detalhado do login:', error)
-          setMessage(`❌ ${error.message}`)
+          // AQUI: Usamos a função de tradução
+          setMessage(`❌ ${translateError(error.message)}`)
         } else {
-          console.log('✅ Login bem-sucedido:', data)
           setMessage('✅ Login realizado com sucesso!')
-          
           const needsCompletion = await checkProfileCompletion(data.user.id)
           
           if (needsCompletion) {
-            console.log('Perfil incompleto - redirecionando para complete-profile')
             router.push('/complete-profile')
           } else {
-            console.log('Perfil completo - redirecionando para dashboard')
             router.push('/dashboard')
           }
         }
-      } else if (authView === 'register') { // MODIFICADO
+      } else if (authView === 'register') {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -141,7 +153,8 @@ export default function AuthPage() {
         })
 
         if (error) {
-          setMessage(`❌ ${error.message}`)
+          // AQUI: Usamos a função de tradução
+          setMessage(`❌ ${translateError(error.message)}`)
         } else {
           setMessage('✅ Conta criada com sucesso! Verifique seu email para confirmar.')
           setEmail('')
@@ -151,12 +164,11 @@ export default function AuthPage() {
         }
       }
     } catch (error) {
-      setMessage(`❌ ${error.message}`)
+      setMessage(`❌ ${translateError(error.message)}`)
     }
     setLoading(false)
   }
 
-  // ADICIONADO: Nova função para 'Esqueceu sua senha'
   const handlePasswordReset = async (e) => {
     e.preventDefault()
     if (!email) {
@@ -172,24 +184,17 @@ export default function AuthPage() {
          redirectTo: 'https://swiftbot.com.br/reset-password',
       })
 
-      if (error) {
-        throw error
-      }
-      
-      setMessage('✅ Email enviado! Verifique sua caixa de entrada para o link de redefinição.')
+      if (error) throw error
+      setMessage('✅ Email enviado! Verifique sua caixa de entrada.')
       
     } catch (error) {
-      console.error('Erro ao redefinir senha:', error)
-      setMessage(`❌ Erro: ${error.message}`)
+      setMessage(`❌ Erro: ${translateError(error.message)}`)
     }
-    
     setLoading(false)
   }
 
-  // Login social (sem alterações)
   const handleSocialLogin = async (provider) => {
     setSocialLoading(provider)
-    
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider,
@@ -198,11 +203,11 @@ export default function AuthPage() {
         }
       })
       if (error) {
-        setMessage(`❌ Erro no login com ${provider}: ${error.message}`)
+        setMessage(`❌ Erro no login com ${provider}: ${translateError(error.message)}`)
         setSocialLoading('')
       }
     } catch (error) {
-      setMessage(`❌ ${error.message}`)
+      setMessage(`❌ ${translateError(error.message)}`)
       setSocialLoading('')
     }
   }
@@ -211,7 +216,7 @@ export default function AuthPage() {
     { 
       name: 'google', 
       label: 'Google', 
-      gradient: 'from-pink-500 via-purple-500 to-indigo-500',
+      gradient: 'from-[#DB4437] to-[#C53929]', 
       icon: (
         <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
           <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -224,7 +229,7 @@ export default function AuthPage() {
     { 
       name: 'facebook', 
       label: 'Facebook', 
-      gradient: 'from-cyan-400 via-blue-500 to-purple-500',
+      gradient: 'from-[#4267B2] to-[#365899]',
       icon: (
         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
           <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
@@ -233,353 +238,270 @@ export default function AuthPage() {
     }
   ]
 
+  // ==================================================================================
+  // 🎨 RENDERIZAÇÃO
+  // ==================================================================================
   return (
     <>
-      <div className="min-h-screen bg-black relative overflow-hidden flex items-center justify-center px-4 pt-24 pb-16">
+      <div className="min-h-screen bg-[#0A0A0A] relative overflow-hidden flex items-center justify-center px-4 pt-24 pb-16">
         
-        {/* Backgrounds (sem alterações) */}
-        <div className="absolute inset-0 opacity-10">
-          <div 
-            className="absolute inset-0" 
-            style={{
-              backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.15) 1px, transparent 0)`,
-              backgroundSize: '50px 50px'
-            }}
-          />
-        </div>
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-black to-pink-900/20" />
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1.5s'}} />
+        {/* Background Ambient Light */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-900/10 rounded-full blur-[100px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#00FF99]/5 rounded-full blur-[100px]" />
 
-        {/* Auth Card */}
-        <div className="animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000 relative w-full max-w-md">
+        {/* Auth Card Container */}
+        <div className="animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000 relative w-full max-w-lg">
           
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-8 md:p-10 shadow-2xl hover:bg-white/[0.07] transition-all duration-500">
+          {/* ✨ Borda Gradiente via Parent Wrapper */}
+          <div 
+            className="rounded-[32px] p-[2px]"
+            style={{ backgroundImage: 'linear-gradient(to right, #8A2BE2, #00BFFF, #00FF99)' }}
+          >
+            <div className="bg-[#111111] rounded-[30px] p-8 md:p-10 shadow-2xl">
             
-            {/* Renderização Condicional da View
-              Mostra (Login/Registro) OU (Esqueceu Senha)
-            */}
-            
-            {/* ADICIONADO: View de Esqueceu Senha */}
+            {/* VIEW: ESQUECEU A SENHA */}
             {authView === 'forgotPassword' ? (
               <>
-                {/* Título */}
                 <div className="text-center mb-8">
-                  <h1 className="text-4xl font-light text-white mb-3">
-                    Recuperar <span className="font-normal bg-gradient-to-r from-[#00FF99] to-[#00E88C] bg-clip-text text-transparent">Senha</span>
-                  </h1>
-                  <p className="text-gray-400 font-light">
-                    Digite seu email para enviarmos um link de redefinição.
-                  </p>
+                  <h1 className="text-3xl font-bold text-white mb-2">Recuperar Senha</h1>
+                  <p className="text-[#B0B0B0] text-sm">Digite seu email para enviarmos um link de redefinição.</p>
                 </div>
 
-                {/* Formulário de Esqueceu Senha */}
-                <form onSubmit={handlePasswordReset} className="space-y-4">
-                  {/* Email */}
+                <form onSubmit={handlePasswordReset} className="space-y-6">
                   <div>
-                    <label className="block text-sm font-light text-gray-300 mb-2">
-                      Email *
-                    </label>
+                    <label className={labelClass}>Email</label>
                     <input
                       type="email"
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className={`w-full px-4 py-3 bg-white/5 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] focus:border-[#00FF99] outline-none transition-all duration-300 font-light ${
-                        errors.email ? 'border-red-500/50' : 'border-white/10'
-                      }`}
+                      className={getInputClass(errors.email)}
                       placeholder="seu@email.com"
                     />
-                    {errors.email && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.email}</p>}
+                    {errors.email && <p className="text-red-400 text-xs ml-4 mt-1.5">{errors.email}</p>}
                   </div>
 
-                  {/* Message */}
                   {message && (
-                    <div className={`p-3 rounded-xl text-sm border backdrop-blur-sm font-light ${
+                    <div className={`p-4 rounded-2xl text-sm border text-center font-medium ${
                       message.includes('✅') 
-                        ? 'bg-green-900/20 text-green-400 border-green-800/50' 
-                        : 'bg-red-900/20 text-red-400 border-red-800/50'
+                        ? 'bg-[#00FF99]/10 text-[#00FF99] border-[#00FF99]/20' 
+                        : 'bg-red-500/10 text-red-400 border-red-500/20'
                     }`}>
                       {message}
                     </div>
                   )}
 
-                  {/* Submit Button */}
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] hover:shadow-[0_0_40px_rgba(0,255,153,0.6)] disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-4 px-4 rounded-xl transition-all duration-300 hover:scale-105 flex items-center justify-center"
+                    className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold py-4 rounded-3xl hover:shadow-[0_0_20px_rgba(0,255,153,0.3)] transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center"
                   >
                     {loading ? (
-                      <div className="flex items-center">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black mr-2"></div>
-                        <span className="font-light">Enviando...</span>
-                      </div>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black"></div>
                     ) : (
-                      <span className="font-medium">
-                        Enviar Link de Recuperação
-                      </span>
+                      'Enviar Link de Recuperação'
                     )}
                   </button>
                 </form>
 
-                {/* Voltar para Login */}
                 <div className="mt-8 text-center">
                   <button
                     onClick={() => { setAuthView('login'); setMessage(''); setErrors({}); }}
-                    className="text-gray-500 hover:text-[#00FF99] text-sm transition-colors duration-300 flex items-center justify-center mx-auto font-light group"
+                    className="text-[#B0B0B0] hover:text-[#00FF99] text-sm transition-colors duration-300 font-medium"
                   >
-                    <span className="mr-2 group-hover:-translate-x-1 transition-transform duration-300">←</span>
-                    Voltar para o Login
+                    ← Voltar para o Login
                   </button>
                 </div>
               </>
             
             ) : (
               
-              /* MODIFICADO: View de Login/Registro (todo o conteúdo anterior) */
+              /* VIEW: LOGIN / REGISTRO */
               <>
-                {/* Badge Trial Gratuito */}
+                {/* Badge Trial */}
                 <div className="flex justify-center mb-6">
-                  <div className="inline-flex items-center gap-2 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-6 py-2">
-                    <div className="w-2 h-2 bg-[#00FF99] rounded-full animate-pulse" />
-                    <span className="text-sm text-gray-300 font-light">4 dias grátis • Sem cartão de crédito</span>
+                  <div className="inline-flex items-center gap-2 bg-[#1E1E1E] border border-white/5 rounded-full px-5 py-2">
+                    <div className="w-2 h-2 bg-[#00FF99] rounded-full animate-pulse shadow-[0_0_10px_#00FF99]" />
+                    <span className="text-xs text-gray-300 font-medium uppercase tracking-wide">4 dias grátis • Sem cartão</span>
                   </div>
                 </div>
 
-                {/* Título */}
                 <div className="text-center mb-8">
-                  <h1 className="text-4xl font-light text-white mb-3">
-                    Bem-vindo ao <span className="font-normal bg-gradient-to-r from-[#00FF99] to-[#00E88C] bg-clip-text text-transparent">SwiftBot</span>
+                  <h1 className="text-4xl font-bold text-white mb-2">
+                    {authView === 'login' ? 'Bem-vindo de volta' : 'Crie sua conta'}
                   </h1>
-                  <p className="text-gray-400 font-light">
-                    {authView === 'login' ? 'Entre na sua conta e continue automatizando' : 'Crie sua conta e comece em segundos'}
+                  <p className="text-[#B0B0B0]">
+                    {authView === 'login' ? 'Entre para continuar automatizando.' : 'Comece em segundos.'}
                   </p>
                 </div>
 
-                {/* Social Login Buttons */}
-                <div className="space-y-3 mb-6">
+                {/* Social Buttons */}
+                <div className="space-y-3 mb-8">
                   {socialProviders.map((provider) => (
                     <button
                       key={provider.name}
                       onClick={() => handleSocialLogin(provider.name)}
                       disabled={socialLoading === provider.name}
-                      className={`group w-full flex items-center justify-center gap-3 px-4 py-3 bg-gradient-to-r ${provider.gradient} rounded-xl text-white font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden`}
+                      className={`group w-full flex items-center justify-center gap-3 px-4 py-4 bg-gradient-to-r ${provider.gradient} rounded-3xl text-white font-bold transition-all duration-300 hover:scale-[1.02] hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
-                      <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300" />
-                      
                       {socialLoading === provider.name ? (
-                        <div className="flex items-center relative z-10">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          <span className="font-light">Conectando...</span>
-                        </div>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                       ) : (
-                        <div className="flex items-center gap-3 relative z-10">
+                        <>
                           {provider.icon}
-                          <span className="font-light">Continuar com {provider.label}</span>
-                        </div>
+                          <span className="text-sm">Continuar com {provider.label}</span>
+                        </>
                       )}
                     </button>
                   ))}
                 </div>
 
-                {/* Divider */}
-                <div className="relative flex items-center justify-center mb-6 gap-4">
+                <div className="relative flex items-center justify-center mb-8">
                   <div className="flex-1 border-t border-white/10"></div>
-                  <span className="text-sm text-gray-400 font-light">ou</span>
+                  <span className="text-xs text-[#505050] uppercase px-4 font-bold tracking-widest">ou continue com email</span>
                   <div className="flex-1 border-t border-white/10"></div>
                 </div>
 
-                {/* Toggle Login/Register */}
-                <div className="flex bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-1 mb-6">
+                {/* Toggle Personalizado */}
+                <div className="flex bg-[#1E1E1E] rounded-2xl p-1 mb-8">
                   <button
-                    onClick={() => { setAuthView('login'); setMessage(''); setErrors({}); }} // MODIFICADO
-                    className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-light transition-all duration-300 ${
+                    onClick={() => { setAuthView('login'); setMessage(''); setErrors({}); }}
+                    className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${
                       authView === 'login' 
-                        ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black shadow-lg font-medium' 
-                        : 'text-gray-400 hover:text-white'
+                        ? 'bg-[#2A2A2A] text-white shadow-lg' 
+                        : 'text-gray-500 hover:text-white'
                     }`}
                   >
                     Entrar
                   </button>
                   <button
-                    onClick={() => { setAuthView('register'); setMessage(''); setErrors({}); }} // MODIFICADO
-                    className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-light transition-all duration-300 ${
+                    onClick={() => { setAuthView('register'); setMessage(''); setErrors({}); }}
+                    className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${
                       authView === 'register' 
-                        ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black shadow-lg font-medium' 
-                        : 'text-gray-400 hover:text-white'
+                        ? 'bg-[#2A2A2A] text-white shadow-lg' 
+                        : 'text-gray-500 hover:text-white'
                     }`}
                   >
                     Cadastrar
                   </button>
                 </div>
 
-                {/* Form */}
-                <form onSubmit={handleAuth} className="space-y-4">
+                <form onSubmit={handleAuth} className="space-y-6">
                   
-                  {/* Nome Completo - apenas no cadastro */}
                   {authView === 'register' && (
                     <div>
-                      <label className="block text-sm font-light text-gray-300 mb-2">
-                        Nome Completo *
-                      </label>
+                      <label className={labelClass}>Nome Completo</label>
                       <input
                         type="text"
                         required={authView === 'register'}
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
-                        className={`w-full px-4 py-3 bg-white/5 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] focus:border-[#00FF99] outline-none transition-all duration-300 font-light ${
-                          errors.fullName ? 'border-red-500/50' : 'border-white/10'
-                        }`}
-                        placeholder="João Silva"
+                        className={getInputClass(errors.fullName)}
+                        placeholder="Ex: João Silva"
                       />
-                      {errors.fullName && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.fullName}</p>}
+                      {errors.fullName && <p className="text-red-400 text-xs ml-4 mt-1.5">{errors.fullName}</p>}
                     </div>
                   )}
 
-                  {/* Email */}
                   <div>
-                    <label className="block text-sm font-light text-gray-300 mb-2">
-                      Email *
-                    </label>
+                    <label className={labelClass}>Email</label>
                     <input
                       type="email"
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className={`w-full px-4 py-3 bg-white/5 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] focus:border-[#00FF99] outline-none transition-all duration-300 font-light ${
-                        errors.email ? 'border-red-500/50' : 'border-white/10'
-                      }`}
+                      className={getInputClass(errors.email)}
                       placeholder="seu@email.com"
                     />
-                    {errors.email && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.email}</p>}
+                    {errors.email && <p className="text-red-400 text-xs ml-4 mt-1.5">{errors.email}</p>}
                   </div>
 
-                  {/* Senha */}
                   <div>
-                    <label className="block text-sm font-light text-gray-300 mb-2">
-                      Senha *
-                    </label>
+                    <label className={labelClass}>Senha</label>
                     <input
                       type="password"
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className={`w-full px-4 py-3 bg-white/5 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] focus:border-[#00FF99] outline-none transition-all duration-300 font-light ${
-                        errors.password ? 'border-red-500/50' : 'border-white/10'
-                      }`}
+                      className={getInputClass(errors.password)}
                       placeholder="••••••••"
                       minLength={6}
                     />
-                    {errors.password && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.password}</p>}
+                    {errors.password && <p className="text-red-400 text-xs ml-4 mt-1.5">{errors.password}</p>}
                   </div>
 
-                  {/* Confirmar Senha - apenas no cadastro */}
                   {authView === 'register' && (
                     <div>
-                      <label className="block text-sm font-light text-gray-300 mb-2">
-                        Confirmar Senha *
-                      </label>
+                      <label className={labelClass}>Confirmar Senha</label>
                       <input
                         type="password"
                         required={authView === 'register'}
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        className={`w-full px-4 py-3 bg-white/5 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] focus:border-[#00FF99] outline-none transition-all duration-300 font-light ${
-                          errors.confirmPassword ? 'border-red-500/50' : 'border-white/10'
-                        }`}
+                        className={getInputClass(errors.confirmPassword)}
                         placeholder="••••••••"
                       />
-                      {errors.confirmPassword && <p className="text-red-400 text-xs mt-1.5 font-light">{errors.confirmPassword}</p>}
+                      {errors.confirmPassword && <p className="text-red-400 text-xs ml-4 mt-1.5">{errors.confirmPassword}</p>}
                     </div>
                   )}
 
-                  {/* Esqueceu senha link - apenas no login */}
                   {authView === 'login' && (
-                    <div className="text-right">
+                    <div className="flex justify-end pr-2">
                       <button
                         type="button"
-                        // MODIFICADO: onClick para mudar a view
                         onClick={() => { setAuthView('forgotPassword'); setMessage(''); setErrors({}); }}
-                        className="text-sm text-gray-400 hover:text-[#00FF99] transition-colors duration-300 font-light"
+                        className="text-xs text-[#B0B0B0] hover:text-[#00FF99] transition-colors font-medium"
                       >
-                        Esqueceu sua senha?
+                        Esqueceu a senha?
                       </button>
                     </div>
                   )}
 
-                  {/* Message */}
                   {message && (
-                    <div className={`p-3 rounded-xl text-sm border backdrop-blur-sm font-light ${
+                    <div className={`p-4 rounded-2xl text-sm border text-center font-medium ${
                       message.includes('✅') 
-                        ? 'bg-green-900/20 text-green-400 border-green-800/50' 
-                        : 'bg-red-900/20 text-red-400 border-red-800/50'
+                        ? 'bg-[#00FF99]/10 text-[#00FF99] border-[#00FF99]/20' 
+                        : 'bg-red-500/10 text-red-400 border-red-500/20'
                     }`}>
                       {message}
                     </div>
                   )}
-                  {/*(Termos de Uso) */}
+                  
+                  {/* Termos */}
                   {authView === 'register' && (
-                    <p className="text-xs text-gray-500 text-center font-light pt-2">
-                      Ao clicar em "Criar Minha Conta", você aceita nossos<br />
-                      <a 
-                        href="/termos" 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="text-gray-400 hover:text-[#00FF99] underline transition-colors"
-                      >
-                        Termos de Uso
-                      </a> 
-                      {" e "}
-                      <a 
-                        href="/privacidade" 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="text-gray-400 hover:text-[#00FF99] underline transition-colors"
-                      >
-                        Política de Privacidade
-                      </a>.
+                    <p className="text-[10px] text-gray-500 text-center px-4">
+                      Ao criar conta, você aceita nossos <a href="#" className="text-[#00FF99] hover:underline">Termos</a> e <a href="#" className="text-[#00FF99] hover:underline">Privacidade</a>.
                     </p>
                   )}
                   
-                  {/* Submit Button */}
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] hover:shadow-[0_0_40px_rgba(0,255,153,0.6)] disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold py-4 px-4 rounded-xl transition-all duration-300 hover:scale-105 flex items-center justify-center"
+                    className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold py-4 rounded-3xl hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center"
                   >
                     {loading ? (
-                      <div className="flex items-center">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black mr-2"></div>
-                        <span className="font-light">{authView === 'login' ? 'Entrando...' : 'Criando conta...'}</span>
-                      </div>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black"></div>
                     ) : (
-                      <span className="font-medium">
-                        {authView === 'login' ? 'Entrar na Plataforma' : 'Criar Minha Conta'}
-                      </span>
+                      authView === 'login' ? 'Entrar na Plataforma' : 'Criar Conta Grátis'
                     )}
                   </button>
                 </form>
 
-                {/* Back to Home */}
                 <div className="mt-8 text-center">
                   <button
                     onClick={() => router.push('/')}
-                    className="text-gray-500 hover:text-[#00FF99] text-sm transition-colors duration-300 flex items-center justify-center mx-auto font-light group"
+                    className="text-[#B0B0B0] hover:text-white text-xs transition-colors font-medium"
                   >
-                    <span className="mr-2 group-hover:-translate-x-1 transition-transform duration-300">←</span>
                     Voltar ao início
                   </button>
                 </div>
               </>
             )} 
-            {/* Fim da renderização condicional */}
-
+            </div>
           </div>
         </div>
       </div>
 
-      {/* CSS para animações */}
       <style jsx global>{`
         .animate-on-scroll {
           transition-property: opacity, transform;
