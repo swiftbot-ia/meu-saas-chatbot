@@ -70,6 +70,7 @@ export default function AuthPage() {
         return 'Muitas tentativas. Aguarde um momento e tente novamente.'
     }
     
+    // Fallback: se não for nenhum erro conhecido, retorna o original (ou uma mensagem genérica)
     return errorMsg
   }
 
@@ -131,6 +132,7 @@ export default function AuthPage() {
         })
 
         if (error) {
+          // AQUI: Usamos a função de tradução
           setMessage(`❌ ${translateError(error.message)}`)
         } else {
           setMessage('✅ Login realizado com sucesso!')
@@ -163,6 +165,7 @@ export default function AuthPage() {
         })
 
         if (error) {
+          // AQUI: Usamos a função de tradução
           setMessage(`❌ ${translateError(error.message)}`)
         } else {
           setMessage('✅ Conta criada com sucesso! Verifique seu email para confirmar.')
