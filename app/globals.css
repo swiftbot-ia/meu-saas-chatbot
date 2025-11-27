@@ -107,11 +107,13 @@ body {
   outline: none;
 }
 
+/*
 *:focus-visible {
   outline: 2px solid var(--swiftbot-green);
   outline-offset: 2px;
   border-radius: 4px;
 }
+*/
 
 /* ===========================
    ANIMATIONS
@@ -400,4 +402,9 @@ body {
   .no-print {
     display: none !important;
   }
+}
+
+.standalone-page {
+  margin-left: 0 !important;
+  left: 0 !important;
 }
