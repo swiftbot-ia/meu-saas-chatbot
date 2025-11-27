@@ -1,11 +1,15 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../../lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import StandardModal, { initialModalConfig, createModalConfig } from '../components/StandardModal'
 
 export default function Dashboard() {
   const router = useRouter()
-  
+
+  // Ref para timer de atualização de perfil
+  const profileUpdateTimerRef = useRef(null)
+
   // Estados
   const [user, setUser] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
@@ -26,7 +30,8 @@ export default function Dashboard() {
   })
   const [statsLoading, setStatsLoading] = useState(false)
   const [showQRModal, setShowQRModal] = useState(false)
-  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false)
+  // Sidebar
+  // const [accountDropdownOpen, setAccountDropdownOpen] = useState(false)
   const [connectionsDropdownOpen, setConnectionsDropdownOpen] = useState(false)
   
   // Estados do Checkout
@@ -46,11 +51,28 @@ export default function Dashboard() {
   const [stripeElements, setStripeElements] = useState(null)
   const [isPaymentElementReady, setIsPaymentElementReady] = useState(false)
 
+  // Standard Modal state
+  const [modalConfig, setModalConfig] = useState(initialModalConfig)
+  const [pendingAction, setPendingAction] = useState(null) // Para armazenar ações pendentes de confirmação
+
+  // Helper para fechar o modal
+  const closeModal = () => {
+    setModalConfig(initialModalConfig)
+    setPendingAction(null)
+  }
+
   // ============================================================================
   // CARREGAMENTO INICIAL
   // ============================================================================
   useEffect(() => {
     checkUser()
+
+    // Cleanup: limpar timer de atualização de perfil ao desmontar
+    return () => {
+      if (profileUpdateTimerRef.current) {
+        clearTimeout(profileUpdateTimerRef.current)
+      }
+    }
   }, [])
 
   const checkUser = async () => {
@@ -209,16 +231,109 @@ const loadSubscription = async (userId) => {
   }
 
   // ============================================================================
+  // ATUALIZAR APENAS OS DADOS DAS CONEXÕES (sem recarregar página)
+  // ============================================================================
+  const refreshConnectionsData = async () => {
+    if (!user) return
+
+    try {
+      console.log('🔄 [Dashboard] Atualizando dados das conexões...')
+
+      // 1. Buscar conexões atuais do Supabase
+      const { data: currentConnections, error: fetchError } = await supabase
+        .from('whatsapp_connections')
+        .select('*')
+        .eq('user_id', user.id)
+
+      if (fetchError) throw fetchError
+
+      // 2. Para cada conexão conectada, chamar API de status para atualizar perfil
+      const connectedConnections = (currentConnections || []).filter(
+        c => c.status === 'connected' || c.is_connected
+      )
+
+      console.log(`📡 [Dashboard] Atualizando perfil de ${connectedConnections.length} conexões...`)
+
+      for (const conn of connectedConnections) {
+        try {
+          const response = await fetch('/api/whatsapp/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ connectionId: conn.id })
+          })
+
+          const data = await response.json()
+          console.log(`✅ [Dashboard] Status atualizado para ${conn.id}:`, {
+            name: data.profileName,
+            phone: data.phoneNumber
+          })
+        } catch (err) {
+          console.error(`❌ [Dashboard] Erro ao atualizar status de ${conn.id}:`, err)
+        }
+      }
+
+      // 3. Buscar dados atualizados do Supabase
+      const { data: updatedConnections, error: refetchError } = await supabase
+        .from('whatsapp_connections')
+        .select('*')
+        .eq('user_id', user.id)
+
+      if (refetchError) throw refetchError
+
+      // 4. Atualizar lista de conexões
+      setConnections(updatedConnections || [])
+
+      // 5. Atualizar activeConnection se existir
+      if (activeConnection && updatedConnections) {
+        const updatedActive = updatedConnections.find(c => c.id === activeConnection.id)
+        if (updatedActive) {
+          setActiveConnection(updatedActive)
+          console.log('✅ [Dashboard] Conexão ativa atualizada:', {
+            name: updatedActive.profile_name,
+            phone: updatedActive.phone_number,
+            pic: updatedActive.profile_pic_url ? 'sim' : 'não'
+          })
+        }
+      }
+    } catch (error) {
+      console.error('❌ [Dashboard] Erro ao atualizar conexões:', error)
+    }
+  }
+
+  // ============================================================================
+  // AGENDAR ATUALIZAÇÃO DE PERFIL (30 segundos após conexão)
+  // ============================================================================
+  const scheduleProfileUpdate = () => {
+    // Limpar timer anterior se existir
+    if (profileUpdateTimerRef.current) {
+      clearTimeout(profileUpdateTimerRef.current)
+    }
+
+    console.log('⏰ [Dashboard] Agendando atualização de perfil em 30 segundos...')
+
+    profileUpdateTimerRef.current = setTimeout(async () => {
+      console.log('⏰ [Dashboard] Executando atualização agendada de perfil...')
+      await refreshConnectionsData()
+    }, 30000) // 30 segundos
+  }
+
+  // ============================================================================
   // FECHAR MODAL QR CODE (com refresh automático)
   // ============================================================================
   const handleCloseQRModal = async () => {
     setShowQRModal(false)
     setQrCode(null)
 
-    // Recarregar conexões para pegar status atualizado
+    // Recarregar conexões para pegar status atualizado (incluindo perfil)
     if (user) {
       console.log('🔄 [Dashboard] Recarregando conexões após fechar modal...')
+      // Aguardar um pouco para garantir que o Supabase foi atualizado
+      await new Promise(resolve => setTimeout(resolve, 500))
       await loadConnections(user.id)
+
+      // Agendar atualização de perfil em 30 segundos
+      // (para pegar dados de perfil que a UAZAPI pode demorar a retornar)
+      scheduleProfileUpdate()
     }
   }
 
@@ -255,7 +370,10 @@ const loadSubscription = async (userId) => {
   // ============================================================================
   const connectWhatsApp = async (connection) => {
     if (!connection) {
-      alert('Selecione uma conexão primeiro')
+      setModalConfig(createModalConfig.warning(
+        'Selecione uma conexão',
+        'Por favor, selecione uma conexão antes de tentar conectar o WhatsApp.'
+      ))
       return
     }
 
@@ -284,11 +402,14 @@ const loadSubscription = async (userId) => {
     if (subscriptionStatus === 'trial' && subscription?.trial_end_date) {
       const trialEndDate = new Date(subscription.trial_end_date)
       const now = new Date()
-      
+
       if (now > trialEndDate) {
         console.log('❌ Trial expirado detectado no frontend')
-        alert('Seu período de teste expirou. Por favor, assine um plano para continuar.')
-        setShowCheckoutModal(true)
+        setModalConfig(createModalConfig.warning(
+          'Período de Teste Expirado',
+          'Seu período de teste expirou. Por favor, assine um plano para continuar usando a plataforma.',
+          () => setShowCheckoutModal(true)
+        ))
         return
       }
     }
@@ -321,16 +442,25 @@ const loadSubscription = async (userId) => {
         // Tratamento de erros específicos
         if (data.subscription_status) {
           console.log(`❌ Erro de assinatura: ${data.subscription_status}`)
-          alert(data.error || 'Problema com sua assinatura. Verifique seu plano.')
-          setShowCheckoutModal(true)
+          setModalConfig(createModalConfig.error(
+            'Problema com Assinatura',
+            data.error || 'Há um problema com sua assinatura. Verifique seu plano.',
+            () => setShowCheckoutModal(true)
+          ))
         } else {
-          alert(data.error || 'Erro ao conectar WhatsApp')
+          setModalConfig(createModalConfig.error(
+            'Erro ao Conectar',
+            data.error || 'Ocorreu um erro ao conectar o WhatsApp. Tente novamente.'
+          ))
         }
         return
       }
     } catch (error) {
       console.error('Erro ao conectar WhatsApp:', error)
-      alert('Erro ao conectar WhatsApp')
+      setModalConfig(createModalConfig.error(
+        'Erro ao Conectar',
+        'Ocorreu um erro ao conectar o WhatsApp. Verifique sua conexão e tente novamente.'
+      ))
     } finally {
       setConnecting(false)
     }
@@ -350,14 +480,9 @@ const loadSubscription = async (userId) => {
 
       if (data.success) {
         setWhatsappStatus(data.status)
-        
-        await supabase
-          .from('whatsapp_connections')
-          .update({ 
-            status: data.status,
-            phone_number: data.phoneNumber || connection.phone_number
-          })
-          .eq('id', connection.id)
+
+        // NOTA: Não atualizar Supabase aqui - a API /api/whatsapp/status já faz isso
+        // incluindo profile_name, profile_pic_url e phone_number
 
         if (data.status === 'connected') {
           await handleCloseQRModal()
@@ -421,16 +546,96 @@ const loadSubscription = async (userId) => {
         setActiveConnection(newConnection)
       }
 
-      alert('Nova conexão criada com sucesso!')
+      setModalConfig(createModalConfig.success(
+        'Conexão Criada',
+        'Nova conexão criada com sucesso! Agora você pode conectar o WhatsApp.'
+      ))
     } catch (error) {
       console.error('Erro ao criar conexão:', error)
-      alert('Erro ao criar nova conexão: ' + error.message)
+      setModalConfig(createModalConfig.error(
+        'Erro ao Criar Conexão',
+        `Não foi possível criar a nova conexão: ${error.message}`
+      ))
+    }
+  }
+
+  // ============================================================================
+  // DESCONECTAR WHATSAPP
+  // ============================================================================
+  const handleDisconnect = (connection) => {
+    if (!connection) {
+      setModalConfig(createModalConfig.error(
+        'Nenhuma conexão selecionada',
+        'Por favor, selecione uma conexão antes de tentar desconectar.'
+      ))
+      return
+    }
+
+    // Mostrar modal de confirmação
+    setModalConfig({
+      isOpen: true,
+      title: 'Desconectar WhatsApp',
+      message: `Tem certeza que deseja desconectar "${getConnectionName(connection)}"?\n\nA instância será excluída da Uazapi, mas o registro será mantido no sistema. Você poderá reconectar esta instância posteriormente.`,
+      type: 'warning',
+      confirmText: 'Desconectar',
+      cancelText: 'Cancelar',
+      showCancelButton: true,
+      onConfirm: () => executeDisconnect(connection)
+    })
+  }
+
+  // Função que realmente executa a desconexão
+  const executeDisconnect = async (connection) => {
+    try {
+      setConnecting(true)
+      console.log('🔌 Desconectando instância:', connection.id)
+
+      const response = await fetch('/api/whatsapp/disconnect-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          connectionId: connection.id
+        })
+      })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao desconectar')
+      }
+
+      console.log('✅ Instância desconectada com sucesso')
+
+      // Atualizar lista de conexões
+      await loadConnections(user.id)
+
+      // Limpar conexão ativa se for a que foi desconectada
+      if (activeConnection?.id === connection.id) {
+        setActiveConnection(null)
+        setWhatsappStatus('disconnected')
+      }
+
+      setModalConfig(createModalConfig.success(
+        'WhatsApp Desconectado',
+        'A instância foi desconectada com sucesso. Você pode reconectá-la a qualquer momento.'
+      ))
+    } catch (error) {
+      console.error('❌ Erro ao desconectar:', error)
+      setModalConfig(createModalConfig.error(
+        'Erro ao Desconectar',
+        `Não foi possível desconectar o WhatsApp: ${error.message}`
+      ))
+    } finally {
+      setConnecting(false)
     }
   }
 
   const syncSubscriptionStatus = async () => {
     if (!subscription?.stripe_subscription_id || subscription.stripe_subscription_id === 'super_account_bypass') {
-      alert('Não há assinatura para sincronizar')
+      setModalConfig(createModalConfig.info(
+        'Sem Assinatura',
+        'Não há assinatura ativa para sincronizar.'
+      ))
       return
     }
 
@@ -438,7 +643,7 @@ const loadSubscription = async (userId) => {
       const response = await fetch('/api/subscription/sync-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           userId: user.id,
           subscriptionId: subscription.stripe_subscription_id
         })
@@ -447,14 +652,23 @@ const loadSubscription = async (userId) => {
       const data = await response.json()
 
       if (data.success) {
-        alert('Status sincronizado com sucesso!')
+        setModalConfig(createModalConfig.success(
+          'Sincronizado',
+          'Status da assinatura sincronizado com sucesso!'
+        ))
         await loadSubscription(user.id)
       } else {
-        alert(data.error || 'Erro ao sincronizar')
+        setModalConfig(createModalConfig.error(
+          'Erro ao Sincronizar',
+          data.error || 'Não foi possível sincronizar o status da assinatura.'
+        ))
       }
     } catch (error) {
       console.error('Erro ao sincronizar:', error)
-      alert('Erro ao sincronizar status')
+      setModalConfig(createModalConfig.error(
+        'Erro ao Sincronizar',
+        'Ocorreu um erro ao sincronizar o status. Tente novamente.'
+      ))
     }
   }
 
@@ -701,7 +915,10 @@ const handleCreateSubscription = async () => {
 
   } catch (error) {
     console.error('❌ Erro:', error)
-    alert('❌ Erro: ' + error.message)
+    setModalConfig(createModalConfig.error(
+      'Erro no Checkout',
+      error.message || 'Ocorreu um erro ao iniciar o checkout. Tente novamente.'
+    ))
   }
 
   setCheckoutLoading(false)
@@ -713,7 +930,10 @@ const handleConfirmPayment = async (e) => {
   e.preventDefault()
 
   if (!window.stripeInstance || !stripeElements || !paymentElement || !isPaymentElementReady) {
-    alert('Aguarde o formulário carregar')
+    setModalConfig(createModalConfig.info(
+      'Aguarde',
+      'O formulário de pagamento ainda está a carregar. Por favor, aguarde alguns segundos.'
+    ))
     return
   }
 
@@ -771,15 +991,21 @@ const handleConfirmPayment = async (e) => {
     await loadSubscription(user.id)
     await loadConnections(user.id)
 
-    const message = subscriptionData.is_trial 
-      ? `🎉 Teste Grátis de ${subscriptionData.trial_days} dias ativado!`
-      : '💳 Plano ativado!'
+    const isTrialMessage = subscriptionData.is_trial
+      ? `Seu teste grátis de ${subscriptionData.trial_days} dias foi ativado com sucesso!`
+      : 'Seu plano foi ativado com sucesso!'
 
-    alert(message)
+    setModalConfig(createModalConfig.success(
+      subscriptionData.is_trial ? 'Teste Grátis Ativado!' : 'Plano Ativado!',
+      isTrialMessage
+    ))
 
   } catch (error) {
     console.error('❌ Erro:', error)
-    alert('❌ Erro: ' + error.message)
+    setModalConfig(createModalConfig.error(
+      'Erro no Pagamento',
+      error.message || 'Ocorreu um erro ao processar o pagamento. Tente novamente.'
+    ))
   }
 
   setCheckoutLoading(false)
@@ -867,6 +1093,34 @@ const handleConfirmPayment = async (e) => {
     }
   }
 
+  /**
+   * Retorna o nome formatado da conexão
+   * - Se conectado e com profile_name: "Nome, telefone"
+   * - Se não conectado: "Conexão N" (baseado na posição)
+   */
+  const getConnectionName = (connection, index = null) => {
+    // Se tiver profile_name (conectado)
+    if (connection.profile_name) {
+      if (connection.phone_number) {
+        return `${connection.profile_name}, ${connection.phone_number}`
+      }
+      return connection.profile_name
+    }
+
+    // Se não tiver profile_name, usar numeração
+    if (index !== null) {
+      return `Conexão ${index + 1}`
+    }
+
+    // Fallback: tentar encontrar índice na lista de conexões
+    const connectionIndex = connections.findIndex(c => c.id === connection.id)
+    if (connectionIndex >= 0) {
+      return `Conexão ${connectionIndex + 1}`
+    }
+
+    return connection.instance_name || 'Conexão'
+  }
+
   // ============================================================================
   // RENDER
   // ============================================================================
@@ -900,13 +1154,6 @@ const handleConfirmPayment = async (e) => {
               <h1 className="text-5xl font-bold text-white">
                 Olá, <span className="capitalize bg-gradient-to-r from-[#00FF99] via-[#00E88C] to-[#00D97F] bg-clip-text text-transparent">{displayName}</span>
               </h1>
-              {/* LOGO MOVIDA PARA CÁ */}
-              <div className="hidden lg:flex w-10 h-10 items-center justify-center">
-                <svg width="40" height="40" viewBox="0 0 1564 1564" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M1001.683,23.139L433.941,727.705C433.941,727.705 414.727,752.657 429.123,757.818C454,766.738 783.43,754.723 771.86,756.415C771.86,756.415 799.555,753.473 791.713,787.082C784.04,819.968 735.527,1088.176 721.925,1130.644C708.323,1173.112 714.745,1159.731 714.745,1159.731C712.575,1159.731 711.288,1182.876 723.478,1185.568C736.204,1188.379 743.209,1188.065 756.911,1174.333C771.677,1159.534 861.262,1028.542 863.24,1028.542L1226.88,546.873C1227.906,548.514 1248.393,525.692 1221.45,522.235M1221.45,522.235L1115.236,520.972L902.566,520.972C902.566,520.972 885.36,525.188 897.567,497.267C909.774,469.345 912.072,456.497 912.072,456.497L1022.331,70.647L1028.875,32.645C1028.875,32.645 1026.615,9.308 1001.808,23.139" fill="#00FF99"/>
-                  <path d="M507.177,1105.829C493.786,1121.663 477.201,1132.121 457.867,1137.955L690.658,1372.989C705.266,1359.456 721.561,1351.518 738.923,1347.115L507.177,1105.829ZM429.844,939.939C485.576,939.939 530.824,985.187 530.824,1040.92C530.824,1096.653 485.576,1141.901 429.844,1141.901C374.111,1141.901 328.863,1096.653 328.863,1040.92C328.863,985.187 374.111,939.939 429.844,939.939ZM429.844,981.253C462.775,981.253 489.511,1007.989 489.511,1040.92C489.511,1073.851 462.775,1100.587 429.844,1100.587C396.912,1100.587 370.176,1073.851 370.176,1040.92C370.176,1007.989 396.912,981.253 429.844,981.253ZM1028.441,1105.372L797.555,1352.091C814.771,1359.117 830.462,1370.383 842.586,1387.319L1073.308,1136.429C1056.017,1130.603 1041.204,1119.974 1028.441,1105.372ZM760.432,1345.038C816.124,1345.076 861.398,1390.3 861.413,1446.019C861.428,1501.752 816.165,1547 760.432,1547C704.699,1547 659.451,1501.752 659.451,1446.019C659.451,1390.286 704.699,1345 760.432,1345.038ZM760.432,1386.352C793.363,1386.352 820.1,1413.088 820.1,1446.019C820.1,1478.951 793.363,1505.687 760.432,1505.687C727.501,1505.687 700.765,1478.951 700.765,1446.019C700.765,1413.088 727.501,1386.352 760.432,1386.352ZM1106.156,939.939C1161.889,939.939 1207.137,985.187 1207.137,1040.92C1207.137,1096.653 1161.889,1141.901 1106.156,1106.156C1050.424,1141.901 1005.176,1096.653 1005.176,1040.92C1005.176,985.187 1050.424,939.939 1106.156,939.939ZM1106.156,981.253C1139.088,981.253 1165.824,1007.989 1165.824,1040.92C1165.824,1073.851 1139.088,1100.587 1106.156,1100.587C1073.225,1100.587 1046.489,1073.851 1046.489,1040.92C1046.489,1007.989 1073.225,981.253 1106.156,981.253Z" fill="#00FF99" stroke="#00FF99" strokeWidth="1"/>
-                </svg>
-              </div>
             </div>
             
             <p className="text-[#B0B0B0] text-lg mt-3"> {/* Adicionado mt-3 para separar o texto do h1 */}
@@ -914,126 +1161,17 @@ const handleConfirmPayment = async (e) => {
             </p>
           </div>
 
-          {/* Coluna da Direita: Novo Header (Menu da Conta) */}
-          <div className="relative">
-{/* MODIFICADO: Botão com conteúdo responsivo */}
-            <button
-              onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
-              className="flex items-center justify-center p-2 rounded-xl hover:opacity-80 transition-opacity duration-200"
-              style={{ backgroundColor: '#272727' }}
-            >
-              
-              {/* --- Conteúdo Desktop (Avatar + Seta) --- */}
-              {/* 'hidden lg:flex' = Escondido no mobile, Flex no desktop */}
-              <div className="hidden lg:flex items-center gap-3">
-                <div 
-                  className="w-9 h-9 rounded-full flex items-center justify-center text-black font-bold text-sm"
-                  style={{
-                    background: 'linear-gradient(135deg, #00FF99 0%, #00E88C 100%)',
-                    boxShadow: '0 0 0 2px rgba(0, 255, 153, 0.2)'
-                  }}
-                >
-                  {initials}
-                </div>
-                <svg className="w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
 
-              {/* --- Conteúdo Mobile (Ícone "=") --- */}
-              {/* 'lg:hidden' = Mostrado no mobile, Escondido no desktop */}
-              <div className="lg:hidden w-9 h-9 flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 8h16M4 16h16" />
-                </svg>
-              </div>
+          {/* =====================================================================
+              REMOVER: Menu de Perfil Superior
 
-            </button>
+              ⚠️ O menu de conta foi migrado para a Sidebar lateral.
+              Todas as ações de conta (Configurar Conta, Gerenciar Assinatura,
+              Central de Sugestões, Central de Ajuda, Sair da Conta) agora
+              residem exclusivamente na Sidebar.
 
-            {accountDropdownOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setAccountDropdownOpen(false)} />
-                
-                {/* MODIFICADO: Fundo #272727, borda REMOVIDA */}
-                <div 
-                  className="absolute right-0 mt-3 w-64 shadow-2xl rounded-2xl overflow-hidden z-50"
-                  style={{ backgroundColor: '#272727' }}
-                >
-                  {/* O header do dropdown (com nome e email) já tinha sido removido */}
-                  
-                  <div className="py-2">
-                    <button
-                      onClick={() => {
-                        setAccountDropdownOpen(false)
-                        router.push('/account/profile')
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#B0B0B0] hover:text-white hover:bg-white/5 transition-all"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                      Configurar Conta
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setAccountDropdownOpen(false)
-                        router.push('/account/subscription')
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#B0B0B0] hover:text-white hover:bg-white/5 transition-all"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                      </svg>
-                      Gerenciar Assinatura
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setAccountDropdownOpen(false)
-                        router.push('/sugestao')
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#B0B0B0] hover:text-white hover:bg-white/5 transition-all"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
-                      </svg>
-                      Central de Sugestões
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setAccountDropdownOpen(false)
-                        router.push('/suporte')
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#B0B0B0] hover:text-white hover:bg-white/5 transition-all"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
-                      </svg>
-                      Central de Ajuda
-                    </button>
-                    
-                    <div className="border-t border-white/10 mt-2 pt-2">
-                      <button
-                        onClick={() => {
-                          setAccountDropdownOpen(false)
-                          handleLogout()
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:text-red-300 hover:bg-red-900/10 transition-all"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3 3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                        Sair da Conta
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-          {/* Fim da Coluna da Direita */}
+              Ver: app/components/Sidebar.js
+          ===================================================================== */}
 
         </div>
         {/* Fim da Linha Welcome+Header */}
@@ -1205,28 +1343,46 @@ const handleConfirmPayment = async (e) => {
 
                 {/* Botão para cancelar mudança */}
                 <button
-                  onClick={async () => {
-                    if (!confirm('Tem certeza que deseja cancelar a mudança agendada?')) return
-                    
-                    try {
-                      const response = await fetch('/api/subscription/cancel-change', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ userId: user.id })
-                      })
-                      
-                      const data = await response.json()
-                      
-                      if (data.success) {
-                        alert('✅ Mudança cancelada com sucesso!')
-                        await loadSubscription(user.id)
-                      } else {
-                        alert(`❌ Erro: ${data.error}`)
+                  onClick={() => {
+                    setModalConfig({
+                      isOpen: true,
+                      title: 'Cancelar Mudança Agendada',
+                      message: 'Tem certeza que deseja cancelar a mudança de plano agendada? Seu plano atual será mantido.',
+                      type: 'warning',
+                      confirmText: 'Sim, Cancelar Mudança',
+                      cancelText: 'Não',
+                      showCancelButton: true,
+                      onConfirm: async () => {
+                        try {
+                          const response = await fetch('/api/subscription/cancel-change', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ userId: user.id })
+                          })
+
+                          const data = await response.json()
+
+                          if (data.success) {
+                            setModalConfig(createModalConfig.success(
+                              'Mudança Cancelada',
+                              'A mudança de plano agendada foi cancelada com sucesso. Seu plano atual será mantido.'
+                            ))
+                            await loadSubscription(user.id)
+                          } else {
+                            setModalConfig(createModalConfig.error(
+                              'Erro ao Cancelar',
+                              data.error || 'Não foi possível cancelar a mudança agendada.'
+                            ))
+                          }
+                        } catch (error) {
+                          console.error('Erro:', error)
+                          setModalConfig(createModalConfig.error(
+                            'Erro ao Cancelar',
+                            'Ocorreu um erro ao cancelar a mudança. Tente novamente.'
+                          ))
+                        }
                       }
-                    } catch (error) {
-                      console.error('Erro:', error)
-                      alert('❌ Erro ao cancelar mudança')
-                    }
+                    })
                   }}
                   className="bg-gradient-to-r from-[#00FF99] to-[#00E88C] hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] text-black py-3 px-8 rounded-xl font-bold transition-all duration-300 flex items-center gap-2"
                 >
@@ -1279,20 +1435,45 @@ const handleConfirmPayment = async (e) => {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <svg className="w-5 h-5 text-[#10E57C]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    <div className="text-left">
-                      <p className="text-sm font-semibold text-white">
-                        {activeConnection ? (activeConnection.profile_name || activeConnection.instance_name || 'Conexão Sem Nome') : 'Selecionar Conexão'}
+                    {/* Avatar */}
+                    {activeConnection ? (
+                      <div className="flex-shrink-0">
+                        {activeConnection.profile_pic_url ? (
+                          <img
+                            src={activeConnection.profile_pic_url}
+                            alt={activeConnection.profile_name || 'Conexão'}
+                            className="w-12 h-12 rounded-full object-cover bg-[#333333]"
+                            onError={(e) => {
+                              e.target.style.display = 'none'
+                              e.target.nextSibling.style.display = 'flex'
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          className={`w-12 h-12 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold text-lg ${
+                            activeConnection.profile_pic_url ? 'hidden' : 'flex'
+                          }`}
+                          style={{ display: activeConnection.profile_pic_url ? 'none' : 'flex' }}
+                        >
+                          {activeConnection.profile_name ? activeConnection.profile_name.charAt(0).toUpperCase() : '?'}
+                        </div>
+                      </div>
+                    ) : (
+                      <svg className="w-12 h-12 text-[#10E57C]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                    )}
+
+                    {/* Info */}
+                    <div className="text-left flex-1">
+                      <p className="text-[15px] font-medium text-white">
+                        {activeConnection ? (activeConnection.profile_name || 'Conexão sem nome') : 'Selecionar Conexão'}
                       </p>
-                      {activeConnection?.phone_number && (
-                        <p className="text-xs text-gray-400">
-                          {activeConnection.phone_number}
-                        </p>
-                      )}
-                      <p className="text-xs text-[#B0B0B0]">
-                        {connectedCount} de {totalSlots} ativas
+                      <p className="text-[13px] text-[#8696A0]">
+                        {activeConnection
+                          ? (activeConnection.phone_number ? `+${activeConnection.phone_number}` : 'Desconectado')
+                          : `${connectedCount} de ${totalSlots} ativas`
+                        }
                       </p>
                     </div>
                   </div>
@@ -1305,43 +1486,64 @@ const handleConfirmPayment = async (e) => {
               {connectionsDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setConnectionsDropdownOpen(false)} />
-                  
+
                   <div className="absolute top-full left-0 right-0 mt-2 backdrop-blur-md bg-[#111111]/95 border border-white/10 rounded-xl shadow-2xl z-50 max-h-80 overflow-y-auto">
                     {connections.length === 0 ? (
                       <div className="p-8 text-center text-[#B0B0B0] text-sm">
                         Nenhuma conexão encontrada
                       </div>
                     ) : (
-                      connections.map((conn) => (
+                      connections.map((conn, index) => (
                         <button
                           key={conn.id}
                           onClick={() => handleConnectionSelect(conn)}
-                          className={`w-full p-4 text-left hover:bg-white/5 transition-all border-b border-white/5 last:border-0 ${
+                          className={`w-full p-3 text-left hover:bg-white/5 transition-all border-b border-white/5 last:border-0 ${
                             activeConnection?.id === conn.id ? 'bg-white/5' : ''
                           }`}
                         >
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex flex-col">
-                              <span className="text-white font-semibold text-sm">
-                                {conn.profile_name || conn.instance_name || 'Conexão Sem Nome'}
-                              </span>
-                              {conn.phone_number && (
-                                <span className="text-xs text-gray-400 mt-1">
-                                  {conn.phone_number}
-                                </span>
-                              )}
+                          <div className="flex items-center gap-3">
+                            {/* Avatar */}
+                            <div className="flex-shrink-0">
+                              {conn.profile_pic_url ? (
+                                <img
+                                  src={conn.profile_pic_url}
+                                  alt={conn.profile_name || `Conexão ${index + 1}`}
+                                  className="w-12 h-12 rounded-full object-cover bg-[#333333]"
+                                  onError={(e) => {
+                                    e.target.style.display = 'none'
+                                    e.target.nextSibling.style.display = 'flex'
+                                  }}
+                                />
+                              ) : null}
+                              <div
+                                className={`w-12 h-12 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold text-lg ${
+                                  conn.profile_pic_url ? 'hidden' : 'flex'
+                                }`}
+                                style={{ display: conn.profile_pic_url ? 'none' : 'flex' }}
+                              >
+                                {conn.profile_name ? conn.profile_name.charAt(0).toUpperCase() : (index + 1)}
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2">
+
+                            {/* Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-white font-medium text-[15px] truncate">
+                                {conn.profile_name || `Conexão ${index + 1}`}
+                              </div>
+                              <div className="text-[#8696A0] text-[13px] truncate mt-0.5">
+                                {conn.phone_number ? `+${conn.phone_number}` : 'Desconectado'}
+                              </div>
+                            </div>
+
+                            {/* Status Badge */}
+                            <div className="flex-shrink-0">
                               {getStatusIcon(conn.status)}
-                              <span className="text-xs text-[#B0B0B0]">
-                                {getStatusText(conn.status)}
-                              </span>
                             </div>
                           </div>
                         </button>
                       ))
                     )}
-                    
+
                     <div className="border-t border-white/10 p-2">
                       {connections.length < totalSlots && (
                         <button
@@ -1379,13 +1581,15 @@ const handleConfirmPayment = async (e) => {
               </div>
             )}
 
+
             {/* Action Button - BOTÃO FANTASMA (Ghost) */}
             {whatsappStatus === 'connected' ? (
               <button
-                onClick={() => checkWhatsAppStatus(activeConnection)}
-                className="w-full bg-[#222222] hover:bg-[#333333] text-[#B0B0B0] hover:text-white font-medium py-3 px-4 rounded-xl transition-all duration-300"
+                onClick={() => handleDisconnect(activeConnection)}
+                disabled={connecting || !activeConnection}
+                className="w-full bg-red-900/20 hover:bg-red-900/30 text-red-400 hover:text-red-300 font-medium py-3 px-4 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Verificar Status
+                {connecting ? 'Desconectando...' : 'Desconectar'}
               </button>
             ) : (
               <button
@@ -1445,7 +1649,10 @@ const handleConfirmPayment = async (e) => {
                 if (activeConnection) {
                   router.push(`/agent-config?connectionId=${activeConnection.id}`)
                 } else {
-                  alert('Selecione uma conexão primeiro')
+                  setModalConfig(createModalConfig.warning(
+                    'Selecione uma Conexão',
+                    'Por favor, selecione uma conexão WhatsApp antes de configurar o agente.'
+                  ))
                 }
               }}
               disabled={!activeConnection}
@@ -1455,37 +1662,56 @@ const handleConfirmPayment = async (e) => {
             </button>
           </div>
 
-          {/* Bate-Papo - Estilo Unificado Neutro */}
-          <div className="bg-[#111111] rounded-2xl p-8 hover:bg-[#1A1A1A] transition-all duration-300">
+          {/* Swiftbot PRO - IA para Análise e Planejamento */}
+          <div className="bg-[#111111] rounded-2xl p-8 hover:bg-[#1A1A1A] transition-all duration-300 group">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                {/* Ícone com Fundo Gradiente Cinza */}
-                <div 
-                  className="w-12 h-12 rounded-xl flex items-center justify-center"
-                  style={{ background: 'linear-gradient(135deg, #AAAAAA 0%, #444444 100%)' }}
+                {/* Ícone com Fundo Gradiente Verde/Roxo */}
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center relative overflow-hidden"
+                  style={{ background: 'linear-gradient(135deg, #00FF99 0%, #8B5CF6 100%)' }}
                 >
+                  {/* Sparkles Icon */}
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold text-white">Bate-Papo</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-semibold text-white">Swiftbot PRO</h3>
+                  <span className="px-2 py-0.5 text-[10px] font-bold bg-gradient-to-r from-[#8B5CF6] to-[#00FF99] text-white rounded-full uppercase tracking-wider">
+                    IA Beta
+                  </span>
+                </div>
               </div>
             </div>
 
             <p className="text-[#B0B0B0] mb-6">
-              Visualize e gerencie conversas em tempo real
+              Use nossa IA para analisar conversas, gerar scripts de vendas e superar objeções.
             </p>
 
             <div className="flex items-center gap-2 mb-6">
-              <div className="w-2.5 h-2.5 rounded-full bg-purple-500" />
-              <span className="text-sm text-[#B0B0B0]">
-                {activeConnection ? `${stats.conversasAtivas} conversas hoje` : 'N/A'}
-              </span>
+              {activeConnection ? (
+                <>
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#00FF99] animate-pulse" />
+                  <span className="text-sm text-[#B0B0B0]">Pronto para analisar dados</span>
+                </>
+              ) : (
+                <>
+                  <div className="w-2.5 h-2.5 rounded-full bg-gray-500" />
+                  <span className="text-sm text-[#B0B0B0]">Conecte o WhatsApp</span>
+                </>
+              )}
             </div>
 
-            <div className="w-full bg-[#222222] text-[#B0B0B0] font-medium py-3 px-4 rounded-xl text-center">
-              Em breve
-            </div>
+            <button
+              onClick={() => router.push('/dashboard/swiftbot-pro')}
+              className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold py-3 px-4 rounded-xl hover:shadow-[0_0_20px_rgba(0,255,153,0.3)] transition-all duration-300 flex items-center justify-center gap-2 group-hover:shadow-[0_0_15px_rgba(0,255,153,0.2)]"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+              </svg>
+              Planejar com AI
+            </button>
           </div>
 
         </div>
@@ -1912,6 +2138,18 @@ const handleConfirmPayment = async (e) => {
   )}
       {/* --> [FIM DO MERGE] */}
 
+      {/* Standard Modal para feedback */}
+      <StandardModal
+        isOpen={modalConfig.isOpen}
+        onClose={closeModal}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        type={modalConfig.type}
+        onConfirm={modalConfig.onConfirm}
+        confirmText={modalConfig.confirmText}
+        cancelText={modalConfig.cancelText}
+        showCancelButton={modalConfig.showCancelButton}
+      />
     </div>
   )
 }

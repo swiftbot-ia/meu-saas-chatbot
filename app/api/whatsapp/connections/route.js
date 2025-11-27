@@ -106,8 +106,9 @@ export async function POST(request) {
     }
 
     // Passo 2.2: Gerar instanceName baseado no ID do registro
+    // Formato: swiftbot_ + UUID completo (mantendo hífens)
     const connectionId = newConnection.id
-    const instanceName = `swiftbot_${connectionId.replace(/-/g, '_')}`
+    const instanceName = `swiftbot_${connectionId}`
 
     console.log('🔄 [CreateConnection] Gerando instanceName:', instanceName)
 

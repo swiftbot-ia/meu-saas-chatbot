@@ -1,452 +1,360 @@
 // app/api/whatsapp/connect/route.js
-import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '../../../../lib/supabase/server.js'
-import { syncUazapiToSupabase, extractInstanceData } from '../helpers/syncUazapiToSupabase.js'
+// ============================================================================
+// ROTA: Conectar/Gerar QR Code na UAZAPI (Corrigido: Importação Admin)
+// ============================================================================
 
-// Configurações da UAZAPI (devem estar em .env.local)
+import { NextResponse } from 'next/server'
+// CORREÇÃO AQUI: Usando o mesmo import do arquivo do seu sócio
+import { supabaseAdmin } from '../../../../lib/supabase/server.js'
+
+export const dynamic = 'force-dynamic' // Garante que a rota não faça cache
+
+// Configurações da UAZAPI
 const UAZAPI_URL = process.env.UAZAPI_BASE_URL || 'https://swiftbot.uazapi.com'
 const UAZAPI_ADMIN_TOKEN = process.env.UAZAPI_ADMIN_TOKEN
 
-// ============================================================================
-// FUNÇÃO AUXILIAR: Delay (para aguardar propagação do token na UAZAPI)
-// ============================================================================
-
-/**
- * Aguarda um tempo específico (em milissegundos)
- * @param {number} ms - Tempo em milissegundos
- * @returns {Promise<void>}
- */
+// Helper: Delay para esperar a API processar
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 
-// ============================================================================
-// FUNÇÃO AUXILIAR: Chamada à UAZAPI (Com tratamento de erro 401/404)
-// ============================================================================
-
-/**
- * Tenta obter o status de uma instância
- * @param {string} token - Token da instância
- * @returns {Promise<object | null>} - Dados da UAZAPI ou null em caso de falha
- */
-async function fetchUazapiStatus(token) {
-  if (!token) return null
-
+// ----------------------------------------------------------------------------
+// 1. Criar Instância na UAZAPI
+// ----------------------------------------------------------------------------
+async function createUazapiInstance(instanceName, userId, connectionId) {
   try {
-    const url = `${UAZAPI_URL}/instance/status`
-    console.log('🔍 [UAZAPI] Buscando status:', { url })
+    console.log(`🔌 [Uazapi] Criando instância: ${instanceName}`)
+    console.log(`   adminField01 (user_id): ${userId}`)
+    console.log(`   adminField02 (connection_id): ${connectionId}`)
 
-    const res = await fetch(url, {
-      method: 'GET',
+    const response = await fetch(`${UAZAPI_URL}/instance/init`, {
+      method: 'POST',
       headers: {
-        'token': token,
-        'Content-Type': 'application/json'
-      }
+        'Content-Type': 'application/json',
+        'admintoken': UAZAPI_ADMIN_TOKEN
+      },
+      body: JSON.stringify({
+        name: instanceName,
+        systemName: 'Swiftbot 1.0',
+        adminField01: userId,
+        adminField02: connectionId
+      })
     })
 
-    if (res.status === 401 || res.status === 404) {
-      console.warn(`⚠️ [UAZAPI] Status ${res.status}: Token inválido ou instância não encontrada`)
-      return null
+    const data = await response.json()
+
+    // Log completo da resposta para debug
+    console.log('📊 [Uazapi] Status HTTP:', response.status)
+    console.log('📊 [Uazapi] Resposta completa:', JSON.stringify(data, null, 2))
+
+    // Se já existe (403), consideramos sucesso para tentar conectar depois
+    if (response.status === 403) {
+      console.log('⚠️ [Uazapi] Instância já existe, prosseguindo...')
+      return { exists: true, data }
     }
 
-    if (!res.ok) {
-      const errorText = await res.text()
-      console.error(`❌ [UAZAPI] Erro ${res.status}:`, errorText)
-      return null
+    if (!response.ok) {
+      const errorMsg = data?.message || data?.error || JSON.stringify(data) || 'Falha ao criar instância'
+      console.error('❌ [Uazapi] Erro detalhado:', errorMsg)
+      throw new Error(errorMsg)
     }
 
-    const data = await res.json()
-    console.log('✅ [UAZAPI] Status obtido:', {
-      status: data?.instance?.status,
-      hasQR: !!data?.instance?.qrcode
-    })
-    return data
+    // Extrair o token gerado pela API
+    const instanceToken = data.token || data.hash
+    console.log('✅ [Uazapi] Token gerado pela API:', instanceToken ? 'SIM' : 'NÃO')
 
+    return { success: true, data, token: instanceToken }
   } catch (error) {
-    console.error('❌ [UAZAPI] Erro ao buscar status:', error.message)
-    return null
+    console.error('❌ [Uazapi] Erro de criação:', error)
+    throw error
   }
 }
 
-// ============================================================================
-// ROTA POST: Conexão Inicial (Cria/Reutiliza/Sincroniza)
-// ============================================================================
-
-export async function POST(request) {
+// ----------------------------------------------------------------------------
+// 2. Conectar e Buscar QR Code / Status
+// ----------------------------------------------------------------------------
+async function connectUazapiInstance(instanceName, token) {
   try {
-    const { connectionId } = await request.json()
+    console.log(`🔄 [Uazapi] Conectando instância: ${instanceName}`)
 
-    if (!connectionId) {
-      return NextResponse.json(
-        { success: false, error: 'connectionId é obrigatório' },
-        { status: 400 }
-      )
-    }
-
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Configuração do servidor incompleta' },
-        { status: 500 }
-      )
-    }
-
-    console.log('🔄 [Connect-POST] Iniciando conexão para:', connectionId)
-
-    // ========================================================================
-    // 1. BUSCAR REGISTRO EXISTENTE NO SUPABASE (DEVE EXISTIR)
-    // ========================================================================
-    const { data: connection, error: fetchError } = await supabaseAdmin
-      .from('whatsapp_connections')
-      .select('*')
-      .eq('id', connectionId)
-      .single()
-
-    if (fetchError || !connection) {
-      console.error('❌ [Connect-POST] Conexão não encontrada:', fetchError)
-      return NextResponse.json(
-        { success: false, error: 'Conexão não encontrada no Supabase' },
-        { status: 404 }
-      )
-    }
-
-    if (!connection.user_id) {
-      console.error('❌ [Connect-POST] Registro incompleto: userId ausente')
-      return NextResponse.json(
-        { success: false, error: 'Registro de conexão está incompleto' },
-        { status: 400 }
-      )
-    }
-
-    // ✅ REGRA: Usar instanceName do banco (se válido), ou gerar baseado em connectionId
-    let instanceName = connection.instance_name
-
-    // Se instanceName não existe ou é temporário, gerar baseado no connectionId
-    if (!instanceName || instanceName === 'temp_pending') {
-      instanceName = `swiftbot_${connectionId.replace(/-/g, '_')}`
-      console.log('🔄 [Connect-POST] instanceName não encontrado no banco, gerando:', instanceName)
-    } else {
-      console.log('✅ [Connect-POST] instanceName do banco:', instanceName)
-    }
-
-    const userId = connection.user_id
-    let currentToken = connection.instance_token
-    let uazapiData = null
-
-    // ========================================================================
-    // 2. TENTAR USAR TOKEN EXISTENTE
-    // ========================================================================
-    if (currentToken) {
-      console.log('🔍 [Connect-POST] Testando token existente...')
-      uazapiData = await fetchUazapiStatus(currentToken)
-
-      if (uazapiData) {
-        const currentStatus = uazapiData?.instance?.status
-        console.log('✅ [Connect-POST] Token válido! Status:', currentStatus)
-
-        // Se já está conectado, sincronizar e retornar
-        if (currentStatus === 'open') {
-          await syncUazapiToSupabase(connectionId, uazapiData)
-          const finalData = extractInstanceData(uazapiData)
-
-          return NextResponse.json({
-            success: true,
-            status: finalData.status,
-            connected: finalData.connected,
-            qrCode: finalData.qrCode,
-            instanceToken: currentToken,
-            connectionId,
-            profileName: finalData.profileName,
-            profilePicUrl: finalData.profilePicUrl,
-            phoneNumber: finalData.phoneNumber,
-            message: 'WhatsApp já está conectado'
-          })
-        }
-      } else {
-        console.warn('⚠️ [Connect-POST] Token inválido - Criando nova instância')
-      }
-    }
-
-    // ========================================================================
-    // 3. CRIAR NOVA INSTÂNCIA NA UAZAPI (se necessário)
-    // ========================================================================
-    if (!currentToken || !uazapiData) {
-      console.log('🆕 [Connect-POST] Criando nova instância:', instanceName)
-
-      // Payload ideal conforme documentação UAZAPI
-      const payload = {
-        name: instanceName,                    // Nome único da instância
-        systemName: "Swiftbot SaaS",          // Nome do sistema
-        adminField01: userId,                  // Rastreabilidade: userId do Supabase
-        adminField02: connectionId             // Vinculação: connectionId em whatsapp_connections
-      }
-
-      console.log('📝 [Connect-POST] Payload UAZAPI:', payload)
-
-      const createRes = await fetch(`${UAZAPI_URL}/instance/init`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'admintoken': UAZAPI_ADMIN_TOKEN   // ⚠️ Usado APENAS aqui para criar instância
-        },
-        body: JSON.stringify(payload)
-      })
-
-      if (!createRes.ok) {
-        const errorBody = await createRes.text()
-        console.error('❌ [Connect-POST] Erro ao criar instância:', errorBody)
-        return NextResponse.json(
-          { success: false, error: 'Falha ao criar instância UAZAPI' },
-          { status: createRes.status }
-        )
-      }
-
-      const newInstanceData = await createRes.json()
-
-      // 🔍 LOG COMPLETO DA RESPOSTA UAZAPI
-      console.log('📦 [Connect-POST] Resposta completa da UAZAPI:', JSON.stringify(newInstanceData, null, 2))
-
-      currentToken = newInstanceData.token || newInstanceData.hash
-
-      if (!currentToken) {
-        console.error('❌ [Connect-POST] Token não foi gerado')
-        return NextResponse.json(
-          { success: false, error: 'Token não foi gerado pela UAZAPI' },
-          { status: 500 }
-        )
-      }
-
-      console.log('✅ [Connect-POST] Nova instância criada com token:', currentToken?.substring(0, 20) + '...')
-
-      // UPDATE do token E instance_name no Supabase (nunca INSERT)
-      const { error: updateError } = await supabaseAdmin
-        .from('whatsapp_connections')
-        .update({
-          instance_name: instanceName,         // ✅ CRÍTICO: Atualizar com nome baseado em connectionId
-          instance_token: currentToken,
-          admin_field_01: userId,              // ✅ Rastreabilidade
-          admin_field_02: connectionId,        // ✅ Vinculação
-          api_credentials: JSON.stringify({
-            token: currentToken,
-            createdAt: new Date().toISOString(),
-            uazapiResponse: newInstanceData    // Salvar resposta completa
-          }),
-          status: 'connecting',
-          is_connected: false
-          // updated_at é gerenciado automaticamente pelo trigger
-        })
-        .eq('id', connectionId)
-
-      if (updateError) {
-        console.error('❌ [Connect-POST] Erro ao atualizar token:', updateError)
-        return NextResponse.json(
-          { success: false, error: 'Erro ao salvar token no Supabase' },
-          { status: 500 }
-        )
-      }
-
-      console.log('✅ [Connect-POST] Token salvo no Supabase (UPDATE)')
-
-      // ⏱️ CRÍTICO: Aguardar 2 segundos para a UAZAPI processar o token recém-criado
-      console.log('⏱️ [Connect-POST] Aguardando 2s para propagação do token na UAZAPI...')
-      await delay(2000)
-      console.log('✅ [Connect-POST] Delay concluído - token deve estar ativo agora')
-    }
-
-    // ========================================================================
-    // 4. INICIAR CONEXÃO (se não estiver conectado)
-    // ========================================================================
-    console.log('🔌 [Connect-POST] Iniciando conexão WhatsApp...')
-
-    const connectRes = await fetch(`${UAZAPI_URL}/instance/connect`, {
+    // Passo 1: Iniciar conexão (POST /instance/connect)
+    const connectResponse = await fetch(`${UAZAPI_URL}/instance/connect`, {
       method: 'POST',
       headers: {
-        'token': currentToken,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'token': token
       },
       body: JSON.stringify({})
     })
 
-    if (!connectRes.ok) {
-      const errorText = await connectRes.text()
-      console.error('❌ [Connect-POST] Erro ao conectar:', errorText)
-      // Não retornar erro fatal - continuar para obter status
-    } else {
-      console.log('✅ [Connect-POST] Conexão iniciada')
+    if (!connectResponse.ok) {
+      const errorText = await connectResponse.text()
+      console.error('❌ [Uazapi] Erro ao conectar:', errorText)
+      return { ok: false, error: errorText }
     }
 
-    // ========================================================================
-    // 5. OBTER STATUS FINAL E QR CODE
-    // ========================================================================
-    console.log('📱 [Connect-POST] Obtendo QR Code...')
+    const connectData = await connectResponse.json()
+    console.log('✅ [Uazapi] Conexão iniciada')
 
-    uazapiData = await fetchUazapiStatus(currentToken)
+    // Passo 2: Buscar status e QR Code (GET /instance/status)
+    const statusResponse = await fetch(`${UAZAPI_URL}/instance/status`, {
+      method: 'GET',
+      headers: { 'token': token }
+    })
 
-    if (!uazapiData) {
-      console.warn('⚠️ [Connect-POST] Não foi possível obter status da UAZAPI')
-      return NextResponse.json({
-        success: true,
-        status: 'connecting',
-        connected: false,
-        qrCode: null,
-        instanceToken: currentToken,
-        connectionId,
-        message: 'Aguardando resposta da UAZAPI'
-      })
+    if (!statusResponse.ok) {
+      const errorText = await statusResponse.text()
+      console.error('❌ [Uazapi] Erro ao buscar status:', errorText)
+      return { ok: false, error: errorText }
     }
 
-    // ========================================================================
-    // 6. SINCRONIZAR COM SUPABASE
-    // ========================================================================
-    await syncUazapiToSupabase(connectionId, uazapiData)
+    const statusData = await statusResponse.json()
+    console.log('📊 [Uazapi] Status recebido:', JSON.stringify(statusData, null, 2))
 
-    // ========================================================================
-    // 7. EXTRAIR E RETORNAR DADOS
-    // ========================================================================
-    const finalData = extractInstanceData(uazapiData)
-
-    console.log('📊 [Connect-POST] Status final:', {
-      status: finalData.status,
-      connected: finalData.connected,
-      hasQR: !!finalData.qrCode
-    })
-
-    return NextResponse.json({
-      success: true,
-      status: finalData.status,
-      connected: finalData.connected,
-      qrCode: finalData.qrCode,
-      instanceToken: currentToken,
-      connectionId,
-      profileName: finalData.profileName,
-      profilePicUrl: finalData.profilePicUrl,
-      phoneNumber: finalData.phoneNumber,
-      message: finalData.qrCode
-        ? 'QR Code gerado. Leia com seu WhatsApp.'
-        : finalData.connected
-          ? 'WhatsApp conectado!'
-          : 'Aguardando QR Code...'
-    })
-
+    return { ok: true, data: statusData }
   } catch (error) {
-    console.error('❌ [Connect-POST] Erro interno:', error)
-    return NextResponse.json(
-      { success: false, error: 'Erro interno: ' + error.message },
-      { status: 500 }
-    )
+    console.error('❌ [Uazapi] Erro na conexão:', error)
+    return { ok: false, error: error.message }
   }
 }
 
-// ============================================================================
-// ROTA GET: Polling (Sincroniza Status)
-// ============================================================================
-
-export async function GET(request) {
+// ----------------------------------------------------------------------------
+// ROTA PRINCIPAL (POST)
+// ----------------------------------------------------------------------------
+export async function POST(request) {
   try {
-    const { searchParams } = new URL(request.url)
-    const connectionId = searchParams.get('connectionId')
+    const body = await request.json()
+    const { connectionId } = body
 
     if (!connectionId) {
-      return NextResponse.json(
-        { success: false, error: 'connectionId é obrigatório' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, error: 'ID da conexão faltando' }, { status: 400 })
     }
 
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Configuração do servidor incompleta' },
-        { status: 500 }
-      )
-    }
+    console.log('🚀 [Connect] Iniciando fluxo para connectionId:', connectionId)
 
-    console.log('🔍 [Polling] Verificando status:', connectionId)
-
-    // ========================================================================
-    // 1. BUSCAR REGISTRO E TOKEN NO SUPABASE
-    // ========================================================================
-    const { data: connection, error: fetchError } = await supabaseAdmin
+    // 1. Buscar Conexão completa no Banco (Usando supabaseAdmin para ter permissão total)
+    const { data: connection, error: dbError } = await supabaseAdmin
       .from('whatsapp_connections')
       .select('*')
       .eq('id', connectionId)
       .single()
 
-    if (fetchError || !connection) {
-      console.error('❌ [Polling] Conexão não encontrada:', fetchError)
-      return NextResponse.json(
-        { success: false, error: 'Conexão não encontrada' },
-        { status: 404 }
+    if (dbError || !connection) {
+      console.error('❌ Erro Supabase:', dbError)
+      return NextResponse.json({ success: false, error: 'Conexão não encontrada' }, { status: 404 })
+    }
+
+    // 2. Gerar/obter instance_name
+    let instanceName = connection.instance_name
+    if (!instanceName) {
+      // Formato: swiftbot_ + UUID completo da conexão
+      instanceName = `swiftbot_${connection.id}`
+      console.log('📝 [Connect] Gerando instance_name:', instanceName)
+    }
+
+    // 3. Verificar se precisa criar nova instância ou usar existente
+    let instanceToken = connection.instance_token
+    let needsCreation = !instanceToken
+
+    // Se o instance_name for diferente do esperado (formato antigo), forçar recriação
+    if (connection.instance_name && connection.instance_name !== instanceName) {
+      console.log('⚠️ [Connect] instance_name com formato antigo, forçando recriação')
+      console.log(`   Antigo: ${connection.instance_name}`)
+      console.log(`   Novo: ${instanceName}`)
+      needsCreation = true
+      instanceToken = null
+
+      // Deletar instância antiga se existir
+      if (connection.instance_name) {
+        try {
+          console.log('🗑️ [Connect] Deletando instância antiga:', connection.instance_name)
+          await fetch(`${UAZAPI_URL}/instance/delete/${connection.instance_name}`, {
+            method: 'DELETE',
+            headers: { 'admintoken': UAZAPI_ADMIN_TOKEN }
+          })
+        } catch (e) {
+          console.log('⚠️ [Connect] Instância antiga não existe ou já foi deletada')
+        }
+      }
+    }
+
+    if (needsCreation) {
+      console.log('🆕 [Connect] Criando nova instância na Uazapi')
+
+      // Criar instância na Uazapi (retorna o token gerado pela API)
+      const createResult = await createUazapiInstance(
+        instanceName,
+        connection.user_id,
+        connection.id
       )
+      instanceToken = createResult.token
+
+      if (!instanceToken) {
+        throw new Error('Token não foi retornado pela API da Uazapi')
+      }
+
+      console.log('✅ [Connect] Token recebido da Uazapi')
+
+      // Salvar instance_name, token e adminFields no banco
+      await supabaseAdmin
+        .from('whatsapp_connections')
+        .update({
+          instance_name: instanceName,
+          instance_token: instanceToken,
+          admin_field_01: connection.user_id,
+          admin_field_02: connection.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', connectionId)
+
+      console.log('💾 [Connect] instance_name, token e adminFields salvos no banco')
+
+      // Pequena pausa para garantir que a UAZAPI registrou a criação
+      await delay(1500)
+    } else {
+      console.log('♻️ [Connect] Usando instância existente')
     }
 
-    if (!connection.instance_token || !connection.instance_name) {
-      console.warn('⚠️ [Polling] Conexão sem token ou instance_name')
-      return NextResponse.json({
-        success: true,
-        status: 'disconnected',
-        connected: false,
-        qrCode: null,
-        message: 'Instância não criada'
-      })
+    // 4. Chamar UAZAPI (Conexão/QR)
+    const connectResult = await connectUazapiInstance(instanceName, instanceToken)
+
+    // Se receber erro 401 (token inválido), deletar instância e recriar
+    if (!connectResult.ok && connectResult.error && connectResult.error.includes('401')) {
+      console.log('⚠️ [Connect] Token inválido detectado, recriando instância...')
+
+      // Deletar instância antiga
+      try {
+        await fetch(`${UAZAPI_URL}/instance/delete/${instanceName}`, {
+          method: 'DELETE',
+          headers: { 'admintoken': UAZAPI_ADMIN_TOKEN }
+        })
+        console.log('🗑️ [Connect] Instância com token inválido deletada')
+      } catch (e) {
+        console.log('⚠️ [Connect] Erro ao deletar instância antiga:', e.message)
+      }
+
+      // Criar nova instância
+      const createResult = await createUazapiInstance(
+        instanceName,
+        connection.user_id,
+        connection.id
+      )
+      instanceToken = createResult.token
+
+      // Salvar novo token e adminFields no banco
+      await supabaseAdmin
+        .from('whatsapp_connections')
+        .update({
+          instance_name: instanceName,
+          instance_token: instanceToken,
+          admin_field_01: connection.user_id,
+          admin_field_02: connection.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', connectionId)
+
+      console.log('✅ [Connect] Nova instância criada com novo token e adminFields')
+
+      // Aguardar e tentar conectar novamente
+      await delay(1500)
+      const retryConnect = await connectUazapiInstance(instanceName, instanceToken)
+      return await processConnectionResult(retryConnect, connectionId, instanceName, instanceToken)
     }
 
-    // ========================================================================
-    // 2. BUSCAR STATUS REAL NA UAZAPI
-    // ========================================================================
-    const uazapiData = await fetchUazapiStatus(connection.instance_token)
+    return await processConnectionResult(connectResult, connectionId, instanceName, instanceToken)
+  } catch (error) {
+    console.error('❌ Erro Fatal na Rota:', error)
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  }
+}
 
-    if (!uazapiData) {
-      console.warn('⚠️ [Polling] Token inválido ou instância não encontrada')
-      return NextResponse.json({
-        success: true,
-        status: connection.status || 'disconnected',
-        connected: false,
-        qrCode: null,
-        profileName: connection.profile_name,
-        message: 'Erro ao verificar status na UAZAPI'
-      })
+// Helper function para processar resultado da conexão
+async function processConnectionResult(connectResult, connectionId, instanceName, instanceToken) {
+  try {
+
+    let qrCode = null
+    let status = 'connecting'
+    let instanceInfo = {}
+
+    if (connectResult.ok && connectResult.data) {
+      const statusData = connectResult.data
+
+      // Extrair informações da instância
+      instanceInfo = statusData.instance || {}
+      status = instanceInfo.status || statusData.status || 'connecting'
+
+      console.log('📊 [Connect] Status da instância:', status)
+
+      // Extrair QR Code (múltiplos formatos possíveis)
+      if (instanceInfo.qrcode) {
+        qrCode = instanceInfo.qrcode
+        console.log('✅ [Connect] QR Code encontrado em instance.qrcode')
+      } else if (statusData.qrcode?.base64) {
+        qrCode = statusData.qrcode.base64
+        console.log('✅ [Connect] QR Code encontrado em qrcode.base64')
+      } else if (statusData.qrcode) {
+        qrCode = statusData.qrcode
+        console.log('✅ [Connect] QR Code encontrado em qrcode')
+      } else if (statusData.qr) {
+        qrCode = statusData.qr
+        console.log('✅ [Connect] QR Code encontrado em qr')
+      } else if (statusData.base64) {
+        qrCode = statusData.base64
+        console.log('✅ [Connect] QR Code encontrado em base64')
+      }
+
+      // Se já está conectado, limpar QR Code
+      if (status === 'open') {
+        qrCode = null
+        status = 'connected'
+        console.log('✅ [Connect] Instância já conectada!')
+      }
     }
 
-    console.log('📥 [Polling] Dados da UAZAPI:', {
-      status: uazapiData?.instance?.status,
-      hasProfile: !!uazapiData?.instance?.profileName
-    })
-
-    // ========================================================================
-    // 3. SINCRONIZAR SUPABASE COM STATUS DA UAZAPI
-    // ========================================================================
-    const syncResult = await syncUazapiToSupabase(connectionId, uazapiData)
-
-    if (!syncResult.success) {
-      console.error('❌ [Polling] Erro na sincronização:', syncResult.error)
+    // 5. Atualizar Status no Banco
+    const updateData = {
+      status: status === 'connected' || status === 'open' ? 'connected' : 'connecting',
+      is_connected: status === 'connected' || status === 'open',
+      updated_at: new Date().toISOString()
     }
 
-    // ========================================================================
-    // 4. EXTRAIR E RETORNAR DADOS ATUALIZADOS
-    // ========================================================================
-    const finalData = extractInstanceData(uazapiData)
+    // Se já conectou, salvar informações do perfil
+    if (status === 'connected' || status === 'open') {
+      if (instanceInfo.profileName) {
+        updateData.profile_name = instanceInfo.profileName
+        updateData.profile_pic_url = instanceInfo.profilePicUrl || null
+        // Limpar o número (remover @s.whatsapp.net se existir)
+        updateData.phone_number = instanceInfo.owner ? instanceInfo.owner.replace('@s.whatsapp.net', '') : null
+        console.log('✅ [Connect] Perfil detectado:', {
+          name: instanceInfo.profileName,
+          phone: updateData.phone_number
+        })
+      }
+    }
 
-    console.log('✅ [Polling] Status sincronizado:', {
-      status: finalData.status,
-      connected: finalData.connected
-    })
+    await supabaseAdmin
+      .from('whatsapp_connections')
+      .update(updateData)
+      .eq('id', connectionId)
+
+    console.log('💾 [Connect] Banco atualizado:', updateData)
 
     return NextResponse.json({
       success: true,
-      status: finalData.status,
-      connected: finalData.connected,
-      qrCode: finalData.qrCode,
-      instanceToken: connection.instance_token,
-      connectionId,
-      profileName: finalData.profileName,
-      profilePicUrl: finalData.profilePicUrl,
-      phoneNumber: finalData.phoneNumber,
-      message: finalData.connected ? 'Conectado' : 'Aguardando conexão'
+      qrCode: qrCode,
+      status: status,
+      instanceName: instanceName,
+      profileName: instanceInfo.profileName || null,
+      profilePicUrl: instanceInfo.profilePicUrl || null,
+      owner: instanceInfo.owner || null,
+      connected: status === 'connected' || status === 'open',
+      message: qrCode
+        ? 'QR Code gerado com sucesso'
+        : status === 'connected' || status === 'open'
+          ? 'Instância já conectada'
+          : 'Aguardando QR Code...'
     })
 
   } catch (error) {
-    console.error('❌ [Polling] Erro interno:', error)
-    return NextResponse.json(
-      { success: false, error: 'Erro interno: ' + error.message },
-      { status: 500 }
-    )
+    console.error('❌ Erro Fatal na Rota:', error)
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }
