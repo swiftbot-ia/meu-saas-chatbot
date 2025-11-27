@@ -18,6 +18,10 @@ export default function AuthPage() {
   const [errors, setErrors] = useState({})
   const router = useRouter()
 
+  // 🔒 URL FIXA DE PRODUÇÃO (Para garantir que o Supabase aceite)
+  // Se um dia for testar local, altere para 'http://localhost:3000'
+  const SITE_URL = 'https://swiftbot.com.br'
+
   // CSS Classes extraídas do Design System da referência para consistência
   const baseInputClass = "w-full bg-[#1E1E1E] text-white placeholder-gray-500 rounded-3xl px-6 py-4 border outline-none focus:outline-none focus:rounded-3xl focus:bg-[#282828] transition-all duration-300 ease-in-out"
   
@@ -48,10 +52,9 @@ export default function AuthPage() {
   }, [])
 
   // ==================================================================================
-  // 🗣️ TRADUTOR DE ERROS (NOVA FUNÇÃO)
+  // 🗣️ TRADUTOR DE ERROS
   // ==================================================================================
   const translateError = (errorMsg) => {
-    // Normaliza a string para evitar problemas com case sensitive
     const msg = errorMsg?.toLowerCase() || ''
 
     if (msg.includes('invalid login credentials')) {
@@ -142,13 +145,22 @@ export default function AuthPage() {
           }
         }
       } else if (authView === 'register') {
+        
+        // ==============================================================================
+        // 🔧 CORREÇÃO: URL FIXA
+        // ==============================================================================
+        // Removemos o 'window.location.origin' e usamos a constante fixa
+        // Isso garante que o Supabase receba uma URL absoluta válida.
+        
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: {
               full_name: fullName
-            }
+            },
+            // Força o redirecionamento para o domínio oficial + /login
+            emailRedirectTo: `${SITE_URL}/login`
           }
         })
 
@@ -180,8 +192,9 @@ export default function AuthPage() {
     setErrors({})
 
     try {
+      // Usa a URL fixa também para o reset de senha
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-         redirectTo: 'https://swiftbot.com.br/reset-password',
+         redirectTo: `${SITE_URL}/reset-password`,
       })
 
       if (error) throw error
@@ -196,10 +209,11 @@ export default function AuthPage() {
   const handleSocialLogin = async (provider) => {
     setSocialLoading(provider)
     try {
+      // Usa a URL fixa também para o callback social
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider,
         options: {
-          redirectTo: `http://localhost:3000/auth/callback`
+          redirectTo: `${SITE_URL}/auth/callback`
         }
       })
       if (error) {
