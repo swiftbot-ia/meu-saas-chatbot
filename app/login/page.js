@@ -336,7 +336,7 @@ export default function AuthPage() {
                 <div className="flex justify-center mb-6">
                   <div className="inline-flex items-center gap-2 bg-[#1E1E1E] border border-white/5 rounded-full px-5 py-2">
                     <div className="w-2 h-2 bg-[#00FF99] rounded-full animate-pulse shadow-[0_0_10px_#00FF99]" />
-                    <span className="text-xs text-gray-300 font-medium uppercase tracking-wide">4 dias grátis • Sem cartão</span>
+                    <span className="text-xs text-gray-300 font-medium uppercase tracking-wide">4 dias grátis</span>
                   </div>
                 </div>
 
