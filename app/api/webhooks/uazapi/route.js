@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/client'
 import { createChatSupabaseClient } from '@/lib/supabase/chat-client'
 import transcriptionService from '@/lib/services/TranscriptionService'
+import mediaStorageService from '@/lib/services/MediaStorageService'
 
 /**
  * POST - Processar eventos do webhook
@@ -260,7 +261,23 @@ async function handleIncomingMessage(payload) {
       }
     }
 
-    // 7. Salvar MENSAGEM
+    // 7. Download e salvamento local de mídia (se houver)
+    let localMediaPath = null
+    if (mediaUrl && messageType !== 'text') {
+      const mediaResult = await mediaStorageService.downloadAndSave(
+        mediaUrl,
+        messageType,
+        messageId
+      )
+
+      if (mediaResult) {
+        localMediaPath = mediaResult.localPath
+        // Atualizar mediaUrl para caminho local ao invés da URL do WhatsApp
+        mediaUrl = `/storage/media/${mediaResult.relativePath}`
+      }
+    }
+
+    // 8. Salvar MENSAGEM
     const { data: savedMessage, error: msgError } = await chatSupabase
       .from('whatsapp_messages')
       .insert({
@@ -292,7 +309,7 @@ async function handleIncomingMessage(payload) {
 
     console.log(`✅ Mensagem salva: ${savedMessage.id} (tipo: ${messageType})`)
 
-    // 8. Atualizar conversa com última mensagem
+    // 9. Atualizar conversa com última mensagem
     await chatSupabase
       .from('whatsapp_conversations')
       .update({
@@ -303,11 +320,11 @@ async function handleIncomingMessage(payload) {
       })
       .eq('id', conversation.id)
 
-    // 9. Se for áudio, processar transcrição (assíncrono)
-    if (messageType === 'audio' && mediaUrl) {
+    // 10. Se for áudio, processar transcrição (assíncrono)
+    if (messageType === 'audio' && localMediaPath) {
       console.log('🎤 Áudio detectado, iniciando transcrição...')
       setImmediate(() => {
-        processAudioTranscription(savedMessage.id, mediaUrl).catch(error => {
+        processAudioTranscription(savedMessage.id, localMediaPath).catch(error => {
           console.error('❌ Erro ao transcrever áudio:', error)
         })
       })
@@ -324,12 +341,12 @@ async function handleIncomingMessage(payload) {
 /**
  * Processa transcrição de áudio
  */
-async function processAudioTranscription(messageId, audioUrl) {
+async function processAudioTranscription(messageId, localFilePath) {
   try {
     console.log(`🎤 Iniciando transcrição para mensagem: ${messageId}`)
 
-    // Usar TranscriptionService
-    const result = await transcriptionService.transcribeAndSave(messageId, audioUrl)
+    // Usar TranscriptionService com arquivo local
+    const result = await transcriptionService.transcribeAndSave(messageId, localFilePath)
 
     if (result) {
       console.log(`✅ Transcrição salva com sucesso: ${messageId}`)
