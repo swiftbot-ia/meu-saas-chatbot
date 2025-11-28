@@ -84,4 +84,5 @@ NOTES.md
 build.log
 
 # Route configs temporário
-app/*/route.config.js
+app/*/route.config.jsbackup-completo.sh
+*.bak
