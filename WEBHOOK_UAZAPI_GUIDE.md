@@ -26,11 +26,30 @@ O processamento de webhooks da UazAPI foi implementado corretamente no SwiftBot,
 ### 2. **Serviço de Transcrição**
 - **Arquivo:** `lib/services/TranscriptionService.js`
 - **Funcionalidades:**
-  - ✅ Download de áudio da URL
+  - ✅ Usa arquivos locais salvos na VPS (não URLs do WhatsApp)
   - ✅ Transcrição via OpenAI Whisper API
   - ✅ Atualização automática da mensagem com transcrição
-  - ✅ Limpeza de arquivos temporários
   - ✅ Logs detalhados
+
+### 3. **Armazenamento Local de Mídias** ⭐ NOVO
+- **Arquivo:** `lib/services/MediaStorageService.js`
+- **Funcionalidades:**
+  - ✅ Download automático de TODAS as mídias (áudio, imagem, vídeo, documento)
+  - ✅ Salvamento local em `/storage/media/{tipo}/`
+  - ✅ Nomenclatura organizada: `YYYY-MM-DD_hash.ext`
+  - ✅ URLs do WhatsApp não são mais usadas (evita expiração)
+  - ✅ Banco salva caminho local em `media_url`
+
+### 4. **API de Servir Mídias**
+- **Arquivo:** `app/api/media/[...path]/route.js`
+- **Endpoint:** `GET /api/media/{tipo}/{arquivo}`
+- **Funcionalidades:**
+  - ✅ Serve arquivos salvos localmente via HTTP
+  - ✅ Headers corretos (Content-Type, Cache-Control)
+  - ✅ Proteção contra directory traversal
+  - ✅ Cache de longo prazo (1 ano)
+
+**📖 Guia completo de testes:** Veja [`MEDIA_STORAGE_TEST_GUIDE.md`](./MEDIA_STORAGE_TEST_GUIDE.md)
 
 ---
 
@@ -51,6 +70,9 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 # Supabase - Banco de Chat
 NEXT_PUBLIC_CHAT_SUPABASE_URL=https://seu-chat.supabase.co
 NEXT_PUBLIC_CHAT_SUPABASE_ANON_KEY=eyJ...
+
+# Supabase - Service Role Key (para webhooks - bypassa RLS)
+CHAT_SUPABASE_SERVICE_ROLE_KEY=eyJ...
 ```
 
 ### 2. Banco de Dados
@@ -257,13 +279,22 @@ LIMIT 10;
    ↓
 10. Determinar tipo (text, audio, image, video, document)
    ↓
-11. Salvar MENSAGEM (whatsapp_messages)
+11. Se tem mídia → Download e salvamento local (MediaStorageService)
+   - Download da URL do WhatsApp
+   - Salvar em storage/media/{tipo}/YYYY-MM-DD_hash.ext
+   - Retornar caminho local
    ↓
-12. Atualizar conversa (last_message_at, unread_count)
+12. Salvar MENSAGEM (whatsapp_messages)
+   - media_url = caminho local (não URL do WhatsApp)
    ↓
-13. Se áudio → Processar transcrição (assíncrono)
+13. Atualizar conversa (last_message_at, unread_count)
    ↓
-14. ✅ Concluído!
+14. Se áudio → Processar transcrição (assíncrono)
+   - Usar arquivo local salvo na VPS
+   - Transcrever com OpenAI Whisper
+   - Atualizar message_content com transcrição
+   ↓
+15. ✅ Concluído!
 ```
 
 ---
@@ -272,13 +303,14 @@ LIMIT 10;
 
 ### Como Funciona
 
-1. Mensagem de áudio é salva normalmente
-2. URL do áudio é extraída: `message.content.URL`
-3. `TranscriptionService` é chamado assincronamente:
-   - Download do áudio
+1. Mensagem de áudio é recebida
+2. Áudio é baixado e salvo localmente via `MediaStorageService`
+3. Mensagem é salva com `media_url` apontando para arquivo local
+4. `TranscriptionService` é chamado assincronamente:
+   - Usa arquivo local já salvo em `storage/media/audio/`
    - Transcrição via OpenAI Whisper
-   - Atualização da mensagem com texto transcrito
-   - Limpeza do arquivo temporário
+   - Atualização da mensagem com texto transcrito no campo `message_content`
+   - Arquivo permanece salvo (não é deletado)
 
 ### Verificar Transcrições
 
