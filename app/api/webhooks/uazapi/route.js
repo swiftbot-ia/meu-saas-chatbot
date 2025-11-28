@@ -134,20 +134,25 @@ async function handleIncomingMessage(payload) {
       return
     }
 
-    // 3. Criar/buscar CONTATO
+    // 3. Criar/buscar CONTATO (padrão Coonver: SELECT primeiro, INSERT se não existir)
     const contactName = chat?.wa_name || chat?.name || message.senderName || null
     const profilePicUrl = chat?.imagePreview || null
 
     let contact
-    const { data: existingContact } = await chatSupabase
+    const { data: existingContact, error: contactFetchError } = await chatSupabase
       .from('whatsapp_contacts')
       .select('*')
       .eq('whatsapp_number', phoneNumber)
       .maybeSingle()
 
+    if (contactFetchError) {
+      console.error('❌ Erro ao buscar contato:', contactFetchError.message)
+      return
+    }
+
     if (existingContact) {
       // Atualizar contato existente
-      const { data: updated } = await chatSupabase
+      const { data: updated, error: updateError } = await chatSupabase
         .from('whatsapp_contacts')
         .update({
           name: contactName || existingContact.name,
@@ -160,11 +165,18 @@ async function handleIncomingMessage(payload) {
         .select()
         .single()
 
-      contact = updated
+      if (updateError) {
+        console.error('❌ Erro ao atualizar contato:', updateError.message)
+        // Usar contato existente mesmo se update falhar
+        contact = existingContact
+      } else {
+        contact = updated
+      }
+
       console.log(`✅ Contato atualizado: ${phoneNumber}`)
     } else {
       // Criar novo contato
-      const { data: created } = await chatSupabase
+      const { data: created, error: createError } = await chatSupabase
         .from('whatsapp_contacts')
         .insert({
           whatsapp_number: phoneNumber,
@@ -176,6 +188,12 @@ async function handleIncomingMessage(payload) {
         .select()
         .single()
 
+      if (createError) {
+        console.error('❌ Erro ao criar contato:', createError.message)
+        console.error('Detalhes:', createError)
+        return
+      }
+
       contact = created
       console.log(`✅ Contato criado: ${phoneNumber}`)
     }
@@ -185,21 +203,26 @@ async function handleIncomingMessage(payload) {
       return
     }
 
-    // 4. Criar/buscar CONVERSA
+    // 4. Criar/buscar CONVERSA (padrão Coonver: SELECT primeiro, INSERT se não existir)
     let conversation
-    const { data: existingConversation } = await chatSupabase
+    const { data: existingConversation, error: convFetchError } = await chatSupabase
       .from('whatsapp_conversations')
       .select('*')
       .eq('instance_name', instanceName)
       .eq('contact_id', contact.id)
       .maybeSingle()
 
+    if (convFetchError) {
+      console.error('❌ Erro ao buscar conversa:', convFetchError.message)
+      return
+    }
+
     if (existingConversation) {
       conversation = existingConversation
       console.log(`✅ Conversa encontrada: ${conversation.id}`)
     } else {
       // Criar nova conversa
-      const { data: created } = await chatSupabase
+      const { data: created, error: createError } = await chatSupabase
         .from('whatsapp_conversations')
         .insert({
           instance_name: instanceName,
@@ -209,6 +232,12 @@ async function handleIncomingMessage(payload) {
         })
         .select()
         .single()
+
+      if (createError) {
+        console.error('❌ Erro ao criar conversa:', createError.message)
+        console.error('Detalhes:', createError)
+        return
+      }
 
       conversation = created
       console.log(`✅ Conversa criada: ${conversation.id}`)
