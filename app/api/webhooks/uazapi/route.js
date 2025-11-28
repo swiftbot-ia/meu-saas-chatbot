@@ -21,6 +21,9 @@ export async function POST(request) {
   try {
     const payload = await request.json()
 
+    // DEBUG: Log complete payload
+    console.log('📨 Webhook PAYLOAD COMPLETO:', JSON.stringify(payload, null, 2))
+
     // UazAPI sends: EventType, instanceName, message
     const eventType = payload.EventType || payload.event
     const instanceName = payload.instanceName || payload.instance
