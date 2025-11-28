@@ -21,17 +21,22 @@ export async function POST(request) {
   try {
     const payload = await request.json()
 
-    // DEBUG: Log complete payload
-    console.log('📨 Webhook PAYLOAD COMPLETO:', JSON.stringify(payload, null, 2))
+    // DEBUG: Log complete payload with all possible keys
+    console.log('📨 ================== WEBHOOK DEBUG ==================')
+    console.log('📦 Payload Keys:', Object.keys(payload))
+    console.log('📦 Payload:', JSON.stringify(payload, null, 2))
+    console.log('====================================================')
 
     // UazAPI sends: EventType, instanceName, message
-    const eventType = payload.EventType || payload.event
-    const instanceName = payload.instanceName || payload.instance
+    // Try multiple possible keys
+    const eventType = payload.EventType || payload.event || payload.eventType || payload.type
+    const instanceName = payload.instanceName || payload.instance || payload.Instance || payload.instancename
 
     console.log('📨 Webhook recebido da UAZAPI:', {
       event: eventType,
       instance: instanceName,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      rawPayloadKeys: Object.keys(payload)
     })
 
     // Validar autenticação básica (opcional)
