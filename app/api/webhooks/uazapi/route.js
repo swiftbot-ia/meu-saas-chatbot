@@ -264,10 +264,14 @@ async function handleIncomingMessage(payload) {
     // 7. Download e salvamento local de mídia (se houver)
     let localMediaPath = null
     if (mediaUrl && messageType !== 'text') {
+      // Extrair token da instância do payload para descriptografar mídia
+      const instanceToken = payload.token || null
+
       const mediaResult = await mediaStorageService.downloadAndSave(
         mediaUrl,
         messageType,
-        messageId
+        messageId,
+        instanceToken // ← Passar token para descriptografar mídia do WhatsApp
       )
 
       if (mediaResult) {
