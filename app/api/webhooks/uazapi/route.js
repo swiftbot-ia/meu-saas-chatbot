@@ -12,6 +12,7 @@
 
 import { NextResponse } from 'next/server'
 import { supabase } from '../../../../lib/supabase'
+import MessageService from '@/lib/MessageService'
 
 /**
  * POST - Processar eventos do webhook
@@ -172,42 +173,27 @@ async function handleMessageReceived(payload) {
     const messages = Array.isArray(messageData) ? messageData : [messageData]
 
     for (const message of messages) {
-      // Extrair informações da mensagem
-      const messageInfo = message.message || message
-      const key = message.key || {}
-
-      const messageRecord = {
-        connection_id: connection.id,
-        user_id: connection.user_id,
-        message_id: key.id || `msg_${Date.now()}`,
-        from_number: key.remoteJid?.replace('@s.whatsapp.net', '') || 'unknown',
-        to_number: connection.phone_number_id || 'unknown',
-        message_type: getMessageType(messageInfo),
-        message_content: extractMessageContent(messageInfo),
-        direction: key.fromMe ? 'outbound' : 'inbound',
-        status: 'received',
-        metadata: {
-          key,
-          messageInfo,
-          timestamp: message.messageTimestamp || Date.now()
-        },
-        received_at: new Date((message.messageTimestamp || Date.now()) * 1000).toISOString()
-      }
-
-      // Salvar mensagem no banco (se a tabela existir)
       try {
-        await supabase
-          .from('whatsapp_messages')
-          .insert(messageRecord)
+        // Use MessageService to process incoming message
+        // This will automatically create/update contact and conversation
+        const savedMessage = await MessageService.processIncomingMessage(
+          message,
+          connection.id,
+          connection.user_id
+        )
 
-        console.log(`✅ Mensagem salva: ${messageRecord.message_id}`)
-      } catch (dbError) {
-        // Tabela pode não existir, não é crítico
-        console.log(`ℹ️ Mensagem não salva (tabela pode não existir):`, dbError.message)
+        if (savedMessage) {
+          console.log(`✅ Mensagem processada: ${savedMessage.message_id}`)
+        } else {
+          console.log(`ℹ️ Mensagem ignorada (provavelmente enviada por nós)`)
+        }
+
+        // TODO: Implementar lógica de resposta automática/bot se necessário
+
+      } catch (messageError) {
+        console.error('❌ Erro ao processar mensagem individual:', messageError)
+        // Continue processando outras mensagens mesmo se uma falhar
       }
-
-      // Aqui você pode processar a mensagem (ex: bot responder)
-      // TODO: Implementar lógica de resposta automática/bot
     }
 
   } catch (error) {

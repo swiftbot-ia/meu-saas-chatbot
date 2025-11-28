@@ -1,0 +1,311 @@
+/**
+ * ChatWindow Component
+ * Main chat window that combines MessageList and ChatInput
+ */
+
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import MessageList from './MessageList';
+import ChatInput from './ChatInput';
+import { Phone, MoreVertical, Archive, Trash2, X } from 'lucide-react';
+
+export default function ChatWindow({
+  conversation,
+  onClose,
+  onArchive,
+  onDelete
+}) {
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+
+  // Load messages when conversation changes
+  useEffect(() => {
+    if (conversation) {
+      loadMessages();
+      markAsRead();
+    } else {
+      setMessages([]);
+    }
+  }, [conversation?.id]);
+
+  const loadMessages = async (before = null) => {
+    if (!conversation) return;
+
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        conversationId: conversation.id,
+        limit: '50'
+      });
+
+      if (before) {
+        params.append('before', before);
+      }
+
+      const response = await fetch(`/api/chat/messages?${params}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao carregar mensagens');
+      }
+
+      if (before) {
+        // Prepend older messages
+        setMessages(prev => [...data.messages, ...prev]);
+      } else {
+        // Initial load
+        setMessages(data.messages);
+      }
+
+      // Check if there are more messages
+      setHasMore(data.messages.length === 50);
+
+    } catch (error) {
+      console.error('Erro ao carregar mensagens:', error);
+      alert('Erro ao carregar mensagens. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadMoreMessages = () => {
+    if (messages.length > 0) {
+      const oldestMessage = messages[0];
+      loadMessages(oldestMessage.received_at);
+    }
+  };
+
+  const markAsRead = async () => {
+    if (!conversation || conversation.unread_count === 0) return;
+
+    try {
+      await fetch(`/api/chat/conversations/${conversation.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'mark_read' })
+      });
+    } catch (error) {
+      console.error('Erro ao marcar como lida:', error);
+    }
+  };
+
+  const handleSend = async ({ text, file, caption }) => {
+    if (!conversation) return;
+
+    setSending(true);
+    try {
+      let response;
+
+      if (file) {
+        // Send media message
+        const formData = new FormData();
+        formData.append('conversationId', conversation.id);
+        formData.append('mediaUrl', ''); // TODO: Upload file first
+        formData.append('caption', caption);
+        formData.append('mediaType', detectMediaType(file.type));
+
+        response = await fetch('/api/chat/send-media', {
+          method: 'POST',
+          body: formData
+        });
+      } else {
+        // Send text message
+        response = await fetch('/api/chat/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            conversationId: conversation.id,
+            message: text
+          })
+        });
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao enviar mensagem');
+      }
+
+      // Add new message to list
+      setMessages(prev => [...prev, data]);
+
+      // Scroll to bottom
+      setTimeout(() => {
+        const messageList = document.querySelector('[data-message-list]');
+        if (messageList) {
+          messageList.scrollTop = messageList.scrollHeight;
+        }
+      }, 100);
+
+    } catch (error) {
+      console.error('Erro ao enviar mensagem:', error);
+      throw error; // Re-throw to let ChatInput handle the error
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const detectMediaType = (mimeType) => {
+    if (mimeType.startsWith('image/')) return 'image';
+    if (mimeType.startsWith('video/')) return 'video';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    return 'document';
+  };
+
+  const handleArchive = async () => {
+    if (!conversation) return;
+
+    try {
+      await fetch(`/api/chat/conversations/${conversation.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'archive' })
+      });
+
+      onArchive?.(conversation.id);
+      setShowMenu(false);
+    } catch (error) {
+      console.error('Erro ao arquivar conversa:', error);
+      alert('Erro ao arquivar conversa. Tente novamente.');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!conversation) return;
+
+    const confirmed = confirm('Tem certeza que deseja deletar esta conversa? Esta ação não pode ser desfeita.');
+    if (!confirmed) return;
+
+    try {
+      await fetch(`/api/chat/conversations/${conversation.id}`, {
+        method: 'DELETE'
+      });
+
+      onDelete?.(conversation.id);
+      setShowMenu(false);
+    } catch (error) {
+      console.error('Erro ao deletar conversa:', error);
+      alert('Erro ao deletar conversa. Tente novamente.');
+    }
+  };
+
+  if (!conversation) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="text-6xl mb-4">💬</div>
+          <p className="text-gray-500 text-lg font-medium">
+            Selecione uma conversa
+          </p>
+          <p className="text-gray-400 text-sm mt-2">
+            Escolha uma conversa da lista para começar a enviar mensagens
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 flex flex-col h-full">
+      {/* Header */}
+      <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          {/* Avatar */}
+          {conversation.contact?.profile_pic_url ? (
+            <img
+              src={conversation.contact.profile_pic_url}
+              alt={conversation.contact.name || 'Contato'}
+              className="w-10 h-10 rounded-full object-cover"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-white font-semibold">
+              {(conversation.contact?.name || conversation.contact?.whatsapp_number || '?')[0].toUpperCase()}
+            </div>
+          )}
+
+          {/* Info */}
+          <div>
+            <h3 className="font-semibold text-gray-900">
+              {conversation.contact?.name || conversation.contact?.whatsapp_number}
+            </h3>
+            <p className="text-sm text-gray-500 flex items-center">
+              <Phone size={12} className="mr-1" />
+              {conversation.contact?.whatsapp_number}
+            </p>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center space-x-2">
+          {/* Menu */}
+          <div className="relative">
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <MoreVertical size={20} className="text-gray-600" />
+            </button>
+
+            {showMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border z-10">
+                <button
+                  onClick={handleArchive}
+                  className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-700"
+                >
+                  <Archive size={16} />
+                  <span>Arquivar</span>
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-red-600"
+                >
+                  <Trash2 size={16} />
+                  <span>Deletar</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Close button (mobile) */}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors md:hidden"
+            >
+              <X size={20} className="text-gray-600" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Messages */}
+      <MessageList
+        messages={messages}
+        loading={loading}
+        hasMore={hasMore}
+        onLoadMore={loadMoreMessages}
+        currentUserId={conversation.user_id}
+        connectionPhoneId={conversation.connection?.phone_number_id}
+      />
+
+      {/* Input */}
+      <ChatInput
+        onSend={handleSend}
+        disabled={sending || !conversation.connection?.is_connected}
+      />
+
+      {/* Disconnected warning */}
+      {!conversation.connection?.is_connected && (
+        <div className="bg-yellow-50 border-t border-yellow-200 px-4 py-2 text-center">
+          <p className="text-sm text-yellow-800">
+            ⚠️ WhatsApp desconectado. Reconecte para enviar mensagens.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
