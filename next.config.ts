@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   compress: true,
@@ -9,8 +8,11 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // ✅ CRÍTICO: Confiar nos headers do proxy
+  experimental: {
+    trustHostHeader: true,
+  },
   webpack: (config, { isServer }) => {
-    // Resolver aliases para @/ corretamente
     config.resolve.alias = {
       ...config.resolve.alias,
       '@': __dirname,
@@ -18,5 +20,4 @@ const nextConfig: NextConfig = {
     return config;
   },
 };
-
 export default nextConfig;
