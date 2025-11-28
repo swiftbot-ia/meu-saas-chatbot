@@ -21,9 +21,13 @@ export async function POST(request) {
   try {
     const payload = await request.json()
 
+    // UazAPI sends: EventType, instanceName, message
+    const eventType = payload.EventType || payload.event
+    const instanceName = payload.instanceName || payload.instance
+
     console.log('📨 Webhook recebido da UAZAPI:', {
-      event: payload.event,
-      instance: payload.instance,
+      event: eventType,
+      instance: instanceName,
       timestamp: new Date().toISOString()
     })
 
@@ -40,20 +44,20 @@ export async function POST(request) {
       }
     }
 
-    // Identificar o tipo de evento
-    const eventType = payload.event
-
     // Processar evento baseado no tipo
     switch (eventType) {
       case 'CONNECTION_UPDATE':
+      case 'connection':
         await handleConnectionUpdate(payload)
         break
 
       case 'MESSAGES_UPSERT':
+      case 'messages':
         await handleMessageReceived(payload)
         break
 
       case 'QRCODE_UPDATED':
+      case 'qrcode':
         await handleQRCodeUpdate(payload)
         break
 
@@ -152,8 +156,9 @@ async function handleConnectionUpdate(payload) {
  */
 async function handleMessageReceived(payload) {
   try {
-    const instanceName = payload.instance
-    const messageData = payload.data
+    // UazAPI format: { instanceName, message, chat, owner, token }
+    const instanceName = payload.instanceName || payload.instance
+    const messageData = payload.message || payload.data
 
     console.log(`💬 MESSAGES_UPSERT: ${instanceName}`)
 
