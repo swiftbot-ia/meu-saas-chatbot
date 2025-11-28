@@ -2,6 +2,10 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
+// ⏱️ Timeout Configuration para evitar 502 Bad Gateway
+// Plano Free Vercel: máximo 10s | Pro: até 60s
+export const maxDuration = 10;
+
 export async function GET(request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
@@ -72,18 +76,18 @@ export async function GET(request) {
               .insert([newProfile])
               .select()
               .single()
-              
+
             if (createdProfile) profile = createdProfile
           }
 
           // Verifica se precisa completar cadastro
-          const needsCompletion = !profile || 
-                                 !profile.company_name || 
-                                 !profile.full_name ||
-                                 !profile.phone
+          const needsCompletion = !profile ||
+            !profile.company_name ||
+            !profile.full_name ||
+            !profile.phone
 
           if (needsCompletion) {
-             return NextResponse.redirect(`${origin}/complete-profile`)
+            return NextResponse.redirect(`${origin}/complete-profile`)
           }
         } catch (profileErr) {
           console.error('Erro ao verificar perfil:', profileErr)
