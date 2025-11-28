@@ -1,18 +1,17 @@
-// app/api/webhooks/evolution/route.js
 /**
  * ============================================================================
- * Webhook Handler: UAZAPI / UAZAPI
+ * Webhook Handler: UazAPI
  * ============================================================================
- * Recebe e processa eventos da UAZAPI:
- * - MESSAGES_UPSERT: Novas mensagens recebidas
- * - CONNECTION_UPDATE: Mudanças no status de conexão
- * - E outros eventos do WhatsApp
+ * Recebe e processa eventos da UazAPI com estrutura correta
+ * - EventType: "messages" (novas mensagens)
+ * - EventType: "status" (status de mensagens enviadas)
  * ============================================================================
  */
 
 import { NextResponse } from 'next/server'
-import { supabase } from '../../../../lib/supabase'
-import MessageService from '@/lib/MessageService'
+import { createServerSupabaseClient } from '@/lib/supabase/client'
+import { createChatSupabaseClient } from '@/lib/supabase/chat-client'
+import transcriptionService from '@/lib/services/TranscriptionService'
 
 /**
  * POST - Processar eventos do webhook
@@ -21,271 +20,360 @@ export async function POST(request) {
   try {
     const payload = await request.json()
 
-    console.log('📨 Webhook recebido da UAZAPI:', {
-      event: payload.event,
-      instance: payload.instance,
+    console.log('📨 Webhook UazAPI recebido:', {
+      EventType: payload.EventType,
+      instanceName: payload.instanceName,
       timestamp: new Date().toISOString()
     })
 
-    // Validar autenticação básica (opcional)
-    const authHeader = request.headers.get('authorization')
-    if (process.env.WEBHOOK_AUTH_USER && process.env.WEBHOOK_AUTH_PASS) {
-      const expectedAuth = Buffer.from(
-        `${process.env.WEBHOOK_AUTH_USER}:${process.env.WEBHOOK_AUTH_PASS}`
-      ).toString('base64')
+    // Sempre responder 200 OK imediatamente (evitar timeout)
+    // Processar de forma assíncrona
+    setImmediate(() => {
+      processWebhookAsync(payload).catch(error => {
+        console.error('❌ Erro ao processar webhook assíncrono:', error)
+      })
+    })
 
-      if (authHeader !== `Basic ${expectedAuth}`) {
-        console.warn('⚠️ Autenticação de webhook falhou')
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
+    return NextResponse.json({
+      success: true,
+      message: 'Webhook recebido'
+    })
+
+  } catch (error) {
+    console.error('❌ Erro ao receber webhook:', error)
+    // Sempre retornar 200 para evitar retry infinito da UazAPI
+    return NextResponse.json({
+      success: true,
+      message: 'Webhook recebido'
+    })
+  }
+}
+
+/**
+ * Processa webhook de forma assíncrona
+ */
+async function processWebhookAsync(payload) {
+  try {
+    // Validar estrutura básica
+    if (!payload.EventType || !payload.instanceName) {
+      console.warn('⚠️ Webhook inválido: EventType ou instanceName ausente')
+      return
     }
 
-    // Identificar o tipo de evento
-    const eventType = payload.event
+    // Processar baseado no tipo de evento
+    const eventType = payload.EventType
 
-    // Processar evento baseado no tipo
     switch (eventType) {
-      case 'CONNECTION_UPDATE':
+      case 'messages':
+        await handleIncomingMessage(payload)
+        break
+
+      case 'status':
+        await handleMessageStatus(payload)
+        break
+
+      case 'connection':
         await handleConnectionUpdate(payload)
-        break
-
-      case 'MESSAGES_UPSERT':
-        await handleMessageReceived(payload)
-        break
-
-      case 'QRCODE_UPDATED':
-        await handleQRCodeUpdate(payload)
-        break
-
-      case 'CONNECTION_LOST':
-      case 'CONNECTION_CLOSE':
-        await handleConnectionLost(payload)
         break
 
       default:
         console.log(`ℹ️ Evento não tratado: ${eventType}`)
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Webhook processado com sucesso'
-    })
-
   } catch (error) {
     console.error('❌ Erro ao processar webhook:', error)
-    return NextResponse.json({
-      success: false,
-      error: error.message
-    }, { status: 500 })
   }
 }
 
 /**
- * Processa atualização de status de conexão
+ * Processa mensagem recebida (EventType: "messages")
  */
-async function handleConnectionUpdate(payload) {
+async function handleIncomingMessage(payload) {
   try {
-    const instanceName = payload.instance
-    const state = payload.data?.state // 'open', 'close', 'connecting'
+    const mainSupabase = createServerSupabaseClient()
+    const chatSupabase = createChatSupabaseClient()
 
-    console.log(`🔄 CONNECTION_UPDATE: ${instanceName} -> ${state}`)
+    // Extrair dados do payload UazAPI
+    const instanceName = payload.instanceName // ← CORRETO: usar instanceName
+    const message = payload.message
+    const chat = payload.chat
 
-    // Buscar conexão no banco
-    const { data: connection, error } = await supabase
-      .from('whatsapp_connections')
-      .select('*')
-      .eq('instance_name', instanceName)
-      .single()
-
-    if (error || !connection) {
-      console.warn(`⚠️ Conexão não encontrada no banco: ${instanceName}`)
+    // Validar campos obrigatórios
+    if (!message || !message.chatid) {
+      console.warn('⚠️ Mensagem sem chatid')
       return
     }
 
-    // Atualizar status baseado no estado
-    let status = 'disconnected'
-    let isConnected = false
+    console.log(`💬 Processando mensagem: ${message.messageid}`)
 
-    if (state === 'open') {
-      status = 'connected'
-      isConnected = true
-    } else if (state === 'connecting') {
-      status = 'connecting'
-    }
-
-    const updates = {
-      status,
-      is_connected: isConnected,
-      updated_at: new Date().toISOString()
-    }
-
-    // Se conectou, salvar timestamp
-    if (isConnected) {
-      updates.last_connected_at = new Date().toISOString()
-    }
-
-    // Extrair número do WhatsApp se disponível
-    if (payload.data?.ownerJid) {
-      updates.phone_number_id = payload.data.ownerJid.replace('@s.whatsapp.net', '')
-    }
-
-    await supabase
+    // 1. Buscar conexão pelo numeroInstancia (instanceName)
+    const { data: connection, error: connError } = await mainSupabase
       .from('whatsapp_connections')
-      .update(updates)
-      .eq('id', connection.id)
-
-    console.log(`✅ Status atualizado: ${instanceName} -> ${status}`)
-
-    // Se desconectou, você pode querer notificar o usuário
-    if (!isConnected && connection.is_connected) {
-      console.log(`⚠️ WhatsApp desconectado: ${instanceName}`)
-      // TODO: Enviar notificação para o usuário (email, push, etc)
-    }
-
-  } catch (error) {
-    console.error('❌ Erro ao processar CONNECTION_UPDATE:', error)
-  }
-}
-
-/**
- * Processa nova mensagem recebida
- */
-async function handleMessageReceived(payload) {
-  try {
-    const instanceName = payload.instance
-    const messageData = payload.data
-
-    console.log(`💬 MESSAGES_UPSERT: ${instanceName}`)
-
-    // Buscar conexão no banco
-    const { data: connection } = await supabase
-      .from('whatsapp_connections')
-      .select('id, user_id')
-      .eq('instance_name', instanceName)
+      .select('id, user_id, instance_name')
+      .eq('instance_name', instanceName) // ← CORRETO: buscar por instance_name
       .single()
 
-    if (!connection) {
+    if (connError || !connection) {
       console.warn(`⚠️ Conexão não encontrada: ${instanceName}`)
       return
     }
 
-    // Processar cada mensagem
-    const messages = Array.isArray(messageData) ? messageData : [messageData]
+    console.log(`✅ Conexão encontrada: ${connection.instance_name} (user: ${connection.user_id})`)
 
-    for (const message of messages) {
-      try {
-        // Use MessageService to process incoming message
-        // This will automatically create/update contact and conversation
-        const savedMessage = await MessageService.processIncomingMessage(
-          message,
-          instanceName,
-          connection.id,
-          connection.user_id
-        )
+    // 2. Extrair dados da mensagem (estrutura UazAPI, NÃO Baileys)
+    const remoteJid = message.chatid // ← CORRETO: usar chatid
+    const phoneNumber = remoteJid.replace('@s.whatsapp.net', '')
+    const messageId = message.messageid // ← CORRETO: usar messageid
+    const fromMe = message.fromMe || false
+    const messageTimestamp = message.messageTimestamp || Date.now()
 
-        if (savedMessage) {
-          console.log(`✅ Mensagem processada: ${savedMessage.message_id}`)
-        } else {
-          console.log(`ℹ️ Mensagem ignorada (provavelmente enviada por nós)`)
-        }
+    // Ignorar mensagens enviadas por nós (já salvas ao enviar)
+    if (fromMe) {
+      console.log('ℹ️ Mensagem enviada por nós, ignorando')
+      return
+    }
 
-        // TODO: Implementar lógica de resposta automática/bot se necessário
+    // 3. Criar/buscar CONTATO
+    const contactName = chat?.wa_name || chat?.name || message.senderName || null
+    const profilePicUrl = chat?.imagePreview || null
 
-      } catch (messageError) {
-        console.error('❌ Erro ao processar mensagem individual:', messageError)
-        // Continue processando outras mensagens mesmo se uma falhar
+    let contact
+    const { data: existingContact } = await chatSupabase
+      .from('whatsapp_contacts')
+      .select('*')
+      .eq('whatsapp_number', phoneNumber)
+      .maybeSingle()
+
+    if (existingContact) {
+      // Atualizar contato existente
+      const { data: updated } = await chatSupabase
+        .from('whatsapp_contacts')
+        .update({
+          name: contactName || existingContact.name,
+          jid: remoteJid,
+          profile_pic_url: profilePicUrl || existingContact.profile_pic_url,
+          last_message_at: new Date(messageTimestamp).toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingContact.id)
+        .select()
+        .single()
+
+      contact = updated
+      console.log(`✅ Contato atualizado: ${phoneNumber}`)
+    } else {
+      // Criar novo contato
+      const { data: created } = await chatSupabase
+        .from('whatsapp_contacts')
+        .insert({
+          whatsapp_number: phoneNumber,
+          name: contactName,
+          jid: remoteJid,
+          profile_pic_url: profilePicUrl,
+          last_message_at: new Date(messageTimestamp).toISOString()
+        })
+        .select()
+        .single()
+
+      contact = created
+      console.log(`✅ Contato criado: ${phoneNumber}`)
+    }
+
+    if (!contact) {
+      console.error('❌ Erro ao criar/buscar contato')
+      return
+    }
+
+    // 4. Criar/buscar CONVERSA
+    let conversation
+    const { data: existingConversation } = await chatSupabase
+      .from('whatsapp_conversations')
+      .select('*')
+      .eq('instance_name', instanceName)
+      .eq('contact_id', contact.id)
+      .maybeSingle()
+
+    if (existingConversation) {
+      conversation = existingConversation
+      console.log(`✅ Conversa encontrada: ${conversation.id}`)
+    } else {
+      // Criar nova conversa
+      const { data: created } = await chatSupabase
+        .from('whatsapp_conversations')
+        .insert({
+          instance_name: instanceName,
+          connection_id: connection.id,
+          contact_id: contact.id,
+          user_id: connection.user_id
+        })
+        .select()
+        .single()
+
+      conversation = created
+      console.log(`✅ Conversa criada: ${conversation.id}`)
+    }
+
+    if (!conversation) {
+      console.error('❌ Erro ao criar/buscar conversa')
+      return
+    }
+
+    // 5. Verificar DUPLICATA
+    const { data: existingMessage } = await chatSupabase
+      .from('whatsapp_messages')
+      .select('id')
+      .eq('message_id', messageId)
+      .eq('conversation_id', conversation.id)
+      .maybeSingle()
+
+    if (existingMessage) {
+      console.log('ℹ️ Mensagem duplicada ignorada:', messageId)
+      return
+    }
+
+    // 6. Determinar tipo de mensagem e extrair conteúdo
+    let messageType = 'text'
+    let messageContent = ''
+    let mediaUrl = null
+
+    if (message.type === 'text') {
+      messageType = 'text'
+      messageContent = message.text || ''
+    } else if (message.type === 'media') {
+      // Processar mídia baseado no messageType
+      if (message.messageType === 'AudioMessage') {
+        messageType = 'audio'
+        mediaUrl = message.content?.URL || null
+        messageContent = ''
+      } else if (message.messageType === 'ImageMessage') {
+        messageType = 'image'
+        mediaUrl = message.content?.URL || null
+        messageContent = message.text || message.content?.caption || ''
+      } else if (message.messageType === 'VideoMessage') {
+        messageType = 'video'
+        mediaUrl = message.content?.URL || null
+        messageContent = message.text || message.content?.caption || ''
+      } else if (message.messageType === 'DocumentMessage') {
+        messageType = 'document'
+        mediaUrl = message.content?.URL || null
+        messageContent = message.text || message.content?.fileName || ''
       }
     }
 
+    // 7. Salvar MENSAGEM
+    const { data: savedMessage, error: msgError } = await chatSupabase
+      .from('whatsapp_messages')
+      .insert({
+        instance_name: instanceName,
+        connection_id: connection.id,
+        conversation_id: conversation.id,
+        contact_id: contact.id,
+        user_id: connection.user_id,
+        message_id: messageId,
+        from_number: phoneNumber,
+        to_number: phoneNumber,
+        message_type: messageType,
+        message_content: messageContent,
+        media_url: mediaUrl,
+        direction: 'inbound',
+        status: 'received',
+        received_at: new Date(messageTimestamp).toISOString(),
+        metadata: {
+          raw_payload: payload
+        }
+      })
+      .select()
+      .single()
+
+    if (msgError) {
+      console.error('❌ Erro ao salvar mensagem:', msgError)
+      return
+    }
+
+    console.log(`✅ Mensagem salva: ${savedMessage.id} (tipo: ${messageType})`)
+
+    // 8. Atualizar conversa com última mensagem
+    await chatSupabase
+      .from('whatsapp_conversations')
+      .update({
+        last_message_at: new Date(messageTimestamp).toISOString(),
+        last_message_preview: messageContent.substring(0, 100) || `[${messageType}]`,
+        unread_count: (conversation.unread_count || 0) + 1,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', conversation.id)
+
+    // 9. Se for áudio, processar transcrição (assíncrono)
+    if (messageType === 'audio' && mediaUrl) {
+      console.log('🎤 Áudio detectado, iniciando transcrição...')
+      setImmediate(() => {
+        processAudioTranscription(savedMessage.id, mediaUrl).catch(error => {
+          console.error('❌ Erro ao transcrever áudio:', error)
+        })
+      })
+    }
+
+    console.log('✅ Processamento completo!')
+
   } catch (error) {
-    console.error('❌ Erro ao processar MESSAGES_UPSERT:', error)
+    console.error('❌ Erro ao processar mensagem:', error)
+    throw error
   }
 }
 
 /**
- * Processa atualização de QR Code
+ * Processa transcrição de áudio
  */
-async function handleQRCodeUpdate(payload) {
+async function processAudioTranscription(messageId, audioUrl) {
   try {
-    const instanceName = payload.instance
-    const qrCode = payload.data?.qrcode || payload.data?.base64
+    console.log(`🎤 Iniciando transcrição para mensagem: ${messageId}`)
 
-    console.log(`📱 QRCODE_UPDATED: ${instanceName}`)
+    // Usar TranscriptionService
+    const result = await transcriptionService.transcribeAndSave(messageId, audioUrl)
 
-    // Você pode armazenar o QR Code atualizado se necessário
-    // Ou notificar o frontend via WebSocket/SSE
-
-    if (qrCode) {
-      await supabase
-        .from('whatsapp_connections')
-        .update({
-          metadata: {
-            last_qr_update: new Date().toISOString(),
-            qr_code: qrCode // CUIDADO: QR Code é grande, considere não salvar
-          },
-          updated_at: new Date().toISOString()
-        })
-        .eq('instance_name', instanceName)
+    if (result) {
+      console.log(`✅ Transcrição salva com sucesso: ${messageId}`)
+    } else {
+      console.warn(`⚠️ Não foi possível transcrever: ${messageId}`)
     }
 
   } catch (error) {
-    console.error('❌ Erro ao processar QRCODE_UPDATE:', error)
+    console.error('❌ Erro na transcrição:', error)
   }
 }
 
 /**
- * Processa perda de conexão
+ * Processa atualização de status de mensagem
  */
-async function handleConnectionLost(payload) {
+async function handleMessageStatus(payload) {
   try {
-    const instanceName = payload.instance
-
-    console.log(`❌ CONNECTION_LOST: ${instanceName}`)
-
-    await supabase
-      .from('whatsapp_connections')
-      .update({
-        status: 'disconnected',
-        is_connected: false,
-        updated_at: new Date().toISOString()
-      })
-      .eq('instance_name', instanceName)
-
-    // TODO: Notificar usuário sobre perda de conexão
-
+    console.log('📊 Status de mensagem:', payload)
+    // TODO: Implementar atualização de status (delivered, read, etc)
   } catch (error) {
-    console.error('❌ Erro ao processar CONNECTION_LOST:', error)
+    console.error('❌ Erro ao processar status:', error)
   }
 }
 
 /**
- * Helpers
+ * Processa atualização de conexão
  */
-function getMessageType(messageInfo) {
-  if (messageInfo.conversation || messageInfo.extendedTextMessage) return 'text'
-  if (messageInfo.imageMessage) return 'image'
-  if (messageInfo.videoMessage) return 'video'
-  if (messageInfo.audioMessage) return 'audio'
-  if (messageInfo.documentMessage) return 'document'
-  if (messageInfo.stickerMessage) return 'sticker'
-  if (messageInfo.locationMessage) return 'location'
-  if (messageInfo.contactMessage) return 'contact'
-  return 'unknown'
+async function handleConnectionUpdate(payload) {
+  try {
+    console.log('🔄 Atualização de conexão:', payload)
+    // TODO: Implementar atualização de status de conexão
+  } catch (error) {
+    console.error('❌ Erro ao processar conexão:', error)
+  }
 }
 
-function extractMessageContent(messageInfo) {
-  if (messageInfo.conversation) return messageInfo.conversation
-  if (messageInfo.extendedTextMessage?.text) return messageInfo.extendedTextMessage.text
-  if (messageInfo.imageMessage?.caption) return messageInfo.imageMessage.caption
-  if (messageInfo.videoMessage?.caption) return messageInfo.videoMessage.caption
-  return ''
-}
-
-// Método GET para verificar se webhook está funcionando
+/**
+ * GET - Verificar se webhook está funcionando
+ */
 export async function GET() {
   return NextResponse.json({
     status: 'online',
-    message: 'UAZAPI Webhook is running',
-    timestamp: new Date().toISOString()
+    message: 'UazAPI Webhook is running',
+    timestamp: new Date().toISOString(),
+    version: '2.0'
   })
 }
