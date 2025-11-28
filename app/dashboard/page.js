@@ -219,7 +219,7 @@ const loadSubscription = async (userId) => {
   const checkAgentConfig = async (connectionId) => {
     try {
       const { data, error } = await supabase
-        .from('agent_configs')
+        .from('ai_agents')
         .select('id')
         .eq('connection_id', connectionId)
         .maybeSingle()
@@ -1704,7 +1704,7 @@ const handleConfirmPayment = async (e) => {
             </div>
 
             <button
-              onClick={() => router.push('/dashboard/swiftbot-pro')}
+              onClick={() => router.push('/swiftbot-ia')}
               className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold py-3 px-4 rounded-xl hover:shadow-[0_0_20px_rgba(0,255,153,0.3)] transition-all duration-300 flex items-center justify-center gap-2 group-hover:shadow-[0_0_15px_rgba(0,255,153,0.2)]"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
