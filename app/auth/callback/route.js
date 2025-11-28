@@ -3,99 +3,115 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 export async function GET(request) {
+  // Captura a URL de origem e o código
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  
-  // Parâmetro "next" opcional para redirecionamento customizado
   const next = searchParams.get('next') ?? '/dashboard'
 
+  // 🛡️ DEBUG: Verifica se as chaves existem no ambiente do servidor
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    console.error('CRITICAL: Variáveis de ambiente do Supabase não encontradas.')
+    return NextResponse.json({ 
+      error: 'Server Configuration Error', 
+      message: 'Supabase URL or Key missing in Vercel Environment Variables.' 
+    }, { status: 500 })
+  }
+
   if (code) {
-    const cookieStore = await cookies()
+    try {
+      // 🛡️ Tenta acessar os cookies (compatível com Next.js 13, 14 e 15)
+      const cookieStore = await cookies()
 
-    // 1. Cria o cliente Supabase com manipulação correta de cookies para Route Handlers
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      {
-        cookies: {
-          get(name) {
-            return cookieStore.get(name)?.value
+      const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        {
+          cookies: {
+            get(name) {
+              return cookieStore.get(name)?.value
+            },
+            set(name, value, options) {
+              try {
+                cookieStore.set({ name, value, ...options })
+              } catch (err) {
+                // Ignora erro de setar cookies em Server Components se acontecer
+              }
+            },
+            remove(name, options) {
+              try {
+                cookieStore.delete({ name, ...options })
+              } catch (err) {
+                 // Ignora erro
+              }
+            },
           },
-          set(name, value, options) {
-            cookieStore.set({ name, value, ...options })
-          },
-          remove(name, options) {
-            cookieStore.delete({ name, ...options })
-          },
-        },
+        }
+      )
+
+      // Troca o código pela sessão
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+
+      if (error) {
+        console.error('Erro ao trocar código por sessão:', error)
+        return NextResponse.redirect(`${origin}/login?error=auth-exchange-error`)
       }
-    )
-
-    // 2. Troca o código pela sessão (Aqui os cookies são setados)
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-
-    if (!error) {
-      console.log('✅ Auth success! User ID:', data.user?.id)
 
       // ==================================================================
-      // 🧠 SUA LÓGICA DE PERFIL (Mantida e Protegida)
+      // 🧠 LÓGICA DE PERFIL (Protegida)
       // ==================================================================
       try {
-        let { data: profile, error: profileError } = await supabase
-          .from('user_profiles')
-          .select('company_name, full_name, phone')
-          .eq('user_id', data.user.id)
-          .single()
-
-        // Se perfil não existe, cria automaticamente usando metadados do Google/Face
-        if (profileError && profileError.code === 'PGRST116') {
-          console.log('Creating profile from auth metadata...')
-          
-          const newProfile = {
-            user_id: data.user.id,
-            full_name: data.user.user_metadata?.full_name || '',
-            company_name: '', // Google não fornece empresa, deixamos vazio para o usuário preencher
-            phone: '', // Google raramente fornece telefone confiável
-            email: data.user.email,
-            avatar_url: data.user.user_metadata?.avatar_url || '',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-
-          const { data: createdProfile, error: createError } = await supabase
+        if (data?.user) {
+            let { data: profile, error: profileError } = await supabase
             .from('user_profiles')
-            .insert([newProfile])
-            .select()
+            .select('company_name, full_name, phone')
+            .eq('user_id', data.user.id)
             .single()
 
-          if (!createError) {
-            profile = createdProfile
-          }
+            // Cria perfil se não existir (PGRST116 = não encontrado)
+            if (profileError && profileError.code === 'PGRST116') {
+            const newProfile = {
+                user_id: data.user.id,
+                full_name: data.user.user_metadata?.full_name || '',
+                company_name: '',
+                phone: '',
+                email: data.user.email,
+                avatar_url: data.user.user_metadata?.avatar_url || '',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            }
+
+            const { data: createdProfile } = await supabase
+                .from('user_profiles')
+                .insert([newProfile])
+                .select()
+                .single()
+                
+            if (createdProfile) profile = createdProfile
+            }
+
+            // Verifica se precisa completar cadastro
+            const needsCompletion = !profile || 
+                                    !profile.company_name || 
+                                    !profile.full_name ||
+                                    !profile.phone
+
+            if (needsCompletion) {
+               return NextResponse.redirect(`${origin}/complete-profile`)
+            }
         }
-
-        // Verifica se precisa completar cadastro
-        const needsCompletion = !profile || 
-                               !profile.company_name || 
-                               profile.company_name.trim() === '' ||
-                               !profile.full_name ||
-                               profile.full_name.trim() === '' ||
-                               !profile.phone ||
-                               profile.phone.trim() === ''
-
-        if (needsCompletion) {
-          return NextResponse.redirect(`${origin}/complete-profile`)
-        }
-
       } catch (err) {
-        console.error('Erro não crítico na verificação de perfil:', err)
-        // Se der erro no perfil, ainda deixamos o usuário entrar, ele será barrado no dashboard se necessário
+        console.error('Erro não crítico no perfil:', err)
+        // Não bloqueia o login por erro no perfil
       }
 
-      // 3. Sucesso total - Redireciona
       return NextResponse.redirect(`${origin}${next}`)
+
+    } catch (err) {
+      console.error('CRITICAL ERROR in Auth Callback:', err)
+      // Retorna erro visível em vez de 502
+      return NextResponse.json({ error: 'Auth Callback Failed', details: err.message }, { status: 500 })
     }
   }
 
-  // Se houver erro no código ou na troca
-  return NextResponse.redirect(`${origin}/login?error=auth-code-error`)
+  return NextResponse.redirect(`${origin}/login?error=no-code`)
 }
