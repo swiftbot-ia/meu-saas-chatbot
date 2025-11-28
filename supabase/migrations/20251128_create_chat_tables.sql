@@ -32,9 +32,14 @@ CREATE TABLE IF NOT EXISTS whatsapp_contacts (
 -- ============================================
 CREATE TABLE IF NOT EXISTS whatsapp_conversations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  connection_id UUID NOT NULL REFERENCES whatsapp_connections(id) ON DELETE CASCADE,
+
+  -- Link to main database (NO foreign keys - different database)
+  instance_name VARCHAR(255) NOT NULL,
+  connection_id UUID NOT NULL, -- Reference only, no FK constraint
+  user_id UUID NOT NULL, -- Reference only, no FK constraint
+
+  -- Link to contact (same database - FK allowed)
   contact_id UUID NOT NULL REFERENCES whatsapp_contacts(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
 
   -- Conversation state
   unread_count INTEGER DEFAULT 0,
@@ -53,7 +58,7 @@ CREATE TABLE IF NOT EXISTS whatsapp_conversations (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
   -- One conversation per contact per instance
-  UNIQUE(connection_id, contact_id)
+  UNIQUE(instance_name, contact_id)
 );
 
 -- ============================================
@@ -73,6 +78,7 @@ CREATE INDEX IF NOT EXISTS idx_contacts_whatsapp ON whatsapp_contacts(whatsapp_n
 CREATE INDEX IF NOT EXISTS idx_contacts_last_message ON whatsapp_contacts(last_message_at DESC);
 
 -- Conversations indexes
+CREATE INDEX IF NOT EXISTS idx_conversations_instance ON whatsapp_conversations(instance_name);
 CREATE INDEX IF NOT EXISTS idx_conversations_connection ON whatsapp_conversations(connection_id);
 CREATE INDEX IF NOT EXISTS idx_conversations_contact ON whatsapp_conversations(contact_id);
 CREATE INDEX IF NOT EXISTS idx_conversations_user ON whatsapp_conversations(user_id);
@@ -124,16 +130,10 @@ CREATE POLICY "Users can view their own conversations"
   ON whatsapp_conversations FOR SELECT
   USING (user_id = auth.uid());
 
--- Conversations: Users can insert conversations for their connections
-CREATE POLICY "Users can insert conversations for their connections"
+-- Conversations: Users can insert conversations (webhook needs this)
+CREATE POLICY "Users can insert conversations"
   ON whatsapp_conversations FOR INSERT
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM whatsapp_connections
-      WHERE whatsapp_connections.id = whatsapp_conversations.connection_id
-      AND whatsapp_connections.user_id = auth.uid()
-    )
-  );
+  WITH CHECK (user_id = auth.uid());
 
 -- Conversations: Users can update their own conversations
 CREATE POLICY "Users can update their own conversations"
@@ -217,6 +217,7 @@ $$ LANGUAGE plpgsql;
 -- ============================================
 
 CREATE OR REPLACE FUNCTION get_or_create_conversation(
+  p_instance_name VARCHAR,
   p_connection_id UUID,
   p_contact_id UUID,
   p_user_id UUID
@@ -228,13 +229,13 @@ BEGIN
   -- Try to find existing conversation
   SELECT id INTO v_conversation_id
   FROM whatsapp_conversations
-  WHERE connection_id = p_connection_id
+  WHERE instance_name = p_instance_name
   AND contact_id = p_contact_id;
 
   -- If not found, create new conversation
   IF v_conversation_id IS NULL THEN
-    INSERT INTO whatsapp_conversations (connection_id, contact_id, user_id)
-    VALUES (p_connection_id, p_contact_id, p_user_id)
+    INSERT INTO whatsapp_conversations (instance_name, connection_id, contact_id, user_id)
+    VALUES (p_instance_name, p_connection_id, p_contact_id, p_user_id)
     RETURNING id INTO v_conversation_id;
   END IF;
 
