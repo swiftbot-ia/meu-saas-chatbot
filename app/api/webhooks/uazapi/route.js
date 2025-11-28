@@ -10,7 +10,7 @@
 
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/client'
-import { createChatSupabaseClient } from '@/lib/supabase/chat-client'
+import { createChatServiceClient } from '@/lib/supabase/chat-service'
 import transcriptionService from '@/lib/services/TranscriptionService'
 import mediaStorageService from '@/lib/services/MediaStorageService'
 
@@ -92,7 +92,7 @@ async function processWebhookAsync(payload) {
 async function handleIncomingMessage(payload) {
   try {
     const mainSupabase = createServerSupabaseClient()
-    const chatSupabase = createChatSupabaseClient()
+    const chatSupabase = createChatServiceClient()
 
     // Extrair dados do payload UazAPI
     const instanceName = payload.instanceName // ← CORRETO: usar instanceName
