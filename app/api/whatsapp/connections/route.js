@@ -1,10 +1,57 @@
 // app/api/whatsapp/connections/route.js
 // ============================================================================
-// ROTA: Criar Registro Inicial de Conexão WhatsApp
+// ROTA: Gerenciar Conexões WhatsApp
 // ============================================================================
 
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '../../../../lib/supabase/server.js'
+import { createServerSupabaseClient } from '../../../../lib/supabase/server.js'
+
+// ============================================================================
+// GET: Listar conexões do usuário autenticado
+// ============================================================================
+export async function GET(request) {
+  try {
+    const supabase = createServerSupabaseClient()
+
+    // Verificar autenticação
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Não autenticado' },
+        { status: 401 }
+      )
+    }
+
+    // Buscar conexões do usuário
+    const { data: connections, error } = await supabase
+      .from('whatsapp_connections')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('❌ [GetConnections] Erro:', error)
+      return NextResponse.json(
+        { success: false, error: 'Erro ao buscar conexões' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      connections: connections || []
+    })
+
+  } catch (error) {
+    console.error('❌ [GetConnections] Erro:', error)
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    )
+  }
+}
 
 // ============================================================================
 // POST: Criar registro inicial de conexão no Supabase
