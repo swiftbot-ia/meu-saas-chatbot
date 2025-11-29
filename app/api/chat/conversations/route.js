@@ -4,12 +4,14 @@
  */
 
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { createServerSupabaseClient } from '@/lib/supabase/client';
 import ConversationService from '@/lib/ConversationService';
 
 export async function GET(request) {
   try {
-    const supabase = createServerSupabaseClient();
+    const cookieStore = await cookies();
+    const supabase = createServerSupabaseClient(cookieStore);
 
     // Get authenticated user
     const { data: { session }, error: authError } = await supabase.auth.getSession();
