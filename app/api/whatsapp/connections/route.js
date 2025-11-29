@@ -1,10 +1,75 @@
 // app/api/whatsapp/connections/route.js
 // ============================================================================
-// ROTA: Criar Registro Inicial de Conexão WhatsApp
+// ROTA: Gerenciar Conexões WhatsApp
 // ============================================================================
 
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '../../../../lib/supabase/server.js'
+import { createClient } from '@supabase/supabase-js'
+import { cookies } from 'next/headers'
+
+// ============================================================================
+// GET: Buscar todas as conexões do usuário
+// ============================================================================
+export async function GET(request) {
+  try {
+    // Obter o cookie de autenticação
+    const cookieStore = await cookies()
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+    // Criar cliente Supabase com o cookie do usuário
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          cookie: cookieStore.toString()
+        }
+      }
+    })
+
+    // Obter usuário autenticado
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      console.error('❌ [GetConnections] Usuário não autenticado:', authError)
+      return NextResponse.json(
+        { success: false, error: 'Não autenticado' },
+        { status: 401 }
+      )
+    }
+
+    console.log('📥 [GetConnections] Buscando conexões para usuário:', user.id)
+
+    // Buscar todas as conexões do usuário
+    const { data: connections, error: fetchError } = await supabaseAdmin
+      .from('whatsapp_connections')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+
+    if (fetchError) {
+      console.error('❌ [GetConnections] Erro ao buscar conexões:', fetchError)
+      return NextResponse.json(
+        { success: false, error: 'Erro ao buscar conexões' },
+        { status: 500 }
+      )
+    }
+
+    console.log('✅ [GetConnections] Conexões encontradas:', connections?.length || 0)
+
+    return NextResponse.json({
+      success: true,
+      connections: connections || []
+    })
+
+  } catch (error) {
+    console.error('❌ [GetConnections] Erro:', error)
+    return NextResponse.json({
+      success: false,
+      error: 'Erro ao buscar conexões: ' + error.message
+    }, { status: 500 })
+  }
+}
 
 // ============================================================================
 // POST: Criar registro inicial de conexão no Supabase
