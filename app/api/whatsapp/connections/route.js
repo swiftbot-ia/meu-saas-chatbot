@@ -1,10 +1,63 @@
 // app/api/whatsapp/connections/route.js
 // ============================================================================
-// ROTA: Criar Registro Inicial de Conexão WhatsApp
+// ROTA: Conexões WhatsApp
 // ============================================================================
 
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '../../../../lib/supabase/server.js'
+import { createServerSupabaseClient } from '@/lib/supabase/client'
+
+// ============================================================================
+// GET: Listar todas as conexões do usuário autenticado
+// ============================================================================
+export async function GET(request) {
+  try {
+    const supabase = createServerSupabaseClient()
+
+    // Get authenticated user
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
+
+    if (authError || !session) {
+      return NextResponse.json(
+        { error: 'Não autenticado' },
+        { status: 401 }
+      )
+    }
+
+    const userId = session.user.id
+
+    console.log('📥 [ListConnections] Buscando conexões para userId:', userId)
+
+    // Buscar todas as conexões do usuário
+    const { data: connections, error } = await supabaseAdmin
+      .from('whatsapp_connections')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('❌ [ListConnections] Erro ao buscar conexões:', error)
+      return NextResponse.json(
+        { error: 'Erro ao buscar conexões' },
+        { status: 500 }
+      )
+    }
+
+    console.log(`✅ [ListConnections] Encontradas ${connections?.length || 0} conexões`)
+
+    return NextResponse.json({
+      success: true,
+      connections: connections || []
+    })
+
+  } catch (error) {
+    console.error('❌ [ListConnections] Erro:', error)
+    return NextResponse.json(
+      { error: 'Erro ao listar conexões: ' + error.message },
+      { status: 500 }
+    )
+  }
+}
 
 // ============================================================================
 // POST: Criar registro inicial de conexão no Supabase
