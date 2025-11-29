@@ -5,7 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '../../../../lib/supabase/server.js'
-import { createClient } from '@supabase/supabase-js'
+import { createServerSupabaseClient } from '../../../../lib/supabase/client.js'
 import { cookies } from 'next/headers'
 
 // ============================================================================
@@ -15,17 +15,7 @@ export async function GET(request) {
   try {
     // Obter o cookie de autenticação
     const cookieStore = await cookies()
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-    // Criar cliente Supabase com o cookie do usuário
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          cookie: cookieStore.toString()
-        }
-      }
-    })
+    const supabase = createServerSupabaseClient(cookieStore)
 
     // Obter usuário autenticado
     const { data: { user }, error: authError } = await supabase.auth.getUser()
