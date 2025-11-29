@@ -23,6 +23,14 @@ export default function ChatPage() {
     loadConnections();
   }, []);
 
+  // Save selected connection to localStorage whenever it changes
+  useEffect(() => {
+    if (selectedConnection) {
+      localStorage.setItem('swiftbot_selected_connection', selectedConnection);
+      console.log('💾 Salvando conexão no localStorage:', selectedConnection);
+    }
+  }, [selectedConnection]);
+
   // Load conversations when connection is selected
   useEffect(() => {
     if (selectedConnection) {
@@ -36,23 +44,44 @@ export default function ChatPage() {
 
   const loadConnections = async () => {
     try {
+      console.log('🔄 [ChatPage] Carregando conexões...');
       const response = await fetch('/api/whatsapp/connections');
       const data = await response.json();
+
+      console.log('📥 [ChatPage] Resposta da API:', data);
 
       if (!response.ok) {
         throw new Error(data.error || 'Erro ao carregar conexões');
       }
 
-      setConnections(data.connections || []);
+      const fetchedConnections = data.connections || [];
+      console.log('✅ [ChatPage] Conexões recebidas:', fetchedConnections.length);
+      setConnections(fetchedConnections);
 
-      // Auto-select first connected instance
-      const connectedInstance = data.connections?.find(c => c.is_connected);
-      if (connectedInstance) {
-        setSelectedConnection(connectedInstance.id);
+      // Try to restore previously selected connection from localStorage
+      const savedConnectionId = localStorage.getItem('swiftbot_selected_connection');
+      console.log('💾 [ChatPage] Conexão salva no localStorage:', savedConnectionId);
+
+      if (savedConnectionId && fetchedConnections.find(c => c.id === savedConnectionId)) {
+        // Use saved connection if it still exists
+        console.log('✅ [ChatPage] Restaurando conexão salva:', savedConnectionId);
+        setSelectedConnection(savedConnectionId);
+      } else {
+        // Auto-select first connected instance
+        const connectedInstance = fetchedConnections.find(c => c.is_connected);
+        console.log('🔍 [ChatPage] Primeira conexão ativa:', connectedInstance?.id);
+
+        if (connectedInstance) {
+          setSelectedConnection(connectedInstance.id);
+        } else if (fetchedConnections.length > 0) {
+          // If no connected instance, select the first one
+          console.log('⚠️ [ChatPage] Nenhuma conexão ativa, selecionando primeira:', fetchedConnections[0].id);
+          setSelectedConnection(fetchedConnections[0].id);
+        }
       }
 
     } catch (err) {
-      console.error('Erro ao carregar conexões:', err);
+      console.error('❌ [ChatPage] Erro ao carregar conexões:', err);
       setError('Erro ao carregar conexões do WhatsApp');
     } finally {
       setLoading(false);
