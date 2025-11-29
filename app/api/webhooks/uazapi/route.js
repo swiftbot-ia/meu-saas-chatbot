@@ -107,15 +107,38 @@ async function handleIncomingMessage(payload) {
 
     console.log(`💬 Processando mensagem: ${message.messageid}`)
 
-    // 1. Buscar conexão pelo numeroInstancia (instanceName)
-    const { data: connection, error: connError } = await mainSupabase
-      .from('whatsapp_connections')
-      .select('id, user_id, instance_name')
-      .eq('instance_name', instanceName) // ← CORRETO: buscar por instance_name
-      .single()
+    // 1. Buscar conexão pelo instance_name (pode ser ID único ou nome amigável)
+    let connection = null
 
-    if (connError || !connection) {
+    // Primeiro: tentar por instance_name (ID único, ex: swiftbot_abc-123)
+    const { data: connByInstanceName } = await mainSupabase
+      .from('whatsapp_connections')
+      .select('id, user_id, instance_name, friendly_name')
+      .eq('instance_name', instanceName)
+      .maybeSingle()
+
+    if (connByInstanceName) {
+      connection = connByInstanceName
+      console.log(`✅ Conexão encontrada por instance_name: ${connection.instance_name}`)
+    } else {
+      // Fallback: tentar por friendly_name (nome amigável, ex: "JTS Equipamentos")
+      console.log(`⚠️ Não encontrado por instance_name, tentando por friendly_name: ${instanceName}`)
+
+      const { data: connByFriendlyName } = await mainSupabase
+        .from('whatsapp_connections')
+        .select('id, user_id, instance_name, friendly_name')
+        .eq('friendly_name', instanceName)
+        .maybeSingle()
+
+      if (connByFriendlyName) {
+        connection = connByFriendlyName
+        console.log(`✅ Conexão encontrada por friendly_name: ${connection.friendly_name} (instance: ${connection.instance_name})`)
+      }
+    }
+
+    if (!connection) {
       console.warn(`⚠️ Conexão não encontrada: ${instanceName}`)
+      console.warn('💡 Verifique se instance_name ou friendly_name existe no banco')
       return
     }
 
