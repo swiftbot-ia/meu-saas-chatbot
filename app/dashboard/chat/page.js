@@ -171,42 +171,93 @@ export default function ChatPage() {
     );
   }
 
+  // Get selected connection object
+  const activeConnection = connections.find(c => c.id === selectedConnection);
+
   // Main chat interface
   return (
-    <div className="flex h-screen bg-white">
-      {/* Connection selector (if multiple connections) */}
-      {connections.length > 1 && (
-        <div className="w-64 border-r bg-gray-50 p-4">
-          <h3 className="font-semibold text-gray-700 mb-3">Instâncias</h3>
-          <div className="space-y-2">
-            {connections.map((connection) => (
-              <button
-                key={connection.id}
-                onClick={() => setSelectedConnection(connection.id)}
-                className={`w-full text-left p-3 rounded-lg transition-colors ${
-                  selectedConnection === connection.id
-                    ? 'bg-green-500 text-white'
-                    : 'bg-white hover:bg-gray-100 text-gray-700'
-                }`}
+    <div className="flex h-screen bg-[#0A0A0A]">
+      {/* Left Sidebar - Connection Selector */}
+      <div className="w-80 bg-[#111111] border-r border-[#2A2A2A] flex flex-col">
+        {/* Connection Selector Header */}
+        <div className="p-6 border-b border-[#2A2A2A]">
+          <div className="flex items-center gap-3 mb-4">
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg, rgb(16, 229, 124) 0%, rgb(0, 191, 255) 100%)' }}
+            >
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-white">Conexão Ativa</h3>
+          </div>
+
+          {/* Active Connection Display */}
+          {activeConnection && (
+            <div className="bg-[#0A0A0A] hover:bg-black rounded-xl p-4 transition-all duration-300 border border-[#2A2A2A]">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0">
+                  {activeConnection.profile_pic_url ? (
+                    <img
+                      alt={activeConnection.profile_name || activeConnection.instance_name}
+                      className="w-12 h-12 rounded-full object-cover"
+                      src={activeConnection.profile_pic_url}
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold text-lg">
+                      {(activeConnection.profile_name || activeConnection.instance_name || 'W')[0].toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div className="text-left flex-1">
+                  <p className="text-[15px] font-medium text-white">
+                    {activeConnection.profile_name || activeConnection.instance_name}
+                  </p>
+                  <p className="text-[13px] text-[#8696A0]">
+                    {activeConnection.phone_number_id}
+                  </p>
+                </div>
+              </div>
+
+              {/* Connection Status */}
+              <div className="flex items-center gap-2 mt-3">
+                <div className={`w-2.5 h-2.5 rounded-full ${activeConnection.is_connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <span className="text-sm text-[#B0B0B0]">
+                  {activeConnection.is_connected ? 'Conectado' : 'Desconectado'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Multiple connections dropdown */}
+          {connections.length > 1 && (
+            <div className="mt-4">
+              <select
+                value={selectedConnection || ''}
+                onChange={(e) => setSelectedConnection(e.target.value)}
+                className="w-full bg-[#0A0A0A] text-white border border-[#2A2A2A] rounded-xl px-4 py-3 focus:outline-none focus:border-[#00BFD8] transition-colors"
               >
-                <div className="font-medium">
-                  {connection.profile_name || connection.instance_name}
-                </div>
-                <div className="text-sm opacity-75">
-                  {connection.phone_number_id}
-                </div>
-                <div className={`text-xs mt-1 ${
-                  connection.is_connected ? 'text-green-200' : 'text-red-300'
-                }`}>
-                  {connection.is_connected ? '● Conectado' : '○ Desconectado'}
-                </div>
-              </button>
-            ))}
+                {connections.map((connection) => (
+                  <option key={connection.id} value={connection.id}>
+                    {connection.profile_name || connection.instance_name} {connection.is_connected ? '●' : '○'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* Stats or Additional Info */}
+        <div className="p-6">
+          <div className="bg-[#0A0A0A] rounded-xl p-4 border border-[#2A2A2A]">
+            <div className="text-sm text-[#8696A0] mb-2">Conversas Ativas</div>
+            <div className="text-2xl font-bold text-white">{conversations.length}</div>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Conversations list */}
+      {/* Conversations list - WhatsApp Dark Style */}
       <div className="w-96">
         <ConversationList
           conversations={conversations}
@@ -225,12 +276,12 @@ export default function ChatPage() {
 
       {/* Error toast */}
       {error && (
-        <div className="fixed bottom-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-2">
+        <div className="fixed bottom-4 right-4 bg-red-900/90 text-white px-6 py-3 rounded-xl shadow-lg flex items-center space-x-2 border border-red-700">
           <AlertCircle size={20} />
           <span>{error}</span>
           <button
             onClick={() => setError(null)}
-            className="ml-4 hover:bg-red-600 px-2 py-1 rounded"
+            className="ml-4 hover:bg-red-800 px-2 py-1 rounded transition-colors"
           >
             ✕
           </button>

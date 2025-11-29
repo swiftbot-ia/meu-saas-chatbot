@@ -18,11 +18,11 @@ export default function MessageBubble({ message, isOwn }) {
     switch (message.message_type) {
       case 'image':
         return (
-          <div className="mb-2">
+          <div className="mb-1">
             <img
               src={message.media_url}
               alt="Imagem"
-              className="max-w-xs rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+              className="max-w-xs rounded-md cursor-pointer hover:opacity-90 transition-opacity"
               onClick={() => window.open(message.media_url, '_blank')}
             />
           </div>
@@ -30,18 +30,18 @@ export default function MessageBubble({ message, isOwn }) {
 
       case 'video':
         return (
-          <div className="mb-2">
+          <div className="mb-1">
             <video
               src={message.media_url}
               controls
-              className="max-w-xs rounded-lg"
+              className="max-w-xs rounded-md"
             />
           </div>
         );
 
       case 'audio':
         return (
-          <div className="mb-2">
+          <div className="mb-1">
             <audio src={message.media_url} controls className="w-64" />
           </div>
         );
@@ -52,7 +52,11 @@ export default function MessageBubble({ message, isOwn }) {
             href={message.media_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center p-3 bg-white/10 rounded-lg border border-white/20 hover:bg-white/20 transition-colors mb-2"
+            className={`flex items-center p-3 rounded-lg transition-colors mb-1 ${
+              isOwn
+                ? 'bg-[#056162] hover:bg-[#056162]/90'
+                : 'bg-[#1F1F1F] hover:bg-[#2A2A2A]'
+            }`}
           >
             <FileText className="w-6 h-6 mr-3" />
             <span className="font-medium">Documento</span>
@@ -87,23 +91,23 @@ export default function MessageBubble({ message, isOwn }) {
     if (!isOwn) return null;
 
     if (message.status === 'read') {
-      return <CheckCheck size={16} className="text-blue-400" />;
+      return <CheckCheck size={16} className="text-[#53BDEB]" />;
     } else if (message.status === 'delivered') {
-      return <CheckCheck size={16} />;
+      return <CheckCheck size={16} className="text-[#8696A0]" />;
     } else if (message.status === 'sent') {
-      return <Check size={16} />;
+      return <Check size={16} className="text-[#8696A0]" />;
     }
 
     return null;
   };
 
   return (
-    <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-3`}>
+    <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-1`}>
       <div
-        className={`max-w-md px-4 py-2 rounded-2xl shadow-sm ${
+        className={`max-w-md px-3 py-2 rounded-lg shadow-sm ${
           isOwn
-            ? 'bg-green-500 text-white rounded-br-none'
-            : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none'
+            ? 'bg-[#005C4B] text-white rounded-tr-sm'
+            : 'bg-[#202C33] text-[#E9EDEF] rounded-tl-sm'
         }`}
       >
         {/* Media content */}
@@ -111,17 +115,17 @@ export default function MessageBubble({ message, isOwn }) {
 
         {/* Text content */}
         {message.message_content && (
-          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+          <p className="whitespace-pre-wrap break-words text-[14.2px] leading-[19px]">
             {renderMediaIcon()}
             {message.message_content}
           </p>
         )}
 
         {/* Timestamp and status */}
-        <div className="flex items-center justify-end mt-1 space-x-1">
+        <div className="flex items-center justify-end mt-1 space-x-1 min-w-[60px]">
           <span
-            className={`text-xs ${
-              isOwn ? 'text-green-100' : 'text-gray-500'
+            className={`text-[11px] ${
+              isOwn ? 'text-[#8696A0]' : 'text-[#8696A0]'
             }`}
           >
             {formatTime(message.received_at)}

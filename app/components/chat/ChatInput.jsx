@@ -66,7 +66,7 @@ export default function ChatInput({ onSend, disabled = false }) {
   };
 
   return (
-    <div className="border-t bg-white p-4">
+    <div className="border-t border-[#2A2A2A] bg-[#1F1F1F] p-4">
       <form onSubmit={handleSubmit} className="flex items-end space-x-2">
         {/* File input (hidden) */}
         <input
@@ -78,29 +78,31 @@ export default function ChatInput({ onSend, disabled = false }) {
           disabled={sending || disabled}
         />
 
-        {/* Attachment button */}
+        {/* Plus button (for actions menu - simplified to attachment) */}
         <button
           type="button"
           onClick={handleFileSelect}
           disabled={sending || disabled}
-          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="p-2.5 text-[#8696A0] hover:text-[#E9EDEF] hover:bg-[#2A2A2A] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title="Anexar arquivo"
         >
-          <Paperclip size={20} />
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
         </button>
 
         {/* Message input */}
-        <div className="flex-1">
+        <div className="flex-1 bg-[#2A2A2A] rounded-lg flex items-center px-3 py-2">
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Digite uma mensagem..."
+            placeholder="Escrever uma mensagem"
             disabled={sending || disabled}
             rows={1}
-            className="w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 bg-transparent text-[#E9EDEF] placeholder-[#8696A0] focus:outline-none resize-none disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
-              minHeight: '40px',
+              minHeight: '24px',
               maxHeight: '120px'
             }}
             onInput={(e) => {
@@ -108,27 +110,45 @@ export default function ChatInput({ onSend, disabled = false }) {
               e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
             }}
           />
+
+          {/* Emoji button */}
+          <button
+            type="button"
+            className="p-1 text-[#8696A0] hover:text-[#E9EDEF] transition-colors"
+            title="Emoji"
+          >
+            <Smile size={20} />
+          </button>
         </div>
 
-        {/* Send button */}
-        <button
-          type="submit"
-          disabled={!message.trim() || sending || disabled}
-          className="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-green-500"
-          title="Enviar mensagem"
-        >
-          {sending ? (
-            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <Send size={20} />
-          )}
-        </button>
+        {/* Send/Mic button */}
+        {message.trim() ? (
+          <button
+            type="submit"
+            disabled={sending || disabled}
+            className="p-2.5 bg-[#00A884] text-[#111] rounded-full hover:bg-[#00A884]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Enviar mensagem"
+          >
+            {sending ? (
+              <div className="w-6 h-6 border-2 border-[#111] border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Send size={20} />
+            )}
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={disabled}
+            className="p-2.5 text-[#8696A0] hover:text-[#E9EDEF] hover:bg-[#2A2A2A] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Gravar áudio"
+          >
+            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+              <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+            </svg>
+          </button>
+        )}
       </form>
-
-      {/* Info text */}
-      <p className="text-xs text-gray-500 mt-2 px-2">
-        Enter para enviar, Shift+Enter para nova linha
-      </p>
     </div>
   );
 }

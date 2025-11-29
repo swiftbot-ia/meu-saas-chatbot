@@ -63,13 +63,16 @@ export default function MessageList({
 
   if (messages.length === 0 && !loading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-50">
+      <div className="flex-1 flex items-center justify-center bg-[#0A0A0A]" style={{
+        backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' viewBox=\'0 0 100 100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M50 10 L60 30 L80 30 L65 45 L70 65 L50 50 L30 65 L35 45 L20 30 L40 30 Z\' fill=\'%23ffffff\' opacity=\'0.02\'/%3E%3C/svg%3E")',
+        backgroundSize: '100px 100px'
+      }}>
         <div className="text-center">
           <div className="text-6xl mb-4">💬</div>
-          <p className="text-gray-500 text-lg font-medium">
+          <p className="text-[#E9EDEF] text-lg font-medium">
             Nenhuma mensagem ainda
           </p>
-          <p className="text-gray-400 text-sm mt-2">
+          <p className="text-[#8696A0] text-sm mt-2">
             Envie uma mensagem para começar a conversa
           </p>
         </div>
@@ -81,17 +84,21 @@ export default function MessageList({
     <div
       ref={scrollRef}
       onScroll={handleScroll}
-      className="flex-1 overflow-y-auto bg-gray-50 p-4 scroll-smooth"
+      className="flex-1 overflow-y-auto bg-[#0A0A0A] p-4 scroll-smooth scrollbar-thin scrollbar-thumb-[#2A2A2A] scrollbar-track-transparent"
+      style={{
+        backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' viewBox=\'0 0 100 100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M50 10 L60 30 L80 30 L65 45 L70 65 L50 50 L30 65 L35 45 L20 30 L40 30 Z\' fill=\'%23ffffff\' opacity=\'0.02\'/%3E%3C/svg%3E")',
+        backgroundSize: '100px 100px'
+      }}
     >
       {/* Load more indicator */}
       {hasMore && (
         <div className="flex justify-center mb-4">
           {loading ? (
-            <Loader2 className="animate-spin text-gray-400" size={24} />
+            <Loader2 className="animate-spin text-[#8696A0]" size={24} />
           ) : (
             <button
               onClick={onLoadMore}
-              className="text-sm text-gray-500 hover:text-gray-700 hover:underline"
+              className="text-sm text-[#8696A0] hover:text-[#E9EDEF] hover:underline bg-[#1F1F1F] px-4 py-2 rounded-full"
             >
               Carregar mensagens antigas
             </button>
@@ -110,7 +117,7 @@ export default function MessageList({
               {/* Date divider */}
               {showDateDivider && (
                 <div className="flex items-center justify-center my-4">
-                  <div className="bg-gray-200 text-gray-600 text-xs px-3 py-1 rounded-full">
+                  <div className="bg-[#1F1F1F] text-[#E9EDEF] text-xs px-3 py-1.5 rounded-lg shadow-sm">
                     {formatDate(message.received_at)}
                   </div>
                 </div>
@@ -126,7 +133,7 @@ export default function MessageList({
       {/* Loading indicator */}
       {loading && messages.length === 0 && (
         <div className="flex items-center justify-center h-full">
-          <Loader2 className="animate-spin text-gray-400" size={32} />
+          <Loader2 className="animate-spin text-[#8696A0]" size={32} />
         </div>
       )}
 
@@ -134,7 +141,7 @@ export default function MessageList({
       {!autoScroll && (
         <button
           onClick={scrollToBottom}
-          className="fixed bottom-24 right-8 bg-green-500 text-white p-3 rounded-full shadow-lg hover:bg-green-600 transition-colors"
+          className="fixed bottom-24 right-8 bg-[#00A884] text-white p-3 rounded-full shadow-lg hover:bg-[#00A884]/90 transition-colors"
           title="Ir para o final"
         >
           <svg

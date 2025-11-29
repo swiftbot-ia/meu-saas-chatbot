@@ -195,13 +195,16 @@ export default function ChatWindow({
 
   if (!conversation) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-50">
+      <div className="flex-1 flex items-center justify-center bg-[#0A0A0A]" style={{
+        backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' viewBox=\'0 0 100 100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M50 10 L60 30 L80 30 L65 45 L70 65 L50 50 L30 65 L35 45 L20 30 L40 30 Z\' fill=\'%23ffffff\' opacity=\'0.02\'/%3E%3C/svg%3E")',
+        backgroundSize: '100px 100px'
+      }}>
         <div className="text-center">
           <div className="text-6xl mb-4">💬</div>
-          <p className="text-gray-500 text-lg font-medium">
+          <p className="text-[#E9EDEF] text-lg font-medium">
             Selecione uma conversa
           </p>
-          <p className="text-gray-400 text-sm mt-2">
+          <p className="text-[#8696A0] text-sm mt-2 max-w-md">
             Escolha uma conversa da lista para começar a enviar mensagens
           </p>
         </div>
@@ -210,9 +213,9 @@ export default function ChatWindow({
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full">
-      {/* Header */}
-      <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
+    <div className="flex-1 flex flex-col h-full bg-[#0A0A0A]">
+      {/* Header - WhatsApp Dark Style */}
+      <div className="bg-[#1F1F1F] border-b border-[#2A2A2A] px-4 py-3 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           {/* Avatar */}
           {conversation.contact?.profile_pic_url ? (
@@ -222,17 +225,17 @@ export default function ChatWindow({
               className="w-10 h-10 rounded-full object-cover"
             />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-white font-semibold">
+            <div className="w-10 h-10 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold">
               {(conversation.contact?.name || conversation.contact?.whatsapp_number || '?')[0].toUpperCase()}
             </div>
           )}
 
           {/* Info */}
           <div>
-            <h3 className="font-semibold text-gray-900">
+            <h3 className="font-medium text-[#E9EDEF]">
               {conversation.contact?.name || conversation.contact?.whatsapp_number}
             </h3>
-            <p className="text-sm text-gray-500 flex items-center">
+            <p className="text-sm text-[#8696A0] flex items-center">
               <Phone size={12} className="mr-1" />
               {conversation.contact?.whatsapp_number}
             </p>
@@ -245,23 +248,23 @@ export default function ChatWindow({
           <div className="relative">
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              className="p-2 hover:bg-[#2A2A2A] rounded-full transition-colors"
             >
-              <MoreVertical size={20} className="text-gray-600" />
+              <MoreVertical size={20} className="text-[#8696A0]" />
             </button>
 
             {showMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border z-10">
+              <div className="absolute right-0 mt-2 w-48 bg-[#1F1F1F] rounded-lg shadow-lg border border-[#2A2A2A] z-10">
                 <button
                   onClick={handleArchive}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-700"
+                  className="w-full px-4 py-2 text-left hover:bg-[#2A2A2A] flex items-center space-x-2 text-[#E9EDEF] rounded-t-lg"
                 >
                   <Archive size={16} />
                   <span>Arquivar</span>
                 </button>
                 <button
                   onClick={handleDelete}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-red-600"
+                  className="w-full px-4 py-2 text-left hover:bg-[#2A2A2A] flex items-center space-x-2 text-red-400 rounded-b-lg"
                 >
                   <Trash2 size={16} />
                   <span>Deletar</span>
@@ -274,9 +277,9 @@ export default function ChatWindow({
           {onClose && (
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors md:hidden"
+              className="p-2 hover:bg-[#2A2A2A] rounded-full transition-colors md:hidden"
             >
-              <X size={20} className="text-gray-600" />
+              <X size={20} className="text-[#8696A0]" />
             </button>
           )}
         </div>
@@ -300,8 +303,8 @@ export default function ChatWindow({
 
       {/* Disconnected warning */}
       {!conversation.connection?.is_connected && (
-        <div className="bg-yellow-50 border-t border-yellow-200 px-4 py-2 text-center">
-          <p className="text-sm text-yellow-800">
+        <div className="bg-yellow-900/20 border-t border-yellow-700/50 px-4 py-2 text-center">
+          <p className="text-sm text-yellow-400">
             ⚠️ WhatsApp desconectado. Reconecte para enviar mensagens.
           </p>
         </div>
