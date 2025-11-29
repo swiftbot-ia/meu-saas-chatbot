@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { supabaseAdmin } from '../../../../lib/supabase/server.js'
 import { createServerSupabaseClient } from '@/lib/supabase/client'
 
@@ -12,7 +13,8 @@ import { createServerSupabaseClient } from '@/lib/supabase/client'
 // ============================================================================
 export async function GET(request) {
   try {
-    const supabase = createServerSupabaseClient()
+    const cookieStore = await cookies()
+    const supabase = createServerSupabaseClient(cookieStore)
 
     // Get authenticated user
     const { data: { session }, error: authError } = await supabase.auth.getSession()
