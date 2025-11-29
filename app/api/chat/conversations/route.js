@@ -10,6 +10,8 @@ import ConversationService from '@/lib/ConversationService';
 
 export async function GET(request) {
   try {
+    console.log('🔄 [Conversations] Iniciando requisição...');
+
     const cookieStore = await cookies();
     const supabase = createServerSupabaseClient(cookieStore);
 
@@ -25,6 +27,7 @@ export async function GET(request) {
     }
 
     const userId = user.id;
+    console.log('✅ [Conversations] Usuário autenticado:', userId);
 
     // Get query params
     const { searchParams } = new URL(request.url);
@@ -36,6 +39,7 @@ export async function GET(request) {
     console.log('📥 [Conversations] Params:', { userId, connectionId, search, limit, offset });
 
     // List conversations
+    console.log('🔍 [Conversations] Buscando conversas...');
     const result = await ConversationService.listConversations(userId, {
       connectionId,
       search,
@@ -43,7 +47,11 @@ export async function GET(request) {
       offset
     });
 
-    console.log('✅ [Conversations] Result:', { count: result.conversations?.length });
+    console.log('✅ [Conversations] Conversas encontradas:', {
+      count: result.conversations?.length,
+      total: result.total,
+      hasMore: result.hasMore
+    });
 
     return NextResponse.json(result);
 
