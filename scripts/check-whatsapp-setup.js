@@ -64,7 +64,7 @@ async function runDiagnostics() {
 
     const { data: connections, error: connError, count: connCount } = await mainSupabase
       .from('whatsapp_connections')
-      .select('id, user_id, instance_name, phone_number_id, status, is_connected, created_at', { count: 'exact' })
+      .select('id, user_id, instance_name, phone_number, status, is_connected, created_at', { count: 'exact' })
       .order('created_at', { ascending: false });
 
     if (connError) {
@@ -83,7 +83,7 @@ async function runDiagnostics() {
           console.log(`\n   ${i + 1}. ID: ${conn.id}`);
           console.log(`      User ID: ${conn.user_id}`);
           console.log(`      Instance Name: ${conn.instance_name}`);
-          console.log(`      Phone: ${conn.phone_number_id || 'N/A'}`);
+          console.log(`      Phone: ${conn.phone_number || 'N/A'}`);
           console.log(`      Status: ${conn.status}`);
           console.log(`      Conectado: ${conn.is_connected ? '✅ Sim' : '❌ Não'}`);
           console.log(`      Criado em: ${new Date(conn.created_at).toLocaleString('pt-BR')}`);
