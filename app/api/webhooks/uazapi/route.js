@@ -16,11 +16,49 @@ import MessageService from '@/lib/MessageService'
 import { createChatSupabaseAdminClient } from '@/lib/supabase/chat-server'
 
 /**
+ * Transform UAZAPI payload to Evolution API format
+ */
+function transformUazApiPayload(payload) {
+  // Check if it's UAZAPI format (has EventType, instanceName, message)
+  if (payload.EventType && payload.instanceName && payload.message) {
+    const msg = payload.message
+
+    // Extract message ID (remove owner prefix if present)
+    const messageId = msg.id ? msg.id.split(':').pop() : msg.messageid || ''
+
+    // Transform to Evolution API format
+    return {
+      event: payload.EventType === 'messages' ? 'MESSAGES_UPSERT' : payload.EventType.toUpperCase(),
+      instance: payload.instanceName,
+      data: {
+        key: {
+          remoteJid: msg.chatid || msg.sender,
+          fromMe: msg.fromMe || false,
+          id: messageId
+        },
+        message: {
+          conversation: msg.text || msg.content || '',
+          extendedTextMessage: msg.text ? { text: msg.text } : undefined
+        },
+        messageTimestamp: Math.floor((msg.messageTimestamp || Date.now()) / 1000),
+        pushName: msg.senderName || ''
+      }
+    }
+  }
+
+  // Already in Evolution API format
+  return payload
+}
+
+/**
  * POST - Processar eventos do webhook
  */
 export async function POST(request) {
   try {
-    const payload = await request.json()
+    const rawPayload = await request.json()
+
+    // Transform UAZAPI format to Evolution API format
+    const payload = transformUazApiPayload(rawPayload)
 
     console.log('📨 Webhook recebido da UAZAPI:', {
       event: payload.event,
