@@ -256,6 +256,54 @@ async function handleMessageReceived(payload) {
         url: messageData.content?.URL,
         fileName: messageData.content?.fileName || '',
         mimetype: messageData.content?.mimetype
+    // Processar cada mensagem
+    const messages = Array.isArray(messageData) ? messageData : [messageData]
+
+    for (const message of messages) {
+      try {
+        console.log('🔍 DEBUG - Processando mensagem:', {
+          instanceName,
+          connectionId: connection.id,
+          userId: connection.user_id,
+          messageId: message.key?.id,
+          fromMe: message.key?.fromMe,
+          remoteJid: message.key?.remoteJid,
+          hasMessage: !!message.message,
+          messageType: message.message ? Object.keys(message.message)[0] : 'unknown'
+        })
+
+        // Use MessageService to process incoming message
+        // This will automatically create/update contact and conversation
+        const savedMessage = await MessageService.processIncomingMessage(
+          message,
+          instanceName,
+          connection.id,
+          connection.user_id
+        )
+
+        if (savedMessage) {
+          console.log(`✅ Mensagem processada e salva:`, {
+            message_id: savedMessage.message_id,
+            conversation_id: savedMessage.conversation_id,
+            contact_id: savedMessage.contact_id,
+            message_type: savedMessage.message_type,
+            direction: savedMessage.direction
+          })
+        } else {
+          console.log(`ℹ️ Mensagem ignorada (provavelmente enviada por nós)`)
+        }
+
+        // TODO: Implementar lógica de resposta automática/bot se necessário
+
+      } catch (messageError) {
+        console.error('❌ ERRO DETALHADO ao processar mensagem:', {
+          error: messageError.message,
+          code: messageError.code,
+          hint: messageError.hint,
+          details: messageError.details,
+          stack: messageError.stack
+        })
+        // Continue processando outras mensagens mesmo se uma falhar
       }
     }
 
