@@ -7,10 +7,26 @@ import LeadModal from './components/LeadModal';
 import axios from 'axios';
 
 const SALES_STAGES = {
-    novo: { id: 'novo', name: 'Novo', color: '#3B82F6' }, // Blue
-    apresentacao: { id: 'apresentacao', name: 'Apresentação', color: '#F59E0B' }, // Orange
-    negociacao: { id: 'negociacao', name: 'Negociação', color: '#10B981' }, // Green
-    fechamento: { id: 'fechamento', name: 'Fechamento', color: '#8B5CF6' }, // Purple
+    novo: {
+        id: 'novo',
+        name: 'Novo',
+        gradient: 'linear-gradient(to right, #8A2BE2, #00BFFF)'
+    },
+    apresentacao: {
+        id: 'apresentacao',
+        name: 'Apresentação',
+        gradient: 'linear-gradient(to right, #FF6B6B, #FF8E53, #FBBF24)'
+    },
+    negociacao: {
+        id: 'negociacao',
+        name: 'Negociação',
+        gradient: 'linear-gradient(to right, #8A2BE2, #A78BFA, #C084FC)'
+    },
+    fechamento: {
+        id: 'fechamento',
+        name: 'Fechamento',
+        gradient: 'linear-gradient(to right, #00BFFF, #00FF99, #10B981)'
+    },
 };
 
 const SalesFunnelPage = () => {
@@ -18,6 +34,7 @@ const SalesFunnelPage = () => {
     const [leads, setLeads] = useState({});
     const [selectedLead, setSelectedLead] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [currentDragDestination, setCurrentDragDestination] = useState(null);
 
     useEffect(() => {
         fetchLeads();
@@ -34,7 +51,19 @@ const SalesFunnelPage = () => {
         }
     };
 
+    const onDragStart = () => {
+        setCurrentDragDestination(null);
+    };
+
+    const onDragUpdate = (update) => {
+        const { destination } = update;
+        if (destination) {
+            setCurrentDragDestination(destination.droppableId);
+        }
+    };
+
     const onDragEnd = async (result) => {
+        setCurrentDragDestination(null);
         const { destination, source, draggableId } = result;
 
         if (!destination) return;
@@ -49,7 +78,6 @@ const SalesFunnelPage = () => {
         const startStage = source.droppableId;
         const finishStage = destination.droppableId;
 
-        // Optimistic Update
         const startLeads = Array.from(leads[startStage] || []);
         const finishLeads = startStage === finishStage ? startLeads : Array.from(leads[finishStage] || []);
 
@@ -65,7 +93,6 @@ const SalesFunnelPage = () => {
 
         setLeads(newLeads);
 
-        // API Call
         try {
             await axios.patch(`/api/funnels/leads/${draggableId}/move`, {
                 to_stage: finishStage,
@@ -74,59 +101,74 @@ const SalesFunnelPage = () => {
             });
         } catch (error) {
             console.error('Error moving lead:', error);
-            // Revert on error (optional, but good practice)
             fetchLeads();
             alert('Erro ao mover card. A página será recarregada.');
         }
     };
 
     const handleConvert = (leadId) => {
-        fetchLeads(); // Refresh to remove converted lead or update status
+        fetchLeads();
     };
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-screen">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <div className="flex items-center justify-center h-screen bg-[#0A0A0A]">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00FF99]"></div>
             </div>
         );
     }
 
     return (
-        <div className="h-full flex flex-col bg-white">
-            <div className="px-8 py-6 border-b border-gray-200">
-                <div className="flex justify-between items-center">
+        <div className="min-h-screen bg-[#0A0A0A]">
+            <main className="px-4 sm:px-6 lg:px-8 pt-16 pb-8">
+
+                {/* Header centralizado com max-width */}
+                <div className="max-w-7xl mx-auto mb-12 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-800">Funil de Vendas</h1>
-                        <p className="text-gray-500 mt-1">Gerencie seus leads e oportunidades</p>
+                        <h1 className="text-4xl sm:text-5xl font-bold text-white">
+                            Funil de Vendas
+                        </h1>
+                        <p className="text-[#B0B0B0] text-base sm:text-lg mt-3">
+                            Gerencie seus leads e oportunidades
+                        </p>
                     </div>
-                    <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium">
+
+                    <div className="bg-[#00FF99]/10 text-[#00FF99] px-6 py-3 rounded-2xl text-sm font-bold whitespace-nowrap mt-2 sm:mt-0">
                         Total: {Object.values(leads).flat().length} Leads
                     </div>
                 </div>
-            </div>
 
-            <div className="flex-1 overflow-x-auto overflow-y-hidden">
-                <DragDropContext onDragEnd={onDragEnd}>
-                    <div className="flex h-full gap-6 p-8 min-w-max">
-                        {Object.values(columns).map((stage) => (
-                            <KanbanColumn
-                                key={stage.id}
-                                stageId={stage.id}
-                                stage={stage}
-                                leads={leads[stage.id] || []}
-                                onCardClick={setSelectedLead}
-                            />
-                        ))}
-                    </div>
-                </DragDropContext>
-            </div>
+                {/* Kanban Board - Largura total */}
+                <div className="overflow-x-auto -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
+                    <DragDropContext
+                        onDragStart={onDragStart}
+                        onDragUpdate={onDragUpdate}
+                        onDragEnd={onDragEnd}
+                    >
+                        <div className="flex justify-center gap-4 sm:gap-6 pb-8 min-w-max sm:min-w-0">
+                            {Object.values(columns).map((stage) => (
+                                <KanbanColumn
+                                    key={stage.id}
+                                    stageId={stage.id}
+                                    stage={stage}
+                                    leads={leads[stage.id] || []}
+                                    onCardClick={setSelectedLead}
+                                    currentDragDestination={currentDragDestination}
+                                    allStages={SALES_STAGES}
+                                />
+                            ))}
+                        </div>
+                    </DragDropContext>
+                </div>
+
+            </main>
 
             {selectedLead && (
                 <LeadModal
                     lead={selectedLead}
                     onClose={() => setSelectedLead(null)}
                     onConvert={handleConvert}
+                    allStages={SALES_STAGES}
                 />
             )}
         </div>
