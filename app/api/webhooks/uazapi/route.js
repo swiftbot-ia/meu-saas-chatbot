@@ -21,11 +21,20 @@ export async function POST(request) {
   try {
     const payload = await request.json()
 
+    // UAZAPI envia formato diferente: EventType (não event), instanceName (não instance)
+    const eventType = payload.EventType || payload.event
+    const instanceName = payload.instanceName || payload.instance
+
     console.log('📨 Webhook recebido da UAZAPI:', {
-      event: payload.event,
-      instance: payload.instance,
+      EventType: eventType,
+      instanceName: instanceName,
       timestamp: new Date().toISOString()
     })
+
+    // Log do payload completo para diagnóstico (apenas primeira vez para não poluir)
+    if (Math.random() < 0.1) { // 10% das vezes
+      console.log('🔍 PAYLOAD COMPLETO (amostra):', JSON.stringify(payload, null, 2))
+    }
 
     // Validar autenticação básica (opcional)
     const authHeader = request.headers.get('authorization')
@@ -40,19 +49,20 @@ export async function POST(request) {
       }
     }
 
-    // Identificar o tipo de evento
-    const eventType = payload.event
-
     // Processar evento baseado no tipo
+    // UAZAPI envia EventType: "messages", "connection", etc
     switch (eventType) {
+      case 'connection':
       case 'CONNECTION_UPDATE':
         await handleConnectionUpdate(payload)
         break
 
+      case 'messages':
       case 'MESSAGES_UPSERT':
         await handleMessageReceived(payload)
         break
 
+      case 'qrcode':
       case 'QRCODE_UPDATED':
         await handleQRCodeUpdate(payload)
         break
@@ -152,50 +162,147 @@ async function handleConnectionUpdate(payload) {
  */
 async function handleMessageReceived(payload) {
   try {
-    const instanceName = payload.instance
-    const messageData = payload.data
+    // UAZAPI formato: instanceName (não instance), message (não data)
+    const instanceName = payload.instanceName || payload.instance
+    const messageData = payload.message || payload.data
 
     console.log(`💬 MESSAGES_UPSERT: ${instanceName}`)
 
     // Buscar conexão no banco
-    const { data: connection } = await supabase
+    console.log(`🔍 Buscando conexão no banco para instância: "${instanceName}"`)
+
+    // Tentar buscar por instance_name primeiro
+    let { data: connection, error: connError } = await supabase
       .from('whatsapp_connections')
-      .select('id, user_id')
+      .select('id, user_id, instance_name, phone_number, profile_name')
       .eq('instance_name', instanceName)
       .single()
 
+    // Se não encontrou, tentar buscar por profile_name (nomes legíveis como "JTS Equipamentos")
+    if (!connection && !connError?.code?.includes('PGRST116')) {
+      console.log(`⚠️ Não encontrou por instance_name, tentando por profile_name...`)
+
+      const { data: connByProfile } = await supabase
+        .from('whatsapp_connections')
+        .select('id, user_id, instance_name, phone_number, profile_name')
+        .eq('profile_name', instanceName)
+        .eq('is_connected', true)
+        .single()
+
+      if (connByProfile) {
+        connection = connByProfile
+        console.log(`✅ Encontrou conexão pelo profile_name!`)
+      }
+    }
+
     if (!connection) {
-      console.warn(`⚠️ Conexão não encontrada: ${instanceName}`)
+      console.error(`⚠️ Conexão não encontrada para instância: "${instanceName}"`)
+
+      // Buscar todas as conexões para comparar
+      const { data: allConnections } = await supabase
+        .from('whatsapp_connections')
+        .select('instance_name, profile_name, phone_number, is_connected')
+        .eq('is_connected', true)
+
+      console.log('📋 Conexões disponíveis no banco:', allConnections)
+      console.log('❌ Erro ao buscar conexão:', connError)
       return
     }
 
-    // Processar cada mensagem
-    const messages = Array.isArray(messageData) ? messageData : [messageData]
+    console.log('✅ Conexão encontrada:', {
+      id: connection.id,
+      instance_name: connection.instance_name,
+      profile_name: connection.profile_name,
+      phone_number: connection.phone_number
+    })
 
-    for (const message of messages) {
-      try {
-        // Use MessageService to process incoming message
-        // This will automatically create/update contact and conversation
-        const savedMessage = await MessageService.processIncomingMessage(
-          message,
-          instanceName,
-          connection.id,
-          connection.user_id
-        )
+    // UAZAPI envia mensagem diretamente, não em array
+    // Converter para formato esperado pelo MessageService
+    const uazapiMessage = {
+      key: {
+        remoteJid: messageData.chatid,
+        fromMe: messageData.fromMe,
+        id: messageData.messageid || messageData.id
+      },
+      message: {},
+      messageTimestamp: Math.floor(messageData.messageTimestamp / 1000),
+      pushName: messageData.senderName
+    }
 
-        if (savedMessage) {
-          console.log(`✅ Mensagem processada: ${savedMessage.message_id}`)
-        } else {
-          console.log(`ℹ️ Mensagem ignorada (provavelmente enviada por nós)`)
-        }
-
-        // TODO: Implementar lógica de resposta automática/bot se necessário
-
-      } catch (messageError) {
-        console.error('❌ Erro ao processar mensagem individual:', messageError)
-        // Continue processando outras mensagens mesmo se uma falhar
+    // Mapear tipo de mensagem
+    if (messageData.messageType === 'Conversation' || messageData.type === 'text') {
+      uazapiMessage.message.conversation = messageData.content || messageData.text
+    } else if (messageData.messageType === 'ImageMessage') {
+      uazapiMessage.message.imageMessage = {
+        url: messageData.content?.URL,
+        caption: messageData.content?.caption || '',
+        mimetype: messageData.content?.mimetype
+      }
+    } else if (messageData.messageType === 'AudioMessage') {
+      uazapiMessage.message.audioMessage = {
+        url: messageData.content?.URL,
+        mimetype: messageData.content?.mimetype,
+        seconds: messageData.content?.seconds,
+        ptt: messageData.content?.PTT
+      }
+    } else if (messageData.messageType === 'VideoMessage') {
+      uazapiMessage.message.videoMessage = {
+        url: messageData.content?.URL,
+        caption: messageData.content?.caption || '',
+        mimetype: messageData.content?.mimetype
+      }
+    } else if (messageData.messageType === 'DocumentMessage') {
+      uazapiMessage.message.documentMessage = {
+        url: messageData.content?.URL,
+        fileName: messageData.content?.fileName || '',
+        mimetype: messageData.content?.mimetype
       }
     }
+
+    try {
+      console.log('🔍 DEBUG - Processando mensagem:', {
+        instanceName,
+        connectionId: connection.id,
+        userId: connection.user_id,
+        messageId: uazapiMessage.key.id,
+        fromMe: uazapiMessage.key.fromMe,
+        remoteJid: uazapiMessage.key.remoteJid,
+        messageType: messageData.messageType
+      })
+
+      // Use MessageService to process incoming message
+      // This will automatically create/update contact and conversation
+      const savedMessage = await MessageService.processIncomingMessage(
+        uazapiMessage,
+        instanceName,
+        connection.id,
+        connection.user_id
+      )
+
+      if (savedMessage) {
+        console.log(`✅ Mensagem processada e salva:`, {
+          message_id: savedMessage.message_id,
+          conversation_id: savedMessage.conversation_id,
+          contact_id: savedMessage.contact_id,
+          message_type: savedMessage.message_type,
+          direction: savedMessage.direction
+        })
+      } else {
+        console.log(`ℹ️ Mensagem ignorada (provavelmente enviada por nós)`)
+      }
+
+      // TODO: Implementar lógica de resposta automática/bot se necessário
+
+    } catch (messageError) {
+      console.error('❌ ERRO DETALHADO ao processar mensagem:', {
+        error: messageError.message,
+        code: messageError.code,
+        hint: messageError.hint,
+        details: messageError.details,
+        stack: messageError.stack
+      })
+    }
+
 
   } catch (error) {
     console.error('❌ Erro ao processar MESSAGES_UPSERT:', error)
