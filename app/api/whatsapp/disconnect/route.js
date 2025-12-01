@@ -2,6 +2,9 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '../../../../lib/supabase' // ✅ CORREÇÃO: Caminho correto
 
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+
 export async function POST(request) {
   try {
     const { userId } = await request.json()

@@ -9,6 +9,9 @@ import {
   createRefund 
 } from '../../../../lib/stripe'
 
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+
 export async function POST(request) {
   try {
     const { userId } = await request.json()

@@ -12,6 +12,9 @@ const UAZAPI_URL = process.env.UAZAPI_BASE_URL || 'https://swiftbot.uazapi.com'
 // ============================================================================
 // POST: Verificar status de uma conexão específica
 // ============================================================================
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+
 export async function POST(request) {
   try {
     const { connectionId, userId } = await request.json()

@@ -7,6 +7,9 @@ import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/client'
 import { createChatSupabaseClient } from '@/lib/supabase/chat-client'
 
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+
 export async function GET(request) {
   const results = {
     timestamp: new Date().toISOString(),

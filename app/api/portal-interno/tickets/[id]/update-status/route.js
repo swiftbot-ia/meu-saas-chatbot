@@ -14,6 +14,9 @@ const statusLabels = {
   closed: 'Fechado'
 };
 
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+
 export async function POST(request, { params }) {
   try {
     const session = await getCurrentSession();
