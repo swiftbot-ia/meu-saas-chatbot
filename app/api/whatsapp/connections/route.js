@@ -1,10 +1,83 @@
 // app/api/whatsapp/connections/route.js
 // ============================================================================
-// ROTA: Criar Registro Inicial de Conexão WhatsApp
+// ROTA: Gerenciar Conexões WhatsApp
 // ============================================================================
 
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { supabaseAdmin } from '../../../../lib/supabase/server.js'
+
+// ============================================================================
+// GET: Listar todas as conexões do usuário
+// ============================================================================
+export async function GET(request) {
+  try {
+    // Obter token de autenticação do header
+    const authHeader = request.headers.get('cookie')
+
+    if (!authHeader) {
+      return NextResponse.json(
+        { error: 'Não autenticado' },
+        { status: 401 }
+      )
+    }
+
+    // Extrair o token do cookie
+    const tokenMatch = authHeader.match(/sb-[^=]+-auth-token\.0=([^;]+)/)
+    const tokenMatch2 = authHeader.match(/sb-[^=]+-auth-token\.1=([^;]+)/)
+
+    if (!tokenMatch || !tokenMatch2) {
+      return NextResponse.json(
+        { error: 'Token inválido' },
+        { status: 401 }
+      )
+    }
+
+    // Decodificar o token base64
+    const base64Token = tokenMatch[1].replace('base64-', '')
+    const tokenData = JSON.parse(Buffer.from(base64Token, 'base64').toString('utf-8'))
+
+    const userId = tokenData.user?.id
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Usuário não identificado' },
+        { status: 401 }
+      )
+    }
+
+    console.log('📋 [ListConnections] Buscando conexões para userId:', userId)
+
+    // Buscar conexões do usuário
+    const { data: connections, error } = await supabaseAdmin
+      .from('whatsapp_connections')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('❌ [ListConnections] Erro ao buscar conexões:', error)
+      return NextResponse.json(
+        { error: 'Erro ao buscar conexões' },
+        { status: 500 }
+      )
+    }
+
+    console.log('✅ [ListConnections] Conexões encontradas:', connections?.length || 0)
+
+    return NextResponse.json({
+      connections: connections || [],
+      count: connections?.length || 0
+    })
+
+  } catch (error) {
+    console.error('❌ [ListConnections] Erro:', error)
+    return NextResponse.json(
+      { error: 'Erro ao listar conexões: ' + error.message },
+      { status: 500 }
+    )
+  }
+}
 
 // ============================================================================
 // POST: Criar registro inicial de conexão no Supabase
