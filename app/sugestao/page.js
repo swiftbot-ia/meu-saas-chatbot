@@ -191,8 +191,7 @@ export default function FeedbackPage() {
             
             {/* MODIFICADO: Título da página e SVG */}
             <h1 className="text-5xl font-bold text-white flex items-center gap-4">
-              Central de Feedback
-              <svg className="w-10 h-10 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-3.86 8.25-8.625 8.25S3.75 16.556 3.75 12c0-4.556 3.86-8.25 8.625-8.25S21 7.444 21 12z" /></svg>
+              Central de Sugestão
             </h1>
             <p className="text-[#B0B0B0] text-lg mt-3">
               Ajude-nos a construir o SwiftBot ideal para você
