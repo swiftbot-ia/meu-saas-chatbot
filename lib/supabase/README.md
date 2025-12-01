@@ -102,13 +102,44 @@ Este arquivo re-exporta os clientes corretos para manter compatibilidade.
 Configure no arquivo `.env.local`:
 
 ```bash
+# ============================
+# MAIN DATABASE (Auth, Connections)
+# ============================
+
 # Público - pode ser exposto no frontend
-NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto-main.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...
 
 # Privado - NUNCA exponha no frontend
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...
+
+# ============================
+# CHAT DATABASE (Messages, Conversations, Contacts)
+# ============================
+
+# Público - pode ser exposto no frontend
+NEXT_PUBLIC_CHAT_SUPABASE_URL=https://seu-projeto-chat.supabase.co
+NEXT_PUBLIC_CHAT_SUPABASE_ANON_KEY=eyJhbGc...
+
+# Privado - RECOMENDADO para bypass de RLS no chat
+# O chat database não compartilha auth com main database,
+# então RLS com auth.uid() não funciona. Use service role key.
+CHAT_SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...
 ```
+
+### Arquitetura Dual-Database
+
+O sistema usa dois bancos de dados Supabase separados:
+
+| Database | Tabelas | Proposito |
+|----------|---------|-----------|
+| **Main** | `auth.users`, `whatsapp_connections`, `profiles` | Autenticacao e conexoes WhatsApp |
+| **Chat** | `whatsapp_messages`, `whatsapp_conversations`, `whatsapp_contacts` | Mensagens e conversas do chat |
+
+**Por que separados?**
+- Escalabilidade: Mensagens podem crescer muito
+- Performance: Queries de chat nao afetam o main database
+- Isolamento: Problemas no chat nao afetam autenticacao
 
 ### Validação Automática
 
