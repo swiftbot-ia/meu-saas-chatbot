@@ -163,19 +163,37 @@ async function handleMessageReceived(payload) {
     // Buscar conexão no banco
     console.log(`🔍 Buscando conexão no banco para instância: "${instanceName}"`)
 
-    const { data: connection, error: connError } = await supabase
+    // Tentar buscar por instance_name primeiro
+    let { data: connection, error: connError } = await supabase
       .from('whatsapp_connections')
-      .select('id, user_id, instance_name, phone_number')
+      .select('id, user_id, instance_name, phone_number, profile_name')
       .eq('instance_name', instanceName)
       .single()
 
-    if (!connection || connError) {
+    // Se não encontrou, tentar buscar por profile_name (nomes legíveis como "JTS Equipamentos")
+    if (!connection && !connError?.code?.includes('PGRST116')) {
+      console.log(`⚠️ Não encontrou por instance_name, tentando por profile_name...`)
+
+      const { data: connByProfile } = await supabase
+        .from('whatsapp_connections')
+        .select('id, user_id, instance_name, phone_number, profile_name')
+        .eq('profile_name', instanceName)
+        .eq('is_connected', true)
+        .single()
+
+      if (connByProfile) {
+        connection = connByProfile
+        console.log(`✅ Encontrou conexão pelo profile_name!`)
+      }
+    }
+
+    if (!connection) {
       console.error(`⚠️ Conexão não encontrada para instância: "${instanceName}"`)
 
       // Buscar todas as conexões para comparar
       const { data: allConnections } = await supabase
         .from('whatsapp_connections')
-        .select('instance_name, phone_number, is_connected')
+        .select('instance_name, profile_name, phone_number, is_connected')
         .eq('is_connected', true)
 
       console.log('📋 Conexões disponíveis no banco:', allConnections)
@@ -186,6 +204,7 @@ async function handleMessageReceived(payload) {
     console.log('✅ Conexão encontrada:', {
       id: connection.id,
       instance_name: connection.instance_name,
+      profile_name: connection.profile_name,
       phone_number: connection.phone_number
     })
 
