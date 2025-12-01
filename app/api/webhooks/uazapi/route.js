@@ -27,6 +27,9 @@ export async function POST(request) {
       timestamp: new Date().toISOString()
     })
 
+    // Log do payload completo para diagnóstico
+    console.log('🔍 PAYLOAD COMPLETO:', JSON.stringify(payload, null, 2))
+
     // Validar autenticação básica (opcional)
     const authHeader = request.headers.get('authorization')
     if (process.env.WEBHOOK_AUTH_USER && process.env.WEBHOOK_AUTH_PASS) {
@@ -158,16 +161,33 @@ async function handleMessageReceived(payload) {
     console.log(`💬 MESSAGES_UPSERT: ${instanceName}`)
 
     // Buscar conexão no banco
-    const { data: connection } = await supabase
+    console.log(`🔍 Buscando conexão no banco para instância: "${instanceName}"`)
+
+    const { data: connection, error: connError } = await supabase
       .from('whatsapp_connections')
-      .select('id, user_id')
+      .select('id, user_id, instance_name, phone_number')
       .eq('instance_name', instanceName)
       .single()
 
-    if (!connection) {
-      console.warn(`⚠️ Conexão não encontrada: ${instanceName}`)
+    if (!connection || connError) {
+      console.error(`⚠️ Conexão não encontrada para instância: "${instanceName}"`)
+
+      // Buscar todas as conexões para comparar
+      const { data: allConnections } = await supabase
+        .from('whatsapp_connections')
+        .select('instance_name, phone_number, is_connected')
+        .eq('is_connected', true)
+
+      console.log('📋 Conexões disponíveis no banco:', allConnections)
+      console.log('❌ Erro ao buscar conexão:', connError)
       return
     }
+
+    console.log('✅ Conexão encontrada:', {
+      id: connection.id,
+      instance_name: connection.instance_name,
+      phone_number: connection.phone_number
+    })
 
     // Processar cada mensagem
     const messages = Array.isArray(messageData) ? messageData : [messageData]
