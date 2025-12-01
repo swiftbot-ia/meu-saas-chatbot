@@ -21,10 +21,32 @@ export async function POST(request) {
   try {
     const payload = await request.json()
 
-    console.log('📨 Webhook recebido da UAZAPI:', {
-      event: payload.event,
-      instance: payload.instance,
-      timestamp: new Date().toISOString()
+    // Log detalhado do payload para debug
+    console.log('📨 Webhook UAZAPI - Payload completo:', JSON.stringify(payload, null, 2))
+
+    // UAZAPI pode enviar eventos em diferentes formatos
+    // Tentar identificar o tipo de evento de várias formas
+    let eventType = payload.event || payload.type || payload.action
+    let instanceName = payload.instance || payload.instanceName || payload.data?.instance
+
+    // Se não encontrou evento mas tem dados de mensagem, assumir MESSAGES_UPSERT
+    if (!eventType && (payload.data?.messages || payload.messages || payload.message || payload.data?.key)) {
+      eventType = 'MESSAGES_UPSERT'
+      console.log('📨 Detectado como MESSAGES_UPSERT por estrutura do payload')
+    }
+
+    // Se não encontrou evento mas tem dados de conexão, assumir CONNECTION_UPDATE
+    if (!eventType && (payload.data?.state || payload.state || payload.data?.status)) {
+      eventType = 'CONNECTION_UPDATE'
+      console.log('📨 Detectado como CONNECTION_UPDATE por estrutura do payload')
+    }
+
+    console.log('📨 Webhook identificado:', {
+      event: eventType,
+      instance: instanceName,
+      timestamp: new Date().toISOString(),
+      payloadKeys: Object.keys(payload),
+      dataKeys: payload.data ? Object.keys(payload.data) : []
     })
 
     // Validar autenticação básica (opcional)
@@ -39,9 +61,6 @@ export async function POST(request) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
     }
-
-    // Identificar o tipo de evento
-    const eventType = payload.event
 
     // Processar evento baseado no tipo
     switch (eventType) {
@@ -152,28 +171,50 @@ async function handleConnectionUpdate(payload) {
  */
 async function handleMessageReceived(payload) {
   try {
-    const instanceName = payload.instance
-    const messageData = payload.data
+    // Extrair instance name de várias fontes possíveis
+    const instanceName = payload.instance || payload.instanceName || payload.data?.instance
+
+    // Extrair dados da mensagem de várias fontes possíveis
+    let messageData = payload.data || payload
+
+    // Se data contém messages array, usar isso
+    if (messageData.messages) {
+      messageData = messageData.messages
+    }
 
     console.log(`💬 MESSAGES_UPSERT: ${instanceName}`)
+    console.log(`💬 Message data structure:`, JSON.stringify(messageData, null, 2).substring(0, 500))
+
+    if (!instanceName) {
+      console.error('❌ Instance name não encontrado no payload')
+      return
+    }
 
     // Buscar conexão no banco
-    const { data: connection } = await supabase
+    const { data: connection, error: connError } = await supabase
       .from('whatsapp_connections')
       .select('id, user_id')
       .eq('instance_name', instanceName)
       .single()
 
-    if (!connection) {
-      console.warn(`⚠️ Conexão não encontrada: ${instanceName}`)
+    if (connError || !connection) {
+      console.warn(`⚠️ Conexão não encontrada: ${instanceName}`, connError)
       return
     }
+
+    console.log(`✅ Conexão encontrada: ${connection.id} para user ${connection.user_id}`)
 
     // Processar cada mensagem
     const messages = Array.isArray(messageData) ? messageData : [messageData]
 
     for (const message of messages) {
       try {
+        // Verificar se a mensagem tem estrutura válida
+        if (!message || (!message.key && !message.message)) {
+          console.log('ℹ️ Mensagem sem estrutura válida, ignorando:', JSON.stringify(message).substring(0, 200))
+          continue
+        }
+
         // Use MessageService to process incoming message
         // This will automatically create/update contact and conversation
         const savedMessage = await MessageService.processIncomingMessage(
@@ -186,13 +227,13 @@ async function handleMessageReceived(payload) {
         if (savedMessage) {
           console.log(`✅ Mensagem processada: ${savedMessage.message_id}`)
         } else {
-          console.log(`ℹ️ Mensagem ignorada (provavelmente enviada por nós)`)
+          console.log(`ℹ️ Mensagem ignorada (provavelmente enviada por nós ou sem conteúdo)`)
         }
 
         // TODO: Implementar lógica de resposta automática/bot se necessário
 
       } catch (messageError) {
-        console.error('❌ Erro ao processar mensagem individual:', messageError)
+        console.error('❌ Erro ao processar mensagem individual:', messageError.message)
         // Continue processando outras mensagens mesmo se uma falhar
       }
     }
