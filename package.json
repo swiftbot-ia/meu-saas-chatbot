@@ -17,6 +17,7 @@
     "lucide-react": "^0.548.0",
     "next": "15.4.5",
     "nodemailer": "^7.0.10",
+    "openai": "^4.73.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-phone-number-input": "^3.4.14",
