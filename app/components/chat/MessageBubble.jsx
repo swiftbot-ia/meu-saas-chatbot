@@ -3,6 +3,8 @@
  * Displays an individual message in the chat
  */
 
+'use client';
+
 import React from 'react';
 import { Check, CheckCheck, Image, Video, FileText, Mic } from 'lucide-react';
 
