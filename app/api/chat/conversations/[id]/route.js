@@ -4,12 +4,38 @@
  */
 
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/client';
+import { cookies } from 'next/headers';
+import { createServerClient } from '@supabase/ssr';
 import ConversationService from '@/lib/ConversationService';
+
+// Helper para criar cliente Supabase com cookies (para autenticação)
+function createAuthClient() {
+  const cookieStore = cookies()
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      cookies: {
+        get(name) {
+          return cookieStore.get(name)?.value
+        },
+        set(name, value, options) {
+          cookieStore.set({ name, value, ...options })
+        },
+        remove(name, options) {
+          cookieStore.set({ name, value: '', ...options })
+        },
+      },
+    }
+  )
+}
+
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
 
 export async function GET(request, { params }) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createAuthClient();
 
     // Get authenticated user
     const { data: { session }, error: authError } = await supabase.auth.getSession();
@@ -47,7 +73,7 @@ export async function GET(request, { params }) {
 
 export async function PATCH(request, { params }) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createAuthClient();
 
     // Get authenticated user
     const { data: { session }, error: authError } = await supabase.auth.getSession();
@@ -100,7 +126,7 @@ export async function PATCH(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createAuthClient();
 
     // Get authenticated user
     const { data: { session }, error: authError } = await supabase.auth.getSession();

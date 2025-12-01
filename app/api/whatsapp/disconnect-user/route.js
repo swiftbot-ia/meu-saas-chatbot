@@ -14,6 +14,9 @@ import { uazapi } from '../../../../lib/uazapi-client'
  *
  * Body: { connectionId: string }
  */
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+
 export async function POST(request) {
   try {
     const { connectionId } = await request.json()

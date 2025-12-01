@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
 
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL
   const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY

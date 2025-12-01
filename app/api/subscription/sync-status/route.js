@@ -7,6 +7,9 @@ import { getSubscriptionStatus, mapStripeStatus } from '../../../../lib/stripe'
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY
 const STRIPE_API_URL = 'https://api.stripe.com/v1'
 
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+
 export async function POST(request) {
   try {
     const { userId, subscriptionId } = await request.json()
