@@ -14,44 +14,63 @@ export default function MessageBubble({ message, isOwn }) {
     return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
+  const getMediaUrl = () => {
+    // Prefer local_media_path (stored on VPS) over media_url (external URL)
+    if (message.local_media_path) {
+      return `/${message.local_media_path}`;
+    }
+    return message.media_url;
+  };
+
   const renderMediaContent = () => {
-    if (!message.media_url) return null;
+    const mediaUrl = getMediaUrl();
+    if (!mediaUrl && !message.transcription) return null;
 
     switch (message.message_type) {
       case 'image':
-        return (
+        return mediaUrl ? (
           <div className="mb-2">
             <img
-              src={message.media_url}
+              src={mediaUrl}
               alt="Imagem"
               className="max-w-xs rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-              onClick={() => window.open(message.media_url, '_blank')}
+              onClick={() => window.open(mediaUrl, '_blank')}
             />
           </div>
-        );
+        ) : null;
 
       case 'video':
-        return (
+        return mediaUrl ? (
           <div className="mb-2">
             <video
-              src={message.media_url}
+              src={mediaUrl}
               controls
               className="max-w-xs rounded-lg"
             />
           </div>
-        );
+        ) : null;
 
       case 'audio':
         return (
           <div className="mb-2">
-            <audio src={message.media_url} controls className="w-64" />
+            {mediaUrl && (
+              <audio src={mediaUrl} controls className="w-64" />
+            )}
+            {message.transcription && (
+              <div className={`mt-2 text-xs italic ${
+                isOwn ? 'text-green-100' : 'text-gray-500'
+              }`}>
+                <Mic size={12} className="inline mr-1" />
+                {message.transcription}
+              </div>
+            )}
           </div>
         );
 
       case 'document':
-        return (
+        return mediaUrl ? (
           <a
-            href={message.media_url}
+            href={mediaUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center p-3 bg-white/10 rounded-lg border border-white/20 hover:bg-white/20 transition-colors mb-2"
@@ -59,7 +78,7 @@ export default function MessageBubble({ message, isOwn }) {
             <FileText className="w-6 h-6 mr-3" />
             <span className="font-medium">Documento</span>
           </a>
-        );
+        ) : null;
 
       default:
         return null;
@@ -67,7 +86,7 @@ export default function MessageBubble({ message, isOwn }) {
   };
 
   const renderMediaIcon = () => {
-    if (!message.media_url) return null;
+    if (!message.media_url && !message.local_media_path) return null;
 
     const iconProps = { size: 16, className: 'inline mr-1' };
 
