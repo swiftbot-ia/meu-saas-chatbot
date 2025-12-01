@@ -37,7 +37,29 @@ AND table_name IN ('whatsapp_contacts', 'whatsapp_conversations');
 -- Deve retornar 2 linhas
 ```
 
-### 3️⃣ Testar o Chat
+### 3️⃣ Configurar Variáveis de Ambiente
+
+Para que as webhooks funcionem corretamente, você precisa adicionar a service role key do banco de dados do chat:
+
+```bash
+# .env.local ou .env
+CHAT_SUPABASE_SERVICE_ROLE_KEY=sua_service_role_key_aqui
+```
+
+⚠️ **IMPORTANTE:**
+- Esta chave é diferente da sua chave principal do Supabase
+- Ela permite que webhooks salvem mensagens sem autenticação do usuário
+- Mantenha esta chave **SECRETA** - nunca exponha no frontend
+- Não adicione o prefixo `NEXT_PUBLIC_` a esta variável
+
+**Como obter a service role key:**
+1. Acesse https://supabase.com/dashboard
+2. Selecione seu projeto do chat
+3. Vá em **Settings** → **API**
+4. Copie a **service_role key** (não a anon key)
+5. Cole no seu arquivo `.env.local`
+
+### 4️⃣ Testar o Chat
 
 1. Certifique-se de ter uma instância do WhatsApp conectada
 2. Acesse: `http://localhost:3000/dashboard/chat`

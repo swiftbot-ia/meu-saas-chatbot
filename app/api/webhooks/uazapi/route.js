@@ -13,6 +13,7 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '../../../../lib/supabase'
 import MessageService from '@/lib/MessageService'
+import { createChatSupabaseAdminClient } from '@/lib/supabase/chat-server'
 
 /**
  * POST - Processar eventos do webhook
@@ -169,18 +170,24 @@ async function handleMessageReceived(payload) {
       return
     }
 
+    // Criar cliente admin do chat para bypassar RLS
+    // Necessário porque webhook não tem contexto de autenticação
+    const chatAdminClient = createChatSupabaseAdminClient()
+
     // Processar cada mensagem
     const messages = Array.isArray(messageData) ? messageData : [messageData]
 
     for (const message of messages) {
       try {
         // Use MessageService to process incoming message
+        // Pass chatAdminClient to bypass RLS policies
         // This will automatically create/update contact and conversation
         const savedMessage = await MessageService.processIncomingMessage(
           message,
           instanceName,
           connection.id,
-          connection.user_id
+          connection.user_id,
+          chatAdminClient // Pass admin client to bypass RLS
         )
 
         if (savedMessage) {
