@@ -4,17 +4,41 @@
  */
 
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/client';
+import { cookies } from 'next/headers';
+import { createServerClient } from '@supabase/ssr';
 import MessageService from '@/lib/MessageService';
+
+// Helper para criar cliente Supabase com cookies (para autenticação)
+function createAuthClient() {
+  const cookieStore = cookies()
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      cookies: {
+        get(name) {
+          return cookieStore.get(name)?.value
+        },
+        set(name, value, options) {
+          cookieStore.set({ name, value, ...options })
+        },
+        remove(name, options) {
+          cookieStore.set({ name, value: '', ...options })
+        },
+      },
+    }
+  )
+}
 
 export async function POST(request) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = createAuthClient();
 
     // Get authenticated user
     const { data: { session }, error: authError } = await supabase.auth.getSession();
 
     if (authError || !session) {
+      console.error('❌ [SendMessage] Usuário não autenticado:', authError);
       return NextResponse.json(
         { error: 'Não autenticado' },
         { status: 401 }
@@ -22,6 +46,7 @@ export async function POST(request) {
     }
 
     const userId = session.user.id;
+    console.log('📤 [SendMessage] userId:', userId);
     const body = await request.json();
 
     const { conversationId, message } = body;

@@ -4,22 +4,50 @@
  */
 
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/client';
+import { cookies } from 'next/headers';
+import { createServerClient } from '@supabase/ssr';
 import ConversationService from '@/lib/ConversationService';
+
+// Helper para criar cliente Supabase com cookies (para autenticação)
+function createAuthClient() {
+  const cookieStore = cookies()
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      cookies: {
+        get(name) {
+          return cookieStore.get(name)?.value
+        },
+        set(name, value, options) {
+          cookieStore.set({ name, value, ...options })
+        },
+        remove(name, options) {
+          cookieStore.set({ name, value: '', ...options })
+        },
+      },
+    }
+  )
+}
 
 export async function GET(request) {
   try {
-    const supabase = createServerSupabaseClient();
+    console.log('📋 [Conversations] Iniciando listagem de conversas');
+
+    const supabase = createAuthClient();
 
     // Get authenticated user
     const { data: { session }, error: authError } = await supabase.auth.getSession();
 
     if (authError || !session) {
+      console.error('❌ [Conversations] Usuário não autenticado:', authError);
       return NextResponse.json(
         { error: 'Não autenticado' },
         { status: 401 }
       );
     }
+
+    console.log('👤 [Conversations] userId:', session.user.id);
 
     const userId = session.user.id;
 
