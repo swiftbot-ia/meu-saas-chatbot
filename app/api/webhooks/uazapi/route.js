@@ -187,7 +187,10 @@ function convertUazapiMessage(uazapiMessage) {
         url: uazapiMessage.content?.URL || uazapiMessage.content?.url,
         mimetype: uazapiMessage.content?.mimetype || 'audio/ogg',
         seconds: uazapiMessage.content?.seconds || 0,
-        ptt: uazapiMessage.content?.PTT || uazapiMessage.mediaType === 'ptt'
+        ptt: uazapiMessage.content?.PTT || uazapiMessage.mediaType === 'ptt',
+        // WhatsApp encryption fields for decryption
+        mediaKey: uazapiMessage.content?.mediaKey,
+        fileSHA256: uazapiMessage.content?.fileSHA256
       }
     }
   } else if (messageType === 'ImageMessage') {
@@ -196,7 +199,10 @@ function convertUazapiMessage(uazapiMessage) {
       imageMessage: {
         url: uazapiMessage.content?.URL || uazapiMessage.content?.url,
         mimetype: uazapiMessage.content?.mimetype || 'image/jpeg',
-        caption: uazapiMessage.text || ''
+        caption: uazapiMessage.text || '',
+        // WhatsApp encryption fields for decryption
+        mediaKey: uazapiMessage.content?.mediaKey,
+        fileSHA256: uazapiMessage.content?.fileSHA256
       }
     }
   } else if (messageType === 'VideoMessage') {
@@ -205,7 +211,10 @@ function convertUazapiMessage(uazapiMessage) {
       videoMessage: {
         url: uazapiMessage.content?.URL || uazapiMessage.content?.url,
         mimetype: uazapiMessage.content?.mimetype || 'video/mp4',
-        caption: uazapiMessage.text || ''
+        caption: uazapiMessage.text || '',
+        // WhatsApp encryption fields for decryption
+        mediaKey: uazapiMessage.content?.mediaKey,
+        fileSHA256: uazapiMessage.content?.fileSHA256
       }
     }
   } else if (messageType === 'DocumentMessage') {
@@ -214,7 +223,10 @@ function convertUazapiMessage(uazapiMessage) {
       documentMessage: {
         url: uazapiMessage.content?.URL || uazapiMessage.content?.url,
         mimetype: uazapiMessage.content?.mimetype || 'application/octet-stream',
-        fileName: uazapiMessage.content?.fileName || 'document'
+        fileName: uazapiMessage.content?.fileName || 'document',
+        // WhatsApp encryption fields for decryption
+        mediaKey: uazapiMessage.content?.mediaKey,
+        fileSHA256: uazapiMessage.content?.fileSHA256
       }
     }
   } else {
