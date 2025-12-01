@@ -24,11 +24,20 @@ export async function POST(request) {
   try {
     const payload = await request.json()
 
+    // UAZAPI mudou o formato: EventType ao invés de event, instanceName ao invés de instance
+    const eventType = payload.EventType || payload.event
+    const instanceName = payload.instanceName || payload.instance
+
     console.log('📨 Webhook recebido da UAZAPI:', {
-      event: payload.event,
-      instance: payload.instance,
+      event: eventType,
+      instance: instanceName,
       timestamp: new Date().toISOString()
     })
+
+    // Log completo para debug
+    if (!eventType) {
+      console.log('🔍 PAYLOAD COMPLETO:', JSON.stringify(payload, null, 2))
+    }
 
     // Validar autenticação básica (opcional)
     const authHeader = request.headers.get('authorization')
@@ -43,30 +52,18 @@ export async function POST(request) {
       }
     }
 
-    // Identificar o tipo de evento
-    const eventType = payload.event
-
     // Processar evento baseado no tipo
-    switch (eventType) {
-      case 'CONNECTION_UPDATE':
-        await handleConnectionUpdate(payload)
-        break
-
-      case 'MESSAGES_UPSERT':
-        await handleMessageReceived(payload)
-        break
-
-      case 'QRCODE_UPDATED':
-        await handleQRCodeUpdate(payload)
-        break
-
-      case 'CONNECTION_LOST':
-      case 'CONNECTION_CLOSE':
-        await handleConnectionLost(payload)
-        break
-
-      default:
-        console.log(`ℹ️ Evento não tratado: ${eventType}`)
+    // UAZAPI usa "messages" para MESSAGES_UPSERT
+    if (eventType === 'messages' || eventType === 'MESSAGES_UPSERT') {
+      await handleMessageReceived(payload, instanceName)
+    } else if (eventType === 'CONNECTION_UPDATE') {
+      await handleConnectionUpdate(payload, instanceName)
+    } else if (eventType === 'QRCODE_UPDATED') {
+      await handleQRCodeUpdate(payload, instanceName)
+    } else if (eventType === 'CONNECTION_LOST' || eventType === 'CONNECTION_CLOSE') {
+      await handleConnectionLost(payload, instanceName)
+    } else {
+      console.log(`ℹ️ Evento não tratado: ${eventType}`)
     }
 
     return NextResponse.json({
@@ -86,9 +83,8 @@ export async function POST(request) {
 /**
  * Processa atualização de status de conexão
  */
-async function handleConnectionUpdate(payload) {
+async function handleConnectionUpdate(payload, instanceName) {
   try {
-    const instanceName = payload.instance
     const state = payload.data?.state // 'open', 'close', 'connecting'
 
     console.log(`🔄 CONNECTION_UPDATE: ${instanceName} -> ${state}`)
@@ -151,14 +147,89 @@ async function handleConnectionUpdate(payload) {
 }
 
 /**
+ * Converte formato novo da UAZAPI para o formato antigo esperado pelo MessageService
+ */
+function convertUazapiMessage(uazapiMessage) {
+  // Formato novo: payload.message = { id, messageType, content, sender, chatid, ... }
+  // Formato antigo: { key: {...}, message: {...}, messageTimestamp }
+
+  const messageId = uazapiMessage.id || uazapiMessage.messageid
+  const sender = uazapiMessage.sender
+  const fromMe = uazapiMessage.fromMe || false
+  const timestamp = Math.floor(uazapiMessage.messageTimestamp / 1000)
+
+  // Construir estrutura antiga
+  const converted = {
+    key: {
+      remoteJid: sender,
+      fromMe: fromMe,
+      id: messageId
+    },
+    messageTimestamp: timestamp,
+    pushName: uazapiMessage.senderName || ''
+  }
+
+  // Converter content baseado no messageType
+  const messageType = uazapiMessage.messageType
+
+  if (messageType === 'Conversation' || messageType === 'ExtendedTextMessage') {
+    // Mensagem de texto
+    converted.message = {
+      conversation: uazapiMessage.text || uazapiMessage.content
+    }
+  } else if (messageType === 'AudioMessage') {
+    // Mensagem de áudio
+    converted.message = {
+      audioMessage: {
+        url: uazapiMessage.content?.URL || uazapiMessage.content?.url,
+        mimetype: uazapiMessage.content?.mimetype || 'audio/ogg',
+        seconds: uazapiMessage.content?.seconds || 0,
+        ptt: uazapiMessage.content?.PTT || uazapiMessage.mediaType === 'ptt'
+      }
+    }
+  } else if (messageType === 'ImageMessage') {
+    // Mensagem de imagem
+    converted.message = {
+      imageMessage: {
+        url: uazapiMessage.content?.URL || uazapiMessage.content?.url,
+        mimetype: uazapiMessage.content?.mimetype || 'image/jpeg',
+        caption: uazapiMessage.text || ''
+      }
+    }
+  } else if (messageType === 'VideoMessage') {
+    // Mensagem de vídeo
+    converted.message = {
+      videoMessage: {
+        url: uazapiMessage.content?.URL || uazapiMessage.content?.url,
+        mimetype: uazapiMessage.content?.mimetype || 'video/mp4',
+        caption: uazapiMessage.text || ''
+      }
+    }
+  } else if (messageType === 'DocumentMessage') {
+    // Mensagem de documento
+    converted.message = {
+      documentMessage: {
+        url: uazapiMessage.content?.URL || uazapiMessage.content?.url,
+        mimetype: uazapiMessage.content?.mimetype || 'application/octet-stream',
+        fileName: uazapiMessage.content?.fileName || 'document'
+      }
+    }
+  } else {
+    // Tipo desconhecido - texto genérico
+    converted.message = {
+      conversation: uazapiMessage.text || JSON.stringify(uazapiMessage.content)
+    }
+  }
+
+  return converted
+}
+
+/**
  * Processa nova mensagem recebida
  */
-async function handleMessageReceived(payload) {
+async function handleMessageReceived(payload, instanceName) {
   try {
-    const instanceName = payload.instance
-    const messageData = payload.data
-
-    console.log(`💬 MESSAGES_UPSERT: ${instanceName}`)
+    console.log(`💬 MESSAGES (novo formato): ${instanceName}`)
 
     // Buscar conexão no banco
     const { data: connection } = await supabase
@@ -172,68 +243,72 @@ async function handleMessageReceived(payload) {
       return
     }
 
-    // Processar cada mensagem
-    const messages = Array.isArray(messageData) ? messageData : [messageData]
+    // Converter mensagem do formato novo para o antigo
+    const uazapiMessage = payload.message
 
-    for (const message of messages) {
-      try {
-        console.log('🔍 DEBUG - Processando mensagem:', {
-          instanceName,
-          connectionId: connection.id,
-          userId: connection.user_id,
-          messageId: message.key?.id,
-          fromMe: message.key?.fromMe,
-          remoteJid: message.key?.remoteJid,
-          hasMessage: !!message.message,
-          messageType: message.message ? Object.keys(message.message)[0] : 'unknown'
+    if (!uazapiMessage) {
+      console.warn('⚠️ Payload sem mensagem')
+      return
+    }
+
+    try {
+      // Converter para formato antigo
+      const convertedMessage = convertUazapiMessage(uazapiMessage)
+
+      console.log('🔍 DEBUG - Processando mensagem convertida:', {
+        instanceName,
+        connectionId: connection.id,
+        userId: connection.user_id,
+        messageId: convertedMessage.key?.id,
+        fromMe: convertedMessage.key?.fromMe,
+        remoteJid: convertedMessage.key?.remoteJid,
+        hasMessage: !!convertedMessage.message,
+        messageType: convertedMessage.message ? Object.keys(convertedMessage.message)[0] : 'unknown'
+      })
+
+      // Use MessageService to process incoming message
+      // This will automatically create/update contact and conversation
+      const savedMessage = await MessageService.processIncomingMessage(
+        convertedMessage,
+        instanceName,
+        connection.id,
+        connection.user_id
+      )
+
+      if (savedMessage) {
+        console.log(`✅ Mensagem processada e salva:`, {
+          message_id: savedMessage.message_id,
+          conversation_id: savedMessage.conversation_id,
+          contact_id: savedMessage.contact_id,
+          message_type: savedMessage.message_type,
+          direction: savedMessage.direction,
+          has_media: !!savedMessage.local_media_path,
+          has_transcription: !!savedMessage.transcription
         })
-
-        // Use MessageService to process incoming message
-        // This will automatically create/update contact and conversation
-        const savedMessage = await MessageService.processIncomingMessage(
-          message,
-          instanceName,
-          connection.id,
-          connection.user_id
-        )
-
-        if (savedMessage) {
-          console.log(`✅ Mensagem processada e salva:`, {
-            message_id: savedMessage.message_id,
-            conversation_id: savedMessage.conversation_id,
-            contact_id: savedMessage.contact_id,
-            message_type: savedMessage.message_type,
-            direction: savedMessage.direction
-          })
-        } else {
-          console.log(`ℹ️ Mensagem ignorada (provavelmente enviada por nós)`)
-        }
-
-        // TODO: Implementar lógica de resposta automática/bot se necessário
-
-      } catch (messageError) {
-        console.error('❌ ERRO DETALHADO ao processar mensagem:', {
-          error: messageError.message,
-          code: messageError.code,
-          hint: messageError.hint,
-          details: messageError.details,
-          stack: messageError.stack
-        })
-        // Continue processando outras mensagens mesmo se uma falhar
+      } else {
+        console.log(`ℹ️ Mensagem ignorada (provavelmente enviada por nós)`)
       }
+
+    } catch (messageError) {
+      console.error('❌ ERRO DETALHADO ao processar mensagem:', {
+        error: messageError.message,
+        code: messageError.code,
+        hint: messageError.hint,
+        details: messageError.details,
+        stack: messageError.stack
+      })
     }
 
   } catch (error) {
-    console.error('❌ Erro ao processar MESSAGES_UPSERT:', error)
+    console.error('❌ Erro ao processar MESSAGES:', error)
   }
 }
 
 /**
  * Processa atualização de QR Code
  */
-async function handleQRCodeUpdate(payload) {
+async function handleQRCodeUpdate(payload, instanceName) {
   try {
-    const instanceName = payload.instance
     const qrCode = payload.data?.qrcode || payload.data?.base64
 
     console.log(`📱 QRCODE_UPDATED: ${instanceName}`)
@@ -262,10 +337,8 @@ async function handleQRCodeUpdate(payload) {
 /**
  * Processa perda de conexão
  */
-async function handleConnectionLost(payload) {
+async function handleConnectionLost(payload, instanceName) {
   try {
-    const instanceName = payload.instance
-
     console.log(`❌ CONNECTION_LOST: ${instanceName}`)
 
     await supabase
