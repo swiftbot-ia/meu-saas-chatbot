@@ -7,21 +7,110 @@ import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input'
 import 'react-phone-number-input/style.css' // Importante: Garanta que seu projeto suporte import de CSS de node_modules
 
 // ==================================================================================
+// 🎨 COMPONENTE CUSTOM SELECT (Pill Style)
+// ==================================================================================
+const CustomSelect = ({ label, value, onChange, options, placeholder, error }) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const selectedOption = options.find(opt => opt.value === value)
+  const displayValue = selectedOption ? selectedOption.label : placeholder
+
+  return (
+    <div className="w-full relative">
+      <label className="block text-xs font-medium text-[#B0B0B0] mb-2 ml-4 uppercase tracking-wider">
+        {label}
+      </label>
+      <div
+        className={`
+          bg-[#1E1E1E] w-full transition-all duration-300 ease-out overflow-hidden z-20 relative
+          ${error ? 'border border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : 'border border-transparent'}
+          ${isOpen ? 'rounded-[28px] shadow-[0_0_20px_rgba(255,255,255,0.05)] bg-[#282828]' : 'rounded-3xl'}
+        `}
+      >
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full px-6 py-4 flex items-center justify-between text-left outline-none"
+        >
+          <span className={`${!value ? 'text-gray-500' : 'text-white'} transition-colors truncate pr-4`}>
+            {displayValue}
+          </span>
+          <svg
+            className={`w-4 h-4 text-gray-500 transition-transform duration-300 flex-shrink-0 ${isOpen ? 'rotate-180' : 'rotate-0'}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        <div
+          className={`
+            transition-all duration-300 ease-out 
+            ${isOpen ? 'max-h-[300px] opacity-100 pb-2' : 'max-h-0 opacity-0'}
+            overflow-y-auto custom-scrollbar
+          `}
+        >
+          <div className="flex flex-col px-2">
+            {options.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  onChange(opt.value)
+                  setIsOpen(false)
+                }}
+                className={`
+                  px-4 py-3 text-sm text-left rounded-xl transition-all duration-200
+                  ${value === opt.value
+                    ? 'bg-[#00FF99]/10 text-[#00FF99] font-medium'
+                    : 'text-gray-300 hover:bg-white/5 hover:text-white'}
+                `}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      {isOpen && <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />}
+    </div>
+  )
+}
+
+// ==================================================================================
 // 🚀 COMPONENTE PRINCIPAL
 // ==================================================================================
 export default function CompleteProfile() {
   const [user, setUser] = useState(null)
-  
+
   // Form States
   const [fullName, setFullName] = useState('')
   const [companyName, setCompanyName] = useState('')
+  const [businessSector, setBusinessSector] = useState('')
+  const [customSector, setCustomSector] = useState('')
   const [phone, setPhone] = useState('') // O PhoneInput gerencia o valor completo (E.164)
-  
+
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [errors, setErrors] = useState({})
   const [checking, setChecking] = useState(true)
   const router = useRouter()
+
+  // Business Sector Options
+  const BUSINESS_SECTORS = [
+    { value: 'E-commerce / Varejo', label: 'E-commerce / Varejo' },
+    { value: 'Tecnologia / SaaS', label: 'Tecnologia / SaaS' },
+    { value: 'Saúde / Clínica', label: 'Saúde / Clínica' },
+    { value: 'Educação / Cursos', label: 'Educação / Cursos' },
+    { value: 'Imobiliária', label: 'Imobiliária' },
+    { value: 'Delivery / Alimentação', label: 'Delivery / Alimentação' },
+    { value: 'Marketing / Agência', label: 'Marketing / Agência' },
+    { value: 'Advocacia / Jurídico', label: 'Advocacia / Jurídico' },
+    { value: 'Serviços Financeiros', label: 'Serviços Financeiros' },
+    { value: 'Turismo / Hotelaria', label: 'Turismo / Hotelaria' },
+    { value: 'Outros', label: 'Outros' }
+  ]
 
   // Styles (Design System)
   const baseInputClass = "w-full bg-[#1E1E1E] text-white placeholder-gray-500 rounded-3xl px-6 py-4 border outline-none focus:outline-none focus:rounded-3xl focus:bg-[#282828] transition-all duration-300 ease-in-out"
@@ -29,7 +118,7 @@ export default function CompleteProfile() {
 
   const getInputClass = (hasError) => {
     if (hasError) {
-        return `${baseInputClass} border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]`
+      return `${baseInputClass} border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]`
     }
     return `${baseInputClass} border-transparent focus:border-white/10 focus:shadow-[0_0_20px_rgba(255,255,255,0.05)]`
   }
@@ -41,7 +130,7 @@ export default function CompleteProfile() {
   const checkUser = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user) {
         router.push('/login')
         return
@@ -60,21 +149,21 @@ export default function CompleteProfile() {
       }
 
       setUser(user)
-      
+
       // Pre-fill
-      const displayName = user.user_metadata?.full_name || 
-                          user.user_metadata?.name || 
-                          user.email?.split('@')[0] || ''
+      const displayName = user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.email?.split('@')[0] || ''
       setFullName(displayName)
-      
+
       if (profile) {
         if (profile.company_name) setCompanyName(profile.company_name)
         if (profile.full_name) setFullName(profile.full_name)
         if (profile.phone) setPhone(profile.phone)
       }
-      
+
       setChecking(false)
-      
+
     } catch (error) {
       console.error('Erro ao verificar usuário:', error)
       router.push('/login')
@@ -83,17 +172,23 @@ export default function CompleteProfile() {
 
   const validateForm = () => {
     const newErrors = {}
-    
+
     if (!fullName.trim()) newErrors.fullName = 'Nome é obrigatório'
     if (!companyName.trim()) newErrors.companyName = 'Nome da empresa é obrigatório'
-    
+
+    if (!businessSector) {
+      newErrors.businessSector = 'Segmento de atuação é obrigatório'
+    } else if (businessSector === 'Outros' && !customSector.trim()) {
+      newErrors.customSector = 'Por favor, especifique seu segmento'
+    }
+
     if (!phone) {
       newErrors.phone = 'Telefone é obrigatório'
     } else if (phone && !isValidPhoneNumber(phone)) {
-       // isValidPhoneNumber verifica se o número bate com o padrão do país
-       newErrors.phone = 'Número de telefone inválido'
+      // isValidPhoneNumber verifica se o número bate com o padrão do país
+      newErrors.phone = 'Número de telefone inválido'
     }
-    
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -106,11 +201,14 @@ export default function CompleteProfile() {
     setMessage('')
 
     try {
+      const finalBusinessSector = businessSector === 'Outros' ? customSector : businessSector
+
       const { error } = await supabase
         .from('user_profiles')
         .update({
           full_name: fullName,
           company_name: companyName,
+          business_sector: finalBusinessSector,
           phone: phone, // Já está no formato E.164 (ex: +5511999999999)
           avatar_url: user.user_metadata?.avatar_url || null
         })
@@ -140,146 +238,180 @@ export default function CompleteProfile() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] relative overflow-hidden flex items-center justify-center px-4 py-12">
-      
+
       {/* Background Ambient Light */}
       <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-purple-900/10 rounded-full blur-[100px]" />
       <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-[#00FF99]/5 rounded-full blur-[100px]" />
 
       {/* Main Container com Borda Gradiente */}
       <div className="relative w-full max-w-lg animate-fade-in-up">
-        <div 
-            className="rounded-[32px] p-[2px]"
-            style={{ backgroundImage: 'linear-gradient(to right, #8A2BE2, #00BFFF, #00FF99)' }}
+        <div
+          className="rounded-[32px] p-[2px]"
+          style={{ backgroundImage: 'linear-gradient(to right, #8A2BE2, #00BFFF, #00FF99)' }}
         >
-            <div className="bg-[#111111] rounded-[30px] p-8 md:p-10 shadow-2xl">
-                
-                {/* Header */}
-                <div className="text-center mb-8">
-                    <div className="w-16 h-16 bg-[#00FF99]/10 rounded-2xl flex items-center justify-center mx-auto mb-6 rotate-3 border border-[#00FF99]/20">
-                        <svg className="w-8 h-8 text-[#00FF99]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                    </div>
-                    
-                    <h1 className="text-3xl font-bold text-white mb-2">
-                    Complete seu <span className="text-[#00FF99]">Perfil</span>
-                    </h1>
-                    <p className="text-[#B0B0B0]">
-                    Precisamos de alguns detalhes para personalizar sua experiência.
-                    </p>
+          <div className="bg-[#111111] rounded-[30px] p-8 md:p-10 shadow-2xl">
+
+            {/* Header */}
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-[#00FF99]/10 rounded-2xl flex items-center justify-center mx-auto mb-6 rotate-3 border border-[#00FF99]/20">
+                <svg className="w-8 h-8 text-[#00FF99]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+
+              <h1 className="text-3xl font-bold text-white mb-2">
+                Complete seu <span className="text-[#00FF99]">Perfil</span>
+              </h1>
+              <p className="text-[#B0B0B0]">
+                Precisamos de alguns detalhes para personalizar sua experiência.
+              </p>
+            </div>
+
+            {/* Avatar Display */}
+            {user.user_metadata?.avatar_url && (
+              <div className="flex items-center gap-4 p-4 bg-[#1E1E1E] rounded-3xl mb-8 border border-white/5">
+                <img
+                  src={user.user_metadata.avatar_url}
+                  alt="Avatar"
+                  className="w-14 h-14 rounded-full border-2 border-[#00FF99]/30 p-0.5"
+                />
+                <div className="flex-1 overflow-hidden">
+                  <p className="text-white font-bold truncate">{user.email}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Conta Verificada</p>
+                  </div>
                 </div>
+              </div>
+            )}
 
-                {/* Avatar Display */}
-                {user.user_metadata?.avatar_url && (
-                    <div className="flex items-center gap-4 p-4 bg-[#1E1E1E] rounded-3xl mb-8 border border-white/5">
-                        <img 
-                            src={user.user_metadata.avatar_url} 
-                            alt="Avatar"
-                            className="w-14 h-14 rounded-full border-2 border-[#00FF99]/30 p-0.5"
-                        />
-                        <div className="flex-1 overflow-hidden">
-                            <p className="text-white font-bold truncate">{user.email}</p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                                <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Conta Verificada</p>
-                            </div>
-                        </div>
-                    </div>
-                )}
+            {/* Form */}
+            <form onSubmit={handleComplete} className="space-y-6">
 
-                {/* Form */}
-                <form onSubmit={handleComplete} className="space-y-6">
-                    
-                    {/* Nome Completo */}
+              {/* Nome Completo */}
+              <div>
+                <label className={labelClass}>Nome Completo</label>
+                <input
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className={getInputClass(errors.fullName)}
+                  placeholder="Ex: João Silva"
+                />
+                {errors.fullName && <p className="text-red-400 text-xs ml-4 mt-1.5">{errors.fullName}</p>}
+              </div>
+
+              {/* Nome da Empresa */}
+              <div>
+                <label className={labelClass}>Nome da Empresa</label>
+                <input
+                  type="text"
+                  required
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  className={getInputClass(errors.companyName)}
+                  placeholder="Ex: Tech Solutions Ltda"
+                />
+                {errors.companyName && <p className="text-red-400 text-xs ml-4 mt-1.5">{errors.companyName}</p>}
+              </div>
+
+              {/* Segmento de Atuação */}
+              <div>
+                <div className={`${businessSector === 'Outros' ? 'grid grid-cols-1 md:grid-cols-2 gap-3' : ''}`}>
+                  <CustomSelect
+                    label="Segmento de Atuação"
+                    value={businessSector}
+                    onChange={(val) => {
+                      setBusinessSector(val)
+                      if (val !== 'Outros') {
+                        setCustomSector('')
+                      }
+                    }}
+                    options={BUSINESS_SECTORS}
+                    placeholder="Selecione seu segmento"
+                    error={errors.businessSector}
+                  />
+
+                  {businessSector === 'Outros' && (
                     <div>
-                        <label className={labelClass}>Nome Completo</label>
-                        <input
-                            type="text"
-                            required
-                            value={fullName}
-                            onChange={(e) => setFullName(e.target.value)}
-                            className={getInputClass(errors.fullName)}
-                            placeholder="Ex: João Silva"
-                        />
-                        {errors.fullName && <p className="text-red-400 text-xs ml-4 mt-1.5">{errors.fullName}</p>}
+                      <label className={labelClass}>Especifique seu Segmento</label>
+                      <input
+                        type="text"
+                        required
+                        value={customSector}
+                        onChange={(e) => setCustomSector(e.target.value)}
+                        className={`${getInputClass(errors.customSector)} transition-all duration-300`}
+                        placeholder="Descreva seu segmento"
+                      />
                     </div>
+                  )}
+                </div>
+                {errors.businessSector && <p className="text-red-400 text-xs ml-4 mt-1.5">{errors.businessSector}</p>}
+                {errors.customSector && <p className="text-red-400 text-xs ml-4 mt-1.5">{errors.customSector}</p>}
+              </div>
 
-                    {/* Nome da Empresa */}
-                    <div>
-                        <label className={labelClass}>Nome da Empresa</label>
-                        <input
-                            type="text"
-                            required
-                            value={companyName}
-                            onChange={(e) => setCompanyName(e.target.value)}
-                            className={getInputClass(errors.companyName)}
-                            placeholder="Ex: Tech Solutions Ltda"
-                        />
-                        {errors.companyName && <p className="text-red-400 text-xs ml-4 mt-1.5">{errors.companyName}</p>}
-                    </div>
-
-                    {/* Telefone Global via react-phone-number-input */}
-                    <div>
-                        <label className={labelClass}>WhatsApp / Celular</label>
-                        <div className={`
+              {/* Telefone Global via react-phone-number-input */}
+              <div>
+                <label className={labelClass}>Seu WhatsApp Pessoal</label>
+                <div className={`
                             relative transition-all duration-300
                             ${errors.phone ? 'shadow-[0_0_10px_rgba(239,68,68,0.2)]' : ''}
                         `}>
-                            <PhoneInput
-                                international
-                                defaultCountry="BR"
-                                value={phone}
-                                onChange={setPhone}
-                                className={`custom-phone-input ${errors.phone ? 'error' : ''}`}
-                            />
-                        </div>
-                        {errors.phone && <p className="text-red-400 text-xs ml-4 mt-1.5">{errors.phone}</p>}
-                    </div>
-
-                    {/* Feedback Message */}
-                    {message && (
-                        <div className={`p-4 rounded-2xl text-sm border text-center font-medium animate-in fade-in zoom-in duration-300 ${
-                            message.includes('✅') 
-                            ? 'bg-[#00FF99]/10 text-[#00FF99] border-[#00FF99]/20' 
-                            : 'bg-red-500/10 text-red-400 border-red-500/20'
-                        }`}>
-                            {message}
-                        </div>
-                    )}
-
-                    {/* Submit Button */}
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold py-4 rounded-3xl hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center gap-2"
-                    >
-                        {loading ? (
-                            <>
-                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black" />
-                                <span>Salvando...</span>
-                            </>
-                        ) : (
-                            <>
-                                <span>Concluir Cadastro</span>
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-                            </>
-                        )}
-                    </button>
-                </form>
-
-                {/* Footer Info */}
-                <div className="mt-8 text-center border-t border-white/5 pt-6">
-                    <p className="text-[#505050] text-xs max-w-xs mx-auto">
-                        Seus dados são utilizados apenas para personalizar sua comunicação dentro da plataforma.
-                    </p>
-                    <button
-                        onClick={() => router.push('/')}
-                        className="mt-4 text-[#B0B0B0] hover:text-white text-xs transition-colors font-medium hover:underline"
-                    >
-                        Sair desta conta
-                    </button>
+                  <PhoneInput
+                    international
+                    defaultCountry="BR"
+                    value={phone}
+                    onChange={setPhone}
+                    className={`custom-phone-input ${errors.phone ? 'error' : ''}`}
+                  />
                 </div>
+                {errors.phone && <p className="text-red-400 text-xs ml-4 mt-1.5">{errors.phone}</p>}
+              </div>
+
+              {/* Feedback Message */}
+              {message && (
+                <div className={`p-4 rounded-2xl text-sm border text-center font-medium animate-in fade-in zoom-in duration-300 ${message.includes('✅')
+                    ? 'bg-[#00FF99]/10 text-[#00FF99] border-[#00FF99]/20'
+                    : 'bg-red-500/10 text-red-400 border-red-500/20'
+                  }`}>
+                  {message}
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold py-4 rounded-3xl hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black" />
+                    <span>Salvando...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Concluir Cadastro</span>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Footer Info */}
+            <div className="mt-8 text-center border-t border-white/5 pt-6">
+              <p className="text-[#505050] text-xs max-w-xs mx-auto">
+                Seus dados são utilizados apenas para personalizar sua comunicação dentro da plataforma.
+              </p>
+              <button
+                onClick={() => router.push('/')}
+                className="mt-4 text-[#B0B0B0] hover:text-white text-xs transition-colors font-medium hover:underline"
+              >
+                Sair desta conta
+              </button>
             </div>
+          </div>
         </div>
       </div>
 
@@ -365,6 +497,24 @@ export default function CompleteProfile() {
         /* Foco na bandeira */
         .PhoneInputCountry:focus .PhoneInputCountrySelectArrow {
             color: #00FF99;
+        }
+
+        /* Custom Scrollbar para o dropdown */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 3px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #555;
         }
       `}</style>
     </div>

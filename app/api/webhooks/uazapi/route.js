@@ -178,6 +178,7 @@ async function handleMessageReceived(payload) {
         // This will automatically create/update contact and conversation
         const savedMessage = await MessageService.processIncomingMessage(
           message,
+          instanceName,
           connection.id,
           connection.user_id
         )

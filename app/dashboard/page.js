@@ -202,13 +202,35 @@ const loadSubscription = async (userId) => {
       setConnections(data || [])
       
       if (data && data.length > 0) {
-        const firstConnected = data.find(c => c.status === 'connected') || data[0]
-        setActiveConnection(firstConnected)
+        let selectedConnection = null
         
-        if (firstConnected.status === 'connected') {
+        // ✅ Check for saved connection ID in localStorage (client-side only)
+        if (typeof window !== 'undefined') {
+          const savedConnectionId = localStorage.getItem('activeConnectionId')
+          
+          if (savedConnectionId) {
+            // Try to find the saved connection in the current list
+            selectedConnection = data.find(c => c.id === savedConnectionId)
+            
+            if (selectedConnection) {
+              console.log('✅ Restored saved connection from localStorage:', savedConnectionId)
+            } else {
+              console.log('⚠️ Saved connection not found, using default')
+            }
+          }
+        }
+        
+        // Fallback: use first connected connection or first in list
+        if (!selectedConnection) {
+          selectedConnection = data.find(c => c.status === 'connected') || data[0]
+        }
+        
+        setActiveConnection(selectedConnection)
+        
+        if (selectedConnection.status === 'connected') {
           setWhatsappStatus('connected')
-          checkAgentConfig(firstConnected.id)
-          loadDashboardStats(firstConnected)
+          checkAgentConfig(selectedConnection.id)
+          loadDashboardStats(selectedConnection)
         }
       }
     } catch (error) {
@@ -501,6 +523,12 @@ const loadSubscription = async (userId) => {
     setActiveConnection(connection)
     setWhatsappStatus(connection.status)
     setConnectionsDropdownOpen(false)
+    
+    // ✅ Save selected connection ID to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('activeConnectionId', connection.id)
+      console.log('💾 Saved connection to localStorage:', connection.id)
+    }
     
     if (connection.status === 'connected') {
       checkAgentConfig(connection.id)
@@ -1677,7 +1705,7 @@ const handleConfirmPayment = async (e) => {
                   </svg>
                 </div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-xl font-semibold text-white">Swiftbot PRO</h3>
+                  <h3 className="text-xl font-semibold text-white">Swiftbot IA</h3>
                   <span className="px-2 py-0.5 text-[10px] font-bold bg-gradient-to-r from-[#8B5CF6] to-[#00FF99] text-white rounded-full uppercase tracking-wider">
                     IA Beta
                   </span>

@@ -8,10 +8,6 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // ✅ CRÍTICO: Confiar nos headers do proxy
-  experimental: {
-    trustHostHeader: true,
-  },
   webpack: (config, { isServer }) => {
     config.resolve.alias = {
       ...config.resolve.alias,

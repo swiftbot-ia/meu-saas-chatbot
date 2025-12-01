@@ -1,7 +1,8 @@
 -- ============================================
--- MIGRATION: Chat Tables (Contacts & Conversations)
+-- MIGRATION: Chat Tables (Contacts & Conversations) - FIXED VERSION
 -- Created: 2025-11-28
 -- Description: Creates tables for WhatsApp contacts and conversations
+-- Safe to run multiple times (idempotent)
 -- ============================================
 
 -- ============================================
@@ -67,7 +68,8 @@ CREATE TABLE IF NOT EXISTS whatsapp_conversations (
 -- ============================================
 ALTER TABLE whatsapp_messages
   ADD COLUMN IF NOT EXISTS conversation_id UUID REFERENCES whatsapp_conversations(id) ON DELETE CASCADE,
-  ADD COLUMN IF NOT EXISTS contact_id UUID REFERENCES whatsapp_contacts(id) ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS contact_id UUID REFERENCES whatsapp_contacts(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS instance_name VARCHAR(255);
 
 -- ============================================
 -- INDEXES for Performance
@@ -88,6 +90,7 @@ CREATE INDEX IF NOT EXISTS idx_conversations_unread ON whatsapp_conversations(un
 -- Messages indexes (additional)
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON whatsapp_messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_messages_contact ON whatsapp_messages(contact_id);
+CREATE INDEX IF NOT EXISTS idx_messages_instance ON whatsapp_messages(instance_name);
 CREATE INDEX IF NOT EXISTS idx_messages_received_at ON whatsapp_messages(received_at DESC);
 
 -- ============================================
@@ -97,6 +100,15 @@ CREATE INDEX IF NOT EXISTS idx_messages_received_at ON whatsapp_messages(receive
 -- Enable RLS
 ALTER TABLE whatsapp_contacts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE whatsapp_conversations ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Users can view contacts from their conversations" ON whatsapp_contacts;
+DROP POLICY IF EXISTS "Users can insert contacts" ON whatsapp_contacts;
+DROP POLICY IF EXISTS "Users can update contacts from their conversations" ON whatsapp_contacts;
+DROP POLICY IF EXISTS "Users can view their own conversations" ON whatsapp_conversations;
+DROP POLICY IF EXISTS "Users can insert conversations" ON whatsapp_conversations;
+DROP POLICY IF EXISTS "Users can update their own conversations" ON whatsapp_conversations;
+DROP POLICY IF EXISTS "Users can delete their own conversations" ON whatsapp_conversations;
 
 -- Contacts: Users can only see contacts from their conversations
 CREATE POLICY "Users can view contacts from their conversations"
