@@ -33,6 +33,9 @@ function createAuthClient() {
 // ============================================================================
 // GET: Listar conexões do usuário autenticado
 // ============================================================================
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+
 export async function GET(request) {
   try {
     console.log('📋 [GetConnections] Iniciando listagem de conexões')

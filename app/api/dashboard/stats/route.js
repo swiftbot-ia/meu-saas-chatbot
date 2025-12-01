@@ -4,6 +4,9 @@ import { supabase } from '../../../../lib/supabase'
 const EVOLUTION_API_URL = 'https://evolution.swiftbot.com.br'
 const GLOBAL_API_KEY = 'b4b6f08781bfddc7ce1192691264f97a'
 
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+
 export async function POST(request) {
   try {
     const { userId } = await request.json()

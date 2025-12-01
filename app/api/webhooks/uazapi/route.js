@@ -17,6 +17,9 @@ import MessageService from '@/lib/MessageService'
 /**
  * POST - Processar eventos do webhook
  */
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+
 export async function POST(request) {
   try {
     const payload = await request.json()

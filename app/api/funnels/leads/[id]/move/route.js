@@ -1,6 +1,9 @@
 import { createChatSupabaseClient } from '@/lib/supabase/chat-client';
 import { NextResponse } from 'next/server';
 
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+
 export async function PATCH(request, { params }) {
     const { id } = await params;
     const { to_stage, notes, new_index } = await request.json();
