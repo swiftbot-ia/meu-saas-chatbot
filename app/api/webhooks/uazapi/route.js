@@ -179,6 +179,9 @@ function convertUazapiMessage(uazapiMessage) {
     }
   } else if (messageType === 'AudioMessage') {
     // Mensagem de áudio
+    // DEBUG: Log full audio message content to understand UAZAPI structure
+    console.log('🔍 DEBUG - UAZAPI Audio Message Full Content:', JSON.stringify(uazapiMessage.content, null, 2))
+
     converted.message = {
       audioMessage: {
         url: uazapiMessage.content?.URL || uazapiMessage.content?.url,
