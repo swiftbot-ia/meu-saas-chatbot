@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { cookies } from 'next/headers'
 import { supabaseAdmin } from '../../../../lib/supabase/server.js'
 
 // ============================================================================
@@ -12,40 +13,33 @@ import { supabaseAdmin } from '../../../../lib/supabase/server.js'
 // ============================================================================
 export async function GET(request) {
   try {
-    // Obter token de autenticação do header
-    const authHeader = request.headers.get('cookie')
+    // Criar cliente Supabase com os cookies da requisição
+    const cookieStore = cookies()
 
-    if (!authHeader) {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        cookies: {
+          get(name) {
+            return cookieStore.get(name)?.value
+          }
+        }
+      }
+    )
+
+    // Obter usuário autenticado
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      console.error('❌ [ListConnections] Erro de autenticação:', authError)
       return NextResponse.json(
         { error: 'Não autenticado' },
         { status: 401 }
       )
     }
 
-    // Extrair o token do cookie
-    const tokenMatch = authHeader.match(/sb-[^=]+-auth-token\.0=([^;]+)/)
-    const tokenMatch2 = authHeader.match(/sb-[^=]+-auth-token\.1=([^;]+)/)
-
-    if (!tokenMatch || !tokenMatch2) {
-      return NextResponse.json(
-        { error: 'Token inválido' },
-        { status: 401 }
-      )
-    }
-
-    // Decodificar o token base64
-    const base64Token = tokenMatch[1].replace('base64-', '')
-    const tokenData = JSON.parse(Buffer.from(base64Token, 'base64').toString('utf-8'))
-
-    const userId = tokenData.user?.id
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Usuário não identificado' },
-        { status: 401 }
-      )
-    }
-
+    const userId = user.id
     console.log('📋 [ListConnections] Buscando conexões para userId:', userId)
 
     // Buscar conexões do usuário
