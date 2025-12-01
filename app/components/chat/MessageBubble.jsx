@@ -15,6 +15,17 @@ export default function MessageBubble({ message, isOwn }) {
   };
 
   const getMediaUrl = () => {
+    // DEBUG: Log message data for audio messages
+    if (message.message_type === 'audio') {
+      console.log('🔍 Audio Message Debug:', {
+        message_id: message.message_id,
+        local_media_path: message.local_media_path,
+        media_url: message.media_url,
+        transcription: message.transcription,
+        full_message: message
+      });
+    }
+
     // Prefer local_media_path (stored on VPS) over media_url (external URL)
     if (message.local_media_path) {
       return `/${message.local_media_path}`;
