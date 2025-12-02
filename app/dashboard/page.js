@@ -13,6 +13,7 @@ export default function Dashboard() {
   // Estados
   const [user, setUser] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
+  const [profileLoading, setProfileLoading] = useState(true)
   const [subscription, setSubscription] = useState(null)
   const [hasUsedTrialBefore, setHasUsedTrialBefore] = useState(false)
   const [subscriptionStatus, setSubscriptionStatus] = useState('loading')
@@ -98,6 +99,7 @@ export default function Dashboard() {
 
   const loadUserProfile = async (userId) => {
     try {
+      setProfileLoading(true)
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -108,6 +110,8 @@ export default function Dashboard() {
       setUserProfile(data)
     } catch (error) {
       console.error('Erro ao carregar perfil:', error)
+    } finally {
+      setProfileLoading(false)
     }
   }
 
@@ -1160,7 +1164,7 @@ export default function Dashboard() {
     )
   }
 
-  const displayName = (userProfile?.full_name || user?.email?.split('@')[0] || 'Usuário').split(' ')[0]
+  const displayName = profileLoading ? '...' : (userProfile?.full_name || user?.email?.split('@')[0] || 'Usuário').split(' ')[0]
   const initials = displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
   const connectedCount = connections.filter(c => c.status === 'connected').length
   const totalSlots = subscription?.connections_purchased || 1
