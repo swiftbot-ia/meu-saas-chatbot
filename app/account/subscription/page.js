@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '../../../lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 export default function AccountSubscription() {
   const [user, setUser] = useState(null)
@@ -23,11 +23,19 @@ export default function AccountSubscription() {
   const [showConfirmDowngradeModal, setShowConfirmDowngradeModal] = useState(false)
 
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   useEffect(() => {
     checkUser()
   }, [])
 
+
+  // Detecta parâmetro autoOpen e abre modal automaticamente
+  useEffect(() => {
+    if (searchParams.get('autoOpen') === 'true' && subscription && !loading) {
+      handleOpenPlanChange()
+    }
+  }, [searchParams, subscription, loading])
   const checkUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     
