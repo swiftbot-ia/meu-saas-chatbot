@@ -156,8 +156,8 @@ export default function MessageBubble({ message, isOwn }) {
         {/* Media content */}
         {renderMediaContent()}
 
-        {/* Text content */}
-        {message.message_content && (
+        {/* Text content - Don't show for audio messages (transcription is in toggle button) */}
+        {message.message_content && message.message_type !== 'audio' && (
           <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
             {renderMediaIcon()}
             {message.message_content}
