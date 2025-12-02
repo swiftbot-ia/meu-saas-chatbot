@@ -41,7 +41,8 @@ function transformUazApiPayload(payload) {
           extendedTextMessage: msg.text ? { text: msg.text } : undefined
         },
         messageTimestamp: Math.floor((msg.messageTimestamp || Date.now()) / 1000),
-        pushName: msg.senderName || ''
+        pushName: msg.senderName || '',
+        profilePicUrl: msg.profilePicUrl || msg.profilePic || null
       }
     }
   }
