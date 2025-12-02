@@ -728,20 +728,8 @@ async function getOrCreateContact(requestId, whatsappNumber, data = {}) {
     .maybeSingle();
 
   if (existing) {
-    // Atualizar nome se fornecido e diferente
-    if (data.name && data.name !== existing.name) {
-      await chatSupabaseAdmin
-        .from('whatsapp_contacts')
-        .update({
-          name: data.name,
-          jid: data.jid || existing.jid,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existing.id);
-
-      log(requestId, 'info', '📝', `Contato atualizado: ${whatsappNumber}`);
-    }
-
+    // NÃO atualizar nome se já existir - manter consistência
+    // Nome do contato deve ser fixo, não mudar com cada mensagem
     return existing;
   }
 
