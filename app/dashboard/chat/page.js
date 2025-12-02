@@ -93,8 +93,6 @@ export default function ChatPage() {
 
   const handleSelectConversation = (conversation) => {
     setSelectedConversation(conversation);
-    // Forçar reload das conversas para atualizar counters
-    loadConversations();
   };
 
   const handleArchiveConversation = (conversationId) => {
@@ -186,8 +184,8 @@ export default function ChatPage() {
                 key={connection.id}
                 onClick={() => setSelectedConnection(connection.id)}
                 className={`w-full text-left p-3 rounded-lg transition-colors ${selectedConnection === connection.id
-                    ? 'bg-green-500 text-white'
-                    : 'bg-white hover:bg-gray-100 text-gray-700'
+                  ? 'bg-green-500 text-white'
+                  : 'bg-white hover:bg-gray-100 text-gray-700'
                   }`}
               >
                 <div className="font-medium">
