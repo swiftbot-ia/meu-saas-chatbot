@@ -13,70 +13,37 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '../../../../lib/supabase'
 import MessageService from '@/lib/MessageService'
-import { createChatSupabaseAdminClient } from '@/lib/supabase/chat-server'
-
-/**
- * Transform UAZAPI payload to Evolution API format
- */
-function transformUazApiPayload(payload) {
-  // Check if it's UAZAPI format (has EventType, instanceName, message)
-  if (payload.EventType && payload.instanceName && payload.message) {
-    const msg = payload.message
-
-    // Extract message ID (remove owner prefix if present)
-    const messageId = msg.id ? msg.id.split(':').pop() : msg.messageid || ''
-
-    // Transform to Evolution API format
-    return {
-      event: payload.EventType === 'messages' ? 'MESSAGES_UPSERT' : payload.EventType.toUpperCase(),
-      instance: payload.instanceName,
-      data: {
-        key: {
-          remoteJid: msg.chatid || msg.sender,
-          fromMe: msg.fromMe || false,
-          id: messageId
-        },
-        message: {
-          conversation: msg.text || msg.content || '',
-          extendedTextMessage: msg.text ? { text: msg.text } : undefined
-        },
-        messageTimestamp: Math.floor((msg.messageTimestamp || Date.now()) / 1000),
-        pushName: msg.senderName || ''
-      }
-    }
-  }
-
-  // Already in Evolution API format
-  return payload
-}
 
 /**
  * POST - Processar eventos do webhook
  */
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+
 export async function POST(request) {
   try {
-    const rawPayload = await request.json()
+    const payload = await request.json()
 
-    // Transform UAZAPI format to Evolution API format
-    const payload = transformUazApiPayload(rawPayload)
-
-    // DEBUG: Log complete payload with all possible keys
-    console.log('📨 ================== WEBHOOK DEBUG ==================')
-    console.log('📦 Payload Keys:', Object.keys(payload))
-    console.log('📦 Payload:', JSON.stringify(payload, null, 2))
-    console.log('====================================================')
-
-    // UazAPI sends: EventType, instanceName, message
-    // Try multiple possible keys
-    const eventType = payload.EventType || payload.event || payload.eventType || payload.type
-    const instanceName = payload.instanceName || payload.instance || payload.Instance || payload.instancename
+    // Support both payload formats from UAZAPI
+    // Format 1: { event, instance, data }
+    // Format 2: { EventType, instanceName, message }
+    const eventType = payload.event || payload.EventType
+    const instanceName = payload.instance || payload.instanceName
 
     console.log('📨 Webhook recebido da UAZAPI:', {
       event: eventType,
       instance: instanceName,
-      timestamp: new Date().toISOString(),
-      rawPayloadKeys: Object.keys(payload)
+      timestamp: new Date().toISOString()
     })
+
+    // Log full payload if event or instance is missing (for debugging)
+    if (!eventType || !instanceName) {
+      console.log('⚠️ Payload incompleto recebido:', JSON.stringify(payload, null, 2))
+      return NextResponse.json({
+        success: true,
+        message: 'Payload incompleto, ignorando'
+      })
+    }
 
     // Validar autenticação básica (opcional)
     const authHeader = request.headers.get('authorization')
@@ -94,23 +61,24 @@ export async function POST(request) {
     // Processar evento baseado no tipo
     switch (eventType) {
       case 'CONNECTION_UPDATE':
-      case 'connection':
-        await handleConnectionUpdate(payload)
+        await handleConnectionUpdate({ instance: instanceName, ...payload })
         break
 
       case 'MESSAGES_UPSERT':
-      case 'messages':
-        await handleMessageReceived(payload)
+        await handleMessageReceived({ instance: instanceName, data: payload.data, ...payload })
+        break
+
+      case 'messages': // New format from UAZAPI
+        await handleNewFormatMessage({ instance: instanceName, ...payload })
         break
 
       case 'QRCODE_UPDATED':
-      case 'qrcode':
-        await handleQRCodeUpdate(payload)
+        await handleQRCodeUpdate({ instance: instanceName, ...payload })
         break
 
       case 'CONNECTION_LOST':
       case 'CONNECTION_CLOSE':
-        await handleConnectionLost(payload)
+        await handleConnectionLost({ instance: instanceName, ...payload })
         break
 
       default:
@@ -146,10 +114,11 @@ async function handleConnectionUpdate(payload) {
       .from('whatsapp_connections')
       .select('*')
       .eq('instance_name', instanceName)
-      .single()
+      .maybeSingle()
 
+    // Se não houver conexão no banco, apenas ignorar silenciosamente
     if (error || !connection) {
-      console.warn(`⚠️ Conexão não encontrada no banco: ${instanceName}`)
+      console.log(`ℹ️ Conexão não encontrada no banco, ignorando evento: ${instanceName}`)
       return
     }
 
@@ -203,46 +172,57 @@ async function handleConnectionUpdate(payload) {
  */
 async function handleMessageReceived(payload) {
   try {
-    // UazAPI format: { instanceName, message, chat, owner, token }
-    const instanceName = payload.instanceName || payload.instance
-    const messageData = payload.message || payload.data
+    const instanceName = payload.instance
+    const messageData = payload.data
 
     console.log(`💬 MESSAGES_UPSERT: ${instanceName}`)
 
     // Buscar conexão no banco
-    const { data: connection } = await supabase
+    const { data: connection, error: connectionError } = await supabase
       .from('whatsapp_connections')
       .select('id, user_id')
       .eq('instance_name', instanceName)
-      .single()
+      .maybeSingle()
 
-    if (!connection) {
-      console.warn(`⚠️ Conexão não encontrada: ${instanceName}`)
+    // Se não houver conexão no banco, apenas ignorar silenciosamente
+    if (!connection || connectionError) {
+      console.log(`ℹ️ Conexão não encontrada no banco, ignorando mensagem: ${instanceName}`)
       return
     }
-
-    // Criar cliente admin do chat para bypassar RLS
-    // Necessário porque webhook não tem contexto de autenticação
-    const chatAdminClient = createChatSupabaseAdminClient()
 
     // Processar cada mensagem
     const messages = Array.isArray(messageData) ? messageData : [messageData]
 
     for (const message of messages) {
       try {
+        console.log('🔍 DEBUG - Processando mensagem:', {
+          instanceName,
+          connectionId: connection.id,
+          userId: connection.user_id,
+          messageId: message.key?.id,
+          fromMe: message.key?.fromMe,
+          remoteJid: message.key?.remoteJid,
+          hasMessage: !!message.message,
+          messageType: message.message ? Object.keys(message.message)[0] : 'unknown'
+        })
+
         // Use MessageService to process incoming message
-        // Pass chatAdminClient to bypass RLS policies
         // This will automatically create/update contact and conversation
         const savedMessage = await MessageService.processIncomingMessage(
           message,
           instanceName,
           connection.id,
-          connection.user_id,
-          chatAdminClient // Pass admin client to bypass RLS
+          connection.user_id
         )
 
         if (savedMessage) {
-          console.log(`✅ Mensagem processada: ${savedMessage.message_id}`)
+          console.log(`✅ Mensagem processada e salva:`, {
+            message_id: savedMessage.message_id,
+            conversation_id: savedMessage.conversation_id,
+            contact_id: savedMessage.contact_id,
+            message_type: savedMessage.message_type,
+            direction: savedMessage.direction
+          })
         } else {
           console.log(`ℹ️ Mensagem ignorada (provavelmente enviada por nós)`)
         }
@@ -250,13 +230,142 @@ async function handleMessageReceived(payload) {
         // TODO: Implementar lógica de resposta automática/bot se necessário
 
       } catch (messageError) {
-        console.error('❌ Erro ao processar mensagem individual:', messageError)
+        console.error('❌ ERRO DETALHADO ao processar mensagem:', {
+          error: messageError.message,
+          code: messageError.code,
+          hint: messageError.hint,
+          details: messageError.details,
+          stack: messageError.stack
+        })
         // Continue processando outras mensagens mesmo se uma falhar
       }
     }
 
   } catch (error) {
     console.error('❌ Erro ao processar MESSAGES_UPSERT:', error)
+  }
+}
+
+/**
+ * Handle new message format from UAZAPI
+ * Converts new format to old format expected by MessageService
+ */
+async function handleNewFormatMessage(payload) {
+  try {
+    const instanceName = payload.instanceName
+    const messageData = payload.message
+
+    console.log(`💬 NEW FORMAT MESSAGE: ${instanceName}`)
+
+    // Buscar conexão no banco
+    const { data: connection, error: connectionError } = await supabase
+      .from('whatsapp_connections')
+      .select('id, user_id')
+      .eq('instance_name', instanceName)
+      .maybeSingle()
+
+    // Se não houver conexão no banco, apenas ignorar silenciosamente
+    if (!connection || connectionError) {
+      console.log(`ℹ️ Conexão não encontrada no banco, ignorando mensagem: ${instanceName}`)
+      return
+    }
+
+    // Convert new format to old format expected by MessageService
+    const convertedMessage = {
+      key: {
+        remoteJid: messageData.chatid,
+        fromMe: messageData.fromMe,
+        id: messageData.messageid || messageData.id.split(':')[1]
+      },
+      messageTimestamp: Math.floor(messageData.messageTimestamp / 1000), // Convert ms to seconds
+      pushName: messageData.senderName,
+      message: {}
+    }
+
+    // Convert message type
+    switch (messageData.messageType) {
+      case 'AudioMessage':
+        convertedMessage.message.audioMessage = {
+          url: messageData.content.URL,
+          mimetype: messageData.content.mimetype,
+          mediaKey: messageData.content.mediaKey,
+          fileEncSha256: messageData.content.fileEncSHA256,
+          fileSha256: messageData.content.fileSHA256,
+          fileLength: messageData.content.fileLength,
+          seconds: messageData.content.seconds
+        }
+        break
+
+      case 'ImageMessage':
+        convertedMessage.message.imageMessage = {
+          url: messageData.content.URL,
+          mimetype: messageData.content.mimetype,
+          caption: messageData.text || '',
+          mediaKey: messageData.content.mediaKey,
+          fileEncSha256: messageData.content.fileEncSHA256,
+          fileSha256: messageData.content.fileSHA256
+        }
+        break
+
+      case 'VideoMessage':
+        convertedMessage.message.videoMessage = {
+          url: messageData.content.URL,
+          mimetype: messageData.content.mimetype,
+          caption: messageData.text || '',
+          mediaKey: messageData.content.mediaKey,
+          fileEncSha256: messageData.content.fileEncSHA256,
+          fileSha256: messageData.content.fileSHA256,
+          seconds: messageData.content.seconds
+        }
+        break
+
+      case 'DocumentMessage':
+        convertedMessage.message.documentMessage = {
+          url: messageData.content.URL,
+          mimetype: messageData.content.mimetype,
+          fileName: messageData.content.fileName || 'document',
+          mediaKey: messageData.content.mediaKey,
+          fileEncSha256: messageData.content.fileEncSHA256,
+          fileSha256: messageData.content.fileSHA256
+        }
+        break
+
+      case 'TextMessage':
+      default:
+        convertedMessage.message.conversation = messageData.text
+        break
+    }
+
+    console.log('🔄 Converted message format:', {
+      instanceName,
+      messageId: convertedMessage.key.id,
+      messageType: messageData.messageType
+    })
+
+    // Use MessageService to process incoming message
+    const savedMessage = await MessageService.processIncomingMessage(
+      convertedMessage,
+      instanceName,
+      connection.id,
+      connection.user_id
+    )
+
+    if (savedMessage) {
+      console.log(`✅ Mensagem processada e salva:`, {
+        message_id: savedMessage.message_id,
+        conversation_id: savedMessage.conversation_id,
+        contact_id: savedMessage.contact_id,
+        message_type: savedMessage.message_type,
+        direction: savedMessage.direction,
+        has_media: !!savedMessage.local_media_path,
+        has_transcription: !!savedMessage.transcription
+      })
+    } else {
+      console.log(`ℹ️ Mensagem ignorada (provavelmente enviada por nós)`)
+    }
+
+  } catch (error) {
+    console.error('❌ Erro ao processar mensagem novo formato:', error)
   }
 }
 
@@ -269,6 +378,19 @@ async function handleQRCodeUpdate(payload) {
     const qrCode = payload.data?.qrcode || payload.data?.base64
 
     console.log(`📱 QRCODE_UPDATED: ${instanceName}`)
+
+    // Verificar se conexão existe no banco
+    const { data: connection } = await supabase
+      .from('whatsapp_connections')
+      .select('id')
+      .eq('instance_name', instanceName)
+      .maybeSingle()
+
+    // Se não houver conexão no banco, apenas ignorar
+    if (!connection) {
+      console.log(`ℹ️ Conexão não encontrada no banco, ignorando QR Code: ${instanceName}`)
+      return
+    }
 
     // Você pode armazenar o QR Code atualizado se necessário
     // Ou notificar o frontend via WebSocket/SSE
@@ -299,6 +421,19 @@ async function handleConnectionLost(payload) {
     const instanceName = payload.instance
 
     console.log(`❌ CONNECTION_LOST: ${instanceName}`)
+
+    // Verificar se conexão existe no banco
+    const { data: connection } = await supabase
+      .from('whatsapp_connections')
+      .select('id')
+      .eq('instance_name', instanceName)
+      .maybeSingle()
+
+    // Se não houver conexão no banco, apenas ignorar
+    if (!connection) {
+      console.log(`ℹ️ Conexão não encontrada no banco, ignorando perda de conexão: ${instanceName}`)
+      return
+    }
 
     await supabase
       .from('whatsapp_connections')
