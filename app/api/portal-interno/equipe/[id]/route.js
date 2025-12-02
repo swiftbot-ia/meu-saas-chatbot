@@ -2,6 +2,9 @@
 import { NextResponse } from 'next/server';
 import { getCurrentSession, hasPermission, deleteSupportUser } from '@/lib/support-auth';
 
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+
 export async function DELETE(request, { params }) {
   try {
     const session = await getCurrentSession();
