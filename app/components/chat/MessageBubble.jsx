@@ -121,7 +121,8 @@ export default function MessageBubble({ message, isOwn }) {
       case 'video':
         return <Video {...iconProps} />;
       case 'audio':
-        return <Mic {...iconProps} />;
+        // Don't show icon for audio - it has its own player and transcription button
+        return null;
       case 'document':
         return <FileText {...iconProps} />;
       default:

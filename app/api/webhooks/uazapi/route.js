@@ -30,6 +30,11 @@ export async function POST(request) {
       timestamp: new Date().toISOString()
     })
 
+    // Log full payload if event or instance is missing (for debugging)
+    if (!payload.event || !payload.instance) {
+      console.log('⚠️ Payload incompleto recebido:', JSON.stringify(payload, null, 2))
+    }
+
     // Validar autenticação básica (opcional)
     const authHeader = request.headers.get('authorization')
     if (process.env.WEBHOOK_AUTH_USER && process.env.WEBHOOK_AUTH_PASS) {
