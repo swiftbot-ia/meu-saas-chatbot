@@ -1,8 +1,7 @@
 'use client'
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../../../lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import AutoOpenHandler from './AutoOpenHandler'
 
 export default function AccountSubscription() {
   const [user, setUser] = useState(null)
@@ -29,19 +28,15 @@ export default function AccountSubscription() {
     checkUser()
   }, [])
 
-
-
-  // Detecta parâmetro autoOpen e abre modal automaticamente
-
+  // Detecta hash #autoOpen e abre modal automaticamente
   useEffect(() => {
-
-    if (searchParams.get('autoOpen') === 'true' && subscription && !loading) {
-
+    if (typeof window !== 'undefined' && window.location.hash === '#autoOpen' && subscription && !loading) {
       handleOpenPlanChange()
-
+      // Limpar hash da URL
+      window.history.replaceState(null, '', '/account/subscription')
     }
+  }, [subscription, loading])
 
-  }, [searchParams, subscription, loading])
   const checkUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -589,9 +584,9 @@ export default function AccountSubscription() {
                       <div key={log.id} className="flex items-center justify-between p-4 bg-[#0A0A0A] rounded-xl hover:bg-[#1C1C1C] transition-colors duration-300 group">
                         <div className="flex items-center space-x-4">
                           <div className={`w-3 h-3 rounded-full flex-shrink-0 ${log.status === 'success' ? 'bg-green-400' :
-                              log.status === 'failed' ? 'bg-red-400' :
-                                log.status === 'canceled' ? 'bg-red-400' :
-                                  'bg-yellow-400'
+                            log.status === 'failed' ? 'bg-red-400' :
+                              log.status === 'canceled' ? 'bg-red-400' :
+                                'bg-yellow-400'
                             }`}></div>
                           <div>
                             <div className="text-white font-medium group-hover:text-[#00FF99] transition-colors duration-300">
@@ -912,8 +907,8 @@ export default function AccountSubscription() {
                   <button
                     onClick={() => handleSelectNewPlan(selectedNewPlan.connections, 'monthly')}
                     className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all duration-300 ${selectedNewPlan.billing_period === 'monthly'
-                        ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black'
-                        : 'text-gray-400 hover:text-white'
+                      ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black'
+                      : 'text-gray-400 hover:text-white'
                       }`}
                   >
                     Mensal
@@ -921,8 +916,8 @@ export default function AccountSubscription() {
                   <button
                     onClick={() => handleSelectNewPlan(selectedNewPlan.connections, 'annual')}
                     className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all duration-300 ${selectedNewPlan.billing_period === 'annual'
-                        ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black'
-                        : 'text-gray-400 hover:text-white'
+                      ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black'
+                      : 'text-gray-400 hover:text-white'
                       }`}
                   >
                     Anual
@@ -947,10 +942,10 @@ export default function AccountSubscription() {
                       onClick={() => handleSelectNewPlan(connections, selectedNewPlan.billing_period)}
                       disabled={isCurrentPlan}
                       className={`p-4 rounded-xl border-2 transition-all duration-300 ${isCurrentPlan
-                          ? 'border-gray-600 bg-gray-900/50 cursor-not-allowed opacity-50'
-                          : isSelected
-                            ? 'border-[#00FF99] bg-[#00FF99]/10'
-                            : 'border-white/10 hover:border-white/30 bg-[#0A0A0A]'
+                        ? 'border-gray-600 bg-gray-900/50 cursor-not-allowed opacity-50'
+                        : isSelected
+                          ? 'border-[#00FF99] bg-[#00FF99]/10'
+                          : 'border-white/10 hover:border-white/30 bg-[#0A0A0A]'
                         }`}
                     >
                       <div className="text-center">
@@ -974,8 +969,8 @@ export default function AccountSubscription() {
               {/* Info sobre tipo de mudança */}
               {changeType && (
                 <div className={`p-4 rounded-xl mb-6 ${changeType === 'upgrade'
-                    ? 'bg-blue-500/10 border border-blue-500/30'
-                    : 'bg-orange-500/10 border border-orange-500/30'
+                  ? 'bg-blue-500/10 border border-blue-500/30'
+                  : 'bg-orange-500/10 border border-orange-500/30'
                   }`}>
                   <div className="flex items-start gap-3">
                     <svg className={`w-5 h-5 mt-0.5 ${changeType === 'upgrade' ? 'text-blue-400' : 'text-orange-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
