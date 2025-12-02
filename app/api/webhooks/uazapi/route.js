@@ -24,15 +24,25 @@ export async function POST(request) {
   try {
     const payload = await request.json()
 
+    // Support both payload formats from UAZAPI
+    // Format 1: { event, instance, data }
+    // Format 2: { EventType, instanceName, message }
+    const eventType = payload.event || payload.EventType
+    const instanceName = payload.instance || payload.instanceName
+
     console.log('📨 Webhook recebido da UAZAPI:', {
-      event: payload.event,
-      instance: payload.instance,
+      event: eventType,
+      instance: instanceName,
       timestamp: new Date().toISOString()
     })
 
     // Log full payload if event or instance is missing (for debugging)
-    if (!payload.event || !payload.instance) {
+    if (!eventType || !instanceName) {
       console.log('⚠️ Payload incompleto recebido:', JSON.stringify(payload, null, 2))
+      return NextResponse.json({
+        success: true,
+        message: 'Payload incompleto, ignorando'
+      })
     }
 
     // Validar autenticação básica (opcional)
@@ -48,26 +58,27 @@ export async function POST(request) {
       }
     }
 
-    // Identificar o tipo de evento
-    const eventType = payload.event
-
     // Processar evento baseado no tipo
     switch (eventType) {
       case 'CONNECTION_UPDATE':
-        await handleConnectionUpdate(payload)
+        await handleConnectionUpdate({ instance: instanceName, ...payload })
         break
 
       case 'MESSAGES_UPSERT':
-        await handleMessageReceived(payload)
+        await handleMessageReceived({ instance: instanceName, data: payload.data, ...payload })
+        break
+
+      case 'messages': // New format from UAZAPI
+        await handleNewFormatMessage({ instance: instanceName, ...payload })
         break
 
       case 'QRCODE_UPDATED':
-        await handleQRCodeUpdate(payload)
+        await handleQRCodeUpdate({ instance: instanceName, ...payload })
         break
 
       case 'CONNECTION_LOST':
       case 'CONNECTION_CLOSE':
-        await handleConnectionLost(payload)
+        await handleConnectionLost({ instance: instanceName, ...payload })
         break
 
       default:
@@ -232,6 +243,129 @@ async function handleMessageReceived(payload) {
 
   } catch (error) {
     console.error('❌ Erro ao processar MESSAGES_UPSERT:', error)
+  }
+}
+
+/**
+ * Handle new message format from UAZAPI
+ * Converts new format to old format expected by MessageService
+ */
+async function handleNewFormatMessage(payload) {
+  try {
+    const instanceName = payload.instanceName
+    const messageData = payload.message
+
+    console.log(`💬 NEW FORMAT MESSAGE: ${instanceName}`)
+
+    // Buscar conexão no banco
+    const { data: connection, error: connectionError } = await supabase
+      .from('whatsapp_connections')
+      .select('id, user_id')
+      .eq('instance_name', instanceName)
+      .maybeSingle()
+
+    // Se não houver conexão no banco, apenas ignorar silenciosamente
+    if (!connection || connectionError) {
+      console.log(`ℹ️ Conexão não encontrada no banco, ignorando mensagem: ${instanceName}`)
+      return
+    }
+
+    // Convert new format to old format expected by MessageService
+    const convertedMessage = {
+      key: {
+        remoteJid: messageData.chatid,
+        fromMe: messageData.fromMe,
+        id: messageData.messageid || messageData.id.split(':')[1]
+      },
+      messageTimestamp: Math.floor(messageData.messageTimestamp / 1000), // Convert ms to seconds
+      pushName: messageData.senderName,
+      message: {}
+    }
+
+    // Convert message type
+    switch (messageData.messageType) {
+      case 'AudioMessage':
+        convertedMessage.message.audioMessage = {
+          url: messageData.content.URL,
+          mimetype: messageData.content.mimetype,
+          mediaKey: messageData.content.mediaKey,
+          fileEncSha256: messageData.content.fileEncSHA256,
+          fileSha256: messageData.content.fileSHA256,
+          fileLength: messageData.content.fileLength,
+          seconds: messageData.content.seconds
+        }
+        break
+
+      case 'ImageMessage':
+        convertedMessage.message.imageMessage = {
+          url: messageData.content.URL,
+          mimetype: messageData.content.mimetype,
+          caption: messageData.text || '',
+          mediaKey: messageData.content.mediaKey,
+          fileEncSha256: messageData.content.fileEncSHA256,
+          fileSha256: messageData.content.fileSHA256
+        }
+        break
+
+      case 'VideoMessage':
+        convertedMessage.message.videoMessage = {
+          url: messageData.content.URL,
+          mimetype: messageData.content.mimetype,
+          caption: messageData.text || '',
+          mediaKey: messageData.content.mediaKey,
+          fileEncSha256: messageData.content.fileEncSHA256,
+          fileSha256: messageData.content.fileSHA256,
+          seconds: messageData.content.seconds
+        }
+        break
+
+      case 'DocumentMessage':
+        convertedMessage.message.documentMessage = {
+          url: messageData.content.URL,
+          mimetype: messageData.content.mimetype,
+          fileName: messageData.content.fileName || 'document',
+          mediaKey: messageData.content.mediaKey,
+          fileEncSha256: messageData.content.fileEncSHA256,
+          fileSha256: messageData.content.fileSHA256
+        }
+        break
+
+      case 'TextMessage':
+      default:
+        convertedMessage.message.conversation = messageData.text
+        break
+    }
+
+    console.log('🔄 Converted message format:', {
+      instanceName,
+      messageId: convertedMessage.key.id,
+      messageType: messageData.messageType
+    })
+
+    // Use MessageService to process incoming message
+    const savedMessage = await MessageService.processIncomingMessage(
+      convertedMessage,
+      instanceName,
+      connection.id,
+      connection.user_id
+    )
+
+    if (savedMessage) {
+      console.log(`✅ Mensagem processada e salva:`, {
+        message_id: savedMessage.message_id,
+        conversation_id: savedMessage.conversation_id,
+        contact_id: savedMessage.contact_id,
+        message_type: savedMessage.message_type,
+        direction: savedMessage.direction,
+        has_media: !!savedMessage.local_media_path,
+        has_transcription: !!savedMessage.transcription
+      })
+    } else {
+      console.log(`ℹ️ Mensagem ignorada (provavelmente enviada por nós)`)
+    }
+
+  } catch (error) {
+    console.error('❌ Erro ao processar mensagem novo formato:', error)
   }
 }
 
