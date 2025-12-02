@@ -1,18 +1,19 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { supabase } from '../../../lib/supabase/client'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
+import AutoOpenHandler from './AutoOpenHandler'
 
 export default function AccountSubscription() {
   const [user, setUser] = useState(null)
-  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false) 
+  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false)
   const [subscription, setSubscription] = useState(null)
   const [paymentLogs, setPaymentLogs] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [canceling, setCanceling] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
-  
+
   // ============================================
   // 1. ESTADOS ADICIONADOS
   // ============================================
@@ -23,27 +24,32 @@ export default function AccountSubscription() {
   const [showConfirmDowngradeModal, setShowConfirmDowngradeModal] = useState(false)
 
   const router = useRouter()
-  const searchParams = useSearchParams()
 
   useEffect(() => {
     checkUser()
   }, [])
 
-
-  // Detecta parâmetro autoOpen e abre modal automaticamente
-  useEffect(() => {
-    if (searchParams.get('autoOpen') === 'true' && subscription && !loading) {
-      handleOpenPlanChange()
-    }
+
+
+  // Detecta parâmetro autoOpen e abre modal automaticamente
+
+  useEffect(() => {
+
+    if (searchParams.get('autoOpen') === 'true' && subscription && !loading) {
+
+      handleOpenPlanChange()
+
+    }
+
   }, [searchParams, subscription, loading])
   const checkUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    
+
     if (!user) {
       router.push('/login')
     } else {
       setUser(user)
-      await loadUserProfile(user.id) 
+      await loadUserProfile(user.id)
       await loadSubscriptionData(user.id)
     }
     setLoading(false)
@@ -96,44 +102,44 @@ export default function AccountSubscription() {
 
   const getSubscriptionStatus = () => {
     if (!subscription) return 'none'
-    
+
     if (subscription.status === 'trial' && new Date() > new Date(subscription.trial_end_date)) {
       return 'expired'
     }
     return subscription.status
   }
 
-const calculateRemainingDays = () => {
-  // ❌ NÃO MOSTRAR DIAS RESTANTES SE CANCELADO/EXPIRADO
-  if (subscriptionStatus === 'canceled' || 
-      subscriptionStatus === 'cancelled' || 
+  const calculateRemainingDays = () => {
+    // ❌ NÃO MOSTRAR DIAS RESTANTES SE CANCELADO/EXPIRADO
+    if (subscriptionStatus === 'canceled' ||
+      subscriptionStatus === 'cancelled' ||
       subscriptionStatus === 'expired') {
+      return 0
+    }
+
+    // ✅ Para TRIAL ATIVO: usar trial_end_date
+    if (subscriptionStatus === 'trial' && subscription.trial_end_date) {
+      const trialEndDate = new Date(subscription.trial_end_date)
+      const now = new Date()
+      const diffTime = trialEndDate - now
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+      return Math.max(0, diffDays)
+    }
+
+    // ✅ Para PLANO ATIVO: usar next_billing_date
+    if (subscriptionStatus === 'active' && subscription.next_billing_date) {
+      const nextBilling = new Date(subscription.next_billing_date)
+      const now = new Date()
+      const diffTime = nextBilling - now
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+      return Math.max(0, diffDays)
+    }
+
+    // ✅ Caso contrário, não há dias restantes
     return 0
   }
-
-  // ✅ Para TRIAL ATIVO: usar trial_end_date
-  if (subscriptionStatus === 'trial' && subscription.trial_end_date) {
-    const trialEndDate = new Date(subscription.trial_end_date)
-    const now = new Date()
-    const diffTime = trialEndDate - now
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    
-    return Math.max(0, diffDays)
-  }
-
-  // ✅ Para PLANO ATIVO: usar next_billing_date
-  if (subscriptionStatus === 'active' && subscription.next_billing_date) {
-    const nextBilling = new Date(subscription.next_billing_date)
-    const now = new Date()
-    const diffTime = nextBilling - now
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    
-    return Math.max(0, diffDays)
-  }
-
-  // ✅ Caso contrário, não há dias restantes
-  return 0
-}
 
   const calculatePrice = (connections, billingPeriod) => {
     const pricing = {
@@ -145,15 +151,15 @@ const calculateRemainingDays = () => {
 
   const handleCancelSubscription = async () => {
     setCanceling(true)
-    
+
     try {
       console.log('🚨 Iniciando cancelamento da assinatura...')
-      
+
       const response = await fetch('/api/subscription/cancel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          userId: user.id 
+        body: JSON.stringify({
+          userId: user.id
         }),
       })
 
@@ -166,12 +172,12 @@ const calculateRemainingDays = () => {
       } else {
         throw new Error(data.error || 'Erro ao cancelar assinatura')
       }
-      
+
     } catch (error) {
       console.error('❌ Erro ao cancelar assinatura:', error)
       alert('❌ Erro ao cancelar assinatura: ' + error.message)
     }
-    
+
     setCanceling(false)
   }
 
@@ -227,17 +233,17 @@ const calculateRemainingDays = () => {
       monthly: { 1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875 },
       annual: { 1: 1776, 2: 3294, 3: 4806, 4: 6318, 5: 6750, 6: 8100, 7: 9450 }
     }
-    
+
     const currentValue = prices[current.billing_period][current.connections]
     const newValue = prices[newPlan.billing_period][newPlan.connections]
-    
+
     return newValue > currentValue ? 'upgrade' : 'downgrade'
   }
 
   // Abrir modal de mudança de plano
   const handleOpenPlanChange = () => {
     if (!subscription) return
-    
+
     // Inicializar com plano atual
     setSelectedNewPlan({
       connections: subscription.connections_purchased,
@@ -252,12 +258,12 @@ const calculateRemainingDays = () => {
   const handleSelectNewPlan = (connections, period) => {
     const newPlan = { connections, billing_period: period }
     setSelectedNewPlan(newPlan)
-    
+
     const currentPlan = {
       connections: subscription.connections_purchased,
       billing_period: subscription.billing_period
     }
-    
+
     const type = determineChangeType(currentPlan, newPlan)
     setChangeType(type)
   }
@@ -268,95 +274,95 @@ const calculateRemainingDays = () => {
       alert('Por favor, selecione um plano diferente do atual')
       return
     }
-    
+
     if (changeType === 'downgrade') {
       setShowConfirmDowngradeModal(true)
       return
     }
-    
+
     // Se for upgrade, processar direto
     await processPlanChange()
   }
 
   // Processar upgrade ou downgrade
-const processPlanChange = async () => {
-  setChangingPlan(true)
-  
-  try {
-    const endpoint = changeType === 'upgrade' 
-      ? '/api/subscription/upgrade'
-      : '/api/subscription/downgrade'
-    
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: user.id,
-        newPlan: selectedNewPlan
+  const processPlanChange = async () => {
+    setChangingPlan(true)
+
+    try {
+      const endpoint = changeType === 'upgrade'
+        ? '/api/subscription/upgrade'
+        : '/api/subscription/downgrade'
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          newPlan: selectedNewPlan
+        })
       })
-    })
-    
-    const data = await response.json()
-    
-    if (!data.success) {
-      alert(`❌ Erro: ${data.error}`)
-      return
-    }
-    
-    // ✅ CORREÇÃO: Acessar dados corretos da resposta
-    if (changeType === 'upgrade') {
-      const chargedAmount = data.data?.estimated_charge || 0
-      alert(`✅ Upgrade realizado! Você foi cobrado aproximadamente R$ ${chargedAmount.toFixed(2)}`)
-    } else {
-      // ✅ CORREÇÃO: Validar se effective_date existe antes de usar
-      if (data.data?.effective_date) {
-        const effectiveDate = new Date(data.data.effective_date)
-        if (!isNaN(effectiveDate.getTime())) {
-          alert(`✅ Downgrade agendado para ${effectiveDate.toLocaleDateString('pt-BR')}`)
+
+      const data = await response.json()
+
+      if (!data.success) {
+        alert(`❌ Erro: ${data.error}`)
+        return
+      }
+
+      // ✅ CORREÇÃO: Acessar dados corretos da resposta
+      if (changeType === 'upgrade') {
+        const chargedAmount = data.data?.estimated_charge || 0
+        alert(`✅ Upgrade realizado! Você foi cobrado aproximadamente R$ ${chargedAmount.toFixed(2)}`)
+      } else {
+        // ✅ CORREÇÃO: Validar se effective_date existe antes de usar
+        if (data.data?.effective_date) {
+          const effectiveDate = new Date(data.data.effective_date)
+          if (!isNaN(effectiveDate.getTime())) {
+            alert(`✅ Downgrade agendado para ${effectiveDate.toLocaleDateString('pt-BR')}`)
+          } else {
+            alert(`✅ Downgrade agendado com sucesso!`)
+          }
         } else {
           alert(`✅ Downgrade agendado com sucesso!`)
         }
-      } else {
-        alert(`✅ Downgrade agendado com sucesso!`)
       }
+
+      // Recarregar dados
+      await loadSubscriptionData(user.id)
+
+      // Fechar modais
+      setShowPlanChangeModal(false)
+      setShowConfirmDowngradeModal(false)
+
+    } catch (error) {
+      console.error('Erro ao mudar plano:', error)
+      alert('❌ Erro ao processar mudança de plano: ' + error.message)
+    } finally {
+      setChangingPlan(false)
     }
-    
-    // Recarregar dados
-    await loadSubscriptionData(user.id)
-    
-    // Fechar modais
-    setShowPlanChangeModal(false)
-    setShowConfirmDowngradeModal(false)
-    
-  } catch (error) {
-    console.error('Erro ao mudar plano:', error)
-    alert('❌ Erro ao processar mudança de plano: ' + error.message)
-  } finally {
-    setChangingPlan(false)
   }
-}
 
   // Cancelar mudança agendada
   const handleCancelScheduledChange = async () => {
     if (!confirm('Tem certeza que deseja cancelar a mudança agendada?')) return
-    
+
     try {
       const response = await fetch('/api/subscription/cancel-change', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id })
       })
-      
+
       const data = await response.json()
-      
+
       if (!data.success) {
         alert(`❌ Erro: ${data.error}`)
         return
       }
-      
+
       alert('✅ Mudança cancelada com sucesso!')
       await loadSubscriptionData(user.id)
-      
+
     } catch (error) {
       console.error('Erro ao cancelar mudança:', error)
       alert('❌ Erro ao cancelar mudança')
@@ -380,18 +386,18 @@ const processPlanChange = async () => {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A]">
-      
+
       <main className="relative z-10 max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
-        
+
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
+
           {/* Coluna Principal - Detalhes da Assinatura */}
           <div className="lg:col-span-2 space-y-8">
-            
+
             {/* Status da Assinatura */}
             {/* MODIFICADO: Card principal com borda gradiente e fundo #111111 */}
-            <div 
+            <div
               className="rounded-2xl p-8"
               style={{
                 border: '2px solid transparent',
@@ -406,7 +412,7 @@ const processPlanChange = async () => {
                   <svg className="w-6 h-6 text-[#00FF99]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>
                   Status da Assinatura
                 </h2>
-                
+
                 {subscription ? (
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
@@ -419,20 +425,20 @@ const processPlanChange = async () => {
                           {subscriptionStatus === 'expired' && 'Expirado'}
                         </div>
                       </div>
-                      
-{remainingDays > 0 && 
- subscriptionStatus !== 'canceled' && 
- subscriptionStatus !== 'cancelled' &&
- subscriptionStatus !== 'expired' && (
-  <div className="text-right relative">
-    <div className="relative bg-[#0A0A0A] rounded-xl p-4">
-      <div className="text-3xl font-bold text-[#00FF99]">{remainingDays}</div>
-      <div className="text-sm text-gray-400">
-        {subscriptionStatus === 'trial' ? 'dias de trial' : 'dias restantes'}
-      </div>
-    </div>
-  </div>
-)}
+
+                      {remainingDays > 0 &&
+                        subscriptionStatus !== 'canceled' &&
+                        subscriptionStatus !== 'cancelled' &&
+                        subscriptionStatus !== 'expired' && (
+                          <div className="text-right relative">
+                            <div className="relative bg-[#0A0A0A] rounded-xl p-4">
+                              <div className="text-3xl font-bold text-[#00FF99]">{remainingDays}</div>
+                              <div className="text-sm text-gray-400">
+                                {subscriptionStatus === 'trial' ? 'dias de trial' : 'dias restantes'}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                     </div>
 
                     {subscriptionStatus === 'canceled' && (
@@ -465,7 +471,7 @@ const processPlanChange = async () => {
                           </div>
                         </div>
                       </div>
-                      
+
                       {/* MODIFICADO: Sub-card sem borda, com SVG, com hover de bg */}
                       <div className="bg-[#0A0A0A] rounded-xl p-4 hover:bg-[#1C1C1C] transition-colors duration-300 group">
                         <div className="relative z-10">
@@ -478,7 +484,7 @@ const processPlanChange = async () => {
                           </div>
                         </div>
                       </div>
-                      
+
                       {/* MODIFICADO: Sub-card sem borda, com SVG, com hover de bg */}
                       <div className="bg-[#0A0A0A] rounded-xl p-4 hover:bg-[#1C1C1C] transition-colors duration-300 group">
                         <div className="relative z-10">
@@ -506,7 +512,7 @@ const processPlanChange = async () => {
                             </span>
                           </div>
                         )}
-                        
+
                         {subscription.trial_end_date && subscriptionStatus === 'trial' && (
                           <div className="flex items-center space-x-2">
                             <svg className="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -518,7 +524,7 @@ const processPlanChange = async () => {
                             </span>
                           </div>
                         )}
-                        
+
                         {subscription.next_billing_date && subscriptionStatus === 'active' && (
                           <div className="flex items-center space-x-2">
                             <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -575,19 +581,18 @@ const processPlanChange = async () => {
                   <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
                   Histórico de Transações
                 </h3>
-                
+
                 {paymentLogs.length > 0 ? (
                   <div className="space-y-3">
                     {paymentLogs.map((log) => (
                       // MODIFICADO: Item do log sem borda e com hover de bg
                       <div key={log.id} className="flex items-center justify-between p-4 bg-[#0A0A0A] rounded-xl hover:bg-[#1C1C1C] transition-colors duration-300 group">
                         <div className="flex items-center space-x-4">
-                          <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
-                            log.status === 'success' ? 'bg-green-400' :
-                            log.status === 'failed' ? 'bg-red-400' :
-                            log.status === 'canceled' ? 'bg-red-400' :
-                            'bg-yellow-400'
-                          }`}></div>
+                          <div className={`w-3 h-3 rounded-full flex-shrink-0 ${log.status === 'success' ? 'bg-green-400' :
+                              log.status === 'failed' ? 'bg-red-400' :
+                                log.status === 'canceled' ? 'bg-red-400' :
+                                  'bg-yellow-400'
+                            }`}></div>
                           <div>
                             <div className="text-white font-medium group-hover:text-[#00FF99] transition-colors duration-300">
                               {formatEventType(log.event_type)}
@@ -597,7 +602,7 @@ const processPlanChange = async () => {
                             </div>
                           </div>
                         </div>
-                        
+
                         {log.amount > 0 && (
                           <div className="text-white font-semibold text-lg">
                             R$ {log.amount.toFixed(2)}
@@ -623,7 +628,7 @@ const processPlanChange = async () => {
 
           {/* Coluna Lateral - Ações */}
           <div className="space-y-6">
-            
+
             {subscription && subscriptionStatus !== 'canceled' && (
               // MODIFICADO: Card sem borda
               <div className="bg-[#111111] rounded-2xl p-6">
@@ -633,47 +638,47 @@ const processPlanChange = async () => {
                     <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                     Ações Rápidas
                   </h3>
-                  
-<div className="space-y-3">
-  {/* ✅ BOTÃO CONDICIONAL: Alterar ou Reativar */}
-  {subscriptionStatus === 'expired' || subscriptionStatus === 'canceled' ? (
-    // ASSINATURA EXPIRADA/CANCELADA → REATIVAR
-    <button
-      onClick={() => router.push('/dashboard')}
-      className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black py-3 px-4 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] flex items-center justify-center"
-    >
-      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-      </svg>
-      Reativar Assinatura
-    </button>
-  ) : (
-    // ASSINATURA ATIVA/TRIAL → ALTERAR
-    <button
-      onClick={handleOpenPlanChange} 
-      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center"
-    >
-      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-      </svg>
-      Alterar Plano
-    </button>
-  )}
-  
-  {/* BOTÃO DE CANCELAR - Só aparece se ativo/trial */}
-  {(subscriptionStatus === 'active' || subscriptionStatus === 'trial') && (
-    <button
-      onClick={() => setShowCancelModal(true)}
-      disabled={canceling}
-      className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center"
-    >
-      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-      </svg>
-      {canceling ? 'Cancelando...' : 'Cancelar Assinatura'}
-    </button>
-  )}
-</div>
+
+                  <div className="space-y-3">
+                    {/* ✅ BOTÃO CONDICIONAL: Alterar ou Reativar */}
+                    {subscriptionStatus === 'expired' || subscriptionStatus === 'canceled' ? (
+                      // ASSINATURA EXPIRADA/CANCELADA → REATIVAR
+                      <button
+                        onClick={() => router.push('/dashboard')}
+                        className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black py-3 px-4 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] flex items-center justify-center"
+                      >
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Reativar Assinatura
+                      </button>
+                    ) : (
+                      // ASSINATURA ATIVA/TRIAL → ALTERAR
+                      <button
+                        onClick={handleOpenPlanChange}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center"
+                      >
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        Alterar Plano
+                      </button>
+                    )}
+
+                    {/* BOTÃO DE CANCELAR - Só aparece se ativo/trial */}
+                    {(subscriptionStatus === 'active' || subscriptionStatus === 'trial') && (
+                      <button
+                        onClick={() => setShowCancelModal(true)}
+                        disabled={canceling}
+                        className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center"
+                      >
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        {canceling ? 'Cancelando...' : 'Cancelar Assinatura'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -687,7 +692,7 @@ const processPlanChange = async () => {
                     <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                     Reativar Serviço
                   </h3>
-                  
+
                   <div className="space-y-3">
                     <button
                       onClick={() => router.push('/dashboard')}
@@ -711,10 +716,10 @@ const processPlanChange = async () => {
                   <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
                   Precisa de Ajuda?
                 </h3>
-                
+
                 <div className="space-y-4 text-sm text-gray-400">
                   <p>Entre em contato conosco se tiver dúvidas sobre sua assinatura.</p>
-                  
+
                   <div className="space-y-3">
                     {/* MODIFICADO: Item de suporte sem borda e com hover de bg */}
                     <div className="flex items-center p-3 bg-[#0A0A0A] rounded-lg hover:bg-[#1C1C1C] transition-colors duration-300">
@@ -723,7 +728,7 @@ const processPlanChange = async () => {
                       </svg>
                       <span className="text-gray-300">suporte@swiftbot.com.br</span>
                     </div>
-                    
+
                     {/* MODIFICADO: Item de suporte sem borda e com hover de bg */}
                     <div className="flex items-center p-3 bg-[#0A0A0A] rounded-lg hover:bg-[#1C1C1C] transition-colors duration-300">
                       <svg className="w-5 h-5 mr-3 text-[#00FF99] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -754,7 +759,7 @@ const processPlanChange = async () => {
                 </div>
                 <h3 className="text-xl font-bold text-white mb-2">Cancelar Assinatura</h3>
                 <p className="text-gray-400">
-                  {isWithin7Days() 
+                  {isWithin7Days()
                     ? 'Você está nos primeiros 7 dias - Lei do Arrependimento'
                     : 'Seu plano será cancelado mas você mantém acesso'
                   }
@@ -771,7 +776,7 @@ const processPlanChange = async () => {
                           <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                         </svg>
                         <span>
-                          <strong>Lei do Arrependimento (7 dias)</strong><br/>
+                          <strong>Lei do Arrependimento (7 dias)</strong><br />
                           Você está nos primeiros {getDaysSinceCreation()} dias da sua primeira assinatura.
                         </span>
                       </p>
@@ -798,8 +803,8 @@ const processPlanChange = async () => {
                           <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                         </svg>
                         <span>
-                          <strong>Cancelamento no fim do período</strong><br/>
-                          Você pode usar até {subscription?.next_billing_date 
+                          <strong>Cancelamento no fim do período</strong><br />
+                          Você pode usar até {subscription?.next_billing_date
                             ? new Date(subscription.next_billing_date).toLocaleDateString('pt-BR')
                             : 'o fim do período'
                           }
@@ -822,8 +827,8 @@ const processPlanChange = async () => {
                 )}
 
                 <div className="flex items-start space-x-3 pt-4">
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     id="confirmCancel"
                     className="mt-1 w-5 h-5 rounded border-gray-600 text-red-500 focus:ring-red-500 bg-gray-800"
                   />
@@ -906,21 +911,19 @@ const processPlanChange = async () => {
                 <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-full p-1.5 flex">
                   <button
                     onClick={() => handleSelectNewPlan(selectedNewPlan.connections, 'monthly')}
-                    className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all duration-300 ${
-                      selectedNewPlan.billing_period === 'monthly'
+                    className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all duration-300 ${selectedNewPlan.billing_period === 'monthly'
                         ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black'
                         : 'text-gray-400 hover:text-white'
-                    }`}
+                      }`}
                   >
                     Mensal
                   </button>
                   <button
                     onClick={() => handleSelectNewPlan(selectedNewPlan.connections, 'annual')}
-                    className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all duration-300 ${
-                      selectedNewPlan.billing_period === 'annual'
+                    className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all duration-300 ${selectedNewPlan.billing_period === 'annual'
                         ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black'
                         : 'text-gray-400 hover:text-white'
-                    }`}
+                      }`}
                   >
                     Anual
                   </button>
@@ -943,13 +946,12 @@ const processPlanChange = async () => {
                       key={connections}
                       onClick={() => handleSelectNewPlan(connections, selectedNewPlan.billing_period)}
                       disabled={isCurrentPlan}
-                      className={`p-4 rounded-xl border-2 transition-all duration-300 ${
-                        isCurrentPlan
+                      className={`p-4 rounded-xl border-2 transition-all duration-300 ${isCurrentPlan
                           ? 'border-gray-600 bg-gray-900/50 cursor-not-allowed opacity-50'
                           : isSelected
-                          ? 'border-[#00FF99] bg-[#00FF99]/10'
-                          : 'border-white/10 hover:border-white/30 bg-[#0A0A0A]'
-                      }`}
+                            ? 'border-[#00FF99] bg-[#00FF99]/10'
+                            : 'border-white/10 hover:border-white/30 bg-[#0A0A0A]'
+                        }`}
                     >
                       <div className="text-center">
                         <div className="text-3xl font-bold text-white mb-1">{connections}</div>
@@ -971,11 +973,10 @@ const processPlanChange = async () => {
 
               {/* Info sobre tipo de mudança */}
               {changeType && (
-                <div className={`p-4 rounded-xl mb-6 ${
-                  changeType === 'upgrade' 
+                <div className={`p-4 rounded-xl mb-6 ${changeType === 'upgrade'
                     ? 'bg-blue-500/10 border border-blue-500/30'
                     : 'bg-orange-500/10 border border-orange-500/30'
-                }`}>
+                  }`}>
                   <div className="flex items-start gap-3">
                     <svg className={`w-5 h-5 mt-0.5 ${changeType === 'upgrade' ? 'text-blue-400' : 'text-orange-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -985,7 +986,7 @@ const processPlanChange = async () => {
                         {changeType === 'upgrade' ? '⬆️ Upgrade' : '⬇️ Downgrade'}
                       </div>
                       <div className="text-sm text-gray-300">
-                        {changeType === 'upgrade' 
+                        {changeType === 'upgrade'
                           ? 'Será cobrado o valor proporcional imediatamente. Seu período de renovação continua o mesmo.'
                           : `A mudança será aplicada na próxima renovação (${new Date(subscription.next_billing_date).toLocaleDateString('pt-BR')}). Você continuará usando o plano atual até lá.`
                         }
