@@ -6,6 +6,9 @@ import Stripe from 'stripe'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+
 export async function POST(request) {
   try {
     const { userId, userEmail } = await request.json()

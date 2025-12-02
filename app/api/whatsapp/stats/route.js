@@ -9,6 +9,9 @@ import { supabaseAdmin } from '../../../../lib/supabase/server.js'
 // ============================================================================
 // POST: Obter estatísticas de uma conexão específica
 // ============================================================================
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+
 export async function POST(request) {
   try {
     const { connectionId } = await request.json()

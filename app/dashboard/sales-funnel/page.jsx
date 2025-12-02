@@ -1,0 +1,178 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { DragDropContext } from '@hello-pangea/dnd';
+import KanbanColumn from './components/KanbanColumn';
+import LeadModal from './components/LeadModal';
+import axios from 'axios';
+
+const SALES_STAGES = {
+    novo: {
+        id: 'novo',
+        name: 'Novo',
+        gradient: 'linear-gradient(to right, #8A2BE2, #00BFFF)'
+    },
+    apresentacao: {
+        id: 'apresentacao',
+        name: 'Apresentação',
+        gradient: 'linear-gradient(to right, #FF6B6B, #FF8E53, #FBBF24)'
+    },
+    negociacao: {
+        id: 'negociacao',
+        name: 'Negociação',
+        gradient: 'linear-gradient(to right, #8A2BE2, #A78BFA, #C084FC)'
+    },
+    fechamento: {
+        id: 'fechamento',
+        name: 'Fechamento',
+        gradient: 'linear-gradient(to right, #00BFFF, #00FF99, #10B981)'
+    },
+};
+
+const SalesFunnelPage = () => {
+    const [columns, setColumns] = useState(SALES_STAGES);
+    const [leads, setLeads] = useState({});
+    const [selectedLead, setSelectedLead] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [currentDragDestination, setCurrentDragDestination] = useState(null);
+
+    useEffect(() => {
+        fetchLeads();
+    }, []);
+
+    const fetchLeads = async () => {
+        try {
+            const response = await axios.get('/api/funnels/vendas');
+            setLeads(response.data);
+        } catch (error) {
+            console.error('Error fetching leads:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const onDragStart = () => {
+        setCurrentDragDestination(null);
+    };
+
+    const onDragUpdate = (update) => {
+        const { destination } = update;
+        if (destination) {
+            setCurrentDragDestination(destination.droppableId);
+        }
+    };
+
+    const onDragEnd = async (result) => {
+        setCurrentDragDestination(null);
+        const { destination, source, draggableId } = result;
+
+        if (!destination) return;
+
+        if (
+            destination.droppableId === source.droppableId &&
+            destination.index === source.index
+        ) {
+            return;
+        }
+
+        const startStage = source.droppableId;
+        const finishStage = destination.droppableId;
+
+        const startLeads = Array.from(leads[startStage] || []);
+        const finishLeads = startStage === finishStage ? startLeads : Array.from(leads[finishStage] || []);
+
+        const [movedLead] = startLeads.splice(source.index, 1);
+        movedLead.funnel_stage = finishStage;
+        finishLeads.splice(destination.index, 0, movedLead);
+
+        const newLeads = {
+            ...leads,
+            [startStage]: startLeads,
+            [finishStage]: finishLeads,
+        };
+
+        setLeads(newLeads);
+
+        try {
+            await axios.patch(`/api/funnels/leads/${draggableId}/move`, {
+                to_stage: finishStage,
+                new_index: destination.index,
+                notes: `Moved from ${SALES_STAGES[startStage].name} to ${SALES_STAGES[finishStage].name}`
+            });
+        } catch (error) {
+            console.error('Error moving lead:', error);
+            fetchLeads();
+            alert('Erro ao mover card. A página será recarregada.');
+        }
+    };
+
+    const handleConvert = (leadId) => {
+        fetchLeads();
+    };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-screen bg-[#0A0A0A]">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00FF99]"></div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-[#0A0A0A]">
+            <main className="px-4 sm:px-6 lg:px-8 pt-16 pb-8">
+
+                {/* Header centralizado com max-width */}
+                <div className="max-w-7xl mx-auto mb-12 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h1 className="text-4xl sm:text-5xl font-bold text-white">
+                            Funil de Vendas
+                        </h1>
+                        <p className="text-[#B0B0B0] text-base sm:text-lg mt-3">
+                            Gerencie seus leads e oportunidades
+                        </p>
+                    </div>
+
+                    <div className="bg-[#00FF99]/10 text-[#00FF99] px-6 py-3 rounded-2xl text-sm font-bold whitespace-nowrap mt-2 sm:mt-0">
+                        Total: {Object.values(leads).flat().length} Leads
+                    </div>
+                </div>
+
+                {/* Kanban Board - Largura total */}
+                <div className="overflow-x-auto -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
+                    <DragDropContext
+                        onDragStart={onDragStart}
+                        onDragUpdate={onDragUpdate}
+                        onDragEnd={onDragEnd}
+                    >
+                        <div className="flex justify-center gap-4 sm:gap-6 pb-8 min-w-max sm:min-w-0">
+                            {Object.values(columns).map((stage) => (
+                                <KanbanColumn
+                                    key={stage.id}
+                                    stageId={stage.id}
+                                    stage={stage}
+                                    leads={leads[stage.id] || []}
+                                    onCardClick={setSelectedLead}
+                                    currentDragDestination={currentDragDestination}
+                                    allStages={SALES_STAGES}
+                                />
+                            ))}
+                        </div>
+                    </DragDropContext>
+                </div>
+
+            </main>
+
+            {selectedLead && (
+                <LeadModal
+                    lead={selectedLead}
+                    onClose={() => setSelectedLead(null)}
+                    onConvert={handleConvert}
+                    allStages={SALES_STAGES}
+                />
+            )}
+        </div>
+    );
+};
+
+export default SalesFunnelPage;

@@ -6,6 +6,9 @@ import crypto from 'crypto'
 
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET
 
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+
 export async function POST(request) {
   try {
     const body = await request.text()

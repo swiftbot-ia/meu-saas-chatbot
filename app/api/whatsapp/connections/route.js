@@ -4,6 +4,8 @@
 // ============================================================================
 
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+import { createServerClient } from '@supabase/ssr'
 import { supabaseAdmin } from '../../../../lib/supabase/server.js'
 import { createServerSupabaseClient } from '../../../../lib/supabase/server.js'
 
@@ -48,6 +50,85 @@ export async function GET(request) {
     console.error('❌ [GetConnections] Erro:', error)
     return NextResponse.json(
       { success: false, error: error.message },
+      { status: 500 }
+    )
+  }
+}
+
+// Helper para criar cliente Supabase com cookies (para autenticação)
+function createAuthClient() {
+  const cookieStore = cookies()
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      cookies: {
+        get(name) {
+          return cookieStore.get(name)?.value
+        },
+        set(name, value, options) {
+          cookieStore.set({ name, value, ...options })
+        },
+        remove(name, options) {
+          cookieStore.set({ name, value: '', ...options })
+        },
+      },
+    }
+  )
+}
+
+// ============================================================================
+// GET: Listar conexões do usuário autenticado
+// ============================================================================
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+
+export async function GET(request) {
+  try {
+    console.log('📋 [GetConnections] Iniciando listagem de conexões')
+
+    const supabase = createAuthClient()
+
+    // Verificar autenticação
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
+
+    if (authError || !session) {
+      console.error('❌ [GetConnections] Usuário não autenticado:', authError)
+      return NextResponse.json(
+        { error: 'Não autenticado' },
+        { status: 401 }
+      )
+    }
+
+    const userId = session.user.id
+    console.log('👤 [GetConnections] userId:', userId)
+
+    // Buscar conexões do usuário usando supabaseAdmin para bypass RLS
+    const { data: connections, error: fetchError } = await supabaseAdmin
+      .from('whatsapp_connections')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (fetchError) {
+      console.error('❌ [GetConnections] Erro ao buscar conexões:', fetchError)
+      return NextResponse.json(
+        { error: 'Erro ao buscar conexões' },
+        { status: 500 }
+      )
+    }
+
+    console.log('✅ [GetConnections] Conexões encontradas:', connections?.length || 0)
+
+    return NextResponse.json({
+      connections: connections || [],
+      count: connections?.length || 0
+    })
+
+  } catch (error) {
+    console.error('❌ [GetConnections] Erro:', error)
+    return NextResponse.json(
+      { error: 'Erro ao listar conexões: ' + error.message },
       { status: 500 }
     )
   }

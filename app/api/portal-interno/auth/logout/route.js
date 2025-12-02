@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server';
 import { logoutSupport, getCurrentSession } from '@/lib/support-auth';
 import { cookies } from 'next/headers';
 
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+
 export async function POST(request) {
   try {
     const session = await getCurrentSession();
