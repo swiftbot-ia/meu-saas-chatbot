@@ -21,12 +21,43 @@ export default function ChatWindow({
   const [hasMore, setHasMore] = useState(true);
   const [sending, setSending] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [previousMessageCount, setPreviousMessageCount] = useState(0);
+
+  // Auto-scroll to bottom when new messages arrive (only if near bottom)
+  useEffect(() => {
+    if (messages.length > previousMessageCount) {
+      const messageList = document.querySelector('[data-message-list]');
+      if (messageList) {
+        // Only auto-scroll if user is near the bottom (within 100px)
+        const isNearBottom =
+          messageList.scrollHeight - messageList.scrollTop - messageList.clientHeight < 100;
+
+        if (isNearBottom || previousMessageCount === 0) {
+          // Smooth scroll to bottom
+          setTimeout(() => {
+            messageList.scrollTo({
+              top: messageList.scrollHeight,
+              behavior: previousMessageCount === 0 ? 'auto' : 'smooth'
+            });
+          }, 100);
+        }
+      }
+    }
+    setPreviousMessageCount(messages.length);
+  }, [messages]);
 
   // Load messages when conversation changes
   useEffect(() => {
     if (conversation) {
       loadMessages();
       markAsRead();
+
+      // Auto-refresh messages every 5 seconds
+      const interval = setInterval(() => {
+        loadMessages();
+      }, 5000);
+
+      return () => clearInterval(interval);
     } else {
       setMessages([]);
     }
@@ -35,7 +66,11 @@ export default function ChatWindow({
   const loadMessages = async (before = null) => {
     if (!conversation) return;
 
-    setLoading(true);
+    // Don't show loading indicator on refresh
+    if (!before && messages.length === 0) {
+      setLoading(true);
+    }
+
     try {
       const params = new URLSearchParams({
         conversationId: conversation.id,
@@ -57,8 +92,24 @@ export default function ChatWindow({
         // Prepend older messages
         setMessages(prev => [...data.messages, ...prev]);
       } else {
-        // Initial load
-        setMessages(data.messages);
+        // Merge with existing messages to avoid duplicates
+        setMessages(prev => {
+          if (prev.length === 0) {
+            // First load
+            return data.messages;
+          }
+
+          // Create a map of existing messages by ID
+          const existingIds = new Set(prev.map(m => m.id));
+
+          // Add only new messages
+          const newMessages = data.messages.filter(m => !existingIds.has(m.id));
+
+          // Merge and sort by received_at
+          return [...prev, ...newMessages].sort((a, b) =>
+            new Date(a.received_at) - new Date(b.received_at)
+          );
+        });
       }
 
       // Check if there are more messages
@@ -66,7 +117,9 @@ export default function ChatWindow({
 
     } catch (error) {
       console.error('Erro ao carregar mensagens:', error);
-      alert('Erro ao carregar mensagens. Tente novamente.');
+      if (messages.length === 0) {
+        alert('Erro ao carregar mensagens. Tente novamente.');
+      }
     } finally {
       setLoading(false);
     }
