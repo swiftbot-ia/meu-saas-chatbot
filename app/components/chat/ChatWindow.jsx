@@ -48,6 +48,10 @@ export default function ChatWindow({
 
   // Load messages when conversation changes
   useEffect(() => {
+    // Limpar mensagens imediatamente ao trocar conversa
+    setMessages([]);
+    setPreviousMessageCount(0);
+
     if (conversation) {
       loadMessages();
       markAsRead();

@@ -93,6 +93,8 @@ export default function ChatPage() {
 
   const handleSelectConversation = (conversation) => {
     setSelectedConversation(conversation);
+    // Forçar reload das conversas para atualizar counters
+    loadConversations();
   };
 
   const handleArchiveConversation = (conversationId) => {
@@ -183,11 +185,10 @@ export default function ChatPage() {
               <button
                 key={connection.id}
                 onClick={() => setSelectedConnection(connection.id)}
-                className={`w-full text-left p-3 rounded-lg transition-colors ${
-                  selectedConnection === connection.id
+                className={`w-full text-left p-3 rounded-lg transition-colors ${selectedConnection === connection.id
                     ? 'bg-green-500 text-white'
                     : 'bg-white hover:bg-gray-100 text-gray-700'
-                }`}
+                  }`}
               >
                 <div className="font-medium">
                   {connection.profile_name || connection.instance_name}
@@ -195,9 +196,8 @@ export default function ChatPage() {
                 <div className="text-sm opacity-75">
                   {connection.phone_number_id}
                 </div>
-                <div className={`text-xs mt-1 ${
-                  connection.is_connected ? 'text-green-200' : 'text-red-300'
-                }`}>
+                <div className={`text-xs mt-1 ${connection.is_connected ? 'text-green-200' : 'text-red-300'
+                  }`}>
                   {connection.is_connected ? '● Conectado' : '○ Desconectado'}
                 </div>
               </button>
