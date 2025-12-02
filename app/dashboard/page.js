@@ -1586,7 +1586,14 @@ const handleConfirmPayment = async (e) => {
                       )}
                       <button
                         onClick={() => {
-                          setShowCheckoutModal(true)
+                          // Verifica se o usuário tem assinatura ativa
+                          if (subscriptionStatus === 'active' || subscriptionStatus === 'trial') {
+                            // Cliente com assinatura ativa → redireciona para gerenciamento
+                            router.push('/account/subscription?autoOpen=true')
+                          } else {
+                            // Cliente sem assinatura → abre modal de checkout
+                            setShowCheckoutModal(true)
+                          }
                           setConnectionsDropdownOpen(false)
                         }}
                         className="w-full bg-[#222222] hover:bg-[#333333] text-[#B0B0B0] py-3 px-4 rounded-lg transition-all duration-300"
