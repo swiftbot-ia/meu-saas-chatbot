@@ -9,6 +9,8 @@ import React from 'react';
 import { Check, CheckCheck, Image, Video, FileText, Mic } from 'lucide-react';
 
 export default function MessageBubble({ message, isOwn }) {
+  const [showTranscription, setShowTranscription] = React.useState(false);
+
   const formatTime = (timestamp) => {
     const date = new Date(timestamp);
     return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -68,11 +70,23 @@ export default function MessageBubble({ message, isOwn }) {
               <audio src={mediaUrl} controls className="w-64" />
             )}
             {message.transcription && (
-              <div className={`mt-2 text-xs italic ${
-                isOwn ? 'text-green-100' : 'text-gray-500'
-              }`}>
-                <Mic size={12} className="inline mr-1" />
-                {message.transcription}
+              <div className="mt-2">
+                <button
+                  onClick={() => setShowTranscription(!showTranscription)}
+                  className={`text-xs flex items-center space-x-1 hover:underline ${
+                    isOwn ? 'text-green-100' : 'text-gray-600'
+                  }`}
+                >
+                  <Mic size={12} />
+                  <span>{showTranscription ? 'ocultar transcrição' : 'ver transcrição'}</span>
+                </button>
+                {showTranscription && (
+                  <div className={`mt-1 text-xs italic ${
+                    isOwn ? 'text-green-100' : 'text-gray-500'
+                  }`}>
+                    {message.transcription}
+                  </div>
+                )}
               </div>
             )}
           </div>
