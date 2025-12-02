@@ -270,6 +270,7 @@ async function handleNewFormatMessage(requestId, instanceName, payload) {
     log(requestId, 'info', '💬', `NEW FORMAT MESSAGE: ${instanceName}`);
 
     const messageData = payload.message;
+    const instanceToken = payload.token; // Token já vem no payload!
 
     // Converter novo formato para formato padrão
     const convertedMessage = {
@@ -328,7 +329,7 @@ async function handleNewFormatMessage(requestId, instanceName, payload) {
         break;
     }
 
-    await processIncomingMessage(requestId, instanceName, convertedMessage);
+    await processIncomingMessage(requestId, instanceName, convertedMessage, instanceToken);
 
   } catch (error) {
     log(requestId, 'error', '❌', 'Erro em handleNewFormatMessage', { error: error.message });
@@ -451,7 +452,7 @@ async function handleConnectionLost(requestId, instanceName, payload) {
  * ===========================================================================
  * MUDANÇA CRÍTICA: Aceita fromMe=true e false para formar conversa completa
  */
-async function processIncomingMessage(requestId, instanceName, messageData) {
+async function processIncomingMessage(requestId, instanceName, messageData, instanceToken = null) {
   try {
     const messageKey = messageData.key;
     const messageInfo = messageData.message;
@@ -584,7 +585,7 @@ async function processIncomingMessage(requestId, instanceName, messageData) {
           messageId,
           {
             mimetype: messageInfo.audioMessage.mimetype,
-            instanceToken: connection.instance_token // Adicionar token para conversão MP3
+            instanceToken: instanceToken || connection.instance_token // Priorizar token do webhook
           }
         );
 
