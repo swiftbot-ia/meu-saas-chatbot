@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import { supabaseAdmin } from '../../../../lib/supabase/server.js'
+import { createServerSupabaseClient } from '../../../../lib/supabase/server.js'
 
 // Helper para criar cliente Supabase com cookies (para autenticação)
 function createAuthClient() {
@@ -29,6 +30,8 @@ function createAuthClient() {
     }
   )
 }
+
+
 
 // ============================================================================
 // GET: Listar conexões do usuário autenticado

@@ -86,3 +86,4 @@ build.log
 # Route configs temporário
 app/*/route.config.jsbackup-completo.sh
 *.bak
+public/media/

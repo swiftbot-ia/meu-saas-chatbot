@@ -33,18 +33,18 @@ export default function Dashboard() {
   // Sidebar
   // const [accountDropdownOpen, setAccountDropdownOpen] = useState(false)
   const [connectionsDropdownOpen, setConnectionsDropdownOpen] = useState(false)
-  
+
   // Estados do Checkout
   const [showCheckoutModal, setShowCheckoutModal] = useState(false)
   const [checkoutStep, setCheckoutStep] = useState('plan')
-  
+
   // <-- [MERGE] Estado 'selectedPlan' atualizado para o formato do objeto do código 2
   const [selectedPlan, setSelectedPlan] = useState({
     connections: 1,
-    billingPeriod: 'annual' 
+    billingPeriod: 'annual'
   })
   // -->
-  
+
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [clientSecret, setClientSecret] = useState(null)
   const [paymentElement, setPaymentElement] = useState(null)
@@ -78,7 +78,7 @@ export default function Dashboard() {
   const checkUser = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user) {
         router.push('/login')
         return
@@ -111,84 +111,84 @@ export default function Dashboard() {
     }
   }
 
-const loadSubscription = async (userId) => {
-  try {
-    const { data, error } = await supabase
-      .from('user_subscriptions')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    if (error) {
-      console.log('Nenhuma assinatura encontrada')
-      setSubscriptionStatus('none')
-      setSubscription(null)
-      // ⚠️ VERIFICAR SE JÁ EXISTE HISTÓRICO DE TRIAL (mesmo sem assinatura ativa)
-      const { data: historyData } = await supabase
+  const loadSubscription = async (userId) => {
+    try {
+      const { data, error } = await supabase
         .from('user_subscriptions')
-        .select('trial_start_date')
+        .select('*')
         .eq('user_id', userId)
-        .not('trial_start_date', 'is', null)
+        .order('created_at', { ascending: false })
         .limit(1)
         .single()
-      
-      if (historyData) {
-        console.log('🔒 Usuário já usou trial no passado')
+
+      if (error) {
+        console.log('Nenhuma assinatura encontrada')
+        setSubscriptionStatus('none')
+        setSubscription(null)
+        // ⚠️ VERIFICAR SE JÁ EXISTE HISTÓRICO DE TRIAL (mesmo sem assinatura ativa)
+        const { data: historyData } = await supabase
+          .from('user_subscriptions')
+          .select('trial_start_date')
+          .eq('user_id', userId)
+          .not('trial_start_date', 'is', null)
+          .limit(1)
+          .single()
+
+        if (historyData) {
+          console.log('🔒 Usuário já usou trial no passado')
+          setHasUsedTrialBefore(true)
+        }
+
+        return
+      }
+      if (data && data.trial_start_date) {
+        console.log('🔒 Usuário já usou trial anteriormente')
         setHasUsedTrialBefore(true)
       }
-      
-      return
-    }
-    if (data && data.trial_start_date) {
-      console.log('🔒 Usuário já usou trial anteriormente')
-      setHasUsedTrialBefore(true)
-    }
 
-    console.log('📊 Assinatura carregada:', data)
-    setSubscription(data)
-    
-    // ✅ LÓGICA CORRETA DE STATUS
-    if (data.stripe_subscription_id === 'super_account_bypass') {
-      setSubscriptionStatus('super_account')
-} else if (data.status === 'trial' || data.status === 'trialing') {
-      // ✅ VERIFICAR SE TRIAL EXPIROU
-      if (data.trial_end_date) {
-        const trialEndDate = new Date(data.trial_end_date)
-        const now = new Date()
-        
-        if (now > trialEndDate) {
-          console.log('⚠️ Trial expirado detectado')
-          setSubscriptionStatus('expired')
-          
-          // Atualizar no banco
-          await supabase
-            .from('user_subscriptions')
-            .update({ status: 'expired', updated_at: new Date().toISOString() })
-            .eq('id', data.id)
-          
-          return
+      console.log('📊 Assinatura carregada:', data)
+      setSubscription(data)
+
+      // ✅ LÓGICA CORRETA DE STATUS
+      if (data.stripe_subscription_id === 'super_account_bypass') {
+        setSubscriptionStatus('super_account')
+      } else if (data.status === 'trial' || data.status === 'trialing') {
+        // ✅ VERIFICAR SE TRIAL EXPIROU
+        if (data.trial_end_date) {
+          const trialEndDate = new Date(data.trial_end_date)
+          const now = new Date()
+
+          if (now > trialEndDate) {
+            console.log('⚠️ Trial expirado detectado')
+            setSubscriptionStatus('expired')
+
+            // Atualizar no banco
+            await supabase
+              .from('user_subscriptions')
+              .update({ status: 'expired', updated_at: new Date().toISOString() })
+              .eq('id', data.id)
+
+            return
+          }
         }
+        setSubscriptionStatus('trial')
+      } else if (data.status === 'active') {
+        setSubscriptionStatus('active')
+      } else if (data.status === 'past_due') {
+        setSubscriptionStatus('past_due')
+      } else if (data.status === 'canceled' || data.status === 'cancelled') {
+        setSubscriptionStatus('canceled')
+      } else {
+        setSubscriptionStatus('expired')
       }
-      setSubscriptionStatus('trial')
-    } else if (data.status === 'active') {
-      setSubscriptionStatus('active')
-    } else if (data.status === 'past_due') {
-      setSubscriptionStatus('past_due')
-    } else if (data.status === 'canceled' || data.status === 'cancelled') {
-      setSubscriptionStatus('canceled')
-    } else {
-      setSubscriptionStatus('expired')
-    }
 
-    console.log('✅ Status definido como:', data.status)
-  } catch (error) {
-    console.error('Erro ao carregar assinatura:', error)
-    setSubscriptionStatus('none')
-    setSubscription(null)
+      console.log('✅ Status definido como:', data.status)
+    } catch (error) {
+      console.error('Erro ao carregar assinatura:', error)
+      setSubscriptionStatus('none')
+      setSubscription(null)
+    }
   }
-}
 
   const loadConnections = async (userId) => {
     try {
@@ -198,20 +198,20 @@ const loadSubscription = async (userId) => {
         .eq('user_id', userId)
 
       if (error) throw error
-      
+
       setConnections(data || [])
-      
+
       if (data && data.length > 0) {
         let selectedConnection = null
-        
+
         // ✅ Check for saved connection ID in localStorage (client-side only)
         if (typeof window !== 'undefined') {
           const savedConnectionId = localStorage.getItem('activeConnectionId')
-          
+
           if (savedConnectionId) {
             // Try to find the saved connection in the current list
             selectedConnection = data.find(c => c.id === savedConnectionId)
-            
+
             if (selectedConnection) {
               console.log('✅ Restored saved connection from localStorage:', savedConnectionId)
             } else {
@@ -219,14 +219,14 @@ const loadSubscription = async (userId) => {
             }
           }
         }
-        
+
         // Fallback: use first connected connection or first in list
         if (!selectedConnection) {
           selectedConnection = data.find(c => c.status === 'connected') || data[0]
         }
-        
+
         setActiveConnection(selectedConnection)
-        
+
         if (selectedConnection.status === 'connected') {
           setWhatsappStatus('connected')
           checkAgentConfig(selectedConnection.id)
@@ -371,7 +371,7 @@ const loadSubscription = async (userId) => {
       })
 
       const data = await response.json()
-      
+
       if (data.success) {
         setStats({
           mensagensHoje: data.stats.messages_today || 0,
@@ -404,7 +404,7 @@ const loadSubscription = async (userId) => {
     // ============================================================================
     const blockedStatuses = [
       'none',
-      'expired', 
+      'expired',
       'canceled',
       'cancelled',
       'incomplete',
@@ -451,7 +451,7 @@ const loadSubscription = async (userId) => {
           setQrCode(data.qrCode)
           setShowQRModal(true)
           setWhatsappStatus('pending_qr')
-          
+
           await supabase
             .from('whatsapp_connections')
             .update({ status: 'pending_qr' })
@@ -523,13 +523,13 @@ const loadSubscription = async (userId) => {
     setActiveConnection(connection)
     setWhatsappStatus(connection.status)
     setConnectionsDropdownOpen(false)
-    
+
     // ✅ Save selected connection ID to localStorage
     if (typeof window !== 'undefined') {
       localStorage.setItem('activeConnectionId', connection.id)
       console.log('💾 Saved connection to localStorage:', connection.id)
     }
-    
+
     if (connection.status === 'connected') {
       checkAgentConfig(connection.id)
       loadDashboardStats(connection)
@@ -718,7 +718,7 @@ const loadSubscription = async (userId) => {
       return () => clearInterval(interval)
     }
   }, [activeConnection, connecting])
-  
+
   useEffect(() => {
     if (activeConnection && whatsappStatus === 'connected') {
       const statsInterval = setInterval(() => {
@@ -786,13 +786,13 @@ const loadSubscription = async (userId) => {
         // Inicializar Stripe
         // Certifique-se de que NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY está no seu .env.local
         if (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
-           window.stripeInstance = window.Stripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+          window.stripeInstance = window.Stripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
         } else {
-           console.error("❌ Chave publicável do Stripe não encontrada. Defina NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY em .env.local")
+          console.error("❌ Chave publicável do Stripe não encontrada. Defina NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY em .env.local")
         }
       }
       script.onerror = () => {
-         console.error("❌ Erro ao carregar script do Stripe.js")
+        console.error("❌ Erro ao carregar script do Stripe.js")
       }
       document.head.appendChild(script)
     } else if (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
@@ -882,7 +882,7 @@ const loadSubscription = async (userId) => {
               messageContainer.textContent = ''
             }
           }
-          
+
           if (event.complete) {
             setIsPaymentElementReady(true)
           }
@@ -912,134 +912,134 @@ const loadSubscription = async (userId) => {
   // ============================================================================
   // FUNÇÕES DE CHECKOUT
   // ============================================================================
-  
-// ============================================================================
-// 🆕 ETAPA 1: CRIAR SETUP INTENT E OBTER CLIENT_SECRET
-// ============================================================================
-const handleCreateSubscription = async () => {
-  setCheckoutLoading(true)
 
-  try {
-    console.log('📤 [STEP 1] Criando Setup Intent...')
+  // ============================================================================
+  // 🆕 ETAPA 1: CRIAR SETUP INTENT E OBTER CLIENT_SECRET
+  // ============================================================================
+  const handleCreateSubscription = async () => {
+    setCheckoutLoading(true)
 
-    const response = await fetch('/api/checkout/create-setup-intent', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: user.id,
-        userEmail: user.email
+    try {
+      console.log('📤 [STEP 1] Criando Setup Intent...')
+
+      const response = await fetch('/api/checkout/create-setup-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          userEmail: user.email
+        })
       })
-    })
 
-    const data = await response.json()
+      const data = await response.json()
 
-    if (data.success && data.clientSecret) {
-      console.log('✅ Setup Intent criado')
-      setClientSecret(data.clientSecret)
-      setCheckoutStep('payment')
-    } else {
-      throw new Error(data.error || 'Erro ao iniciar checkout')
+      if (data.success && data.clientSecret) {
+        console.log('✅ Setup Intent criado')
+        setClientSecret(data.clientSecret)
+        setCheckoutStep('payment')
+      } else {
+        throw new Error(data.error || 'Erro ao iniciar checkout')
+      }
+
+    } catch (error) {
+      console.error('❌ Erro:', error)
+      setModalConfig(createModalConfig.error(
+        'Erro no Checkout',
+        error.message || 'Ocorreu um erro ao iniciar o checkout. Tente novamente.'
+      ))
     }
 
-  } catch (error) {
-    console.error('❌ Erro:', error)
-    setModalConfig(createModalConfig.error(
-      'Erro no Checkout',
-      error.message || 'Ocorreu um erro ao iniciar o checkout. Tente novamente.'
-    ))
+    setCheckoutLoading(false)
   }
+  // ============================================================================
+  // 🆕 ETAPA 2: CONFIRMAR PAGAMENTO E CRIAR SUBSCRIPTION
+  // ============================================================================
+  const handleConfirmPayment = async (e) => {
+    e.preventDefault()
 
-  setCheckoutLoading(false)
-}
-// ============================================================================
-// 🆕 ETAPA 2: CONFIRMAR PAGAMENTO E CRIAR SUBSCRIPTION
-// ============================================================================
-const handleConfirmPayment = async (e) => {
-  e.preventDefault()
-
-  if (!window.stripeInstance || !stripeElements || !paymentElement || !isPaymentElementReady) {
-    setModalConfig(createModalConfig.info(
-      'Aguarde',
-      'O formulário de pagamento ainda está a carregar. Por favor, aguarde alguns segundos.'
-    ))
-    return
-  }
-
-  setCheckoutLoading(true)
-
-  try {
-    console.log('💳 [STEP 2A] Validando cartão...')
-
-    // ✅ CONFIRMAR SETUP INTENT (VALIDAR CARTÃO)
-    const { error: confirmError, setupIntent } = await window.stripeInstance.confirmSetup({
-      elements: stripeElements,
-      confirmParams: {
-        return_url: `${window.location.origin}/dashboard`,
-      },
-      redirect: 'if_required'
-    })
-
-    if (confirmError) {
-      throw new Error(confirmError.message)
+    if (!window.stripeInstance || !stripeElements || !paymentElement || !isPaymentElementReady) {
+      setModalConfig(createModalConfig.info(
+        'Aguarde',
+        'O formulário de pagamento ainda está a carregar. Por favor, aguarde alguns segundos.'
+      ))
+      return
     }
 
-    console.log('✅ Cartão validado!')
-    console.log('📋 Payment Method:', setupIntent.payment_method)
+    setCheckoutLoading(true)
 
-    await new Promise(resolve => setTimeout(resolve, 500))
+    try {
+      console.log('💳 [STEP 2A] Validando cartão...')
 
-    // ✅ CRIAR SUBSCRIPTION COM CARTÃO VALIDADO
-    console.log('💳 [STEP 2B] Criando subscription...')
-
-    const subscriptionResponse = await fetch('/api/checkout/confirm-subscription', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: user.id,
-        paymentMethodId: setupIntent.payment_method,
-        plan: selectedPlan,
-        userEmail: user.email,
-        userName: userProfile?.full_name || user.email.split('@')[0]
+      // ✅ CONFIRMAR SETUP INTENT (VALIDAR CARTÃO)
+      const { error: confirmError, setupIntent } = await window.stripeInstance.confirmSetup({
+        elements: stripeElements,
+        confirmParams: {
+          return_url: `${window.location.origin}/dashboard`,
+        },
+        redirect: 'if_required'
       })
-    })
 
-    const subscriptionData = await subscriptionResponse.json()
+      if (confirmError) {
+        throw new Error(confirmError.message)
+      }
 
-    if (!subscriptionData.success) {
-      throw new Error(subscriptionData.error || 'Erro ao criar assinatura')
+      console.log('✅ Cartão validado!')
+      console.log('📋 Payment Method:', setupIntent.payment_method)
+
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // ✅ CRIAR SUBSCRIPTION COM CARTÃO VALIDADO
+      console.log('💳 [STEP 2B] Criando subscription...')
+
+      const subscriptionResponse = await fetch('/api/checkout/confirm-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          paymentMethodId: setupIntent.payment_method,
+          plan: selectedPlan,
+          userEmail: user.email,
+          userName: userProfile?.full_name || user.email.split('@')[0]
+        })
+      })
+
+      const subscriptionData = await subscriptionResponse.json()
+
+      if (!subscriptionData.success) {
+        throw new Error(subscriptionData.error || 'Erro ao criar assinatura')
+      }
+
+      console.log('✅ Subscription criada!')
+
+      // ✅ LIMPAR E FECHAR
+      setShowCheckoutModal(false)
+      setCheckoutStep('plan')
+      setClientSecret(null)
+
+      await loadSubscription(user.id)
+      await loadConnections(user.id)
+
+      const isTrialMessage = subscriptionData.is_trial
+        ? `Seu teste grátis de ${subscriptionData.trial_days} dias foi ativado com sucesso!`
+        : 'Seu plano foi ativado com sucesso!'
+
+      setModalConfig(createModalConfig.success(
+        subscriptionData.is_trial ? 'Teste Grátis Ativado!' : 'Plano Ativado!',
+        isTrialMessage
+      ))
+
+    } catch (error) {
+      console.error('❌ Erro:', error)
+      setModalConfig(createModalConfig.error(
+        'Erro no Pagamento',
+        error.message || 'Ocorreu um erro ao processar o pagamento. Tente novamente.'
+      ))
     }
 
-    console.log('✅ Subscription criada!')
-
-    // ✅ LIMPAR E FECHAR
-    setShowCheckoutModal(false)
-    setCheckoutStep('plan')
-    setClientSecret(null)
-
-    await loadSubscription(user.id)
-    await loadConnections(user.id)
-
-    const isTrialMessage = subscriptionData.is_trial
-      ? `Seu teste grátis de ${subscriptionData.trial_days} dias foi ativado com sucesso!`
-      : 'Seu plano foi ativado com sucesso!'
-
-    setModalConfig(createModalConfig.success(
-      subscriptionData.is_trial ? 'Teste Grátis Ativado!' : 'Plano Ativado!',
-      isTrialMessage
-    ))
-
-  } catch (error) {
-    console.error('❌ Erro:', error)
-    setModalConfig(createModalConfig.error(
-      'Erro no Pagamento',
-      error.message || 'Ocorreu um erro ao processar o pagamento. Tente novamente.'
-    ))
+    setCheckoutLoading(false)
   }
-
-  setCheckoutLoading(false)
-}
   // -->
-  
+
   // <-- [MERGE] Funções helper de checkout substituídas/adicionadas
   const calculatePrice = () => {
     const pricing = {
@@ -1048,7 +1048,7 @@ const handleConfirmPayment = async (e) => {
     }
     return pricing[selectedPlan.billingPeriod][selectedPlan.connections] || 0;
   }
-  
+
   const hasDiscount = () => {
     const savings = {
       monthly: { 2: 8, 3: 10, 4: 11, 5: 24, 6: 24, 7: 24 },
@@ -1056,11 +1056,11 @@ const handleConfirmPayment = async (e) => {
     }
     return savings[selectedPlan.billingPeriod][selectedPlan.connections] || 0
   }
-  
+
   // Precisamos da 'getSubscriptionStatus' do código 2, pois 'shouldShowTrial' depende dela
   const getSubscriptionStatus = () => {
     // Usamos o 'subscriptionStatus' do estado do código 1
-    return subscriptionStatus; 
+    return subscriptionStatus;
   }
 
   const calculateAnnualDiscount = () => {
@@ -1084,25 +1084,25 @@ const handleConfirmPayment = async (e) => {
     const annualMonthlyPrice = pricing.annual[selectedPlan.connections]
     return (annualMonthlyPrice || 0) * 12
   }
-  
+
   // 'hasUsedTrial' é necessária para 'shouldShowTrial'
   const hasUsedTrial = () => {
     if (!subscription) return false
-    
+
     // Usamos o 'subscriptionStatus' do estado do código 1
     return subscriptionStatus === 'expired' || subscriptionStatus === 'past_due'
   }
-  
+
   const shouldShowTrial = () => {
     if (subscription && selectedPlan.connections > (subscription.connections_purchased || 1)) {
-        return false;
+      return false;
     }
     return !hasUsedTrial()
   }
   // -->
 
   const getStatusIcon = (status) => {
-    switch(status) {
+    switch (status) {
       case 'connected':
         return <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
       case 'pending_qr':
@@ -1113,7 +1113,7 @@ const handleConfirmPayment = async (e) => {
   }
 
   const getStatusText = (status) => {
-    switch(status) {
+    switch (status) {
       case 'connected': return 'Conectado'
       case 'pending_qr': return 'Aguardando QR'
       case 'error': return 'Erro'
@@ -1171,10 +1171,10 @@ const handleConfirmPayment = async (e) => {
       {/* Main Content */}
       {/* Padding top mantido em pt-16 */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-16">
-          
+
         {/* Welcome e Header agora estão na mesma linha */}
         <div className="mb-12 flex justify-between items-start gap-4">
-          
+
           {/* Coluna da Esquerda: Welcome + Logo */}
           <div>
             {/* MODIFICADO: Adicionado flex e items-center, gap-4 */}
@@ -1183,7 +1183,7 @@ const handleConfirmPayment = async (e) => {
                 Olá, <span className="capitalize bg-gradient-to-r from-[#00FF99] via-[#00E88C] to-[#00D97F] bg-clip-text text-transparent">{displayName}</span>
               </h1>
             </div>
-            
+
             <p className="text-[#B0B0B0] text-lg mt-3"> {/* Adicionado mt-3 para separar o texto do h1 */}
               Acompanhe suas conexões e estatísticas em tempo real
             </p>
@@ -1206,7 +1206,7 @@ const handleConfirmPayment = async (e) => {
 
         {/* Subscription Alert - FUNDO PRETO COM BORDA GRADIENTE */}
         {(subscriptionStatus === 'none' || subscriptionStatus === 'expired' || subscriptionStatus === 'past_due') && !hasUsedTrialBefore && (
-          <div 
+          <div
             className="mb-12 bg-black rounded-2xl p-8 relative"
             style={{
               border: '2px solid transparent',
@@ -1219,7 +1219,7 @@ const handleConfirmPayment = async (e) => {
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-3">
                   {/* Ícone Presente com Gradiente */}
-                  <div 
+                  <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center"
                     style={{ background: 'linear-gradient(135deg, #8A2BE2 0%, #00BFFF 100%)' }}
                   >
@@ -1232,7 +1232,7 @@ const handleConfirmPayment = async (e) => {
                   </h3>
                 </div>
                 <p className="text-[#B0B0B0] mb-5 text-lg">
-                  {subscriptionStatus === 'past_due' 
+                  {subscriptionStatus === 'past_due'
                     ? 'Atualize seu pagamento para continuar usando a plataforma'
                     : 'Ative 4 dias grátis e comece a automatizar seu atendimento agora'}
                 </p>
@@ -1246,9 +1246,9 @@ const handleConfirmPayment = async (e) => {
                   </svg>
                 </button>
               </div>
-              
+
               {subscription?.stripe_subscription_id && subscription.stripe_subscription_id !== 'super_account_bypass' && (
-                <button 
+                <button
                   onClick={syncSubscriptionStatus}
                   className="ml-4 p-3 bg-[#0A0A0A] hover:bg-[#1A1A1A] rounded-xl transition-all duration-300"
                   title="Sincronizar status"
@@ -1261,55 +1261,55 @@ const handleConfirmPayment = async (e) => {
             </div>
           </div>
         )}
-{/* Card para usuários que JÁ USARAM trial */}
-{(subscriptionStatus === 'none' || subscriptionStatus === 'expired' || subscriptionStatus === 'past_due') && hasUsedTrialBefore && (
-  <div 
-    className="mb-12 bg-black rounded-2xl p-8 relative"
-    style={{
-      border: '2px solid transparent',
-      backgroundImage: 'linear-gradient(black, black), linear-gradient(to right, #FF6B6B, #FF8E53)',
-      backgroundOrigin: 'border-box',
-      backgroundClip: 'padding-box, border-box'
-    }}
-  >
-    <div className="flex items-start justify-between">
-      <div className="flex-1">
-        <div className="flex items-center gap-3 mb-3">
-          <div 
-            className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)' }}
+        {/* Card para usuários que JÁ USARAM trial */}
+        {(subscriptionStatus === 'none' || subscriptionStatus === 'expired' || subscriptionStatus === 'past_due') && hasUsedTrialBefore && (
+          <div
+            className="mb-12 bg-black rounded-2xl p-8 relative"
+            style={{
+              border: '2px solid transparent',
+              backgroundImage: 'linear-gradient(black, black), linear-gradient(to right, #FF6B6B, #FF8E53)',
+              backgroundOrigin: 'border-box',
+              backgroundClip: 'padding-box, border-box'
+            }}
           >
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-3">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center"
+                    style={{ background: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)' }}
+                  >
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-2xl font-bold text-white">
+                    Assinatura Necessária
+                  </h3>
+                </div>
+                <p className="text-[#B0B0B0] mb-5 text-lg">
+                  Assine um plano para continuar automatizando seu atendimento
+                </p>
+                <button
+                  onClick={() => setShowCheckoutModal(true)}
+                  className="inline-flex items-center gap-2 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold px-8 py-4 rounded-xl hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] transition-all duration-300"
+                >
+                  Ver Planos
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </button>
+              </div>
+            </div>
           </div>
-          <h3 className="text-2xl font-bold text-white">
-            Assinatura Necessária
-          </h3>
-        </div>
-        <p className="text-[#B0B0B0] mb-5 text-lg">
-          Assine um plano para continuar automatizando seu atendimento
-        </p>
-        <button
-          onClick={() => setShowCheckoutModal(true)}
-          className="inline-flex items-center gap-2 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold px-8 py-4 rounded-xl hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] transition-all duration-300"
-        >
-          Ver Planos
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-          </svg>
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+        )}
         {/* ================================================================= */}
         {/* INÍCIO DO BANNER ADICIONADO (DE banner-mudanca-agendada.txt)       */}
         {/* ================================================================= */}
-        
+
         {/* Banner de Mudança Agendada (Downgrade ou Cancelamento) - FUNDO PRETO COM BORDA VERMELHA */}
         {subscription && (subscription.pending_change_type || subscription.canceled_at) && subscription.status !== 'canceled' && (
-          <div 
+          <div
             className="mb-12 bg-black rounded-2xl p-8 relative"
             style={{
               border: '2px solid transparent',
@@ -1322,7 +1322,7 @@ const handleConfirmPayment = async (e) => {
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-3">
                   {/* Ícone de Alerta com Vermelho */}
-                  <div 
+                  <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center"
                     style={{ background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)' }}
                   >
@@ -1334,24 +1334,24 @@ const handleConfirmPayment = async (e) => {
                     ⚠️ Mudança de Plano Agendada
                   </h3>
                 </div>
-                
+
                 {/* Conteúdo do Banner */}
                 <div className="space-y-2 mb-5">
                   <p className="text-[#B0B0B0] text-lg">
                     <strong className="text-white">Plano atual:</strong> {subscription.connections_purchased} {subscription.connections_purchased === 1 ? 'conexão' : 'conexões'} - R$ {
-                      subscription.billing_period === 'monthly' 
-                        ? {1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875}[subscription.connections_purchased]
-                        : {1: 1776, 2: 3294, 3: 4806, 4: 6318, 5: 6750, 6: 8100, 7: 9450}[subscription.connections_purchased]
+                      subscription.billing_period === 'monthly'
+                        ? { 1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875 }[subscription.connections_purchased]
+                        : { 1: 1776, 2: 3294, 3: 4806, 4: 6318, 5: 6750, 6: 8100, 7: 9450 }[subscription.connections_purchased]
                     }/{subscription.billing_period === 'monthly' ? 'mês' : 'ano'}
                   </p>
-                  
+
                   {subscription.pending_change_type === 'downgrade' && (
                     <>
                       <p className="text-[#B0B0B0] text-lg">
                         <strong className="text-orange-400">A partir de {new Date(subscription.next_billing_date).toLocaleDateString('pt-BR')}:</strong> {subscription.pending_connections} {subscription.pending_connections === 1 ? 'conexão' : 'conexões'} - R$ {
-                          subscription.pending_billing_period === 'monthly' 
-                            ? {1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875}[subscription.pending_connections]
-                            : {1: 1776, 2: 3294, 3: 4806, 4: 6318, 5: 6750, 6: 8100, 7: 9450}[subscription.pending_connections]
+                          subscription.pending_billing_period === 'monthly'
+                            ? { 1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875 }[subscription.pending_connections]
+                            : { 1: 1776, 2: 3294, 3: 4806, 4: 6318, 5: 6750, 6: 8100, 7: 9450 }[subscription.pending_connections]
                         }/{subscription.pending_billing_period === 'monthly' ? 'mês' : 'ano'}
                       </p>
                       {subscription.pending_connections < subscription.connections_purchased && (
@@ -1361,7 +1361,7 @@ const handleConfirmPayment = async (e) => {
                       )}
                     </>
                   )}
-                  
+
                   {subscription.canceled_at && !subscription.pending_change_type && (
                     <p className="text-[#B0B0B0] text-lg">
                       <strong className="text-red-400">Cancelamento agendado para:</strong> {new Date(subscription.next_billing_date).toLocaleDateString('pt-BR')}
@@ -1437,13 +1437,13 @@ const handleConfirmPayment = async (e) => {
 
         {/* Main Grid - CARDS COM BORDAS GRADIENTES */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
-          
+
           {/* Conexão Ativa - Estilo Unificado Neutro */}
           <div className="bg-[#111111] rounded-2xl p-8 hover:bg-[#1A1A1A] transition-all duration-300">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 {/* Ícone com Fundo Gradiente Verde→Azul */}
-                <div 
+                <div
                   className="w-12 h-12 rounded-xl flex items-center justify-center"
                   style={{ background: 'linear-gradient(135deg, #10E57C 0%, #00BFFF 100%)' }}
                 >
@@ -1478,9 +1478,8 @@ const handleConfirmPayment = async (e) => {
                           />
                         ) : null}
                         <div
-                          className={`w-12 h-12 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold text-lg ${
-                            activeConnection.profile_pic_url ? 'hidden' : 'flex'
-                          }`}
+                          className={`w-12 h-12 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold text-lg ${activeConnection.profile_pic_url ? 'hidden' : 'flex'
+                            }`}
                           style={{ display: activeConnection.profile_pic_url ? 'none' : 'flex' }}
                         >
                           {activeConnection.profile_name ? activeConnection.profile_name.charAt(0).toUpperCase() : '?'}
@@ -1525,9 +1524,8 @@ const handleConfirmPayment = async (e) => {
                         <button
                           key={conn.id}
                           onClick={() => handleConnectionSelect(conn)}
-                          className={`w-full p-3 text-left hover:bg-white/5 transition-all border-b border-white/5 last:border-0 ${
-                            activeConnection?.id === conn.id ? 'bg-white/5' : ''
-                          }`}
+                          className={`w-full p-3 text-left hover:bg-white/5 transition-all border-b border-white/5 last:border-0 ${activeConnection?.id === conn.id ? 'bg-white/5' : ''
+                            }`}
                         >
                           <div className="flex items-center gap-3">
                             {/* Avatar */}
@@ -1544,9 +1542,8 @@ const handleConfirmPayment = async (e) => {
                                 />
                               ) : null}
                               <div
-                                className={`w-12 h-12 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold text-lg ${
-                                  conn.profile_pic_url ? 'hidden' : 'flex'
-                                }`}
+                                className={`w-12 h-12 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold text-lg ${conn.profile_pic_url ? 'hidden' : 'flex'
+                                  }`}
                                 style={{ display: conn.profile_pic_url ? 'none' : 'flex' }}
                               >
                                 {conn.profile_name ? conn.profile_name.charAt(0).toUpperCase() : (index + 1)}
@@ -1586,7 +1583,14 @@ const handleConfirmPayment = async (e) => {
                       )}
                       <button
                         onClick={() => {
-                          setShowCheckoutModal(true)
+                          // Verifica se o usuário tem assinatura ativa
+                          if (subscriptionStatus === 'active' || subscriptionStatus === 'trial') {
+                            // Cliente com assinatura ativa → redireciona para gerenciamento
+                            router.push('/account/subscription#autoOpen')
+                          } else {
+                            // Cliente sem assinatura → abre modal de checkout
+                            setShowCheckoutModal(true)
+                          }
                           setConnectionsDropdownOpen(false)
                         }}
                         className="w-full bg-[#222222] hover:bg-[#333333] text-[#B0B0B0] py-3 px-4 rounded-lg transition-all duration-300"
@@ -1642,7 +1646,7 @@ const handleConfirmPayment = async (e) => {
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 {/* Ícone com Fundo Gradiente Roxo→Rosa */}
-                <div 
+                <div
                   className="w-12 h-12 rounded-xl flex items-center justify-center"
                   style={{ background: 'linear-gradient(135deg, #8A2BE2 0%, #FF1493 100%)' }}
                 >
@@ -1790,7 +1794,7 @@ const handleConfirmPayment = async (e) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-            
+
             <div className="text-center">
               <h3 className="text-2xl font-bold text-white mb-2">
                 Conectar WhatsApp
@@ -1798,11 +1802,11 @@ const handleConfirmPayment = async (e) => {
               <p className="text-[#B0B0B0] mb-6">
                 Escaneie o QR Code com seu WhatsApp
               </p>
-              
+
               <div className="bg-white rounded-2xl p-4 mb-6 inline-block">
                 <img src={qrCode} alt="QR Code WhatsApp" className="w-64 h-64" />
               </div>
-              
+
               <div className="bg-[#00FF99]/10 border border-[#00FF99]/20 rounded-xl p-4">
                 <p className="text-sm text-white mb-2 font-semibold">Como conectar:</p>
                 <ol className="text-xs text-[#B0B0B0] space-y-1 text-left">
@@ -1819,351 +1823,349 @@ const handleConfirmPayment = async (e) => {
       )}
 
       {/* <-- [MERGE] Bloco JSX do Checkout Modal substituído pelo do código 2 --> */}
-{showCheckoutModal && (
-  <>
-    {/* OVERLAY COM BLUR - Camada separada */}
-    <div 
-      className="fixed inset-0 z-[60]"
-      style={{
-        backdropFilter: 'blur(40px)',
-        WebkitBackdropFilter: 'blur(40px)',
-        backgroundColor: 'rgba(0, 0, 0, 0.6)'
-      }}
-      onClick={() => setShowCheckoutModal(false)}
-    />
-    
-    {/* CONTAINER DO MODAL - Camada acima do blur */}
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 overflow-y-auto pointer-events-none">
-      <div className="pointer-events-auto max-w-lg lg:max-w-xl w-full mx-4">
-          
-          {/* Efeitos de fundo (copiados do código 2) */}
-{/* Background Pattern */}
+      {showCheckoutModal && (
+        <>
+          {/* OVERLAY COM BLUR - Camada separada */}
+          <div
+            className="fixed inset-0 z-[60]"
+            style={{
+              backdropFilter: 'blur(40px)',
+              WebkitBackdropFilter: 'blur(40px)',
+              backgroundColor: 'rgba(0, 0, 0, 0.6)'
+            }}
+            onClick={() => setShowCheckoutModal(false)}
+          />
 
-{/* Animated Gradient Blobs */}
-<div 
-  className="relative rounded-3xl p-8 w-full max-h-[90vh] overflow-y-auto"
-  style={{
-    backgroundColor: '#1A1A1A',
-    border: '2px solid transparent',
-    backgroundImage: 'linear-gradient(#1A1A1A, #1A1A1A), linear-gradient(135deg, #FF6B00 0%, #FF0080 50%, #8B00FF 100%)',
-    backgroundOrigin: 'border-box',
-    backgroundClip: 'padding-box, border-box'
-  }}
->    
-          
-            {/* Step 1: Seleção de Plano */}
-            {checkoutStep === 'plan' && (
-              <div className="relative z-10">
-                <div className="text-center mb-6">
-                  <div className="flex justify-center mb-6">
-  <svg width="48" height="48" viewBox="0 0 1564 1564" xmlns="http://www.w3.org/2000/svg">
-    <path d="M1001.683,23.139L433.941,727.705C433.941,727.705 414.727,752.657 429.123,757.818C454,766.738 783.43,754.723 771.86,756.415C771.86,756.415 799.555,753.473 791.713,787.082C784.04,819.968 735.527,1088.176 721.925,1130.644C708.323,1173.112 714.745,1159.731 714.745,1159.731C712.575,1159.731 711.288,1182.876 723.478,1185.568C736.204,1188.379 743.209,1188.065 756.911,1174.333C771.677,1159.534 861.262,1028.542 863.24,1028.542L1226.88,546.873C1227.906,548.514 1248.393,525.692 1221.45,522.235M1221.45,522.235L1115.236,520.972L902.566,520.972C902.566,520.972 885.36,525.188 897.567,497.267C909.774,469.345 912.072,456.497 912.072,456.497L1022.331,70.647L1028.875,32.645C1028.875,32.645 1026.615,9.308 1001.808,23.139" fill="#00FF99"/>
-    <path d="M507.177,1105.829C493.786,1121.663 477.201,1132.121 457.867,1137.955L690.658,1372.989C705.266,1359.456 721.561,1351.518 738.923,1347.115L507.177,1105.829ZM429.844,939.939C485.576,939.939 530.824,985.187 530.824,1040.92C530.824,1096.653 485.576,1141.901 429.844,1141.901C374.111,1141.901 328.863,1096.653 328.863,1040.92C328.863,985.187 374.111,939.939 429.844,939.939ZM429.844,981.253C462.775,981.253 489.511,1007.989 489.511,1040.92C489.511,1073.851 462.775,1100.587 429.844,1100.587C396.912,1100.587 370.176,1073.851 370.176,1040.92C370.176,1007.989 396.912,981.253 429.844,981.253ZM1028.441,1105.372L797.555,1352.091C814.771,1359.117 830.462,1370.383 842.586,1387.319L1073.308,1136.429C1056.017,1130.603 1041.204,1119.974 1028.441,1105.372ZM760.432,1345.038C816.124,1345.076 861.398,1390.3 861.413,1446.019C861.428,1501.752 816.165,1547 760.432,1547C704.699,1547 659.451,1501.752 659.451,1446.019C659.451,1390.286 704.699,1345 760.432,1345.038ZM760.432,1386.352C793.363,1386.352 820.1,1413.088 820.1,1446.019C820.1,1478.951 793.363,1505.687 760.432,1505.687C727.501,1505.687 700.765,1478.951 700.765,1446.019C700.765,1413.088 727.501,1386.352 760.432,1386.352ZM1106.156,939.939C1161.889,939.939 1207.137,985.187 1207.137,1040.92C1207.137,1096.653 1161.889,1141.901 1106.156,1106.156C1050.424,1141.901 1005.176,1096.653 1005.176,1040.92C1005.176,985.187 1050.424,939.939 1106.156,939.939ZM1106.156,981.253C1139.088,981.253 1165.824,1007.989 1165.824,1040.92C1165.824,1073.851 1139.088,1100.587 1106.156,1100.587C1073.225,1100.587 1046.489,1073.851 1046.489,1040.92C1046.489,1007.989 1073.225,981.253 1106.156,981.253Z" fill="#00FF99" stroke="#00FF99" strokeWidth="1"/>
-  </svg>
-</div>
-<div className="text-center mb-6">
-                    {/* Ícone (simulando o do código 2) */}
-                  </div>
-                  <h2 className="text-2xl font-bold text-white mb-2">
-                    {shouldShowTrial() ? 'Teste Grátis' : '💳 Ativar ou Fazer Upgrade'}
-                  </h2>
-                  <p className="text-gray-400">
-                    {shouldShowTrial() 
-                      ? 'Teste todos os recursos sem compromisso' 
-                      : 'Ative ou adicione mais conexões ao seu plano'
-                    }
-                  </p>
-                </div>
-                
-                <div className="flex justify-center mb-6">
-                  <div className="bg-[#222222] rounded-xl p-1 flex border border-[#333333]">
-                    <button
-                      onClick={() => setSelectedPlan({...selectedPlan, billingPeriod: 'monthly'})}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-                        selectedPlan.billingPeriod === 'monthly'
-                          ? 'bg-[#04F5A0] text-black'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      MENSAL
-                    </button>
-                    <button
-                      onClick={() => setSelectedPlan({...selectedPlan, billingPeriod: 'annual'})}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex items-center ${
-                        selectedPlan.billingPeriod === 'annual'
-                          ? 'bg-[#04F5A0] text-black'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      ANUAL
-                      <span className="ml-1 px-1 py-0.5 bg-orange-500 text-white text-xs rounded">
-                        -{calculateAnnualDiscount()}%
-                      </span>
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-300 mb-3">
-                    Quantas conexões WhatsApp você precisa?
-                  </label>
-                  
-                  <div className="relative mb-4">
-                    <div className="h-2 bg-white/10 rounded-lg backdrop-blur-sm">
-                      <div
-                        className="h-full bg-gradient-to-r from-[#04F5A0] to-orange-500 rounded-lg transition-all duration-300"
-                        style={{ width: `${((selectedPlan.connections - 1) / 6) * 100}%` }}
-                      />
-                    </div>
-                    <input
-                      type="range"
-                      min={subscription?.connections_purchased || 1}
-                      max="7"
-                      value={selectedPlan.connections}
-                      onChange={(e) => setSelectedPlan({...selectedPlan, connections: parseInt(e.target.value)})}
-                      className="absolute top-0 left-0 w-full h-2 opacity-0 cursor-pointer"
-                    />
-                  </div>
-                  
-                  <div className="flex justify-between text-xs text-gray-500 mb-4">
-                    <span>1</span>
-                    <span>2</span>
-                    <span>3</span>
-                    <span>4</span>
-                    <span>5</span>
-                    <span>6</span>
-                    <span>7</span>
-                  </div>
-                  
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-[#04F5A0] mb-1">
-                      {selectedPlan.connections} {selectedPlan.connections === 1 ? 'conexão' : 'conexões'}
-                    </div>
-                    {hasDiscount() > 0 && (
-                      <div className="text-orange-400 text-sm font-medium">
-                        ✨ {hasDiscount()}% de desconto por conexão!
+          {/* CONTAINER DO MODAL - Camada acima do blur */}
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 overflow-y-auto pointer-events-none">
+            <div className="pointer-events-auto max-w-lg lg:max-w-xl w-full mx-4">
+
+              {/* Efeitos de fundo (copiados do código 2) */}
+              {/* Background Pattern */}
+
+              {/* Animated Gradient Blobs */}
+              <div
+                className="relative rounded-3xl p-8 w-full max-h-[90vh] overflow-y-auto"
+                style={{
+                  backgroundColor: '#1A1A1A',
+                  border: '2px solid transparent',
+                  backgroundImage: 'linear-gradient(#1A1A1A, #1A1A1A), linear-gradient(135deg, #FF6B00 0%, #FF0080 50%, #8B00FF 100%)',
+                  backgroundOrigin: 'border-box',
+                  backgroundClip: 'padding-box, border-box'
+                }}
+              >
+
+                {/* Step 1: Seleção de Plano */}
+                {checkoutStep === 'plan' && (
+                  <div className="relative z-10">
+                    <div className="text-center mb-6">
+                      <div className="flex justify-center mb-6">
+                        <svg width="48" height="48" viewBox="0 0 1564 1564" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1001.683,23.139L433.941,727.705C433.941,727.705 414.727,752.657 429.123,757.818C454,766.738 783.43,754.723 771.86,756.415C771.86,756.415 799.555,753.473 791.713,787.082C784.04,819.968 735.527,1088.176 721.925,1130.644C708.323,1173.112 714.745,1159.731 714.745,1159.731C712.575,1159.731 711.288,1182.876 723.478,1185.568C736.204,1188.379 743.209,1188.065 756.911,1174.333C771.677,1159.534 861.262,1028.542 863.24,1028.542L1226.88,546.873C1227.906,548.514 1248.393,525.692 1221.45,522.235M1221.45,522.235L1115.236,520.972L902.566,520.972C902.566,520.972 885.36,525.188 897.567,497.267C909.774,469.345 912.072,456.497 912.072,456.497L1022.331,70.647L1028.875,32.645C1028.875,32.645 1026.615,9.308 1001.808,23.139" fill="#00FF99" />
+                          <path d="M507.177,1105.829C493.786,1121.663 477.201,1132.121 457.867,1137.955L690.658,1372.989C705.266,1359.456 721.561,1351.518 738.923,1347.115L507.177,1105.829ZM429.844,939.939C485.576,939.939 530.824,985.187 530.824,1040.92C530.824,1096.653 485.576,1141.901 429.844,1141.901C374.111,1141.901 328.863,1096.653 328.863,1040.92C328.863,985.187 374.111,939.939 429.844,939.939ZM429.844,981.253C462.775,981.253 489.511,1007.989 489.511,1040.92C489.511,1073.851 462.775,1100.587 429.844,1100.587C396.912,1100.587 370.176,1073.851 370.176,1040.92C370.176,1007.989 396.912,981.253 429.844,981.253ZM1028.441,1105.372L797.555,1352.091C814.771,1359.117 830.462,1370.383 842.586,1387.319L1073.308,1136.429C1056.017,1130.603 1041.204,1119.974 1028.441,1105.372ZM760.432,1345.038C816.124,1345.076 861.398,1390.3 861.413,1446.019C861.428,1501.752 816.165,1547 760.432,1547C704.699,1547 659.451,1501.752 659.451,1446.019C659.451,1390.286 704.699,1345 760.432,1345.038ZM760.432,1386.352C793.363,1386.352 820.1,1413.088 820.1,1446.019C820.1,1478.951 793.363,1505.687 760.432,1505.687C727.501,1505.687 700.765,1478.951 700.765,1446.019C700.765,1413.088 727.501,1386.352 760.432,1386.352ZM1106.156,939.939C1161.889,939.939 1207.137,985.187 1207.137,1040.92C1207.137,1096.653 1161.889,1141.901 1106.156,1106.156C1050.424,1141.901 1005.176,1096.653 1005.176,1040.92C1005.176,985.187 1050.424,939.939 1106.156,939.939ZM1106.156,981.253C1139.088,981.253 1165.824,1007.989 1165.824,1040.92C1165.824,1073.851 1139.088,1100.587 1106.156,1100.587C1073.225,1100.587 1046.489,1073.851 1046.489,1040.92C1046.489,1007.989 1073.225,981.253 1106.156,981.253Z" fill="#00FF99" stroke="#00FF99" strokeWidth="1" />
+                        </svg>
                       </div>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="bg-[#222222] rounded-xl p-6 mb-6 border border-[#333333]">
-                  <div className="text-center mb-4">
-                    {shouldShowTrial() ? (
-                      <>
-                        <div className="text-5xl font-bold text-[#04F5A0] mb-2">
-                          R$ 0,00
-                        </div>
-                        <div className="text-sm text-gray-400 mb-3">
-                          por 4 dias {/* Mantendo os 4 dias do texto do código 1 */}
-                        </div>
-                        <div className="h-px bg-gradient-to-r from-transparent via-gray-600 to-transparent mb-3"></div>
-                        <div className="text-gray-400 text-sm mb-1">
-                          Depois cobraremos:
-                        </div>
-                      </>
-                    ) : null}
-                    
-                    {selectedPlan.billingPeriod === 'monthly' ? (
-                      <>
-                        <div className="text-4xl font-bold text-white mb-2">
-                          R$ {calculatePrice().toLocaleString('pt-BR')}
-                          <span className="text-lg text-gray-400 ml-1">/mês</span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="text-4xl font-bold text-white mb-2">
-                          R$ {calculatePrice().toLocaleString('pt-BR')}
-                          <span className="text-lg text-gray-400 ml-1">/mês</span>
-                        </div>
-                        <div className="text-lg text-gray-500 mb-1">
-                          R$ {calculateAnnualTotal().toLocaleString('pt-BR')}/ano
-                        </div>
-                        <div className="text-orange-400 text-sm font-medium">
-                           Economize {calculateAnnualDiscount()}% no plano anual!
-                        </div>
-                      </>
-                    )}
-                    
-                    {!shouldShowTrial() && (
-                      <div className="text-red-400 text-sm font-medium mt-2">
-                        ⚠️ Teste Grátis já utilizado ou modo de upgrade - Cobrança imediata
+                      <div className="text-center mb-6">
+                        {/* Ícone (simulando o do código 2) */}
                       </div>
-                    )}
-                  </div>
-                  
-                  <div className="text-center">
-                    <div className="text-yellow-400 text-sm font-medium mb-2">
-                      {shouldShowTrial() 
-                        ? ' Teste Grátis completo e sem compromisso' 
-                        : '💎 Acesso completo aos recursos'
-                      }
+                      <h2 className="text-2xl font-bold text-white mb-2">
+                        {shouldShowTrial() ? 'Teste Grátis' : '💳 Ativar ou Fazer Upgrade'}
+                      </h2>
+                      <p className="text-gray-400">
+                        {shouldShowTrial()
+                          ? 'Teste todos os recursos sem compromisso'
+                          : 'Ative ou adicione mais conexões ao seu plano'
+                        }
+                      </p>
                     </div>
-                    <div className="text-xs text-gray-500">
-                      {shouldShowTrial() 
-                        ? 'Cancele a qualquer momento durante o teste grátis'
-                        : 'Cancele a qualquer momento'
-                      }
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex space-x-3">
-                  <button
-                    type="button" // Garante que não submete formulário
-                    onClick={() => setShowCheckoutModal(false)}
-                    className="flex-1 bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 border border-white/20"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button" // Garante que não submete formulário
-                    onClick={handleCreateSubscription}
-                    disabled={checkoutLoading}
-                    className="flex-1 bg-[#04F5A0] hover:bg-[#03E691] disabled:bg-gray-600 disabled:cursor-not-allowed text-black py-3 px-4 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_25px_rgba(4,245,160,0.4)]"
-                  >
-                    {checkoutLoading ? 'Criando...' : 'Continuar'}
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            {/* Step 2: Dados do Cartão (SEM CPF E ENDEREÇO) */}
-            {checkoutStep === 'payment' && (
-              <div className="relative z-10">
-              
-                {/* Overlay de Loading (copiado do código 2) */}
-                {checkoutLoading && (
-                  <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm rounded-3xl -m-8">
-                    <div className="relative z-10 text-center">
-                      <div className="w-16 h-16 bg-[#00FF99] rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
+
+                    <div className="flex justify-center mb-6">
+                      <div className="bg-[#222222] rounded-xl p-1 flex border border-[#333333]">
+                        <button
+                          onClick={() => setSelectedPlan({ ...selectedPlan, billingPeriod: 'monthly' })}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${selectedPlan.billingPeriod === 'monthly'
+                            ? 'bg-[#04F5A0] text-black'
+                            : 'text-gray-400 hover:text-white'
+                            }`}
+                        >
+                          MENSAL
+                        </button>
+                        <button
+                          onClick={() => setSelectedPlan({ ...selectedPlan, billingPeriod: 'annual' })}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex items-center ${selectedPlan.billingPeriod === 'annual'
+                            ? 'bg-[#04F5A0] text-black'
+                            : 'text-gray-400 hover:text-white'
+                            }`}
+                        >
+                          ANUAL
+                          <span className="ml-1 px-1 py-0.5 bg-orange-500 text-white text-xs rounded">
+                            -{calculateAnnualDiscount()}%
+                          </span>
+                        </button>
                       </div>
-                      <h2 className="text-2xl font-bold text-white mb-2">Processando Pagamento</h2>
-                      <p className="text-gray-400">Por favor, aguarde. Não feche esta janela.</p>
+                    </div>
+
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-gray-300 mb-3">
+                        Quantas conexões WhatsApp você precisa?
+                      </label>
+
+                      <div className="relative mb-4">
+                        <div className="h-2 bg-white/10 rounded-lg backdrop-blur-sm">
+                          <div
+                            className="h-full bg-gradient-to-r from-[#04F5A0] to-orange-500 rounded-lg transition-all duration-300"
+                            style={{ width: `${((selectedPlan.connections - 1) / 6) * 100}%` }}
+                          />
+                        </div>
+                        <input
+                          type="range"
+                          min={subscription?.connections_purchased || 1}
+                          max="7"
+                          value={selectedPlan.connections}
+                          onChange={(e) => setSelectedPlan({ ...selectedPlan, connections: parseInt(e.target.value) })}
+                          className="absolute top-0 left-0 w-full h-2 opacity-0 cursor-pointer"
+                        />
+                      </div>
+
+                      <div className="flex justify-between text-xs text-gray-500 mb-4">
+                        <span>1</span>
+                        <span>2</span>
+                        <span>3</span>
+                        <span>4</span>
+                        <span>5</span>
+                        <span>6</span>
+                        <span>7</span>
+                      </div>
+
+                      <div className="text-center">
+                        <div className="text-3xl font-bold text-[#04F5A0] mb-1">
+                          {selectedPlan.connections} {selectedPlan.connections === 1 ? 'conexão' : 'conexões'}
+                        </div>
+                        {hasDiscount() > 0 && (
+                          <div className="text-orange-400 text-sm font-medium">
+                            ✨ {hasDiscount()}% de desconto por conexão!
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="bg-[#222222] rounded-xl p-6 mb-6 border border-[#333333]">
+                      <div className="text-center mb-4">
+                        {shouldShowTrial() ? (
+                          <>
+                            <div className="text-5xl font-bold text-[#04F5A0] mb-2">
+                              R$ 0,00
+                            </div>
+                            <div className="text-sm text-gray-400 mb-3">
+                              por 4 dias {/* Mantendo os 4 dias do texto do código 1 */}
+                            </div>
+                            <div className="h-px bg-gradient-to-r from-transparent via-gray-600 to-transparent mb-3"></div>
+                            <div className="text-gray-400 text-sm mb-1">
+                              Depois cobraremos:
+                            </div>
+                          </>
+                        ) : null}
+
+                        {selectedPlan.billingPeriod === 'monthly' ? (
+                          <>
+                            <div className="text-4xl font-bold text-white mb-2">
+                              R$ {calculatePrice().toLocaleString('pt-BR')}
+                              <span className="text-lg text-gray-400 ml-1">/mês</span>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-4xl font-bold text-white mb-2">
+                              R$ {calculatePrice().toLocaleString('pt-BR')}
+                              <span className="text-lg text-gray-400 ml-1">/mês</span>
+                            </div>
+                            <div className="text-lg text-gray-500 mb-1">
+                              R$ {calculateAnnualTotal().toLocaleString('pt-BR')}/ano
+                            </div>
+                            <div className="text-orange-400 text-sm font-medium">
+                              Economize {calculateAnnualDiscount()}% no plano anual!
+                            </div>
+                          </>
+                        )}
+
+                        {!shouldShowTrial() && (
+                          <div className="text-red-400 text-sm font-medium mt-2">
+                            ⚠️ Teste Grátis já utilizado ou modo de upgrade - Cobrança imediata
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="text-center">
+                        <div className="text-yellow-400 text-sm font-medium mb-2">
+                          {shouldShowTrial()
+                            ? ' Teste Grátis completo e sem compromisso'
+                            : '💎 Acesso completo aos recursos'
+                          }
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {shouldShowTrial()
+                            ? 'Cancele a qualquer momento durante o teste grátis'
+                            : 'Cancele a qualquer momento'
+                          }
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex space-x-3">
+                      <button
+                        type="button" // Garante que não submete formulário
+                        onClick={() => setShowCheckoutModal(false)}
+                        className="flex-1 bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 border border-white/20"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button" // Garante que não submete formulário
+                        onClick={handleCreateSubscription}
+                        disabled={checkoutLoading}
+                        className="flex-1 bg-[#04F5A0] hover:bg-[#03E691] disabled:bg-gray-600 disabled:cursor-not-allowed text-black py-3 px-4 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_25px_rgba(4,245,160,0.4)]"
+                      >
+                        {checkoutLoading ? 'Criando...' : 'Continuar'}
+                      </button>
                     </div>
                   </div>
                 )}
 
-                <div className="text-center mb-6">
-                  <div className="flex justify-center mb-6">
-</div>
-                  <h2 className="text-2xl font-bold text-white mb-2">Dados do Cartão</h2>
-                  <p className="text-gray-400">Checkout seguro e criptografado via Stripe</p>
-                </div>
-                
-                <div 
-  className="rounded-xl p-4 mb-6"
-  style={{
-    backgroundColor: '#222222',
-    border: '1px solid transparent',
-    backgroundImage: 'linear-gradient(#222222, #222222), linear-gradient(135deg, #FF6B00 0%, #FF0080 50%, #8B00FF 100%)',
-    backgroundOrigin: 'border-box',
-    backgroundClip: 'padding-box, border-box'
-  }}
->
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="text-white font-medium">
-                        {selectedPlan.connections} {selectedPlan.connections === 1 ? 'conexão' : 'conexões'}
+                {/* Step 2: Dados do Cartão (SEM CPF E ENDEREÇO) */}
+                {checkoutStep === 'payment' && (
+                  <div className="relative z-10">
+
+                    {/* Overlay de Loading (copiado do código 2) */}
+                    {checkoutLoading && (
+                      <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm rounded-3xl -m-8">
+                        <div className="relative z-10 text-center">
+                          <div className="w-16 h-16 bg-[#00FF99] rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
+                          </div>
+                          <h2 className="text-2xl font-bold text-white mb-2">Processando Pagamento</h2>
+                          <p className="text-gray-400">Por favor, aguarde. Não feche esta janela.</p>
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-400 capitalize">
-                        Plano {selectedPlan.billingPeriod === 'monthly' ? 'mensal' : 'anual'}
+                    )}
+
+                    <div className="text-center mb-6">
+                      <div className="flex justify-center mb-6">
                       </div>
+                      <h2 className="text-2xl font-bold text-white mb-2">Dados do Cartão</h2>
+                      <p className="text-gray-400">Checkout seguro e criptografado via Stripe</p>
                     </div>
-                    <div className="text-right">
-                      {shouldShowTrial() ? (
+
+                    <div
+                      className="rounded-xl p-4 mb-6"
+                      style={{
+                        backgroundColor: '#222222',
+                        border: '1px solid transparent',
+                        backgroundImage: 'linear-gradient(#222222, #222222), linear-gradient(135deg, #FF6B00 0%, #FF0080 50%, #8B00FF 100%)',
+                        backgroundOrigin: 'border-box',
+                        backgroundClip: 'padding-box, border-box'
+                      }}
+                    >
+                      <div className="flex justify-between items-center">
                         <div>
-                          <div className="text-lg font-bold text-[#04F5A0]">R$ 0,00</div>
-                          <div className="text-xs text-gray-400">por 4 dias</div>
-                          <div className="text-xs text-gray-500 mt-1">
-                            Depois: {selectedPlan.billingPeriod === 'annual' 
-                              ? `R$ ${calculateAnnualTotal().toLocaleString('pt-BR')}/ano`
-                              : `R$ ${calculatePrice().toLocaleString('pt-BR')}/mês`
-                            }
+                          <div className="text-white font-medium">
+                            {selectedPlan.connections} {selectedPlan.connections === 1 ? 'conexão' : 'conexões'}
+                          </div>
+                          <div className="text-sm text-gray-400 capitalize">
+                            Plano {selectedPlan.billingPeriod === 'monthly' ? 'mensal' : 'anual'}
                           </div>
                         </div>
-                      ) : (
-                        <div>
-                          {selectedPlan.billingPeriod === 'annual' ? (
-                            <>
-                              <div className="text-lg font-bold text-[#04F5A0]">
-                                R$ {calculateAnnualTotal().toLocaleString('pt-BR')}
+                        <div className="text-right">
+                          {shouldShowTrial() ? (
+                            <div>
+                              <div className="text-lg font-bold text-[#04F5A0]">R$ 0,00</div>
+                              <div className="text-xs text-gray-400">por 4 dias</div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                Depois: {selectedPlan.billingPeriod === 'annual'
+                                  ? `R$ ${calculateAnnualTotal().toLocaleString('pt-BR')}/ano`
+                                  : `R$ ${calculatePrice().toLocaleString('pt-BR')}/mês`
+                                }
                               </div>
-                              <div className="text-xs text-gray-400">/ano</div>
-                              <div className="text-xs text-orange-400 font-medium mt-1">
-                                 Economize {calculateAnnualDiscount()}% vs mensal
-                              </div>
-                            </>
+                            </div>
                           ) : (
-                            <>
-                              <div className="text-lg font-bold text-[#04F5A0]">
-                                R$ {calculatePrice().toLocaleString('pt-BR')}
-                              </div>
-                              <div className="text-xs text-gray-400">/mês</div>
-                            </>
+                            <div>
+                              {selectedPlan.billingPeriod === 'annual' ? (
+                                <>
+                                  <div className="text-lg font-bold text-[#04F5A0]">
+                                    R$ {calculateAnnualTotal().toLocaleString('pt-BR')}
+                                  </div>
+                                  <div className="text-xs text-gray-400">/ano</div>
+                                  <div className="text-xs text-orange-400 font-medium mt-1">
+                                    Economize {calculateAnnualDiscount()}% vs mensal
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="text-lg font-bold text-[#04F5A0]">
+                                    R$ {calculatePrice().toLocaleString('pt-BR')}
+                                  </div>
+                                  <div className="text-xs text-gray-400">/mês</div>
+                                </>
+                              )}
+                            </div>
                           )}
                         </div>
-                      )}
+                      </div>
                     </div>
+
+                    <form onSubmit={handleConfirmPayment}>
+                      <div className="space-y-4 mb-6">
+                        {/* Stripe Payment Element */}
+                        <div>
+                          <div
+                            id="payment-element"
+                            className="min-h-[200px]"
+                          />
+                          {/* Mensagens de erro aparecem aqui */}
+                          <div
+                            id="payment-message"
+                            className="text-red-400 text-sm mt-2"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex space-x-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCheckoutStep('plan')
+                            setClientSecret(null)
+                            if (paymentElement) {
+                              paymentElement.unmount()
+                              setPaymentElement(null)
+                            }
+                          }}
+                          disabled={checkoutLoading}
+                          className="flex-1 bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 border border-white/20"
+                        >
+                          Voltar
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={checkoutLoading || !isPaymentElementReady}
+                          className="flex-1 bg-[#04F5A0] hover:bg-[#03E691] disabled:bg-gray-600 disabled:cursor-not-allowed text-black py-3 px-4 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_25px_rgba(4,245,160,0.4)]"
+                        >
+                          {checkoutLoading
+                            ? 'Processando...'
+                            : !isPaymentElementReady
+                              ? 'Carregando formulário...'
+                              : (shouldShowTrial() ? 'Ativar Teste Grátis' : 'Pagar e Ativar')
+                          }
+                        </button>
+                      </div>
+                    </form>
                   </div>
-                </div>
-                
-                <form onSubmit={handleConfirmPayment}>
-                  <div className="space-y-4 mb-6">
-                    {/* Stripe Payment Element */}
-                    <div>
-                      <div 
-                        id="payment-element"
-                        className="min-h-[200px]"
-                      />
-                      {/* Mensagens de erro aparecem aqui */}
-                      <div 
-                        id="payment-message" 
-                        className="text-red-400 text-sm mt-2"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="flex space-x-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCheckoutStep('plan')
-                        setClientSecret(null)
-                        if (paymentElement) {
-                          paymentElement.unmount()
-                          setPaymentElement(null)
-                        }
-                      }}
-                      disabled={checkoutLoading}
-                      className="flex-1 bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 border border-white/20"
-                    >
-                      Voltar
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={checkoutLoading || !isPaymentElementReady}
-                      className="flex-1 bg-[#04F5A0] hover:bg-[#03E691] disabled:bg-gray-600 disabled:cursor-not-allowed text-black py-3 px-4 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_25px_rgba(4,245,160,0.4)]"
-                    >
-                      {checkoutLoading 
-                        ? 'Processando...' 
-                        : !isPaymentElementReady 
-                          ? 'Carregando formulário...'
-                          : (shouldShowTrial() ? 'Ativar Teste Grátis' : 'Pagar e Ativar')
-                      }
-                    </button>
-                  </div>
-                </form>
+                )}
+
               </div>
-            )}
-            
-</div>
-        </div>
-      </div>
-    </>
-  )}
+            </div>
+          </div>
+        </>
+      )}
       {/* --> [FIM DO MERGE] */}
 
       {/* Standard Modal para feedback */}
