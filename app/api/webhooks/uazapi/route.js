@@ -103,10 +103,11 @@ async function handleConnectionUpdate(payload) {
       .from('whatsapp_connections')
       .select('*')
       .eq('instance_name', instanceName)
-      .single()
+      .maybeSingle()
 
+    // Se não houver conexão no banco, apenas ignorar silenciosamente
     if (error || !connection) {
-      console.warn(`⚠️ Conexão não encontrada no banco: ${instanceName}`)
+      console.log(`ℹ️ Conexão não encontrada no banco, ignorando evento: ${instanceName}`)
       return
     }
 
@@ -166,14 +167,15 @@ async function handleMessageReceived(payload) {
     console.log(`💬 MESSAGES_UPSERT: ${instanceName}`)
 
     // Buscar conexão no banco
-    const { data: connection } = await supabase
+    const { data: connection, error: connectionError } = await supabase
       .from('whatsapp_connections')
       .select('id, user_id')
       .eq('instance_name', instanceName)
-      .single()
+      .maybeSingle()
 
-    if (!connection) {
-      console.warn(`⚠️ Conexão não encontrada: ${instanceName}`)
+    // Se não houver conexão no banco, apenas ignorar silenciosamente
+    if (!connection || connectionError) {
+      console.log(`ℹ️ Conexão não encontrada no banco, ignorando mensagem: ${instanceName}`)
       return
     }
 
@@ -243,6 +245,19 @@ async function handleQRCodeUpdate(payload) {
 
     console.log(`📱 QRCODE_UPDATED: ${instanceName}`)
 
+    // Verificar se conexão existe no banco
+    const { data: connection } = await supabase
+      .from('whatsapp_connections')
+      .select('id')
+      .eq('instance_name', instanceName)
+      .maybeSingle()
+
+    // Se não houver conexão no banco, apenas ignorar
+    if (!connection) {
+      console.log(`ℹ️ Conexão não encontrada no banco, ignorando QR Code: ${instanceName}`)
+      return
+    }
+
     // Você pode armazenar o QR Code atualizado se necessário
     // Ou notificar o frontend via WebSocket/SSE
 
@@ -272,6 +287,19 @@ async function handleConnectionLost(payload) {
     const instanceName = payload.instance
 
     console.log(`❌ CONNECTION_LOST: ${instanceName}`)
+
+    // Verificar se conexão existe no banco
+    const { data: connection } = await supabase
+      .from('whatsapp_connections')
+      .select('id')
+      .eq('instance_name', instanceName)
+      .maybeSingle()
+
+    // Se não houver conexão no banco, apenas ignorar
+    if (!connection) {
+      console.log(`ℹ️ Conexão não encontrada no banco, ignorando perda de conexão: ${instanceName}`)
+      return
+    }
 
     await supabase
       .from('whatsapp_connections')
