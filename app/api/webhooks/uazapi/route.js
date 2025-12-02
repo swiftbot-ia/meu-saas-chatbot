@@ -478,7 +478,7 @@ async function processIncomingMessage(requestId, instanceName, messageData) {
     // 2. BUSCAR CONEXÃO NO MAIN DB
     const { data: connection, error: connError } = await supabaseAdmin
       .from('whatsapp_connections')
-      .select('id, user_id')
+      .select('id, user_id, instance_token')
       .eq('instance_name', instanceName)
       .maybeSingle();
 
@@ -582,7 +582,10 @@ async function processIncomingMessage(requestId, instanceName, messageData) {
           messageInfo.audioMessage.url,
           'audio',
           messageId,
-          { mimetype: messageInfo.audioMessage.mimetype }
+          {
+            mimetype: messageInfo.audioMessage.mimetype,
+            instanceToken: connection.instance_token // Adicionar token para conversão MP3
+          }
         );
 
         localMediaPath = result.localPath;
