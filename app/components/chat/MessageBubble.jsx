@@ -54,10 +54,21 @@ export default function MessageBubble({ message, isOwn }) {
                 alt="Imagem"
                 className="max-w-[280px] rounded-lg transition-opacity group-hover:opacity-90"
                 onError={(e) => {
-                  e.target.src = '/placeholder-image.png';
                   console.error('Failed to load image:', mediaUrl);
+                  // Hide broken image icon
+                  e.target.style.display = 'none';
+                  // Show error message
+                  const errorDiv = e.target.nextSibling;
+                  if (errorDiv) errorDiv.style.display = 'flex';
                 }}
               />
+              {/* Error fallback */}
+              <div className="hidden w-[280px] h-40 bg-gray-100 rounded-lg items-center justify-center">
+                <div className="text-center">
+                  <ImageIcon size={48} className="text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">Imagem não disponível</p>
+                </div>
+              </div>
               {/* Hover overlay */}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 rounded-lg transition-colors flex items-center justify-center">
                 <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-full p-3">
@@ -129,8 +140,8 @@ export default function MessageBubble({ message, isOwn }) {
             <button
               onClick={() => handleDownload(mediaUrl, message.message_content || 'documento')}
               className={`flex items-center space-x-3 p-3 rounded-lg border transition-all hover:scale-[1.02] ${isOwn
-                  ? 'bg-green-600/30 border-green-400/30 hover:bg-green-600/40'
-                  : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                ? 'bg-green-600/30 border-green-400/30 hover:bg-green-600/40'
+                : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                 }`}
             >
               <div className={`p-2 rounded ${isOwn ? 'bg-white/20' : 'bg-blue-50'}`}>
@@ -173,8 +184,8 @@ export default function MessageBubble({ message, isOwn }) {
       <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-3`}>
         <div
           className={`max-w-md px-4 py-2 rounded-2xl shadow-sm ${isOwn
-              ? 'bg-green-500 text-white rounded-br-none'
-              : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none'
+            ? 'bg-green-500 text-white rounded-br-none'
+            : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none'
             }`}
         >
           {/* Media content */}
