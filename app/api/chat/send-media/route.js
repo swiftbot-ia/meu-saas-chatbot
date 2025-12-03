@@ -104,8 +104,9 @@ export async function POST(request) {
       await writeFile(filepath, buffer);
 
       // Set mediaUrl to FULL PUBLIC URL for UAZapi
+      // Using API route to serve file because Next.js doesn't serve runtime static files in production
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://swiftbot.com.br';
-      mediaUrl = `${baseUrl}/uploads/audio/${filename}`;
+      mediaUrl = `${baseUrl}/api/uploads/audio/${filename}`;
       console.log(`✅ File uploaded: ${mediaUrl}`);
     }
 
