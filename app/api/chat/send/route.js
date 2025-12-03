@@ -75,13 +75,22 @@ export async function POST(request) {
     }
 
     // Send message
-    const sentMessage = await MessageService.sendTextMessage(
+    const result = await MessageService.sendTextMessage(
       conversationId,
       message,
       userId
     );
 
-    return NextResponse.json(sentMessage);
+    // Return success - webhook will save the message shortly
+    return NextResponse.json({
+      success: true,
+      message: 'Mensagem enviada com sucesso',
+      data: {
+        message_content: message,
+        direction: 'outbound',
+        status: 'sent'
+      }
+    });
 
   } catch (error) {
     console.error('Error in POST /api/chat/send:', error);
