@@ -28,15 +28,12 @@ export default function PrivacyPolicyPage() {
           
           <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
             <div className="text-center mb-12">
-              <div className="inline-block bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-6 py-2 mb-4">
+              <div className="inline-block bg-white/5 backdrop-blur-sm rounded-full px-6 py-2 mb-4">
                 <span className="text-purple-400 font-semibold text-sm">🔒 LGPD / GDPR Compliant</span>
               </div>
               <h1 className="text-5xl md:text-7xl font-light text-white mb-4 leading-tight">
                 Política de <span className="font-normal bg-gradient-to-r from-[#00FF99] via-[#00E88C] to-[#00D97F] bg-clip-text text-transparent">Privacidade</span>
               </h1>
-              <p className="text-lg md:text-xl text-gray-300 max-w-3xl mx-auto font-light">
-                Atualizado em: {new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}
-              </p>
             </div>
           </div>
         </section>
@@ -138,7 +135,7 @@ export default function PrivacyPolicyPage() {
                         <li>Status de mensagens (entregue, lida)</li>
                       </ul>
                       {/* MODIFICADO: Estilo do Info Box */}
-                      <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-3 mt-3">
+                      <div className="bg-yellow-100 rounded-lg p-3 mt-3">
                         <p className="text-yellow-800 text-xs flex items-start">
                           <svg className="w-4 h-4 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -298,7 +295,7 @@ export default function PrivacyPolicyPage() {
                     <p>Implementamos medidas técnicas e organizacionais robustas para proteger seus dados:</p>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                      <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                      <div className="bg-green-50 rounded-xl p-4">
                         <h4 className="font-semibold text-black mb-3 flex items-center gap-2">
                           <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                           Criptografia
@@ -309,7 +306,7 @@ export default function PrivacyPolicyPage() {
                           <li>• Dados em repouso criptografados</li>
                         </ul>
                       </div>
-                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                      <div className="bg-blue-50 rounded-xl p-4">
                         <h4 className="font-semibold text-black mb-3 flex items-center gap-2">
                           <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
                           Controle de Acesso
@@ -367,7 +364,7 @@ export default function PrivacyPolicyPage() {
                       <div className="bg-gray-100 rounded-lg p-4"><strong className="text-black">🔙 Revogação:</strong> Revogar consentimento.</div>
                     </div>
 
-                    <div className="bg-green-50 border border-green-200 rounded-xl p-5 mt-6">
+                    <div className="bg-green-50 rounded-xl p-5 mt-6">
                       <h4 className="font-semibold text-black mb-2">📧 Como Exercer Seus Direitos:</h4>
                       <div className="space-y-2 text-sm">
                         <p>• Email: <a href="mailto:privacidade@swiftbot.com.br" className="text-green-600 hover:underline">privacidade@swiftbot.com.br</a></p>
@@ -462,7 +459,7 @@ export default function PrivacyPolicyPage() {
                 <section className="border-t border-black/10 pt-8">
                   <div className="bg-gray-100 rounded-xl p-6 text-center">
                     <p className="text-gray-700 text-sm">
-                      <strong className="text-black">Última atualização:</strong> {new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      <strong className="text-black">Última atualização:</strong> 10 de outubro de 2025
                     </p>
                   </div>
                 </section>
@@ -516,12 +513,12 @@ export default function PrivacyPolicyPage() {
               </p>
               <div className="flex space-x-4">
                 {/* Social Icons */}
-                <a href="https://www.facebook.com/SwiftBott" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center transition-all duration-300 hover:border-[#00FF99]">
+                <a href="https://www.facebook.com/SwiftBott" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all duration-300 hover:border-[#00FF99]">
                   <svg className="w-5 h-5 text-gray-400 hover:text-[#00FF99]" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                   </svg>
                 </a>
-                <a href="https://www.instagram.com/swiftbot.ia" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center transition-all duration-300 hover:border-[#00FF99]">
+                <a href="https://www.instagram.com/swiftbot.ia" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all duration-300 hover:border-[#00FF99]">
                   <svg className="w-5 h-5 text-gray-400 hover:text-[#00FF99]" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
                   </svg>
