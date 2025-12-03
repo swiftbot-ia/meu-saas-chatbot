@@ -6,7 +6,7 @@
 'use client';
 
 import React from 'react';
-import { Check, CheckCheck, Image as ImageIcon, Video as VideoIcon, FileText, Mic, Download, Play } from 'lucide-react';
+import { Check, CheckCheck, Clock, XCircle, Image as ImageIcon, Video as VideoIcon, FileText, Mic, Download, Play } from 'lucide-react';
 import MediaModal from './MediaModal';
 import AudioPlayer from './AudioPlayer';
 
@@ -172,17 +172,22 @@ export default function MessageBubble({ message, isOwn, contact, connectionAvata
   };
 
   const renderStatusIcon = () => {
-    if (!isOwn) return null;
+    if (!isOwn) return null; // Only show status for own messages
 
-    if (message.status === 'read') {
-      return <CheckCheck size={16} className="text-blue-400" />;
-    } else if (message.status === 'delivered') {
-      return <CheckCheck size={16} />;
-    } else if (message.status === 'sent') {
-      return <Check size={16} />;
+    const iconClass = `w-4 h-4 ${message.status === 'sent' ? 'text-blue-400' : 'text-gray-400'
+      }`;
+
+    // Show status based on message.status
+    if (message.status === 'sending') {
+      return <Clock size={14} className="text-gray-400" />;
     }
 
-    return null;
+    if (message.status === 'error') {
+      return <XCircle size={14} className="text-red-500" />;
+    }
+
+    // Default: sent (double check)
+    return <CheckCheck size={14} className={iconClass} />;
   };
 
   return (

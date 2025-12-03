@@ -9,6 +9,8 @@ export default function ChatInput({ onSend, disabled = false }) {
   const [sending, setSending] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const fileInputRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -85,7 +87,7 @@ export default function ChatInput({ onSend, disabled = false }) {
           className="hidden"
           accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
           onChange={handleFileChange}
-          disabled={sending || disabled}
+          disabled={sending || disabled || isRecording}
         />
 
         {/* Floating capsule container */}

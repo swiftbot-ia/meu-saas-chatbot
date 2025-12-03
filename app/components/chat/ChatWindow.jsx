@@ -9,6 +9,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import { Phone, MoreVertical, Archive, Trash2, X, MessageSquare } from 'lucide-react';
+import { createChatSupabaseClient } from '@/lib/supabase/chat-client';
+
+const chatSupabase = createChatSupabaseClient();
 
 export default function ChatWindow({
   conversation,
@@ -57,12 +60,59 @@ export default function ChatWindow({
       loadMessages();
       markAsRead();
 
-      // Auto-refresh messages every 5 seconds
-      const interval = setInterval(() => {
-        loadMessages();
-      }, 5000);
+      // Setup real-time subscription for message updates
+      const channel = chatSupabase
+        .channel(`messages:${conversation.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'whatsapp_messages',
+            filter: `conversation_id=eq.${conversation.id}`
+          },
+          (payload) => {
+            const newMessage = payload.new;
 
-      return () => clearInterval(interval);
+            setMessages(prev => {
+              // Check if we have an optimistic message to replace
+              const tempIndex = prev.findIndex(m => {
+                if (m.status !== 'sending' || m.direction !== 'outbound') return false;
+
+                // For text, match content exactly
+                if (m.message_type === 'text' && newMessage.message_type === 'text') {
+                  return m.message_content === newMessage.message_content;
+                }
+
+                // For media (audio, image, video), match by type
+                // This handles cases where content changes (e.g. audio transcription)
+                if (m.message_type === newMessage.message_type) {
+                  return true;
+                }
+
+                return false;
+              });
+
+              if (tempIndex >= 0) {
+                // Replace optimistic message with real one
+                const updated = [...prev];
+                updated[tempIndex] = {
+                  ...newMessage,
+                  status: 'sent'  // ✓✓ Confirmed!
+                };
+                return updated;
+              }
+
+              // New inbound message - add it
+              return [...prev, newMessage];
+            });
+          }
+        )
+        .subscribe();
+
+      return () => {
+        chatSupabase.removeChannel(channel);
+      };
     } else {
       setMessages([]);
     }
@@ -159,18 +209,71 @@ export default function ChatWindow({
       let response;
 
       if (file) {
-        // Send media message
+        // 1. Create Optimistic Message for Media
+        const tempId = `temp_${Date.now()}`;
+        const mediaType = detectMediaType(file.type);
+        const optimisticMediaUrl = URL.createObjectURL(file);
+
+        const optimisticMessage = {
+          id: tempId,
+          message_id: tempId,
+          message_content: caption || '',
+          direction: 'outbound',
+          status: 'sending',
+          created_at: new Date().toISOString(),
+          received_at: new Date().toISOString(),
+          sender_name: 'Você',
+          message_type: mediaType,
+          media_url: optimisticMediaUrl, // Local preview URL
+          caption: caption || ''
+        };
+
+        // Add to UI immediately
+        setMessages(prev => [...prev, optimisticMessage]);
+        setTimeout(() => {
+          const messageList = document.querySelector('[data-message-list]');
+          if (messageList) {
+            messageList.scrollTop = messageList.scrollHeight;
+          }
+        }, 100);
+
+        // 2. Send media message
         const formData = new FormData();
         formData.append('conversationId', conversation.id);
-        formData.append('mediaUrl', ''); // TODO: Upload file first
-        formData.append('caption', caption);
-        formData.append('mediaType', detectMediaType(file.type));
+        formData.append('file', file);
+        formData.append('caption', caption || '');
+        formData.append('mediaType', mediaType);
 
         response = await fetch('/api/chat/send-media', {
           method: 'POST',
           body: formData
         });
       } else {
+        // Create optimistic message IMMEDIATELY
+        const tempId = `temp_${Date.now()}`;
+        const optimisticMessage = {
+          id: tempId,
+          message_id: tempId,
+          message_content: text,
+          direction: 'outbound',
+          status: 'sending',  // ⏰ Sending status
+          created_at: new Date().toISOString(),
+          received_at: new Date().toISOString(),
+          sender_name: 'Você',
+          message_type: 'text'
+        };
+
+        // Add to UI INSTANTLY
+        setMessages(prev => [...prev, optimisticMessage]);
+
+        // Scroll to bottom immediately
+        setTimeout(() => {
+          const messageList = document.querySelector('[data-message-list]');
+          if (messageList) {
+            messageList.scrollTop = messageList.scrollHeight;
+          }
+        }, 50);
+
         // Send text message
         response = await fetch('/api/chat/send', {
           method: 'POST',
@@ -188,19 +291,22 @@ export default function ChatWindow({
         throw new Error(data.error || 'Erro ao enviar mensagem');
       }
 
-      // Add new message to list
-      setMessages(prev => [...prev, data]);
-
-      // Scroll to bottom
-      setTimeout(() => {
-        const messageList = document.querySelector('[data-message-list]');
-        if (messageList) {
-          messageList.scrollTop = messageList.scrollHeight;
-        }
-      }, 100);
+      // Message sent successfully
+      // Webhook will update status from 'sending' to 'sent'
+      console.log('✅ Message sent, waiting for webhook confirmation...');
 
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
+
+      // Mark optimistic message as error if it exists
+      if (!file && text) {
+        setMessages(prev => prev.map(m =>
+          m.status === 'sending' && m.message_content === text
+            ? { ...m, status: 'error' }
+            : m
+        ));
+      }
+
       throw error; // Re-throw to let ChatInput handle the error
     } finally {
       setSending(false);
@@ -382,8 +488,6 @@ export default function ChatWindow({
           disabled={sending}
         />
       </div>
-
-
     </div>
   );
 }

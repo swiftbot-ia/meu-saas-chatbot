@@ -7,6 +7,9 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import MessageService from '@/lib/MessageService';
+import { writeFile, mkdir } from 'fs/promises';
+import { join } from 'path';
+import { existsSync } from 'fs';
 
 // Helper para criar cliente Supabase com cookies (para autenticação)
 function createAuthClient() {
@@ -52,21 +55,15 @@ export async function POST(request) {
     // Parse form data
     const formData = await request.formData();
     const conversationId = formData.get('conversationId');
-    const mediaUrl = formData.get('mediaUrl');
+    let mediaUrl = formData.get('mediaUrl');
     const caption = formData.get('caption') || '';
     const mediaType = formData.get('mediaType');
+    const file = formData.get('file'); // File upload
 
     // Validate input
     if (!conversationId) {
       return NextResponse.json(
         { error: 'conversationId é obrigatório' },
-        { status: 400 }
-      );
-    }
-
-    if (!mediaUrl) {
-      return NextResponse.json(
-        { error: 'mediaUrl é obrigatório' },
         { status: 400 }
       );
     }
@@ -87,18 +84,56 @@ export async function POST(request) {
       );
     }
 
+    // If file uploaded, save it to VPS
+    if (file && file.size > 0) {
+      // Create uploads directory if doesn't exist
+      const uploadsDir = join(process.cwd(), 'public', 'uploads', 'audio');
+      if (!existsSync(uploadsDir)) {
+        await mkdir(uploadsDir, { recursive: true });
+      }
+
+      // Generate unique filename
+      const timestamp = Date.now();
+      const ext = mediaType === 'audio' ? 'webm' : file.name.split('.').pop();
+      const filename = `${timestamp}.${ext}`;
+      const filepath = join(uploadsDir, filename);
+
+      // Write file
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      await writeFile(filepath, buffer);
+
+      // Set mediaUrl to FULL PUBLIC URL for UAZapi
+      // Using API route to serve file because Next.js doesn't serve runtime static files in production
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://swiftbot.com.br';
+      mediaUrl = `${baseUrl}/api/uploads/audio/${filename}`;
+      console.log(`✅ File uploaded: ${mediaUrl}`);
+    }
+
+    if (!mediaUrl) {
+      return NextResponse.json(
+        { error: 'mediaUrl ou file é obrigatório' },
+        { status: 400 }
+      );
+    }
+
     // Send media message
     const sentMessage = await MessageService.sendMediaMessage(
       conversationId,
       {
         mediaUrl,
         caption,
-        mediaType
+        mediaType,
+        ptt: mediaType === 'audio' // Send as voice note if audio
       },
       userId
     );
 
-    return NextResponse.json(sentMessage);
+    return NextResponse.json({
+      success: true,
+      message: 'Mídia enviada com sucesso',
+      data: sentMessage
+    });
 
   } catch (error) {
     console.error('Error in POST /api/chat/send-media:', error);
