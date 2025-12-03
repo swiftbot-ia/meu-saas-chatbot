@@ -7,9 +7,14 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import MessageService from '@/lib/MessageService';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, unlink } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import ffmpeg from 'fluent-ffmpeg';
+import ffmpegInstaller from 'ffmpeg-static';
+
+// Configure ffmpeg path
+ffmpeg.setFfmpegPath(ffmpegInstaller);
 
 // Helper para criar cliente Supabase com cookies (para autenticação)
 function createAuthClient() {
@@ -94,20 +99,39 @@ export async function POST(request) {
 
       // Generate unique filename
       const timestamp = Date.now();
-      const ext = mediaType === 'audio' ? 'webm' : file.name.split('.').pop();
-      const filename = `${timestamp}.${ext}`;
+      const originalExt = file.name.split('.').pop();
+      const filename = `${timestamp}.${originalExt}`;
       const filepath = join(uploadsDir, filename);
 
-      // Write file
+      // Convert file to buffer and save
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
       await writeFile(filepath, buffer);
 
-      // Set mediaUrl to FULL PUBLIC URL for UAZapi
-      // Using API route to serve file because Next.js doesn't serve runtime static files in production
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://swiftbot.com.br';
-      mediaUrl = `${baseUrl}/api/uploads/audio/${filename}`;
-      console.log(`✅ File uploaded: ${mediaUrl}`);
+      // If audio/webm, convert to ogg
+      if (mediaType === 'audio' && (originalExt === 'webm' || file.type.includes('webm'))) {
+        const oggFilename = `${timestamp}.ogg`;
+        const oggFilepath = join(uploadsDir, oggFilename);
+
+        await new Promise((resolve, reject) => {
+          ffmpeg(filepath)
+            .toFormat('ogg')
+            .audioCodec('libopus')
+            .on('end', () => resolve())
+            .on('error', (err) => reject(err))
+            .save(oggFilepath);
+        });
+
+        // Delete original webm file
+        await unlink(filepath);
+
+        // Update mediaUrl to point to the new ogg file
+        // Use the dynamic API route for serving the file
+        mediaUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/uploads/audio/${oggFilename}`;
+      } else {
+        // Use the dynamic API route for serving the file
+        mediaUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/uploads/audio/${filename}`;
+      }
     }
 
     if (!mediaUrl) {
