@@ -197,11 +197,11 @@ export default function ChatWindow({
       let response;
 
       if (file) {
-        // Send media message
+        // Send media message with file upload
         const formData = new FormData();
         formData.append('conversationId', conversation.id);
-        formData.append('mediaUrl', ''); // TODO: Upload file first
-        formData.append('caption', caption);
+        formData.append('file', file); // Send the actual file
+        formData.append('caption', caption || '');
         formData.append('mediaType', detectMediaType(file.type));
 
         response = await fetch('/api/chat/send-media', {
