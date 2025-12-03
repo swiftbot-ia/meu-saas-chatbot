@@ -539,7 +539,10 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
           messageInfo.imageMessage.url,
           'image',
           messageId,
-          { mimetype: messageInfo.imageMessage.mimetype }
+          {
+            mimetype: messageInfo.imageMessage.mimetype,
+            instanceToken: instanceToken || connection.instance_token
+          }
         );
 
         localMediaPath = result.localPath;
