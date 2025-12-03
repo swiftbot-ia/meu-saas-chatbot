@@ -103,8 +103,9 @@ export async function POST(request) {
       const buffer = Buffer.from(bytes);
       await writeFile(filepath, buffer);
 
-      // Set mediaUrl to public path
-      mediaUrl = `/uploads/audio/${filename}`;
+      // Set mediaUrl to FULL PUBLIC URL for UAZapi
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://swiftbot.com.br';
+      mediaUrl = `${baseUrl}/uploads/audio/${filename}`;
       console.log(`✅ File uploaded: ${mediaUrl}`);
     }
 
