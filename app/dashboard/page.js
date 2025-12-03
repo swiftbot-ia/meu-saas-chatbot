@@ -1335,7 +1335,7 @@ export default function Dashboard() {
                     </svg>
                   </div>
                   <h3 className="text-2xl font-bold text-white">
-                    ⚠️ Mudança de Plano Agendada
+                    Mudança de Plano Agendada
                   </h3>
                 </div>
 

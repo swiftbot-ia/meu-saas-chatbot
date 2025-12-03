@@ -12,17 +12,17 @@ export default function FeedbackPage() {
   const [sending, setSending] = useState(false)
   // REMOVIDO: mousePosition
   // const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
-  
+
   // ADICIONADO: Estado do menu da conta
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false)
-  
+
   const [formData, setFormData] = useState({
     type: '',
     title: '',
     description: '',
     impact: 'medium'
   })
-  
+
   const [errors, setErrors] = useState({})
   const router = useRouter()
 
@@ -79,34 +79,34 @@ export default function FeedbackPage() {
 
   const validateForm = () => {
     const newErrors = {}
-    
+
     if (!formData.type) {
       newErrors.type = 'Selecione o tipo de sugestão'
     }
-    
+
     if (!formData.title.trim()) {
       newErrors.title = 'Título é obrigatório'
     } else if (formData.title.trim().length < 5) {
       newErrors.title = 'Título deve ter pelo menos 5 caracteres'
     }
-    
+
     if (!formData.description.trim()) {
       newErrors.description = 'Descrição é obrigatória'
     } else if (formData.description.trim().length < 30) {
       newErrors.description = 'Descrição deve ter pelo menos 30 caracteres'
     }
-    
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     if (!validateForm()) return
-    
+
     setSending(true)
-    
+
     try {
       const { error } = await supabase
         .from('user_feedback')
@@ -122,9 +122,9 @@ export default function FeedbackPage() {
           votes: 1,
           created_at: new Date().toISOString()
         }])
-      
+
       if (error) throw error
-      
+
       await fetch('/api/feedback/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -137,9 +137,9 @@ export default function FeedbackPage() {
           impact: impactLevels.find(i => i.value === formData.impact)?.label || formData.impact
         })
       })
-      
+
       alert('🎉 Sugestão enviada com sucesso! Obrigado por contribuir para melhorar o SwiftBot!')
-      
+
       setFormData({
         type: '',
         title: '',
@@ -147,7 +147,7 @@ export default function FeedbackPage() {
         impact: 'medium'
       })
       setErrors({})
-      
+
     } catch (error) {
       console.error('Erro ao enviar:', error)
       alert('❌ Erro ao enviar sugestão. Tente novamente.')
@@ -172,11 +172,11 @@ export default function FeedbackPage() {
   return (
     // MODIFICADO: Fundo principal
     <div className="min-h-screen bg-[#0A0A0A]">
-      
+
       {/* REMOVIDO: Background Effects (grid e mouse gradient) */}
-      
+
       {/* REMOVIDO: Header antigo */}
-      
+
       {/* Conteúdo Principal */}
       {/* MODIFICADO: Padding top alterado para pt-16 */}
       <main className="relative z-10 max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
@@ -185,10 +185,10 @@ export default function FeedbackPage() {
           ADICIONADO: Novo Header Padrão (igual ao dashboard)
         */}
         <div className="mb-12 flex justify-between items-start gap-4">
-          
+
           {/* Coluna da Esquerda: "Voltar" e Título */}
           <div className="flex-1">
-            
+
             {/* MODIFICADO: Título da página e SVG */}
             <h1 className="text-5xl font-bold text-white flex items-center gap-4">
               Central de Sugestão
@@ -198,17 +198,17 @@ export default function FeedbackPage() {
             </p>
           </div>
         </div>
-        
+
         {/* Form Card */}
         {/* MODIFICADO: Estilo do card principal (sem borda, sem blur) */}
         <div className="bg-[#111111] rounded-2xl overflow-hidden relative">
-          
+
           {/* REMOVIDO: Efeitos de blur e vidro */}
-          
+
           <form onSubmit={handleSubmit} className="relative z-20">
             <div className="p-8">
               <div className="space-y-6">
-                
+
                 {/* Tipo de Sugestão */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
@@ -263,7 +263,7 @@ export default function FeedbackPage() {
                   <input
                     type="text"
                     value={formData.title}
-                    onChange={(e) => setFormData({...formData, title: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     placeholder="Ex: Adicionar integração com Telegram"
                     className="w-full bg-[#0A0A0A] border-0 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-purple-500 outline-none transition-all duration-300"
                   />
@@ -281,13 +281,12 @@ export default function FeedbackPage() {
                       <button
                         key={level.value}
                         type="button"
-                        onClick={() => setFormData({...formData, impact: level.value})}
+                        onClick={() => setFormData({ ...formData, impact: level.value })}
                         // MODIFICADO: Estilo do botão de impacto
-                        className={`p-3 rounded-xl transition-all duration-300 ${
-                          formData.impact === level.value
-                            ? 'bg-[#0A0A0A] ring-2 ring-white/50'
-                            : 'bg-[#0A0A0A] hover:bg-[#1C1C1C]'
-                        }`}
+                        className={`p-3 rounded-xl transition-all duration-300 ${formData.impact === level.value
+                          ? 'bg-[#0A0A0A] ring-2 ring-white/50'
+                          : 'bg-[#0A0A0A] hover:bg-[#1C1C1C]'
+                          }`}
                       >
                         {/* REMOVIDO: Emoji */}
                         <div className={`text-sm font-medium ${level.color} mb-1`}>{level.label}</div>
@@ -306,7 +305,7 @@ export default function FeedbackPage() {
                   {/* MODIFICADO: Estilo do Textarea */}
                   <textarea
                     value={formData.description}
-                    onChange={(e) => setFormData({...formData, description: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder={`Descreva sua sugestão em detalhes:
 • O que você gostaria que fosse adicionado/melhorado?
 • Por que isso seria útil?
@@ -396,13 +395,13 @@ Quanto mais detalhes, melhor poderemos avaliar sua sugestão!`}
           <div className="bg-[#111111] rounded-2xl p-4 text-center">
             <div className="relative z-10">
               <div className="text-3xl mb-2">
-                <svg className="w-8 h-8 inline-block text-[#00FF99]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.63 2.25c-5.508 0-10.099 3.21-12.12 7.75h4.8m2.58 5.84l2.61-2.61m0 0l2.61 2.61m-2.61-2.61V21m0 0l2.61 2.61m-2.61-2.61l-2.61 2.61" /></svg>
+                <svg className="w-8 h-8 inline-block text-[#00FF99]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l7.5-7.5 7.5 7.5m-15 6l7.5-7.5 7.5 7.5" /></svg>
               </div>
               <div className="text-2xl font-bold text-[#00FF99]">127</div>
               <div className="text-sm text-gray-400">Sugestões recebidas</div>
             </div>
           </div>
-          
+
           {/* MODIFICADO: Card de stat (sem borda, sem blur, com SVG) */}
           <div className="bg-[#111111] rounded-2xl p-4 text-center">
             <div className="relative z-10">
@@ -413,7 +412,7 @@ Quanto mais detalhes, melhor poderemos avaliar sua sugestão!`}
               <div className="text-sm text-gray-400">Features implementadas</div>
             </div>
           </div>
-          
+
           {/* MODIFICADO: Card de stat (sem borda, sem blur, com SVG) */}
           <div className="bg-[#111111] rounded-2xl p-4 text-center">
             <div className="relative z-10">
@@ -434,13 +433,12 @@ Quanto mais detalhes, melhor poderemos avaliar sua sugestão!`}
 const SuggestionButton = ({ type, label, desc, icon, formData, setFormData }) => (
   <button
     type="button"
-    onClick={() => setFormData({...formData, type: type})}
+    onClick={() => setFormData({ ...formData, type: type })}
     // MODIFICADO: Estilo dos botões de tipo
-    className={`p-4 rounded-xl transition-all duration-300 text-left ${
-      formData.type === type
-        ? 'bg-[#0A0A0A] ring-2 ring-purple-500'
-        : 'bg-[#0A0A0A] hover:bg-[#1C1C1C]'
-    }`}
+    className={`p-4 rounded-xl transition-all duration-300 text-left ${formData.type === type
+      ? 'bg-[#0A0A0A] ring-2 ring-purple-500'
+      : 'bg-[#0A0A0A] hover:bg-[#1C1C1C]'
+      }`}
   >
     <div className="flex items-start">
       <div className="text-3xl mr-3 text-purple-400">{icon}</div>

@@ -194,16 +194,49 @@ export default function AccountSubscription() {
 
   const formatEventType = (eventType) => {
     const types = {
+      // Eventos de Trial e Assinatura
       'trial_started': 'Teste Iniciado',
+      'subscription_created': 'Assinatura Criada',
+      'subscription_renewed': 'Assinatura Renovada',
+
+      // Eventos de Pagamento
       'payment_success': 'Pagamento Realizado',
       'payment_failed': 'Falha no Pagamento',
+      'invoice_paid_webhook': 'Fatura Paga',
+      'invoice_payment_failed_webhook': 'Falha no Pagamento da Fatura',
+
+      // Eventos de Cancelamento
       'subscription_canceled': 'Assinatura Cancelada',
-      'subscription_canceled_manual': 'Assinatura Cancelada',
-      'subscription_canceled_webhook': 'Assinatura Cancelada (Auto)',
-      'subscription_renewed': 'Assinatura Renovada',
-      'subscription_canceled_with_refund': 'Assinatura Cancelada com Reembolso'
+      'subscription_canceled_manual': 'Assinatura Cancelada (Manual)',
+      'subscription_canceled_webhook': 'Assinatura Cancelada (Automático)',
+      'subscription_canceled_with_refund': 'Assinatura Cancelada com Reembolso',
+      'subscription_canceled_at_period_end': 'Cancelamento Agendado',
+      'subscription_canceled_failed_payment': 'Assinatura Cancelada (Falha no Pagamento)',
+
+      // Eventos de Upgrade/Downgrade
+      'plan_upgrade_requested': 'Upgrade de Plano Solicitado',
+      'plan_upgrade_confirmed': 'Upgrade de Plano Confirmado',
+      'plan_downgrade_applied': 'Downgrade de Plano Aplicado',
+      'upgrade_proration_paid': 'Prorata de Upgrade Pago',
+
+      // Eventos de Mudança de Plano
+      'plan_change_canceled': 'Mudança de Plano Cancelada',
+      'plan_change_canceled_confirmed': 'Cancelamento de Mudança Confirmado',
+
+      // Eventos de WhatsApp
+      'whatsapp_disconnected_failed_payment': 'WhatsApp Desconectado (Falha no Pagamento)'
     }
-    return types[eventType] || eventType
+
+    // Se o tipo não estiver mapeado, formatar automaticamente
+    // Exemplo: "some_event_type" -> "Some Event Type"
+    if (!types[eventType]) {
+      return eventType
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ')
+    }
+
+    return types[eventType]
   }
 
   // MODIFICADO: Estilo das badges de status (removida borda)
@@ -484,7 +517,7 @@ export default function AccountSubscription() {
                       <div className="bg-[#0A0A0A] rounded-xl p-4 hover:bg-[#1C1C1C] transition-colors duration-300 group">
                         <div className="relative z-10">
                           <div className="text-gray-400 text-sm mb-1 flex items-center gap-2">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0c-1.657 0-3-.895-3-2s1.343-2 3-2 3-.895 3-2-1.343-2-3-2m0 8c1.11 0 2.08-.402 2.599-1M12 16v1m0-1v-8" /></svg>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             Valor
                           </div>
                           <div className="text-lg font-semibold text-white group-hover:text-[#00FF99] transition-colors duration-300">
@@ -651,7 +684,7 @@ export default function AccountSubscription() {
                       // ASSINATURA ATIVA/TRIAL → ALTERAR
                       <button
                         onClick={handleOpenPlanChange}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center"
+                        className="w-full bg-gradient-to-r from-[#3B82F6] to-[#6f00ff] text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center hover:shadow-[0_0_30px_rgba(59,130,246,0.5)] hover:scale-[1.02]"
                       >
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -665,7 +698,7 @@ export default function AccountSubscription() {
                       <button
                         onClick={() => setShowCancelModal(true)}
                         disabled={canceling}
-                        className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center"
+                        className="w-full bg-gradient-to-r from-[#EF4444] to-[#F59E0B] disabled:bg-gray-600 disabled:from-gray-600 disabled:to-gray-600 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center hover:shadow-[0_0_30px_rgba(239,68,68,0.5)] hover:scale-[1.02]"
                       >
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
