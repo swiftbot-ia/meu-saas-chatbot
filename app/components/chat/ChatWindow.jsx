@@ -9,6 +9,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import { Phone, MoreVertical, Archive, Trash2, X } from 'lucide-react';
+import { createChatSupabaseClient } from '@/lib/supabase/chat-client';
+
+const chatSupabase = createChatSupabaseClient();
 
 export default function ChatWindow({
   conversation,
@@ -56,12 +59,48 @@ export default function ChatWindow({
       loadMessages();
       markAsRead();
 
-      // Auto-refresh messages every 5 seconds
-      const interval = setInterval(() => {
-        loadMessages();
-      }, 5000);
+      // Setup real-time subscription for message updates
+      const channel = chatSupabase
+        .channel(`messages:${conversation.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'whatsapp_messages',
+            filter: `conversation_id=eq.${conversation.id}`
+          },
+          (payload) => {
+            const newMessage = payload.new;
 
-      return () => clearInterval(interval);
+            setMessages(prev => {
+              // Check if we have an optimistic message with same content
+              const tempIndex = prev.findIndex(m =>
+                m.status === 'sending' &&
+                m.message_content === newMessage.message_content &&
+                m.direction === 'outbound'
+              );
+
+              if (tempIndex >= 0) {
+                // Replace optimistic message with real one
+                const updated = [...prev];
+                updated[tempIndex] = {
+                  ...newMessage,
+                  status: 'sent'  // ✓✓ Confirmed!
+                };
+                return updated;
+              }
+
+              // New inbound message - add it
+              return [...prev, newMessage];
+            });
+          }
+        )
+        .subscribe();
+
+      return () => {
+        chatSupabase.removeChannel(channel);
+      };
     } else {
       setMessages([]);
     }
@@ -170,6 +209,31 @@ export default function ChatWindow({
           body: formData
         });
       } else {
+        // Create optimistic message IMMEDIATELY
+        const tempId = `temp_${Date.now()}`;
+        const optimisticMessage = {
+          id: tempId,
+          message_id: tempId,
+          message_content: text,
+          direction: 'outbound',
+          status: 'sending',  // ⏰ Sending status
+          created_at: new Date().toISOString(),
+          received_at: new Date().toISOString(),
+          sender_name: 'Você',
+          message_type: 'text'
+        };
+
+        // Add to UI INSTANTLY
+        setMessages(prev => [...prev, optimisticMessage]);
+
+        // Scroll to bottom immediately
+        setTimeout(() => {
+          const messageList = document.querySelector('[data-message-list]');
+          if (messageList) {
+            messageList.scrollTop = messageList.scrollHeight;
+          }
+        }, 50);
+
         // Send text message
         response = await fetch('/api/chat/send', {
           method: 'POST',
@@ -188,19 +252,21 @@ export default function ChatWindow({
       }
 
       // Message sent successfully
-      // Don't add to messages here - webhook will trigger real-time update
+      // Webhook will update status from 'sending' to 'sent'
       console.log('✅ Message sent, waiting for webhook confirmation...');
-
-      // Scroll to bottom
-      setTimeout(() => {
-        const messageList = document.querySelector('[data-message-list]');
-        if (messageList) {
-          messageList.scrollTop = messageList.scrollHeight;
-        }
-      }, 100);
 
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
+
+      // Mark optimistic message as error if it exists
+      if (!file && text) {
+        setMessages(prev => prev.map(m =>
+          m.status === 'sending' && m.message_content === text
+            ? { ...m, status: 'error' }
+            : m
+        ));
+      }
+
       throw error; // Re-throw to let ChatInput handle the error
     } finally {
       setSending(false);
@@ -355,15 +421,6 @@ export default function ChatWindow({
         onSend={handleSend}
         disabled={sending}
       />
-
-      {/* Disconnected warning - informational only */}
-      {!conversation.connection?.is_connected && (
-        <div className="bg-yellow-50 border-t border-yellow-200 px-4 py-2 text-center">
-          <p className="text-sm text-yellow-800">
-            ⚠️ Status de conexão pode estar desatualizado. Envie uma mensagem para testar.
-          </p>
-        </div>
-      )}
     </div>
   );
 }
