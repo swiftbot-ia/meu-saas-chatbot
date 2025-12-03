@@ -114,10 +114,10 @@ export default function ChatPage() {
   // Loading state
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-screen bg-[#111111]">
         <div className="text-center">
-          <Loader2 className="animate-spin text-green-500 mx-auto mb-4" size={48} />
-          <p className="text-gray-600">Carregando chat...</p>
+          <Loader2 className="animate-spin text-[#00FF99] mx-auto mb-4" size={48} />
+          <p className="text-gray-400">Carregando chat...</p>
         </div>
       </div>
     );
@@ -126,18 +126,18 @@ export default function ChatPage() {
   // No connections state
   if (!loading && connections.length === 0) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-50">
+      <div className="flex items-center justify-center h-screen bg-[#111111]">
         <div className="text-center max-w-md">
-          <AlertCircle className="text-yellow-500 mx-auto mb-4" size={64} />
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">
+          <AlertCircle className="text-yellow-400 mx-auto mb-4" size={64} />
+          <h2 className="text-2xl font-bold text-white mb-2">
             Nenhuma conexão WhatsApp
           </h2>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-400 mb-6">
             Você precisa conectar uma instância do WhatsApp para usar o chat ao vivo.
           </p>
           <a
             href="/dashboard"
-            className="inline-block bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors"
+            className="inline-block bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold px-6 py-3 rounded-full hover:shadow-[0_0_20px_rgba(0,255,153,0.3)] transition-all"
           >
             Ir para Dashboard
           </a>
@@ -150,19 +150,19 @@ export default function ChatPage() {
   const hasConnectedInstance = connections.some(c => c.is_connected);
   if (!loading && !hasConnectedInstance) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-50">
+      <div className="flex items-center justify-center h-screen bg-[#111111]">
         <div className="text-center max-w-md">
-          <AlertCircle className="text-yellow-500 mx-auto mb-4" size={64} />
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">
+          <AlertCircle className="text-yellow-400 mx-auto mb-4" size={64} />
+          <h2 className="text-2xl font-bold text-white mb-2">
             WhatsApp desconectado
           </h2>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-400 mb-6">
             Todas as suas instâncias do WhatsApp estão desconectadas.
             Conecte pelo menos uma instância para usar o chat ao vivo.
           </p>
           <a
             href="/dashboard"
-            className="inline-block bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors"
+            className="inline-block bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold px-6 py-3 rounded-full hover:shadow-[0_0_20px_rgba(0,255,153,0.3)] transition-all"
           >
             Conectar WhatsApp
           </a>
@@ -173,37 +173,7 @@ export default function ChatPage() {
 
   // Main chat interface
   return (
-    <div className="flex h-screen bg-white">
-      {/* Connection selector (if multiple connections) */}
-      {connections.length > 1 && (
-        <div className="w-64 border-r bg-gray-50 p-4">
-          <h3 className="font-semibold text-gray-700 mb-3">Instâncias</h3>
-          <div className="space-y-2">
-            {connections.map((connection) => (
-              <button
-                key={connection.id}
-                onClick={() => setSelectedConnection(connection.id)}
-                className={`w-full text-left p-3 rounded-lg transition-colors ${selectedConnection === connection.id
-                  ? 'bg-green-500 text-white'
-                  : 'bg-white hover:bg-gray-100 text-gray-700'
-                  }`}
-              >
-                <div className="font-medium">
-                  {connection.profile_name || connection.instance_name}
-                </div>
-                <div className="text-sm opacity-75">
-                  {connection.phone_number_id}
-                </div>
-                <div className={`text-xs mt-1 ${connection.is_connected ? 'text-green-200' : 'text-red-300'
-                  }`}>
-                  {connection.is_connected ? '● Conectado' : '○ Desconectado'}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
+    <div className="flex h-screen bg-[#111111]">
       {/* Conversations list */}
       <div className="w-96">
         <ConversationList
@@ -211,24 +181,28 @@ export default function ChatPage() {
           selectedConversation={selectedConversation}
           onSelectConversation={handleSelectConversation}
           loading={false}
+          connections={connections}
+          selectedConnection={selectedConnection}
+          onSelectConnection={setSelectedConnection}
         />
       </div>
 
       {/* Chat window */}
       <ChatWindow
         conversation={selectedConversation}
+        connection={connections.find(c => c.id === selectedConnection)}
         onArchive={handleArchiveConversation}
         onDelete={handleDeleteConversation}
       />
 
       {/* Error toast */}
       {error && (
-        <div className="fixed bottom-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-2">
+        <div className="fixed bottom-4 right-4 bg-red-500/90 backdrop-blur-sm text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-2 z-50">
           <AlertCircle size={20} />
           <span>{error}</span>
           <button
             onClick={() => setError(null)}
-            className="ml-4 hover:bg-red-600 px-2 py-1 rounded"
+            className="ml-4 hover:bg-red-600/50 px-2 py-1 rounded"
           >
             ✕
           </button>

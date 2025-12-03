@@ -8,8 +8,9 @@
 import React from 'react';
 import { Check, CheckCheck, Image as ImageIcon, Video as VideoIcon, FileText, Mic, Download, Play } from 'lucide-react';
 import MediaModal from './MediaModal';
+import AudioPlayer from './AudioPlayer';
 
-export default function MessageBubble({ message, isOwn }) {
+export default function MessageBubble({ message, isOwn, contact, connectionAvatar }) {
   const [showTranscription, setShowTranscription] = React.useState(false);
   const [showMediaModal, setShowMediaModal] = React.useState(false);
 
@@ -63,9 +64,9 @@ export default function MessageBubble({ message, isOwn }) {
                 }}
               />
               {/* Error fallback */}
-              <div className="hidden w-[280px] h-40 bg-gray-100 rounded-lg items-center justify-center">
+              <div className="hidden w-[280px] h-40 bg-white/5 rounded-lg items-center justify-center">
                 <div className="text-center">
-                  <ImageIcon size={48} className="text-gray-400 mx-auto mb-2" />
+                  <ImageIcon size={48} className="text-gray-600 mx-auto mb-2" />
                   <p className="text-sm text-gray-500">Imagem não disponível</p>
                 </div>
               </div>
@@ -106,12 +107,16 @@ export default function MessageBubble({ message, isOwn }) {
             )}
           </>
         ) : null;
-
       case 'audio':
         return (
           <div className="mb-2">
             {mediaUrl && (
-              <audio src={mediaUrl} controls className="w-64 max-w-full" />
+              <AudioPlayer
+                src={mediaUrl}
+                isOwn={isOwn}
+                contactAvatar={isOwn ? connectionAvatar : contact?.profile_pic_url}
+                contactName={isOwn ? 'Você' : (contact?.name || contact?.whatsapp_number)}
+              />
             )}
             {message.transcription && (
               <div className="mt-2">
@@ -122,16 +127,17 @@ export default function MessageBubble({ message, isOwn }) {
                 >
                   <Mic size={12} />
                   <span>{showTranscription ? 'Ocultar transcrição' : 'Ver transcrição'}</span>
-                </button>
+                </button >
                 {showTranscription && (
-                  <div className={`mt-2 p-2 rounded text-xs italic ${isOwn ? 'bg-green-600/30 text-green-50' : 'bg-gray-100 text-gray-700'
+                  <div className={`mt-2 p-2 rounded text-xs italic ${isOwn ? 'bg-[#00FF99]/10 text-gray-300' : 'bg-white/5 text-gray-400'
                     }`}>
                     "{message.transcription}"
                   </div>
-                )}
-              </div>
+                )
+                }
+              </div >
             )}
-          </div>
+          </div >
         );
 
       case 'document':
@@ -139,23 +145,23 @@ export default function MessageBubble({ message, isOwn }) {
           <div className="mb-2">
             <button
               onClick={() => handleDownload(mediaUrl, message.message_content || 'documento')}
-              className={`flex items-center space-x-3 p-3 rounded-lg border transition-all hover:scale-[1.02] ${isOwn
-                ? 'bg-green-600/30 border-green-400/30 hover:bg-green-600/40'
-                : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+              className={`flex items-center space-x-3 p-3 rounded-lg transition-all hover:scale-[1.02] ${isOwn
+                ? 'bg-[#00FF99]/10 hover:bg-[#00FF99]/20'
+                : 'bg-white/5 hover:bg-white/10'
                 }`}
             >
-              <div className={`p-2 rounded ${isOwn ? 'bg-white/20' : 'bg-blue-50'}`}>
-                <FileText size={24} className={isOwn ? 'text-white' : 'text-blue-600'} />
+              <div className={`p-2 rounded ${isOwn ? 'bg-white/10' : 'bg-white/10'}`}>
+                <FileText size={24} className={isOwn ? 'text-[#00FF99]' : 'text-blue-400'} />
               </div>
               <div className="flex-1 text-left">
-                <div className={`font-medium text-sm ${isOwn ? 'text-white' : 'text-gray-900'}`}>
+                <div className={`font-medium text-sm ${isOwn ? 'text-white' : 'text-white'}`}>
                   {message.message_content || 'Documento'}
                 </div>
-                <div className={`text-xs ${isOwn ? 'text-green-100' : 'text-gray-500'}`}>
+                <div className={`text-xs ${isOwn ? 'text-gray-400' : 'text-gray-500'}`}>
                   Clique para baixar
                 </div>
               </div>
-              <Download size={20} className={isOwn ? 'text-white' : 'text-gray-400'} />
+              <Download size={20} className={isOwn ? 'text-[#00FF99]' : 'text-gray-400'} />
             </button>
           </div>
         ) : null;
@@ -184,8 +190,8 @@ export default function MessageBubble({ message, isOwn }) {
       <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-3`}>
         <div
           className={`max-w-md px-4 py-2 rounded-2xl shadow-sm ${isOwn
-            ? 'bg-green-500 text-white rounded-br-none'
-            : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none'
+            ? 'bg-[#1D4C38] text-white rounded-br-none'
+            : 'bg-[#1E1E1E] text-white rounded-bl-none'
             }`}
         >
           {/* Media content */}
