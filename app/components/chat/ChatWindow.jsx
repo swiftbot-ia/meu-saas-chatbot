@@ -187,8 +187,9 @@ export default function ChatWindow({
         throw new Error(data.error || 'Erro ao enviar mensagem');
       }
 
-      // Add new message to list
-      setMessages(prev => [...prev, data]);
+      // Message sent successfully
+      // Don't add to messages here - webhook will trigger real-time update
+      console.log('✅ Message sent, waiting for webhook confirmation...');
 
       // Scroll to bottom
       setTimeout(() => {
