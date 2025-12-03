@@ -493,13 +493,28 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
     const fromMe = messageKey.fromMe;
     const whatsappNumber = remoteJid.split('@')[0];
 
-    // 4. CRIAR/BUSCAR CONTATO NO CHAT DB (ADMIN - bypass RLS)
-    const contact = await getOrCreateContact(requestId, whatsappNumber, {
-      name: messageData.pushName || null,
-      jid: remoteJid
-    });
+    // 7. OBTER OU CRIAR CONTATO
+    const contact = await ConversationService.getOrCreateContact(
+      whatsappNumber,
+      {
+        name: messageData.pushName,
+        profilePicUrl: null // Webhook doesn't provide profile pic
+      },
+      chatSupabaseAdmin
+    );
 
-    // 5. CRIAR/BUSCAR CONVERSA NO CHAT DB
+    // Sync contact info if missing (name or profile pic)
+    if (!contact.profile_pic_url || !contact.name || contact.name === whatsappNumber) {
+      // Fire and forget - don't await to avoid blocking response
+      ConversationService.syncContactInfo(
+        contact.id,
+        whatsappNumber,
+        instanceToken,
+        chatSupabaseAdmin
+      ).catch(err => console.error('Background contact sync failed:', err));
+    }
+
+    // 8. OBTER OU CRIAR CONVERSA NO CHAT DB
     const conversation = await getOrCreateConversation(
       requestId,
       instanceName,
