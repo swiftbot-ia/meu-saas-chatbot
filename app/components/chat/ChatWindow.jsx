@@ -8,13 +8,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
-import { Phone, MoreVertical, Archive, Trash2, X } from 'lucide-react';
+import { Phone, MoreVertical, Archive, Trash2, X, MessageSquare } from 'lucide-react';
 import { createChatSupabaseClient } from '@/lib/supabase/chat-client';
 
 const chatSupabase = createChatSupabaseClient();
 
 export default function ChatWindow({
   conversation,
+  connection,
   onClose,
   onArchive,
   onDelete
@@ -229,7 +230,12 @@ export default function ChatWindow({
 
         // Add to UI immediately
         setMessages(prev => [...prev, optimisticMessage]);
-        setTimeout(() => scrollToBottom(), 100);
+        setTimeout(() => {
+          const messageList = document.querySelector('[data-message-list]');
+          if (messageList) {
+            messageList.scrollTop = messageList.scrollHeight;
+          }
+        }, 100);
 
         // 2. Send media message
         const formData = new FormData();
@@ -353,13 +359,24 @@ export default function ChatWindow({
 
   if (!conversation) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="text-6xl mb-4">💬</div>
-          <p className="text-gray-500 text-lg font-medium">
+      <div
+        className="flex-1 flex items-center justify-center bg-[#0A0A0A] relative"
+        style={{
+          backgroundImage: 'url(/chat-pattern.png)',
+          backgroundSize: '400px 400px',
+          backgroundRepeat: 'repeat',
+          backgroundAttachment: 'fixed'
+        }}
+      >
+        <div className="absolute inset-0 bg-black/50" /> {/* Overlay for better text visibility */}
+        <div className="text-center relative z-10">
+          <div className="w-20 h-20 bg-[#1E1E1E] rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+            <MessageSquare size={40} className="text-[#00FF99]" />
+          </div>
+          <h2 className="text-white text-2xl font-semibold mb-2">
             Selecione uma conversa
-          </p>
-          <p className="text-gray-400 text-sm mt-2">
+          </h2>
+          <p className="text-gray-400 text-sm max-w-xs mx-auto">
             Escolha uma conversa da lista para começar a enviar mensagens
           </p>
         </div>
@@ -368,9 +385,9 @@ export default function ChatWindow({
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full">
+    <div className="flex-1 flex flex-col h-full relative">
       {/* Header */}
-      <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
+      <div className="bg-[#111111] px-4 py-3 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           {/* Avatar */}
           {conversation.contact?.profile_pic_url ? (
@@ -380,17 +397,20 @@ export default function ChatWindow({
               className="w-10 h-10 rounded-full object-cover"
             />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-white font-semibold">
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold"
+              style={{ background: 'linear-gradient(135deg, #00FF99 0%, #00E88C 100%)' }}
+            >
               {(conversation.contact?.name || conversation.contact?.whatsapp_number || '?')[0].toUpperCase()}
             </div>
           )}
 
           {/* Info */}
           <div>
-            <h3 className="font-semibold text-gray-900">
+            <h3 className="font-semibold text-white">
               {conversation.contact?.name || conversation.contact?.whatsapp_number}
             </h3>
-            <p className="text-sm text-gray-500 flex items-center">
+            <p className="text-sm text-gray-400 flex items-center">
               <Phone size={12} className="mr-1" />
               {conversation.contact?.whatsapp_number}
             </p>
@@ -403,23 +423,23 @@ export default function ChatWindow({
           <div className="relative">
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              className="p-2 hover:bg-white/5 rounded-full transition-colors"
             >
-              <MoreVertical size={20} className="text-gray-600" />
+              <MoreVertical size={20} className="text-gray-400" />
             </button>
 
             {showMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border z-10">
+              <div className="absolute right-0 mt-2 w-48 bg-[#1E1E1E] rounded-lg shadow-lg border border-white/10 z-10">
                 <button
                   onClick={handleArchive}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-gray-700"
+                  className="w-full px-4 py-2 text-left hover:bg-white/5 flex items-center space-x-2 text-gray-300"
                 >
                   <Archive size={16} />
                   <span>Arquivar</span>
                 </button>
                 <button
                   onClick={handleDelete}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center space-x-2 text-red-600"
+                  className="w-full px-4 py-2 text-left hover:bg-white/5 flex items-center space-x-2 text-red-400"
                 >
                   <Trash2 size={16} />
                   <span>Deletar</span>
@@ -432,13 +452,22 @@ export default function ChatWindow({
           {onClose && (
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors md:hidden"
+              className="p-2 hover:bg-white/5 rounded-full transition-colors md:hidden"
             >
-              <X size={20} className="text-gray-600" />
+              <X size={20} className="text-gray-400" />
             </button>
           )}
         </div>
       </div>
+
+      {/* Disconnected warning */}
+      {!connection?.is_connected && (
+        <div className="bg-yellow-900/20 border-b border-yellow-500/20 px-4 py-2 text-center">
+          <p className="text-sm text-yellow-400">
+            ⚠️ Status de conexão pode estar desatualizado. Envie uma mensagem para testar.
+          </p>
+        </div>
+      )}
 
       {/* Messages */}
       <MessageList
@@ -448,13 +477,17 @@ export default function ChatWindow({
         onLoadMore={loadMoreMessages}
         currentUserId={conversation.user_id}
         connectionPhoneId={conversation.connection?.phone_number_id}
+        contact={conversation.contact}
+        connectionAvatar={connection?.profile_pic_url}
       />
 
-      {/* Input */}
-      <ChatInput
-        onSend={handleSend}
-        disabled={sending}
-      />
+      {/* Input - Floating */}
+      <div className="absolute bottom-0 left-0 right-0">
+        <ChatInput
+          onSend={handleSend}
+          disabled={sending}
+        />
+      </div>
     </div>
   );
 }

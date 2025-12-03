@@ -15,7 +15,9 @@ export default function MessageList({
   hasMore,
   onLoadMore,
   currentUserId,
-  connectionPhoneId
+  connectionPhoneId,
+  contact,
+  connectionAvatar
 }) {
   const scrollRef = useRef(null);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -58,18 +60,18 @@ export default function MessageList({
   const isOwnMessage = (message) => {
     // Check if message is outbound or from the current connection
     return message.direction === 'outbound' ||
-           message.from_number === connectionPhoneId;
+      message.from_number === connectionPhoneId;
   };
 
   if (messages.length === 0 && !loading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-50">
+      <div className="flex-1 flex items-center justify-center bg-[#111111] relative">
         <div className="text-center">
           <div className="text-6xl mb-4">💬</div>
-          <p className="text-gray-500 text-lg font-medium">
+          <p className="text-white text-lg font-medium">
             Nenhuma mensagem ainda
           </p>
-          <p className="text-gray-400 text-sm mt-2">
+          <p className="text-gray-500 text-sm mt-2">
             Envie uma mensagem para começar a conversa
           </p>
         </div>
@@ -81,17 +83,24 @@ export default function MessageList({
     <div
       ref={scrollRef}
       onScroll={handleScroll}
-      className="flex-1 overflow-y-auto bg-gray-50 p-4 scroll-smooth"
+      className="flex-1 overflow-y-auto bg-[#111111] p-4 pb-24 scroll-smooth relative"
+      data-message-list
+      style={{
+        backgroundImage: 'url(/chat-pattern.png)',
+        backgroundSize: '400px 400px',
+        backgroundRepeat: 'repeat',
+        backgroundAttachment: 'fixed'
+      }}
     >
       {/* Load more indicator */}
       {hasMore && (
         <div className="flex justify-center mb-4">
           {loading ? (
-            <Loader2 className="animate-spin text-gray-400" size={24} />
+            <Loader2 className="animate-spin text-gray-500" size={24} />
           ) : (
             <button
               onClick={onLoadMore}
-              className="text-sm text-gray-500 hover:text-gray-700 hover:underline"
+              className="text-sm text-gray-400 hover:text-[#00FF99] hover:underline transition-colors"
             >
               Carregar mensagens antigas
             </button>
@@ -110,14 +119,19 @@ export default function MessageList({
               {/* Date divider */}
               {showDateDivider && (
                 <div className="flex items-center justify-center my-4">
-                  <div className="bg-gray-200 text-gray-600 text-xs px-3 py-1 rounded-full">
+                  <div className="bg-white/5 text-gray-400 text-xs px-3 py-1 rounded-full">
                     {formatDate(message.received_at)}
                   </div>
                 </div>
               )}
 
               {/* Message */}
-              <MessageBubble message={message} isOwn={isOwn} />
+              <MessageBubble
+                message={message}
+                isOwn={isOwn}
+                contact={contact}
+                connectionAvatar={connectionAvatar}
+              />
             </div>
           );
         })}
@@ -126,7 +140,7 @@ export default function MessageList({
       {/* Loading indicator */}
       {loading && messages.length === 0 && (
         <div className="flex items-center justify-center h-full">
-          <Loader2 className="animate-spin text-gray-400" size={32} />
+          <Loader2 className="animate-spin text-[#00FF99]" size={32} />
         </div>
       )}
 
@@ -134,7 +148,7 @@ export default function MessageList({
       {!autoScroll && (
         <button
           onClick={scrollToBottom}
-          className="fixed bottom-24 right-8 bg-green-500 text-white p-3 rounded-full shadow-lg hover:bg-green-600 transition-colors"
+          className="fixed bottom-28 right-6 bg-[#00FF99] text-black p-3 rounded-full shadow-lg shadow-[#00FF99]/30 hover:shadow-[0_0_30px_rgba(0,255,153,0.5)] transition-all z-10"
           title="Ir para o final"
         >
           <svg

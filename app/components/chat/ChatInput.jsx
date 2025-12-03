@@ -1,18 +1,13 @@
-/**
- * ChatInput Component
- * Input field for sending messages with media support and voice recording
- */
-
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, X, Smile, Mic } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Send, Paperclip, Mic } from 'lucide-react';
+import AudioRecorder from './AudioRecorder';
 
 export default function ChatInput({ onSend, disabled = false }) {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState('0:00');
   const fileInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -69,97 +64,22 @@ export default function ChatInput({ onSend, disabled = false }) {
     }
   };
 
-  // Recording timer
-  useEffect(() => {
-    let interval;
-    let seconds = 0;
-
-    if (isRecording) {
-      interval = setInterval(() => {
-        seconds++;
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        setRecordingTime(`${mins}:${secs.toString().padStart(2, '0')}`);
-
-        // Auto-stop after 60 seconds
-        if (seconds >= 60) {
-          stopRecording();
-        }
-      }, 1000);
-    } else {
-      setRecordingTime('0:00');
-    }
-
-    return () => clearInterval(interval);
-  }, [isRecording]);
-
-  const startRecording = async () => {
+  const handleAudioSend = async (audioFile, duration) => {
+    setIsRecording(false);
+    setSending(true);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (e) => {
-        audioChunksRef.current.push(e.data);
-      };
-
-      mediaRecorder.onstop = async () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const file = new File([blob], `recording_${Date.now()}.webm`, { type: 'audio/webm' });
-
-        // Stop all tracks
-        stream.getTracks().forEach(track => track.stop());
-
-        // Send audio file
-        setSending(true);
-        try {
-          await onSend({ file, caption: '' });
-        } catch (error) {
-          console.error('Erro ao enviar áudio:', error);
-          alert('Erro ao enviar áudio. Tente novamente.');
-        } finally {
-          setSending(false);
-        }
-      };
-
-      mediaRecorder.start();
-      mediaRecorderRef.current = mediaRecorder;
-      setIsRecording(true);
+      await onSend({ file: audioFile, duration });
     } catch (error) {
-      console.error('Erro ao access microfone:', error);
-      alert('Permissão de microfone necessária para gravar áudio.');
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
+      console.error('Erro ao enviar áudio:', error);
+      alert('Erro ao enviar áudio. Tente novamente.');
+    } finally {
+      setSending(false);
     }
   };
 
   return (
-    <div className="border-t bg-white p-4">
-      {/* Recording indicator */}
-      {isRecording && (
-        <div className="absolute bottom-full left-0 right-0 mb-2 mx-4 bg-red-50 border border-red-200 rounded-lg p-3 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              <span className="text-red-700 text-sm font-medium">Gravando...</span>
-              <span className="text-red-600 font-mono text-sm">{recordingTime}</span>
-            </div>
-            <button
-              onClick={stopRecording}
-              className="text-red-700 hover:text-red-900 text-sm font-medium px-3 py-1 hover:bg-red-100 rounded transition-colors"
-            >
-              Parar
-            </button>
-          </div>
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="flex items-end space-x-2">
+    <div className="p-4 relative">
+      <form onSubmit={handleSubmit} className="relative z-10">
         {/* File input (hidden) */}
         <input
           ref={fileInputRef}
@@ -170,76 +90,77 @@ export default function ChatInput({ onSend, disabled = false }) {
           disabled={sending || disabled || isRecording}
         />
 
-        {/* Attachment button */}
-        <button
-          type="button"
-          onClick={handleFileSelect}
-          disabled={sending || disabled || isRecording}
-          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Anexar arquivo"
-        >
-          <Paperclip size={20} />
-        </button>
+        {/* Floating capsule container */}
+        <div className={`bg-[#1E1E1E] rounded-full shadow-lg shadow-black/40 flex items-center px-2 py-2 ${isRecording ? 'justify-between' : ''}`}>
 
-        {/* Message input */}
-        <div className="flex-1">
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Digite uma mensagem..."
-            disabled={sending || disabled || isRecording}
-            rows={1}
-            className="w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{
-              minHeight: '40px',
-              maxHeight: '120px'
-            }}
-            onInput={(e) => {
-              e.target.style.height = 'auto';
-              e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-            }}
-          />
+          {isRecording ? (
+            <AudioRecorder
+              onSend={handleAudioSend}
+              onCancel={() => setIsRecording(false)}
+            />
+          ) : (
+            <>
+              {/* Attachment button */}
+              <button
+                type="button"
+                onClick={handleFileSelect}
+                disabled={sending || disabled}
+                className="p-3 text-gray-400 hover:text-[#00FF99] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                title="Anexar arquivo"
+              >
+                <Paperclip size={20} />
+              </button>
+
+              {/* Message input */}
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Digite uma mensagem..."
+                disabled={sending || disabled}
+                rows={1}
+                className="flex-1 bg-transparent text-white placeholder-gray-500 px-3 py-2 outline-none resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  minHeight: '20px',
+                  maxHeight: '120px'
+                }}
+                onInput={(e) => {
+                  e.target.style.height = 'auto';
+                  e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+                }}
+              />
+
+              {/* Send/Mic button - Toggle based on message content */}
+              {message.trim() ? (
+                // Send button when there's text
+                <button
+                  type="submit"
+                  disabled={sending || disabled}
+                  className="p-3 bg-[#00FF99] text-black rounded-full hover:shadow-[0_0_20px_rgba(0,255,153,0.3)] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                  title="Enviar mensagem"
+                >
+                  {sending ? (
+                    <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Send size={20} />
+                  )}
+                </button>
+              ) : (
+                // Mic button when empty
+                <button
+                  type="button"
+                  disabled={disabled}
+                  className="p-3 text-gray-400 hover:text-[#00FF99] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                  title="Gravar áudio"
+                  onClick={() => setIsRecording(true)}
+                >
+                  <Mic size={20} />
+                </button>
+              )}
+            </>
+          )}
         </div>
-
-        {/* Dynamic button: Microphone OR Send */}
-        {message.trim() ? (
-          // Send button (when there's text)
-          <button
-            type="submit"
-            disabled={sending || disabled}
-            className="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-green-500"
-            title="Enviar mensagem"
-          >
-            {sending ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Send size={20} />
-            )}
-          </button>
-        ) : (
-          // Microphone button (when input is empty)
-          <button
-            type="button"
-            onClick={isRecording ? stopRecording : startRecording}
-            disabled={sending || disabled}
-            className={`p-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isRecording
-                ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse'
-                : 'bg-green-500 text-white hover:bg-green-600'
-              }`}
-            title={isRecording ? 'Parar gravação' : 'Gravar áudio'}
-          >
-            <Mic size={20} />
-          </button>
-        )}
       </form>
-
-      {/* Info text */}
-      <p className="text-xs text-gray-500 mt-2 px-2">
-        {isRecording
-          ? 'Gravando áudio... Clique no botão vermelho para parar'
-          : 'Enter para enviar, Shift+Enter para nova linha'}
-      </p>
     </div>
   );
 }
