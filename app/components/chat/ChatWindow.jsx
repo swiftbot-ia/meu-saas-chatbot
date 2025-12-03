@@ -74,12 +74,23 @@ export default function ChatWindow({
             const newMessage = payload.new;
 
             setMessages(prev => {
-              // Check if we have an optimistic message with same content
-              const tempIndex = prev.findIndex(m =>
-                m.status === 'sending' &&
-                m.message_content === newMessage.message_content &&
-                m.direction === 'outbound'
-              );
+              // Check if we have an optimistic message to replace
+              const tempIndex = prev.findIndex(m => {
+                if (m.status !== 'sending' || m.direction !== 'outbound') return false;
+
+                // For text, match content exactly
+                if (m.message_type === 'text' && newMessage.message_type === 'text') {
+                  return m.message_content === newMessage.message_content;
+                }
+
+                // For media (audio, image, video), match by type
+                // This handles cases where content changes (e.g. audio transcription)
+                if (m.message_type === newMessage.message_type) {
+                  return true;
+                }
+
+                return false;
+              });
 
               if (tempIndex >= 0) {
                 // Replace optimistic message with real one
