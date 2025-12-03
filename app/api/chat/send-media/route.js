@@ -14,7 +14,9 @@ import ffmpeg from 'fluent-ffmpeg';
 import ffmpegInstaller from 'ffmpeg-static';
 
 // Configure ffmpeg path
-ffmpeg.setFfmpegPath(ffmpegInstaller);
+if (process.env.NODE_ENV === 'development') {
+  ffmpeg.setFfmpegPath(ffmpegInstaller);
+}
 
 // Helper para criar cliente Supabase com cookies (para autenticação)
 function createAuthClient() {
