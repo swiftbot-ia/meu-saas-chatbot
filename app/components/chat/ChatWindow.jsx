@@ -197,12 +197,35 @@ export default function ChatWindow({
       let response;
 
       if (file) {
-        // Send media message with file upload
+        // 1. Create Optimistic Message for Media
+        const tempId = `temp_${Date.now()}`;
+        const mediaType = detectMediaType(file.type);
+        const optimisticMediaUrl = URL.createObjectURL(file);
+
+        const optimisticMessage = {
+          id: tempId,
+          message_id: tempId,
+          message_content: caption || '',
+          direction: 'outbound',
+          status: 'sending',
+          created_at: new Date().toISOString(),
+          received_at: new Date().toISOString(),
+          sender_name: 'Você',
+          message_type: mediaType,
+          media_url: optimisticMediaUrl, // Local preview URL
+          caption: caption || ''
+        };
+
+        // Add to UI immediately
+        setMessages(prev => [...prev, optimisticMessage]);
+        setTimeout(() => scrollToBottom(), 100);
+
+        // 2. Send media message
         const formData = new FormData();
         formData.append('conversationId', conversation.id);
-        formData.append('file', file); // Send the actual file
+        formData.append('file', file);
         formData.append('caption', caption || '');
-        formData.append('mediaType', detectMediaType(file.type));
+        formData.append('mediaType', mediaType);
 
         response = await fetch('/api/chat/send-media', {
           method: 'POST',
