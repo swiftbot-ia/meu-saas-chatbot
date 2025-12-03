@@ -123,7 +123,8 @@ export async function POST(request) {
       {
         mediaUrl,
         caption,
-        mediaType
+        mediaType,
+        ptt: mediaType === 'audio' // Send as voice note if audio
       },
       userId
     );
