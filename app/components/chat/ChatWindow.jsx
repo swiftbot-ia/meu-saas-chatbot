@@ -352,14 +352,14 @@ export default function ChatWindow({
       {/* Input */}
       <ChatInput
         onSend={handleSend}
-        disabled={sending || !conversation.connection?.is_connected}
+        disabled={sending}
       />
 
-      {/* Disconnected warning */}
+      {/* Disconnected warning - informational only */}
       {!conversation.connection?.is_connected && (
         <div className="bg-yellow-50 border-t border-yellow-200 px-4 py-2 text-center">
           <p className="text-sm text-yellow-800">
-            ⚠️ WhatsApp desconectado. Reconecte para enviar mensagens.
+            ⚠️ Status de conexão pode estar desatualizado. Envie uma mensagem para testar.
           </p>
         </div>
       )}
