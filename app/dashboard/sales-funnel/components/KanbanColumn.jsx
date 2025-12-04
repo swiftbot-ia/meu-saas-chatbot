@@ -1,8 +1,31 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Droppable } from '@hello-pangea/dnd';
+import { useInView } from 'react-intersection-observer';
 import LeadCard from './LeadCard';
 
-const KanbanColumn = ({ stageId, stage, leads, onCardClick, currentDragDestination, allStages }) => {
+const KanbanColumn = ({
+    stageId,
+    stage,
+    leads,
+    onCardClick,
+    currentDragDestination,
+    allStages,
+    onLoadMore,
+    hasMore,
+    loading
+}) => {
+    const { ref, inView } = useInView({
+        threshold: 0,
+        triggerOnce: false
+    });
+
+    // Trigger load more when scroll observer is in view
+    useEffect(() => {
+        if (inView && hasMore && !loading) {
+            onLoadMore(stageId);
+        }
+    }, [inView, hasMore, loading, stageId, onLoadMore]);
+
     return (
         // Container com altura fixa e scroll
         <div className="flex flex-col h-[calc(100vh-280px)] min-h-[500px] min-w-[280px] w-[280px] sm:min-w-[320px] sm:w-[320px] md:w-[360px]">
@@ -53,6 +76,15 @@ const KanbanColumn = ({ stageId, stage, leads, onCardClick, currentDragDestinati
                                     />
                                 ))}
                                 {provided.placeholder}
+
+                                {/* Scroll observer trigger - positioned before empty message */}
+                                {hasMore && (
+                                    <div ref={ref} className="h-10 flex items-center justify-center">
+                                        {loading && (
+                                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#00FF99]"></div>
+                                        )}
+                                    </div>
+                                )}
 
                                 {/* Mensagem quando vazio */}
                                 {leads.length === 0 && (

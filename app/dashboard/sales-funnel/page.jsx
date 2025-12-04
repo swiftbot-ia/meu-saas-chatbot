@@ -36,6 +36,12 @@ const SalesFunnelPage = () => {
     const [loading, setLoading] = useState(true);
     const [currentDragDestination, setCurrentDragDestination] = useState(null);
     const [selectedConnection, setSelectedConnection] = useState(null);
+    const [pagination, setPagination] = useState({
+        novo: { cursor: null, hasMore: true, loading: false },
+        apresentacao: { cursor: null, hasMore: true, loading: false },
+        negociacao: { cursor: null, hasMore: true, loading: false },
+        fechamento: { cursor: null, hasMore: true, loading: false }
+    });
 
     // Read active connection ID and fetch connection details
     useEffect(() => {
@@ -85,13 +91,87 @@ const SalesFunnelPage = () => {
 
         try {
             const response = await axios.get('/api/funnels/vendas', {
-                params: { instance_name: selectedConnection.instance_name }
+                params: {
+                    instance_name: selectedConnection.instance_name,
+                    limit: 20
+                }
             });
-            setLeads(response.data);
+
+            // New API returns { stage: { leads: [...], hasMore: bool, nextCursor: string } }
+            const stagesData = response.data;
+            const leadsData = {};
+            const paginationData = {};
+
+            Object.keys(SALES_STAGES).forEach(stageKey => {
+                const stageData = stagesData[stageKey];
+                if (stageData) {
+                    leadsData[stageKey] = stageData.leads || [];
+                    paginationData[stageKey] = {
+                        cursor: stageData.nextCursor,
+                        hasMore: stageData.hasMore || false,
+                        loading: false
+                    };
+                } else {
+                    leadsData[stageKey] = [];
+                    paginationData[stageKey] = {
+                        cursor: null,
+                        hasMore: false,
+                        loading: false
+                    };
+                }
+            });
+
+            setLeads(leadsData);
+            setPagination(paginationData);
         } catch (error) {
             console.error('Error fetching leads:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadMoreLeads = async (stage) => {
+        if (!pagination[stage].hasMore || pagination[stage].loading || !selectedConnection) {
+            return;
+        }
+
+        // Set loading for this stage
+        setPagination(prev => ({
+            ...prev,
+            [stage]: { ...prev[stage], loading: true }
+        }));
+
+        try {
+            const response = await axios.get('/api/funnels/vendas', {
+                params: {
+                    instance_name: selectedConnection.instance_name,
+                    stage,
+                    cursor: pagination[stage].cursor,
+                    limit: 20
+                }
+            });
+
+            // Append new leads to existing
+            setLeads(prev => ({
+                ...prev,
+                [stage]: [...(prev[stage] || []), ...response.data.leads]
+            }));
+
+            // Update pagination
+            setPagination(prev => ({
+                ...prev,
+                [stage]: {
+                    cursor: response.data.nextCursor,
+                    hasMore: response.data.hasMore,
+                    loading: false
+                }
+            }));
+        } catch (error) {
+            console.error('Error loading more leads:', error);
+            setPagination(prev => ({
+                ...prev,
+                [stage]: { ...prev[stage], loading: false }
+            }));
         }
     };
 
@@ -199,6 +279,9 @@ const SalesFunnelPage = () => {
                                     onCardClick={setSelectedLead}
                                     currentDragDestination={currentDragDestination}
                                     allStages={SALES_STAGES}
+                                    onLoadMore={loadMoreLeads}
+                                    hasMore={pagination[stage.id]?.hasMore || false}
+                                    loading={pagination[stage.id]?.loading || false}
                                 />
                             ))}
                         </div>
