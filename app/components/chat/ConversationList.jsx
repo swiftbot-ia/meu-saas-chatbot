@@ -154,7 +154,7 @@ export default function ConversationList({
     const searchLower = searchTerm.toLowerCase();
     const contactName = conv.contact?.name?.toLowerCase() || '';
     const contactNumber = conv.contact?.whatsapp_number?.toLowerCase() || '';
-    const lastMessage = conv.last_message?.message_content?.toLowerCase() || '';
+    const lastMessage = conv.last_message_preview?.toLowerCase() || '';
 
     return (
       contactName.includes(searchLower) ||
@@ -267,13 +267,13 @@ export default function ConversationList({
                         {conversation.contact?.name || conversation.contact?.whatsapp_number}
                       </h3>
                       <span className="text-xs text-gray-500 ml-2">
-                        {formatTime(conversation.last_message?.received_at)}
+                        {formatTime(conversation.last_message_at)}
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between">
                       <p className="text-sm text-gray-400 truncate">
-                        {conversation.last_message?.message_content || 'Sem mensagens'}
+                        {conversation.last_message_preview || 'Sem mensagens'}
                       </p>
                       {conversation.unread_count > 0 && (
                         <span className="ml-2 bg-[#00FF99] text-black text-xs font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
