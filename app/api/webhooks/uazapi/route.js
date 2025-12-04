@@ -478,13 +478,34 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
     }
 
     // 2. BUSCAR CONEXÃO NO MAIN DB
-    const { data: connection, error: connError } = await supabaseAdmin
+    let connection;
+    let connError;
+
+    // Tentar buscar por instance_name
+    const { data: connByName, error: errName } = await supabaseAdmin
       .from('whatsapp_connections')
       .select('id, user_id, instance_token')
       .eq('instance_name', instanceName)
       .maybeSingle();
 
-    if (!connection || connError) {
+    if (connByName) {
+      connection = connByName;
+    } else if (instanceToken) {
+      // Fallback: Tentar buscar por instance_token
+      log(requestId, 'warn', '⚠️', `Conexão não encontrada por nome (${instanceName}), tentando token...`);
+      const { data: connByToken, error: errToken } = await supabaseAdmin
+        .from('whatsapp_connections')
+        .select('id, user_id, instance_token')
+        .eq('instance_token', instanceToken)
+        .maybeSingle();
+
+      connection = connByToken;
+      connError = errToken;
+    } else {
+      connError = errName;
+    }
+
+    if (!connection) {
       log(requestId, 'warn', '⚠️', `Conexão não encontrada: ${instanceName}`);
       return;
     }
@@ -654,50 +675,74 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
     }
 
     // 8. SALVAR MENSAGEM NO CHAT DB
+    // Extract phone number from participant or remoteJid (remove @s.whatsapp.net suffix)
     const toNumber = messageKey.participant
       ? messageKey.participant.split('@')[0]
       : whatsappNumber;
 
-    const { data: savedMessage, error: msgError } = await chatSupabaseAdmin
-      .from('whatsapp_messages')
-      .insert({
-        instance_name: instanceName,
-        connection_id: connection.id,
-        conversation_id: conversation.id,
-        contact_id: contact.id,
-        user_id: connection.user_id,
-        message_id: messageId,
-        from_number: fromMe ? connection.phone_number : whatsappNumber,
-        to_number: fromMe ? whatsappNumber : connection.phone_number,
-        message_type: messageType,
-        message_content: messageContent,
-        local_media_path: localMediaPath,
-        media_mime_type: mediaMimeType,
-        media_size: mediaSize,
-        transcription: transcription,
-        transcription_status: transcriptionStatus,
-        ai_interpretation: aiInterpretation,
-        media_downloaded_at: mediaDownloadedAt,
-        transcribed_at: transcribedAt,
-        direction: fromMe ? 'outbound' : 'inbound',
-        status: fromMe ? 'sent' : 'received',
-        received_at: new Date(messageTimestamp * 1000).toISOString(),
-        metadata
-      })
-      .select()
-      .single();
+    let savedMessage; // Renamed from 'message' to avoid conflict with 'message' in the outer scope
+    try {
+      const { data: insertedMessage, error: msgError } = await chatSupabaseAdmin // Changed to chatSupabaseAdmin
+        .from('whatsapp_messages')
+        .insert({
+          instance_name: instanceName,
+          connection_id: connection.id, // Kept original connection.id
+          conversation_id: conversation.id,
+          contact_id: contact.id,
+          user_id: connection.user_id, // Kept original connection.user_id
+          message_id: messageId, // Kept original messageId
+          from_number: fromMe ? connection.phone_number : whatsappNumber, // Kept original logic
+          to_number: fromMe ? whatsappNumber : connection.phone_number, // Kept original logic
+          message_type: messageType,
+          message_content: messageContent,
+          media_url: mediaUrl, // New field
+          direction: fromMe ? 'outbound' : 'inbound', // Kept original logic
+          status: fromMe ? 'sent' : 'received', // Kept original logic
+          received_at: new Date(messageTimestamp * 1000).toISOString(),
+          metadata: {
+            ...metadata,
+            local_media_path: localMediaPath,
+            media_mime_type: mediaMimeType,
+            media_size: mediaSize,
+            transcription,
+            transcription_status: transcriptionStatus,
+            ai_interpretation: aiInterpretation,
+            media_downloaded_at: mediaDownloadedAt,
+            transcribed_at: transcribedAt
+          }
+        })
+        .select()
+        .single();
 
-    if (msgError) {
-      log(requestId, 'error', '❌', `Erro ao salvar mensagem`, { error: msgError });
-      throw msgError;
+      if (msgError) throw msgError;
+      savedMessage = insertedMessage; // Assign to savedMessage
+
+      log(requestId, 'success', '✅', `Mensagem salva: ${messageId}`, { // Kept original messageId
+        type: messageType,
+        direction: fromMe ? 'outbound' : 'inbound', // Kept original logic
+        hasMedia: !!mediaUrl, // Changed to mediaUrl
+        hasTranscription: !!transcription
+      });
+
+    } catch (error) {
+      // Handle duplicate key error (race condition)
+      if (error.code === '23505') { // Postgres unique_violation code
+        log(requestId, 'info', 'ℹ️', `Mensagem já existe (race condition): ${messageId}`); // Kept original messageId
+        const { data: existing } = await chatSupabaseAdmin // Changed to chatSupabaseAdmin
+          .from('whatsapp_messages')
+          .select('*')
+          .eq('message_id', messageId) // Kept original messageId
+          .maybeSingle();
+
+        // Se encontrou a mensagem existente, retorna ela e para por aqui
+        // Não precisa atualizar conversa nem disparar gatilhos novamente
+        if (existing) {
+          log(requestId, 'info', 'ℹ️', `Mensagem existente retornada: ${messageId}`);
+          return; // Return early as per instruction
+        }
+      }
+      throw error;
     }
-
-    log(requestId, 'success', '✅', `Mensagem salva: ${messageId}`, {
-      type: messageType,
-      direction: fromMe ? 'outbound' : 'inbound',
-      hasMedia: !!localMediaPath,
-      hasTranscription: !!transcription
-    });
 
     // 9. ATUALIZAR CONVERSA
     const preview = messageContent
