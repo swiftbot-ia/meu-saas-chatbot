@@ -328,6 +328,13 @@ async function processConnectionResult(connectResult, connectionId, instanceName
           phone: updateData.phone_number
         })
       }
+
+      // 🔄 Iniciar sincronização em background (fire and forget)
+      import('@/lib/SyncService').then(({ default: SyncService }) => {
+        SyncService.runFullSync(connectionId, instanceToken)
+          .then(job => console.log('🔄 [Connect] Sync iniciado em background:', job.id))
+          .catch(err => console.error('⚠️ [Connect] Erro ao iniciar sync:', err.message))
+      }).catch(err => console.error('⚠️ [Connect] Erro ao importar SyncService:', err.message))
     }
 
     await supabaseAdmin
