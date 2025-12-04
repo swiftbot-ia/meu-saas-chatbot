@@ -55,9 +55,7 @@ const SalesFunnelPage = () => {
 
                 if (connection) {
                     setSelectedConnection(connection);
-
-                    // DEBUG: Alert showing connection details
-                    alert(`Conexão Ativa:\nID: ${connection.id}\nNome: ${connection.instance_name}`);
+                    console.log('✅ Active connection loaded:', connection.instance_name);
                 } else {
                     console.error('Connection not found for ID:', activeId);
                     setLoading(false);
