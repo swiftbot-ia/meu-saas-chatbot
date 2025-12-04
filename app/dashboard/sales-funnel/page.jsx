@@ -47,25 +47,40 @@ const SalesFunnelPage = () => {
     useEffect(() => {
         const fetchConnectionDetails = async () => {
             const activeId = localStorage.getItem('activeConnectionId');
-            if (!activeId) {
-                console.warn('No activeConnectionId in localStorage');
-                setLoading(false);
-                return;
-            }
 
             try {
                 // Fetch all connections
                 const response = await axios.get('/api/whatsapp/connections');
-                const connections = response.data.connections || response.data; // Handle both formats
-                const connection = connections.find(conn => conn.id === activeId);
+                const connections = response.data.connections || response.data;
 
-                if (connection) {
-                    setSelectedConnection(connection);
-                    console.log('✅ Active connection loaded:', connection.instance_name);
-                } else {
-                    console.error('Connection not found for ID:', activeId);
+                if (!connections || connections.length === 0) {
+                    console.warn('No connections available for this user');
                     setLoading(false);
+                    return;
                 }
+
+                let connection;
+
+                if (activeId) {
+                    // Try to find the stored connection
+                    connection = connections.find(conn => conn.id === activeId);
+
+                    if (connection) {
+                        console.log('✅ Active connection loaded:', connection.instance_name);
+                    } else {
+                        console.warn('Stored connection not found, using first available');
+                        connection = connections[0];
+                    }
+                } else {
+                    // No stored connection, use first one
+                    console.log('No stored connection, using first available');
+                    connection = connections[0];
+
+                    // Save it to localStorage for next time
+                    localStorage.setItem('activeConnectionId', connection.id);
+                }
+
+                setSelectedConnection(connection);
             } catch (error) {
                 console.error('Error fetching connection details:', error);
                 setLoading(false);
