@@ -93,8 +93,9 @@ export async function POST(request) {
 
     // If file uploaded, save it to VPS
     if (file && file.size > 0) {
-      // Create uploads directory if doesn't exist
-      const uploadsDir = join(process.cwd(), 'public', 'uploads', 'audio');
+      // IMPORTANTE: Salvar em /media/audio/ em vez de /uploads/audio/
+      // porque WhatsApp não consegue baixar de rotas API (problemas de SSL/timeout)
+      const uploadsDir = join(process.cwd(), 'public', 'media', 'audio');
       if (!existsSync(uploadsDir)) {
         await mkdir(uploadsDir, { recursive: true });
       }
@@ -110,11 +111,14 @@ export async function POST(request) {
       const buffer = Buffer.from(bytes);
       await writeFile(filepath, buffer);
 
-      // If audio/webm, convert to ogg
+      // If audio/webm, convert to OGG first, then to MP3
       if (mediaType === 'audio' && (originalExt === 'webm' || file.type.includes('webm'))) {
         const oggFilename = `${timestamp}.ogg`;
         const oggFilepath = join(uploadsDir, oggFilename);
+        const mp3Filename = `${timestamp}.mp3`;
+        const mp3Filepath = join(uploadsDir, mp3Filename);
 
+        // Step 1: Convert webm → ogg
         await new Promise((resolve, reject) => {
           ffmpeg(filepath)
             .toFormat('ogg')
@@ -124,15 +128,24 @@ export async function POST(request) {
             .save(oggFilepath);
         });
 
+        // Step 2: Convert ogg → mp3 (para WhatsApp)
+        await new Promise((resolve, reject) => {
+          ffmpeg(oggFilepath)
+            .toFormat('mp3')
+            .audioBitrate('128k')
+            .on('end', () => resolve())
+            .on('error', (err) => reject(err))
+            .save(mp3Filepath);
+        });
+
         // Delete original webm file
         await unlink(filepath);
 
-        // Update mediaUrl to point to the new ogg file
-        // Use the dynamic API route for serving the file
-        mediaUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/uploads/audio/${oggFilename}`;
+        // ENVIAR MP3 para WhatsApp (melhor compatibilidade)
+        mediaUrl = `${process.env.NEXT_PUBLIC_APP_URL}/media/audio/${mp3Filename}`;
       } else {
-        // Use the dynamic API route for serving the file
-        mediaUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/uploads/audio/${filename}`;
+        // USAR URL ESTÁTICO em vez de rota API
+        mediaUrl = `${process.env.NEXT_PUBLIC_APP_URL}/media/audio/${filename}`;
       }
     }
 
