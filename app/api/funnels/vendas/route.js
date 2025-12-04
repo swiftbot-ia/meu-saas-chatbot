@@ -4,6 +4,8 @@ import { NextResponse } from 'next/server';
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
 
+const SALES_STAGES = ['novo', 'apresentacao', 'negociacao', 'fechamento'];
+
 export async function GET(request) {
     const supabase = createChatSupabaseClient();
 
@@ -22,43 +24,38 @@ export async function GET(request) {
             );
         }
 
-        // Build query
-        let query = supabase
-            .from('whatsapp_conversations')
-            .select(`*, contact:whatsapp_contacts(*)`)
-            .eq('instance_name', instanceName);
-
-        // If specific stage requested, filter by it
+        // If specific stage requested (for load more)
         if (stage) {
-            query = query.eq('funnel_stage', stage || 'novo');
-        }
+            let query = supabase
+                .from('whatsapp_conversations')
+                .select(`*, contact:whatsapp_contacts(*)`)
+                .eq('instance_name', instanceName)
+                .eq('funnel_stage', stage || 'novo');
 
-        // If cursor provided, paginate (cursor = last_message_at timestamp)
-        if (cursor) {
-            query = query.lt('last_message_at', cursor);
-        }
+            // If cursor provided, paginate
+            if (cursor) {
+                query = query.lt('last_message_at', cursor);
+            }
 
-        // Order and limit
-        query = query
-            .order('funnel_position', { ascending: true })
-            .order('last_message_at', { ascending: false })
-            .limit(limit + 1); // Fetch one extra to check if there's more
+            // Order and limit
+            query = query
+                .order('funnel_position', { ascending: true })
+                .order('last_message_at', { ascending: false })
+                .limit(limit + 1); // Fetch one extra to check if there's more
 
-        const { data: conversations, error } = await query;
+            const { data: conversations, error } = await query;
 
-        if (error) {
-            throw error;
-        }
+            if (error) {
+                throw error;
+            }
 
-        // Check if there are more results
-        const hasMore = conversations.length > limit;
-        const leads = hasMore ? conversations.slice(0, limit) : conversations;
-        const nextCursor = hasMore && leads.length > 0
-            ? leads[leads.length - 1].last_message_at
-            : null;
+            // Check if there are more results
+            const hasMore = conversations.length > limit;
+            const leads = hasMore ? conversations.slice(0, limit) : conversations;
+            const nextCursor = hasMore && leads.length > 0
+                ? leads[leads.length - 1].last_message_at
+                : null;
 
-        // If specific stage requested, return simple structure
-        if (stage) {
             const formattedLeads = leads.map(conv => ({
                 id: conv.id,
                 name: conv.contact?.name || conv.contact?.whatsapp_number || 'Sem nome',
@@ -79,43 +76,50 @@ export async function GET(request) {
             });
         }
 
-        // Group by funnel_stage for initial load (all stages)
-        const groupedConversations = leads.reduce((acc, conv) => {
-            const stageKey = conv.funnel_stage || 'novo';
+        // INITIAL LOAD: Fetch 20 leads PER STAGE
+        const groupedConversations = {};
 
-            if (!acc[stageKey]) {
-                acc[stageKey] = {
-                    leads: [],
-                    hasMore: false,
-                    nextCursor: null
-                };
+        for (const stageKey of SALES_STAGES) {
+            const query = supabase
+                .from('whatsapp_conversations')
+                .select(`*, contact:whatsapp_contacts(*)`)
+                .eq('instance_name', instanceName)
+                .eq('funnel_stage', stageKey)
+                .order('funnel_position', { ascending: true })
+                .order('last_message_at', { ascending: false })
+                .limit(limit + 1); // Fetch one extra to check if there's more
+
+            const { data: conversations, error } = await query;
+
+            if (error) {
+                console.error(`Error fetching stage ${stageKey}:`, error);
+                continue; // Skip this stage if error
             }
 
-            acc[stageKey].leads.push({
-                id: conv.id,
-                name: conv.contact?.name || conv.contact?.whatsapp_number || 'Sem nome',
-                phone: conv.contact?.whatsapp_number,
-                email: conv.contact?.email,
-                profile_pic_url: conv.contact?.profile_pic_url,
-                funnel_stage: stageKey,
-                unread_count: conv.unread_count,
-                last_message: conv.last_message,
-                last_message_at: conv.last_message_at,
-                created_at: conv.created_at
-            });
+            // Check if there are more results for this stage
+            const hasMore = conversations.length > limit;
+            const leads = hasMore ? conversations.slice(0, limit) : conversations;
+            const nextCursor = hasMore && leads.length > 0
+                ? leads[leads.length - 1].last_message_at
+                : null;
 
-            return acc;
-        }, {});
-
-        // For initial load, mark all stages as potentially having more
-        // (They'll check individually on scroll)
-        Object.keys(groupedConversations).forEach(stageKey => {
-            const stageLeads = groupedConversations[stageKey].leads;
-            if (stageLeads.length >= limit) {
-                groupedConversations[stageKey].hasMore = true;
-                groupedConversations[stageKey].nextCursor = stageLeads[stageLeads.length - 1].last_message_at;
-            }
-        });
+            groupedConversations[stageKey] = {
+                leads: leads.map(conv => ({
+                    id: conv.id,
+                    name: conv.contact?.name || conv.contact?.whatsapp_number || 'Sem nome',
+                    phone: conv.contact?.whatsapp_number,
+                    email: conv.contact?.email,
+                    profile_pic_url: conv.contact?.profile_pic_url,
+                    funnel_stage: stageKey,
+                    unread_count: conv.unread_count,
+                    last_message: conv.last_message,
+                    last_message_at: conv.last_message_at,
+                    created_at: conv.created_at
+                })),
+                hasMore,
+                nextCursor
+            };
+        }
 
         return NextResponse.json(groupedConversations);
     } catch (error) {
