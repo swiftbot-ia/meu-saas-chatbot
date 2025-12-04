@@ -506,7 +506,7 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
     }
 
     if (!connection) {
-      log(requestId, 'warn', '⚠️', `Conexão não encontrada: ${instanceName}`);
+      log(requestId, 'info', 'ℹ️', `Instância não encontrada (esperado): ${instanceName}`);
       return;
     }
 
@@ -548,6 +548,7 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
     // 6. DETERMINAR TIPO E CONTEÚDO DA MENSAGEM
     let messageType = 'text';
     let messageContent = '';
+    let mediaUrl = null; // Defined in outer scope
     let localMediaPath = null;
     let mediaMimeType = null;
     let mediaSize = null;
@@ -583,6 +584,7 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
         );
 
         localMediaPath = result.localPath;
+        mediaUrl = result.fullPublicUrl || result.localPath; // Assign mediaUrl
         mediaMimeType = result.mimeType;
         mediaSize = result.size;
         aiInterpretation = result.aiInterpretation;
@@ -590,7 +592,7 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
 
       } catch (error) {
         log(requestId, 'error', '❌', `Falha ao processar imagem: ${error.message}`);
-        // Continuar mesmo se falhar - salvar pelo menos metadados
+        mediaUrl = messageInfo.imageMessage.url; // Fallback
       }
     }
     else if (messageInfo.videoMessage) {
@@ -606,6 +608,7 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
         );
 
         localMediaPath = result.localPath;
+        mediaUrl = result.fullPublicUrl || result.localPath; // Assign mediaUrl
         mediaMimeType = result.mimeType;
         mediaSize = result.size;
         aiInterpretation = result.aiInterpretation;
@@ -613,6 +616,7 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
 
       } catch (error) {
         log(requestId, 'error', '❌', `Falha ao processar vídeo: ${error.message}`);
+        mediaUrl = messageInfo.videoMessage.url; // Fallback
       }
     }
     else if (messageInfo.audioMessage) {
@@ -625,11 +629,12 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
           messageId,
           {
             mimetype: messageInfo.audioMessage.mimetype,
-            instanceToken: instanceToken || connection.instance_token // Priorizar token do webhook
+            instanceToken: instanceToken || connection.instance_token
           }
         );
 
         localMediaPath = result.localPath;
+        mediaUrl = result.fullPublicUrl || result.localPath; // Assign mediaUrl
         mediaMimeType = result.mimeType;
         mediaSize = result.size;
         transcription = result.transcription;
@@ -638,13 +643,13 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
         mediaDownloadedAt = result.mediaDownloadedAt;
         transcribedAt = result.transcribedAt;
 
-        // Usar transcrição como conteúdo se disponível
         if (transcription) {
           messageContent = transcription;
         }
 
       } catch (error) {
         log(requestId, 'error', '❌', `Falha ao processar áudio: ${error.message}`);
+        mediaUrl = messageInfo.audioMessage.url; // Fallback
       }
     }
     else if (messageInfo.documentMessage) {
@@ -663,14 +668,16 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
         );
 
         localMediaPath = result.localPath;
+        mediaUrl = result.fullPublicUrl || result.localPath; // Assign mediaUrl
         mediaMimeType = result.mimeType;
         mediaSize = result.size;
-        transcription = result.transcription; // Texto extraído
+        transcription = result.transcription;
         aiInterpretation = result.aiInterpretation;
         mediaDownloadedAt = result.mediaDownloadedAt;
 
       } catch (error) {
         log(requestId, 'error', '❌', `Falha ao processar documento: ${error.message}`);
+        mediaUrl = messageInfo.documentMessage.url; // Fallback
       }
     }
 
