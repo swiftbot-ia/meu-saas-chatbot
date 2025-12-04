@@ -510,6 +510,24 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
       return;
     }
 
+    // AUTO-HEALING: Atualizar token no banco se vier no webhook e for diferente/ausente
+    if (instanceToken && connection.instance_token !== instanceToken) {
+      log(requestId, 'info', '🔧', `Atualizando token da instância (Auto-Healing)...`);
+
+      // Fire and forget update
+      supabaseAdmin
+        .from('whatsapp_connections')
+        .update({ instance_token: instanceToken })
+        .eq('id', connection.id)
+        .then(({ error }) => {
+          if (error) console.error('Failed to update instance token:', error);
+          else console.log('✅ Instance token updated successfully');
+        });
+
+      // Atualizar objeto local para uso imediato
+      connection.instance_token = instanceToken;
+    }
+
     // 3. IDENTIFICAR CONTATO
     const remoteJid = messageKey.remoteJid;
     const fromMe = messageKey.fromMe;
