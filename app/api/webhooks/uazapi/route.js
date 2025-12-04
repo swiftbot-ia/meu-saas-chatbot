@@ -704,15 +704,12 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
       ? messageContent.substring(0, 100)
       : `[${messageType}]`;
 
-    await chatSupabaseAdmin
-      .from('whatsapp_conversations')
-      .update({
-        last_message_at: new Date(messageTimestamp * 1000).toISOString(),
-        last_message_preview: preview,
-        unread_count: fromMe ? 0 : ((conversation.unread_count || 0) + 1), // Não incrementar se fromMe
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', conversation.id);
+    await ConversationService.updateConversation(conversation.id, {
+      last_message_at: new Date(messageTimestamp * 1000).toISOString(),
+      last_message_preview: preview,
+      unread_count: fromMe ? 0 : ((conversation.unread_count || 0) + 1), // Não incrementar se fromMe
+      updated_at: new Date().toISOString()
+    }, chatSupabaseAdmin);
 
     // 10. ATUALIZAR CONTATO
     await chatSupabaseAdmin
