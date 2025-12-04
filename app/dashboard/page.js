@@ -1,8 +1,109 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import StandardModal, { initialModalConfig, createModalConfig } from '../components/StandardModal'
+
+// ============================================================================
+// COMPONENTE: SyncProgressBar
+// ============================================================================
+// Exibe progresso da sincronização de contatos/mensagens
+// Faz polling da API a cada 2 segundos enquanto a sincronização está ativa
+// ============================================================================
+function SyncProgressBar({ connectionId }) {
+  const [syncJob, setSyncJob] = useState(null)
+  const [isPolling, setIsPolling] = useState(false)
+
+  const fetchSyncStatus = useCallback(async () => {
+    if (!connectionId) return
+
+    try {
+      const response = await fetch(`/api/whatsapp/sync?connectionId=${connectionId}`)
+      const data = await response.json()
+
+      if (data.success && data.hasActiveSync && data.job) {
+        setSyncJob(data.job)
+        setIsPolling(true)
+      } else {
+        // Limpar após 2 segundos se completou
+        if (syncJob?.status === 'completed' || syncJob?.status === 'failed') {
+          setTimeout(() => setSyncJob(null), 3000)
+        }
+        setIsPolling(false)
+      }
+    } catch (error) {
+      console.error('Erro ao buscar status do sync:', error)
+      setIsPolling(false)
+    }
+  }, [connectionId, syncJob?.status])
+
+  // Polling enquanto ativo
+  useEffect(() => {
+    // Verificar status inicial
+    fetchSyncStatus()
+
+    // Polling a cada 2 segundos
+    const interval = setInterval(() => {
+      if (isPolling || !syncJob) {
+        fetchSyncStatus()
+      }
+    }, 2000)
+
+    return () => clearInterval(interval)
+  }, [connectionId, isPolling])
+
+  // Não renderizar se não houver sync
+  if (!syncJob || (syncJob.status !== 'pending' && syncJob.status !== 'processing' && syncJob.status !== 'completed')) {
+    return null
+  }
+
+  const isComplete = syncJob.status === 'completed'
+  const isFailed = syncJob.status === 'failed'
+
+  return (
+    <div className={`rounded-xl p-4 mb-4 border transition-all duration-300 ${isComplete ? 'bg-green-900/20 border-green-500/30' :
+        isFailed ? 'bg-red-900/20 border-red-500/30' :
+          'bg-[#1A1A1A] border-[#333]'
+      }`}>
+      <div className="flex items-center gap-2 mb-2">
+        {isComplete ? (
+          <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        ) : isFailed ? (
+          <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        ) : (
+          <div className="w-4 h-4 rounded-full border-2 border-t-[#10E57C] border-r-transparent border-b-transparent border-l-transparent animate-spin" />
+        )}
+        <span className={`text-sm ${isComplete ? 'text-green-400' : isFailed ? 'text-red-400' : 'text-white'}`}>
+          {isComplete ? 'Sincronização Concluída!' :
+            isFailed ? 'Erro na Sincronização' :
+              `Sincronizando ${syncJob.progress?.currentPhase === 'contacts' ? 'contatos' : 'mensagens'}...`}
+        </span>
+      </div>
+
+      {/* Progress Bar */}
+      {!isFailed && (
+        <div className="w-full bg-[#333] rounded-full h-2 mb-2">
+          <div
+            className={`h-2 rounded-full transition-all duration-300 ${isComplete ? 'bg-green-500' : 'bg-gradient-to-r from-[#10E57C] to-[#00BFFF]'
+              }`}
+            style={{ width: `${syncJob.progress?.percentage || 0}%` }}
+          />
+        </div>
+      )}
+
+      {/* Stats */}
+      <p className="text-xs text-[#8696A0]">
+        {syncJob.stats?.contactsCreated || 0} contatos • {syncJob.stats?.conversationsCreated || 0} conversas
+        {syncJob.stats?.messagesProcessed > 0 && ` • ${syncJob.stats.messagesProcessed} mensagens`}
+      </p>
+    </div>
+  )
+}
+
 
 export default function Dashboard() {
   const router = useRouter()
@@ -1617,6 +1718,8 @@ export default function Dashboard() {
               </div>
             )}
 
+            {/* Sync Progress - Exibido durante sincronização */}
+            <SyncProgressBar connectionId={activeConnection?.id} />
 
             {/* Action Button - BOTÃO FANTASMA (Ghost) */}
             {whatsappStatus === 'connected' ? (
