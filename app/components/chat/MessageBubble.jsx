@@ -109,6 +109,15 @@ export default function MessageBubble({ message, isOwn, contact, connectionAvata
         ) : null;
       case 'audio':
         const transcriptionText = message.transcription || message.message_content;
+
+        // DEBUG: Log para verificar se transcrição está disponível
+        console.log('Audio transcription debug:', {
+          messageId: message.id,
+          hasTranscription: !!message.transcription,
+          hasMessageContent: !!message.message_content,
+          transcriptionText: transcriptionText
+        });
+
         return (
           <div className="mb-2">
             {mediaUrl && (
