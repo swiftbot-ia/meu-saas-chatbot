@@ -604,7 +604,10 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
           messageInfo.videoMessage.url,
           'video',
           messageId,
-          { mimetype: messageInfo.videoMessage.mimetype }
+          {
+            mimetype: messageInfo.videoMessage.mimetype,
+            instanceToken: instanceToken || connection.instance_token
+          }
         );
 
         localMediaPath = result.localPath;
