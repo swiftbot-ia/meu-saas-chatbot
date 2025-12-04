@@ -10,8 +10,9 @@ import { useSearchParams } from 'next/navigation';
 import ConversationList from '../../components/chat/ConversationList';
 import ChatWindow from '../../components/chat/ChatWindow';
 import { Loader2, AlertCircle } from 'lucide-react';
-
 import { createChatSupabaseClient } from '@/lib/supabase/chat-client';
+import { supabase } from '@/lib/supabase/client';
+import NoSubscription from '../../components/NoSubscription'
 
 const chatSupabase = createChatSupabaseClient();
 
@@ -32,56 +33,17 @@ function ChatContent() {
   const searchParams = useSearchParams();
   const conversationIdParam = searchParams.get('conversation');
 
+  // 1. ESTADOS
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [connections, setConnections] = useState([]);
   const [selectedConnection, setSelectedConnection] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [subscription, setSubscription] = useState(null);
   const [pendingConversationId, setPendingConversationId] = useState(conversationIdParam);
 
-  // Load WhatsApp connections on mount
-  useEffect(() => {
-    loadConnections();
-  }, []);
-
-  // Load conversations when connection is selected
-  useEffect(() => {
-    if (selectedConnection) {
-      loadConversations();
-
-      // Auto-refresh conversations every 10 seconds
-      const interval = setInterval(loadConversations, 10000);
-
-      // Real-time subscription
-      const connection = connections.find(c => c.id === selectedConnection);
-      let channel = null;
-
-      if (connection) {
-        channel = chatSupabase
-          .channel(`conversations:${connection.instance_name}`)
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'whatsapp_conversations',
-              filter: `instance_name=eq.${connection.instance_name}`
-            },
-            () => {
-              loadConversations();
-            }
-          )
-          .subscribe();
-      }
-
-      return () => {
-        clearInterval(interval);
-        if (channel) chatSupabase.removeChannel(channel);
-      };
-    }
-  }, [selectedConnection, connections]);
-
+  // 2. FUNÇÕES
   const loadConnections = async () => {
     try {
       const response = await fetch('/api/whatsapp/connections');
@@ -96,9 +58,8 @@ function ChatContent() {
       if (data.connections && data.connections.length > 0) {
         let selectedConn = null;
 
-        // ✅ If there's a pending conversation from URL, find which connection it belongs to
+        // If there's a pending conversation from URL, find which connection it belongs to
         if (pendingConversationId) {
-          // Try to find the conversation's connection by loading all conversations for each connection
           for (const conn of data.connections) {
             try {
               const convRes = await fetch(`/api/chat/conversations?connectionId=${conn.id}&limit=100`);
@@ -135,6 +96,13 @@ function ChatContent() {
         }
       }
 
+
+      // Load subscription
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await loadSubscription(user.id);
+      }
+
     } catch (err) {
       console.error('Erro ao carregar conexões:', err);
       setError('Erro ao carregar conexões do WhatsApp');
@@ -143,14 +111,33 @@ function ChatContent() {
     }
   };
 
-  // Handle connection selection with localStorage sync
-  const handleConnectionSelect = (connectionId) => {
-    setSelectedConnection(connectionId);
+  const loadSubscription = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
 
-    // ✅ Save to localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('activeConnectionId', connectionId);
-      console.log('💾 [Chat] Saved connection to localStorage:', connectionId);
+      if (!error && data) {
+        const isActive = ['active', 'trial', 'trialing'].includes(data.status) || data.stripe_subscription_id === 'super_account_bypass';
+        const isExpired = data.trial_end_date && new Date() > new Date(data.trial_end_date);
+
+        console.log('✅ [CHAT] Validação:', {
+          status: data.status,
+          isActive,
+          isExpired,
+          trial_end_date: data.trial_end_date
+        });
+
+        if (isActive && !isExpired) {
+          setSubscription(data);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar assinatura:', error);
     }
   };
 
@@ -172,13 +159,13 @@ function ChatContent() {
 
       setConversations(data.conversations || []);
 
-      // ✅ Auto-select conversation from URL parameter (from contacts page)
+      // Auto-select conversation from URL parameter
       if (pendingConversationId) {
         const targetConversation = data.conversations?.find(c => c.id === pendingConversationId);
         if (targetConversation) {
           setSelectedConversation(targetConversation);
           console.log('✅ [Chat] Auto-selected conversation from URL:', pendingConversationId);
-          setPendingConversationId(null); // Clear pending after selection
+          setPendingConversationId(null);
         }
       }
       // Update selected conversation if it exists
@@ -195,12 +182,20 @@ function ChatContent() {
     }
   };
 
+  const handleConnectionSelect = (connectionId) => {
+    setSelectedConnection(connectionId);
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('activeConnectionId', connectionId);
+      console.log('💾 [Chat] Saved connection to localStorage:', connectionId);
+    }
+  };
+
   const handleSelectConversation = (conversation) => {
     setSelectedConversation(conversation);
   };
 
   const handleArchiveConversation = (conversationId) => {
-    // Remove from list
     setConversations(prev => prev.filter(c => c.id !== conversationId));
     if (selectedConversation?.id === conversationId) {
       setSelectedConversation(null);
@@ -208,25 +203,63 @@ function ChatContent() {
   };
 
   const handleDeleteConversation = (conversationId) => {
-    // Remove from list
     setConversations(prev => prev.filter(c => c.id !== conversationId));
     if (selectedConversation?.id === conversationId) {
       setSelectedConversation(null);
     }
   };
 
-  // Loading state
+  // 3. useEffect HOOKS
+  useEffect(() => {
+    loadConnections();
+  }, []);
+
+  useEffect(() => {
+    if (selectedConnection) {
+      loadConversations();
+
+      const interval = setInterval(loadConversations, 10000);
+
+      const connection = connections.find(c => c.id === selectedConnection);
+      let channel = null;
+
+      if (connection) {
+        channel = chatSupabase
+          .channel(`conversations:${connection.instance_name}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'whatsapp_conversations',
+              filter: `instance_name=eq.${connection.instance_name}`
+            },
+            () => {
+              loadConversations();
+            }
+          )
+          .subscribe();
+      }
+
+      return () => {
+        clearInterval(interval);
+        if (channel) chatSupabase.removeChannel(channel);
+      };
+    }
+  }, [selectedConnection, connections]);
+
+  // 4. CHECKS CONDICIONAIS
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-[#111111]">
-        <div className="text-center">
-          <Loader2 className="animate-spin text-[#00FF99] mx-auto mb-4" size={48} />
-          <p className="text-gray-400">Carregando chat...</p>
-        </div>
+      <div className="flex items-center justify-center h-screen bg-[#0A0A0A]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00FF99]"></div>
       </div>
     );
   }
 
+  if (!loading && !subscription) {
+    return <NoSubscription />;
+  }
   // No connections state
   if (!loading && connections.length === 0) {
     return (

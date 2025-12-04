@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase/client'
+import NoSubscription from '../components/NoSubscription'
 import { useRouter } from 'next/navigation'
 
 // REMOVIDO: Componente AccountDropdown antigo
@@ -10,6 +11,8 @@ export default function FeedbackPage() {
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [subscription, setSubscription] = useState(null)
+
   // REMOVIDO: mousePosition
   // const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
 
@@ -55,6 +58,7 @@ export default function FeedbackPage() {
     } else {
       setUser(user)
       await loadUserProfile(user.id)
+      await loadSubscription(user.id) 
     }
     setLoading(false)
   }
@@ -72,6 +76,27 @@ export default function FeedbackPage() {
     }
   }
 
+const loadSubscription = async (userId) => {
+  try {
+    const { data, error } = await supabase
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+    if (!error && data) {
+      const isActive = ['active', 'trial', 'trialing'].includes(data.status) || data.stripe_subscription_id === 'super_account_bypass'
+      const isExpired = data.trial_end_date && new Date() > new Date(data.trial_end_date)
+      
+      if (isActive && !isExpired) {
+        setSubscription(data)
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao carregar assinatura:', error)
+  }
+}
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -164,7 +189,9 @@ export default function FeedbackPage() {
       </div>
     )
   }
-
+if (!loading && !subscription) {
+  return <NoSubscription />
+}
   // ADICIONADO: Constantes para o menu da conta
   const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'Usuário'
   const initials = displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()

@@ -2,10 +2,12 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase/client'
+import NoSubscription from '../components/NoSubscription'
 
 export default function SupportPage() {
   const [user, setUser] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
+  const [subscription, setSubscription] = useState(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   
@@ -41,33 +43,82 @@ export default function SupportPage() {
     checkUser()
   }, [])
 
-  const checkUser = async () => {
-    try {
-      const response = await fetch('/api/user/profile-id')
-      const data = await response.json()
-      
-      if (!data.success) {
-        router.push('/login')
-        return
-      }
-
-      setUser({
-        id: data.profileId,
-        email: data.email
-      })
-      
-      setUserProfile({
-        full_name: data.fullName,
-        company_name: data.companyName
-      })
-    } catch (error) {
-      console.error('Erro ao verificar usuário:', error)
+const checkUser = async () => {
+  try {
+    // Primeiro, pega o user do Supabase Auth
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    
+    if (!authUser) {
       router.push('/login')
-    } finally {
-      setLoading(false)
+      return
     }
+    
+    // Depois, pega os dados do profile
+    const response = await fetch('/api/user/profile-id')
+    const data = await response.json()
+    
+    if (!data.success) {
+      router.push('/login')
+      return
+    }
+    setUser({
+      id: data.profileId,
+      email: data.email
+    })
+    
+    setUserProfile({
+      full_name: data.fullName,
+      company_name: data.companyName
+    })
+    
+    // ✅ USA O authUser.id, NÃO o data.profileId
+    await loadSubscription(authUser.id)
+    
+  } catch (error) {
+    console.error('Erro ao verificar usuário:', error)
+    router.push('/login')
+  } finally {
+    setLoading(false)
   }
-
+}
+const loadSubscription = async (userId) => {
+  try {
+    console.log('🔍 [SUPORTE] Carregando subscription para userId:', userId)
+    
+    const { data, error } = await supabase
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+    
+    console.log('📦 [SUPORTE] Resultado da query:', { data, error })
+    
+    if (!error && data) {
+      const isActive = ['active', 'trial', 'trialing'].includes(data.status) || data.stripe_subscription_id === 'super_account_bypass'
+      const isExpired = data.trial_end_date && new Date() > new Date(data.trial_end_date)
+      
+      console.log('✅ [SUPORTE] Validação:', { 
+        status: data.status, 
+        isActive, 
+        isExpired,
+        trial_end_date: data.trial_end_date 
+      })
+      
+      if (isActive && !isExpired) {
+        setSubscription(data)
+        console.log('✅ [SUPORTE] Subscription definida!')
+      } else {
+        console.log('❌ [SUPORTE] Subscription não é ativa ou está expirada')
+      }
+    } else {
+      console.log('❌ [SUPORTE] Nenhuma subscription encontrada ou erro:', error)
+    }
+  } catch (error) {
+    console.error('❌ [SUPORTE] Erro ao carregar assinatura:', error)
+  }
+}
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -159,7 +210,9 @@ export default function SupportPage() {
       </div>
     )
   }
-
+if (!loading && !subscription) {
+  return <NoSubscription />
+}
   const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'Usuário'
   const initials = displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
 

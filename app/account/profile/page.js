@@ -2,7 +2,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../../lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import Sidebar from '../../components/Sidebar'
 // Importações para o telefone
 import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
@@ -17,7 +16,7 @@ export default function AccountProfile() {
   const [errors, setErrors] = useState({})
   const [emailEditMode, setEmailEditMode] = useState(false)
   const [originalEmail, setOriginalEmail] = useState('')
-  
+
   // Novo estado para controlar o Modal de Resultado (Sucesso/Erro)
   const [resultModal, setResultModal] = useState({
     show: false,
@@ -25,26 +24,26 @@ export default function AccountProfile() {
     title: '',
     message: ''
   })
-  
+
   // Form states
   const [formData, setFormData] = useState({
     full_name: '',
     company_name: '',
-    phone: '', 
+    phone: '',
     email: '',
     current_password: '',
     new_password: '',
     confirm_password: ''
   })
-  
+
   const router = useRouter()
 
   useEffect(() => {
     checkUser()
-    
+
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔔 Auth event:', event, 'Email:', session?.user?.email)
-      
+
       if (event === 'USER_UPDATED' || event === 'SIGNED_IN') {
         if (session?.user?.email) {
           setOriginalEmail(session.user.email)
@@ -63,7 +62,7 @@ export default function AccountProfile() {
 
   const checkUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    
+
     if (!user) {
       router.push('/login')
     } else {
@@ -77,7 +76,7 @@ export default function AccountProfile() {
   const loadUserProfile = async (userId) => {
     try {
       const { data: { user: currentUser } } = await supabase.auth.getUser()
-      
+
       const { data: profile } = await supabase
         .from('user_profiles')
         .select('*')
@@ -89,7 +88,7 @@ export default function AccountProfile() {
         setFormData({
           full_name: profile.full_name || '',
           company_name: profile.company_name || '',
-          phone: profile.phone || '', 
+          phone: profile.phone || '',
           email: currentUser?.email || '',
           current_password: '',
           new_password: '',
@@ -105,13 +104,13 @@ export default function AccountProfile() {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }
-        
+
         const { data: createdProfile } = await supabase
           .from('user_profiles')
           .insert([newProfile])
           .select()
           .single()
-          
+
         setUserProfile(createdProfile)
         setFormData({
           full_name: newProfile.full_name,
@@ -130,9 +129,9 @@ export default function AccountProfile() {
 
   const validateForm = () => {
     const newErrors = {}
-    
+
     if (!formData.full_name.trim()) newErrors.full_name = 'Nome completo é obrigatório'
-    
+
     if (emailEditMode) {
       if (!formData.email.trim()) {
         newErrors.email = 'Email é obrigatório'
@@ -147,7 +146,7 @@ export default function AccountProfile() {
     } else if (!isValidPhoneNumber(formData.phone)) {
       newErrors.phone = 'Número de telefone inválido para o país selecionado'
     }
-    
+
     if (formData.new_password) {
       if (formData.new_password.length < 6) {
         newErrors.new_password = 'Nova senha deve ter pelo menos 6 caracteres'
@@ -156,7 +155,7 @@ export default function AccountProfile() {
         newErrors.confirm_password = 'Senhas não coincidem'
       }
     }
-    
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -164,22 +163,22 @@ export default function AccountProfile() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!validateForm()) return
-    
+
     const emailChanged = emailEditMode && formData.email !== originalEmail
     const sensitiveChanges = emailChanged || formData.new_password
-    
+
     if (sensitiveChanges) {
       setPendingChanges(formData)
       setShowPasswordConfirm(true)
       return
     }
-    
+
     await saveProfile()
   }
 
   const confirmAndSave = async (password) => {
     if (!password) {
-      setErrors({...errors, current_password: 'Senha atual é obrigatória'})
+      setErrors({ ...errors, current_password: 'Senha atual é obrigatória' })
       return
     }
 
@@ -190,7 +189,7 @@ export default function AccountProfile() {
       })
 
       if (signInError) {
-        setErrors({...errors, current_password: 'Senha atual incorreta'})
+        setErrors({ ...errors, current_password: 'Senha atual incorreta' })
         return
       }
 
@@ -198,7 +197,7 @@ export default function AccountProfile() {
       setShowPasswordConfirm(false)
       setPendingChanges(null)
     } catch (error) {
-      setErrors({...errors, current_password: 'Erro ao verificar senha'})
+      setErrors({ ...errors, current_password: 'Erro ao verificar senha' })
     }
   }
 
@@ -226,7 +225,7 @@ export default function AccountProfile() {
         const { error: emailError } = await supabase.auth.updateUser({
           email: data.email
         })
-        
+
         if (emailError) throw emailError
         emailWasChanged = true
       }
@@ -254,17 +253,17 @@ export default function AccountProfile() {
           message: 'Suas informações foram salvas com sucesso!'
         })
       }
-      
+
       setEmailEditMode(false)
       await loadUserProfile(user.id)
-      
+
       setFormData(prev => ({
         ...prev,
         current_password: '',
         new_password: '',
         confirm_password: ''
       }))
-      
+
     } catch (error) {
       console.error('Erro ao salvar perfil:', error)
       // UX MELHORADA: Modal de Erro
@@ -281,8 +280,8 @@ export default function AccountProfile() {
 
   const handleCancelEmailEdit = () => {
     setEmailEditMode(false)
-    setFormData({...formData, email: originalEmail})
-    setErrors({...errors, email: ''})
+    setFormData({ ...formData, email: originalEmail })
+    setErrors({ ...errors, email: '' })
   }
 
   // Função para fechar o modal de resultado
@@ -297,10 +296,9 @@ export default function AccountProfile() {
       </div>
     )
   }
-  
+
   return (
     <div className="min-h-screen bg-[#0A0A0A]">
-      <Sidebar />
 
       <style jsx global>{`
         .PhoneInput {
@@ -345,9 +343,9 @@ export default function AccountProfile() {
 
       <main className="transition-all duration-300 ml-0 md:ml-[80px] lg:ml-[80px]">
         <div className="min-h-screen p-4 sm:p-6 lg:p-8">
-          
+
           <div className="max-w-7xl mx-auto">
-            
+
             <div className="mb-8 pt-8">
               <h1 className="text-4xl font-bold text-white">
                 Configurações da Conta
@@ -358,7 +356,7 @@ export default function AccountProfile() {
             </div>
 
             <div className="bg-[#111111] rounded-2xl p-8">
-              
+
               <div className="relative z-20">
                 <div className="mb-8">
                   <h2 className="text-2xl font-bold text-white mb-2">
@@ -368,7 +366,7 @@ export default function AccountProfile() {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-8">
-                  
+
                   {/* Informações Pessoais */}
                   <div className="bg-[#0A0A0A] rounded-2xl p-6">
                     <div className="relative z-10">
@@ -376,7 +374,7 @@ export default function AccountProfile() {
                         <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                         Informações Pessoais
                       </h3>
-                      
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -385,7 +383,7 @@ export default function AccountProfile() {
                           <input
                             type="text"
                             value={formData.full_name}
-                            onChange={(e) => setFormData({...formData, full_name: e.target.value})}
+                            onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                             className="w-full bg-[#0A0A0A] border-0 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] outline-none transition-all duration-300"
                           />
                           {errors.full_name && <p className="mt-1 text-red-400 text-sm">{errors.full_name}</p>}
@@ -396,15 +394,15 @@ export default function AccountProfile() {
                             <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                             Telefone de Contato *
                           </label>
-                          
+
                           <PhoneInput
                             international
                             defaultCountry="BR"
                             value={formData.phone}
-                            onChange={(value) => setFormData({...formData, phone: value})}
+                            onChange={(value) => setFormData({ ...formData, phone: value })}
                             placeholder="(11) 99999-9999"
                           />
-                          
+
                           {errors.phone && <p className="mt-1 text-red-400 text-sm">{errors.phone}</p>}
                         </div>
                       </div>
@@ -418,7 +416,7 @@ export default function AccountProfile() {
                         <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
                         Informações da Empresa
                       </h3>
-                      
+
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">
                           Nome da Empresa
@@ -426,7 +424,7 @@ export default function AccountProfile() {
                         <input
                           type="text"
                           value={formData.company_name}
-                          onChange={(e) => setFormData({...formData, company_name: e.target.value})}
+                          onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
                           placeholder="Ex: TechSolutions Ltda"
                           className="w-full bg-[#0A0A0A] border-0 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] outline-none transition-all duration-300"
                         />
@@ -441,7 +439,7 @@ export default function AccountProfile() {
                         <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                         Segurança da Conta
                       </h3>
-                      
+
                       <div className="space-y-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
@@ -453,13 +451,12 @@ export default function AccountProfile() {
                               <input
                                 type="email"
                                 value={formData.email}
-                                onChange={(e) => setFormData({...formData, email: e.target.value})}
+                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                 disabled={!emailEditMode}
-                                className={`w-full bg-[#0A0A0A] border-0 rounded-xl px-4 py-3 text-white placeholder-gray-500 transition-all duration-300 ${
-                                  emailEditMode 
-                                    ? 'focus:ring-2 focus:ring-[#00FF99] outline-none' 
+                                className={`w-full bg-[#0A0A0A] border-0 rounded-xl px-4 py-3 text-white placeholder-gray-500 transition-all duration-300 ${emailEditMode
+                                    ? 'focus:ring-2 focus:ring-[#00FF99] outline-none'
                                     : 'opacity-60 cursor-not-allowed'
-                                }`}
+                                  }`}
                               />
                               {errors.email && <p className="mt-1 text-red-400 text-sm">{errors.email}</p>}
                               {emailEditMode && formData.email !== originalEmail && !errors.email && (
@@ -493,7 +490,7 @@ export default function AccountProfile() {
                             <svg width="18px" height="18px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" strokeWidth="0"></g><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"></g><g id="SVGRepo_iconCarrier"> <path d="M2 12C2 8.22876 2 6.34315 3.17157 5.17157C4.34315 4 6.22876 4 10 4H14C17.7712 4 19.6569 4 20.8284 5.17157C22 6.34315 22 8.22876 22 12C22 15.7712 22 17.6569 20.8284 18.8284C19.6569 20 17.7712 20 14 20H10C6.22876 20 4.34315 20 3.17157 18.8284C2 17.6569 2 15.7712 2 12Z" stroke="#BDBDBD" strokeWidth="1.5"></path> <path d="M9 12C9 12.5523 8.55228 13 8 13C7.44772 13 7 12.5523 7 12C7 11.4477 7.44772 11 8 11C8.55228 11 9 11.4477 9 12Z" fill="#BDBDBD"></path> <path d="M13 12C13 12.5523 12.5523 13 12 13C11.4477 13 11 12.5523 11 12C11 11.4477 11.4477 11 12 11C12.5523 11 13 11.4477 13 12Z" fill="#BDBDBD"></path> <path d="M17 12C17 12.5523 16.5523 13 16 13C15.4477 13 15 12.5523 15 12C15 11.4477 15.4477 11 16 11C16.5523 11 17 11.4477 17 12Z" fill="#BDBDBD"></path> </g></svg>
                             Alterar Senha
                           </h4>
-                          
+
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -502,7 +499,7 @@ export default function AccountProfile() {
                               <input
                                 type="password"
                                 value={formData.new_password}
-                                onChange={(e) => setFormData({...formData, new_password: e.target.value})}
+                                onChange={(e) => setFormData({ ...formData, new_password: e.target.value })}
                                 placeholder="Deixe em branco para manter a atual"
                                 className="w-full bg-[#0A0A0A] border-0 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] outline-none transition-all duration-300"
                               />
@@ -516,7 +513,7 @@ export default function AccountProfile() {
                               <input
                                 type="password"
                                 value={formData.confirm_password}
-                                onChange={(e) => setFormData({...formData, confirm_password: e.target.value})}
+                                onChange={(e) => setFormData({ ...formData, confirm_password: e.target.value })}
                                 placeholder="Confirme a nova senha"
                                 className="w-full bg-[#0A0A0A] border-0 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] outline-none transition-all duration-300"
                               />
@@ -588,7 +585,7 @@ export default function AccountProfile() {
                 <input
                   type="password"
                   value={formData.current_password}
-                  onChange={(e) => setFormData({...formData, current_password: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, current_password: e.target.value })}
                   placeholder="Digite sua senha atual"
                   className="w-full bg-[#0A0A0A] border-0 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] outline-none transition-all duration-300"
                   autoFocus
@@ -601,7 +598,7 @@ export default function AccountProfile() {
                   onClick={() => {
                     setShowPasswordConfirm(false)
                     setPendingChanges(null)
-                    setFormData({...formData, current_password: ''})
+                    setFormData({ ...formData, current_password: '' })
                     setErrors({})
                   }}
                   className="flex-1 bg-[#272727] hover:bg-[#333333] text-white py-3 px-4 rounded-xl font-medium transition-all duration-300"
@@ -631,17 +628,15 @@ export default function AccountProfile() {
       {/* MODAL DE RESULTADO (SUCESSO/ERRO) - SUBSTITUI O ALERT */}
       {resultModal.show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div 
-            className={`bg-[#1E1E1E] p-8 rounded-3xl border shadow-[0_0_50px_rgba(0,0,0,0.5)] max-w-md w-full text-center transform transition-all scale-100 ${
-              resultModal.type === 'error' 
-                ? 'border-red-500/20 shadow-[0_0_50px_rgba(239,68,68,0.1)]' 
+          <div
+            className={`bg-[#1E1E1E] p-8 rounded-3xl border shadow-[0_0_50px_rgba(0,0,0,0.5)] max-w-md w-full text-center transform transition-all scale-100 ${resultModal.type === 'error'
+                ? 'border-red-500/20 shadow-[0_0_50px_rgba(239,68,68,0.1)]'
                 : 'border-[#00FF99]/20 shadow-[0_0_50px_rgba(0,255,153,0.1)]'
-            }`}
-          >
-            <div 
-              className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 ${
-                resultModal.type === 'error' ? 'bg-red-500/10' : 'bg-[#00FF99]/10'
               }`}
+          >
+            <div
+              className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 ${resultModal.type === 'error' ? 'bg-red-500/10' : 'bg-[#00FF99]/10'
+                }`}
             >
               {resultModal.type === 'error' ? (
                 <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -653,22 +648,21 @@ export default function AccountProfile() {
                 </svg>
               )}
             </div>
-            
+
             <h3 className="text-2xl font-bold text-white mb-2">
               {resultModal.title}
             </h3>
-            
+
             <p className="text-gray-400 mb-8">
               {resultModal.message}
             </p>
-            
-            <button 
+
+            <button
               onClick={closeResultModal}
-              className={`w-full py-4 font-bold rounded-2xl transition-all ${
-                resultModal.type === 'error'
+              className={`w-full py-4 font-bold rounded-2xl transition-all ${resultModal.type === 'error'
                   ? 'bg-red-500 hover:bg-red-600 text-white shadow-[0_0_20px_rgba(239,68,68,0.3)]'
                   : 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black hover:shadow-[0_0_20px_rgba(0,255,153,0.3)]'
-              }`}
+                }`}
             >
               Entendido
             </button>
