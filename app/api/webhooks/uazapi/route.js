@@ -21,6 +21,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server'; // Main DB Admin
 import { chatSupabaseAdmin } from '@/lib/supabase/chat-server'; // Chat DB Admin
+import ConversationService from '@/lib/ConversationService';
 import MediaServiceVPS from '@/lib/MediaServiceVPS';
 import { randomUUID } from 'crypto';
 
