@@ -62,7 +62,7 @@ export default function AudioPlayer({ src, isOwn, contactAvatar, contactName }) 
     };
 
     const formatTime = (time) => {
-        if (!time || isNaN(time)) return '0:00';
+        if (!time || isNaN(time) || !isFinite(time)) return '0:00';
         const minutes = Math.floor(time / 60);
         const seconds = Math.floor(time % 60);
         return `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -114,7 +114,7 @@ export default function AudioPlayer({ src, isOwn, contactAvatar, contactName }) 
                     />
 
                     {/* Timer */}
-                    <span className="text-xs text-gray-400 font-mono">
+                    <span className="text-xs text-gray-400 font-mono notranslate">
                         {formatTime(currentTime)} / {formatTime(duration)}
                     </span>
                 </div>
