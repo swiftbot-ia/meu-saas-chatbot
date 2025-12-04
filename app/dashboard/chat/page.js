@@ -6,6 +6,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import ConversationList from '../../components/chat/ConversationList';
 import ChatWindow from '../../components/chat/ChatWindow';
 import { Loader2, AlertCircle } from 'lucide-react';
@@ -15,12 +16,16 @@ import { createChatSupabaseClient } from '@/lib/supabase/chat-client';
 const chatSupabase = createChatSupabaseClient();
 
 export default function ChatPage() {
+  const searchParams = useSearchParams();
+  const conversationIdParam = searchParams.get('conversation');
+
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [connections, setConnections] = useState([]);
   const [selectedConnection, setSelectedConnection] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [pendingConversationId, setPendingConversationId] = useState(conversationIdParam);
 
   // Load WhatsApp connections on mount
   useEffect(() => {
@@ -75,10 +80,46 @@ export default function ChatPage() {
 
       setConnections(data.connections || []);
 
-      // Auto-select first connected instance
-      const connectedInstance = data.connections?.find(c => c.is_connected);
-      if (connectedInstance) {
-        setSelectedConnection(connectedInstance.id);
+      if (data.connections && data.connections.length > 0) {
+        let selectedConn = null;
+
+        // ✅ If there's a pending conversation from URL, find which connection it belongs to
+        if (pendingConversationId) {
+          // Try to find the conversation's connection by loading all conversations for each connection
+          for (const conn of data.connections) {
+            try {
+              const convRes = await fetch(`/api/chat/conversations?connectionId=${conn.id}&limit=100`);
+              const convData = await convRes.json();
+              if (convData.conversations?.some(c => c.id === pendingConversationId)) {
+                selectedConn = conn;
+                console.log('✅ [Chat] Found conversation in connection:', conn.profile_name || conn.instance_name);
+                break;
+              }
+            } catch (e) {
+              console.error('Error checking connection:', e);
+            }
+          }
+        }
+
+        // Fallback: Check for saved connection ID in localStorage
+        if (!selectedConn && typeof window !== 'undefined') {
+          const savedConnectionId = localStorage.getItem('activeConnectionId');
+          if (savedConnectionId) {
+            selectedConn = data.connections.find(c => c.id === savedConnectionId);
+            if (selectedConn) {
+              console.log('✅ [Chat] Restored saved connection from localStorage:', savedConnectionId);
+            }
+          }
+        }
+
+        // Final fallback: use first connected instance
+        if (!selectedConn) {
+          selectedConn = data.connections.find(c => c.is_connected);
+        }
+
+        if (selectedConn) {
+          setSelectedConnection(selectedConn.id);
+        }
       }
 
     } catch (err) {
@@ -86,6 +127,17 @@ export default function ChatPage() {
       setError('Erro ao carregar conexões do WhatsApp');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle connection selection with localStorage sync
+  const handleConnectionSelect = (connectionId) => {
+    setSelectedConnection(connectionId);
+
+    // ✅ Save to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('activeConnectionId', connectionId);
+      console.log('💾 [Chat] Saved connection to localStorage:', connectionId);
     }
   };
 
@@ -107,8 +159,17 @@ export default function ChatPage() {
 
       setConversations(data.conversations || []);
 
+      // ✅ Auto-select conversation from URL parameter (from contacts page)
+      if (pendingConversationId) {
+        const targetConversation = data.conversations?.find(c => c.id === pendingConversationId);
+        if (targetConversation) {
+          setSelectedConversation(targetConversation);
+          console.log('✅ [Chat] Auto-selected conversation from URL:', pendingConversationId);
+          setPendingConversationId(null); // Clear pending after selection
+        }
+      }
       // Update selected conversation if it exists
-      if (selectedConversation) {
+      else if (selectedConversation) {
         const updated = data.conversations?.find(c => c.id === selectedConversation.id);
         if (updated) {
           setSelectedConversation(updated);
@@ -213,7 +274,7 @@ export default function ChatPage() {
           loading={false}
           connections={connections}
           selectedConnection={selectedConnection}
-          onSelectConnection={setSelectedConnection}
+          onSelectConnection={handleConnectionSelect}
         />
       </div>
 
