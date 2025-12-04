@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Menu, X, Plus, MessageCircle, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
-
+import NoSubscription from '../components/NoSubscription'
 // ==================================================================================
 // SWIFTBOT IA
 // ==================================================================================
@@ -19,6 +19,7 @@ export default function SwiftbotProPage() {
   // Estados principais
   const [user, setUser] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
+  const [subscription, setSubscription] = useState(null)
   const [loading, setLoading] = useState(true)
   const [chatStarted, setChatStarted] = useState(false)
   const [messages, setMessages] = useState([])
@@ -138,6 +139,7 @@ useEffect(() => {
 
       if (profile) {
         setUserProfile(profile)
+        await loadSubscription(user.id)
       }
     } catch (error) {
       console.error('Erro ao verificar usuário:', error)
@@ -146,7 +148,27 @@ useEffect(() => {
       setLoading(false)
     }
   }
-
+const loadSubscription = async (userId) => {
+  try {
+    const { data, error } = await supabase
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+    if (!error && data) {
+      const isActive = ['active', 'trial', 'trialing'].includes(data.status) || data.stripe_subscription_id === 'super_account_bypass'
+      const isExpired = data.trial_end_date && new Date() > new Date(data.trial_end_date)
+      
+      if (isActive && !isExpired) {
+        setSubscription(data)
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao carregar assinatura:', error)
+  }
+}
   // Criar novo chat
   const handleNewChat = () => {
     setChatStarted(false)
@@ -264,7 +286,9 @@ Posso te ajudar com algo mais específico?`
       </div>
     )
   }
-
+if (!subscription) {
+  return <NoSubscription />
+}
   const userName = userProfile?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'Usuário'
 
   return (

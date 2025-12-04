@@ -5,6 +5,7 @@
 
 'use client';
 
+import { supabase } from '../../../lib/supabase/client'
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -22,6 +23,8 @@ import {
   Clock,
   MapPin
 } from 'lucide-react';
+import NoSubscription from '../../components/NoSubscription'
+
 
 // ============================================================================
 // CONNECTION DROPDOWN - Mesmo estilo do chat/page.js
@@ -160,6 +163,7 @@ export default function ContactsPage() {
   const router = useRouter();
 
   // States
+  const [subscription, setSubscription] = useState(null)
   const [contacts, setContacts] = useState([]);
   const [connections, setConnections] = useState([]);
   const [selectedConnection, setSelectedConnection] = useState(null);
@@ -238,13 +242,52 @@ export default function ContactsPage() {
           setSelectedConnection(selectedConn.id);
         }
       }
-
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await loadSubscription(user.id);
+      }
     } catch (err) {
       console.error('Erro ao carregar conexões:', err);
       setError('Erro ao carregar conexões');
     }
   };
-
+const loadSubscription = async (userId) => {
+  try {
+    console.log('🔍 [CONTACTS] Carregando subscription para userId:', userId)
+    
+    const { data, error } = await supabase
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+    
+    console.log('📦 [CONTACTS] Resultado da query:', { data, error })
+    if (!error && data) {
+      const isActive = ['active', 'trial', 'trialing'].includes(data.status) || data.stripe_subscription_id === 'super_account_bypass'
+      const isExpired = data.trial_end_date && new Date() > new Date(data.trial_end_date)
+      
+      console.log('✅ [CONTACTS] Validação:', { 
+        status: data.status, 
+        isActive, 
+        isExpired,
+        trial_end_date: data.trial_end_date 
+      })
+      
+      if (isActive && !isExpired) {
+        setSubscription(data)
+        console.log('✅ [CONTACTS] Subscription definida!')
+      } else {
+        console.log('❌ [CONTACTS] Subscription não é ativa ou está expirada')
+      }
+    } else {
+      console.log('❌ [CONTACTS] Nenhuma subscription encontrada ou erro:', error)
+    }
+  } catch (error) {
+    console.error('❌ [CONTACTS] Erro ao carregar assinatura:', error)
+  }
+}
   // Handle connection selection with localStorage sync
   const handleConnectionSelect = (connectionId) => {
     setSelectedConnection(connectionId);
@@ -534,7 +577,17 @@ export default function ContactsPage() {
   // Predefined colors for tags
   const tagColors = ['#00FF99', '#00BFFF', '#FFD700', '#FF6B6B', '#A78BFA', '#F472B6', '#34D399', '#FBBF24'];
 
+if (!loading && !subscription) {
+  return <NoSubscription />
+}
   // No connections state
+  if (loading) {
+  return (
+    <div className="flex items-center justify-center h-screen bg-[#0A0A0A]">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00FF99]"></div>
+    </div>
+  );
+}
   if (!loading && connections.length === 0) {
     return (
       <div className="flex items-center justify-center h-screen bg-[#111111]">

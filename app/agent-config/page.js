@@ -3,6 +3,8 @@
 import { useState, useEffect, Suspense } from 'react'
 import { supabase } from '../../lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
+import NoSubscription from '../components/NoSubscription'
+
 
 // ==================================================================================
 // 🎨 COMPONENTE CUSTOM SELECT (Ghost Style - Mantido)
@@ -144,6 +146,7 @@ const MAX_ITEMS = 15
 function AgentConfigContent() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [subscription, setSubscription] = useState(null)
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState({})
 
@@ -205,10 +208,31 @@ function AgentConfigContent() {
     } else {
       setUser(user)
       loadExistingConfig(user.id)
+      await loadSubscription(user.id)
     }
     setLoading(false)
   }
-
+const loadSubscription = async (userId) => {
+  try {
+    const { data, error } = await supabase
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+    if (!error && data) {
+      const isActive = ['active', 'trial', 'trialing'].includes(data.status) || data.stripe_subscription_id === 'super_account_bypass'
+      const isExpired = data.trial_end_date && new Date() > new Date(data.trial_end_date)
+      
+      if (isActive && !isExpired) {
+        setSubscription(data)
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao carregar assinatura:', error)
+  }
+}
   const loadExistingConfig = async (userId) => {
     try {
       let query = supabase.from('ai_agents').select('*').eq('user_id', userId)
@@ -553,7 +577,9 @@ function AgentConfigContent() {
       </div>
     )
   }
-
+if (!subscription) {
+  return <NoSubscription />
+}
   return (
     <div className="min-h-screen bg-[#0A0A0A]">
       <main className="relative z-10 max-w-6xl mx-auto py-16 px-4 sm:px-6 lg:px-8">

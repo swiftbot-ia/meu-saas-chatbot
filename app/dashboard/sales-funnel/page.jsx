@@ -5,6 +5,8 @@ import { DragDropContext } from '@hello-pangea/dnd';
 import KanbanColumn from './components/KanbanColumn';
 import LeadModal from './components/LeadModal';
 import axios from 'axios';
+import { supabase } from '../../../lib/supabase/client'
+import NoSubscription from '../../components/NoSubscription'
 
 const SALES_STAGES = {
     novo: {
@@ -34,6 +36,7 @@ const SalesFunnelPage = () => {
     const [leads, setLeads] = useState({});
     const [selectedLead, setSelectedLead] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [subscription, setSubscription] = useState(null)
     const [currentDragDestination, setCurrentDragDestination] = useState(null);
     const [selectedConnection, setSelectedConnection] = useState(null);
     const [pagination, setPagination] = useState({
@@ -81,6 +84,11 @@ const SalesFunnelPage = () => {
                 }
 
                 setSelectedConnection(connection);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            await loadSubscription(user.id);
+        }
+        
             } catch (error) {
                 console.error('Error fetching connection details:', error);
                 setLoading(false);
@@ -89,7 +97,27 @@ const SalesFunnelPage = () => {
 
         fetchConnectionDetails();
     }, []);
-
+const loadSubscription = async (userId) => {
+    try {
+        const { data, error } = await supabase
+            .from('user_subscriptions')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
+        if (!error && data) {
+            const isActive = ['active', 'trial', 'trialing'].includes(data.status) || data.stripe_subscription_id === 'super_account_bypass'
+            const isExpired = data.trial_end_date && new Date() > new Date(data.trial_end_date)
+            
+            if (isActive && !isExpired) {
+                setSubscription(data)
+            }
+        }
+    } catch (error) {
+        console.error('Erro ao carregar assinatura:', error)
+    }
+}
     // Fetch leads when connection changes
     useEffect(() => {
         if (selectedConnection) {
@@ -256,7 +284,9 @@ const SalesFunnelPage = () => {
             </div>
         );
     }
-
+if (!subscription) {
+    return <NoSubscription />
+}
     return (
         <div className="min-h-screen bg-[#0A0A0A]">
             <main className="px-4 sm:px-6 lg:px-8 pt-16 pb-8">
