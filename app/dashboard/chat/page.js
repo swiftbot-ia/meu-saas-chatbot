@@ -10,6 +10,10 @@ import ConversationList from '../../components/chat/ConversationList';
 import ChatWindow from '../../components/chat/ChatWindow';
 import { Loader2, AlertCircle } from 'lucide-react';
 
+import { createChatSupabaseClient } from '@/lib/supabase/chat-client';
+
+const chatSupabase = createChatSupabaseClient();
+
 export default function ChatPage() {
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
@@ -30,9 +34,35 @@ export default function ChatPage() {
 
       // Auto-refresh conversations every 10 seconds
       const interval = setInterval(loadConversations, 10000);
-      return () => clearInterval(interval);
+
+      // Real-time subscription
+      const connection = connections.find(c => c.id === selectedConnection);
+      let channel = null;
+
+      if (connection) {
+        channel = chatSupabase
+          .channel(`conversations:${connection.instance_name}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'whatsapp_conversations',
+              filter: `instance_name=eq.${connection.instance_name}`
+            },
+            () => {
+              loadConversations();
+            }
+          )
+          .subscribe();
+      }
+
+      return () => {
+        clearInterval(interval);
+        if (channel) chatSupabase.removeChannel(channel);
+      };
     }
-  }, [selectedConnection]);
+  }, [selectedConnection, connections]);
 
   const loadConnections = async () => {
     try {
