@@ -390,7 +390,7 @@ export default function Sidebar() {
             </div>
           ) : (
             <div className="text-center text-xs text-gray-500">
-              <p>v1.0</p>
+              <p>v1.78</p>
             </div>
           )}
         </div>
