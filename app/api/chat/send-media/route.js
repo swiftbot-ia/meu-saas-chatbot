@@ -93,8 +93,9 @@ export async function POST(request) {
 
     // If file uploaded, save it to VPS
     if (file && file.size > 0) {
-      // Create uploads directory if doesn't exist
-      const uploadsDir = join(process.cwd(), 'public', 'uploads', 'audio');
+      // IMPORTANTE: Salvar em /media/audio/ em vez de /uploads/audio/
+      // porque WhatsApp não consegue baixar de rotas API (problemas de SSL/timeout)
+      const uploadsDir = join(process.cwd(), 'public', 'media', 'audio');
       if (!existsSync(uploadsDir)) {
         await mkdir(uploadsDir, { recursive: true });
       }
@@ -127,12 +128,11 @@ export async function POST(request) {
         // Delete original webm file
         await unlink(filepath);
 
-        // Update mediaUrl to point to the new ogg file
-        // Use the dynamic API route for serving the file
-        mediaUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/uploads/audio/${oggFilename}`;
+        // USAR URL ESTÁTICO em vez de rota API
+        mediaUrl = `${process.env.NEXT_PUBLIC_APP_URL}/media/audio/${oggFilename}`;
       } else {
-        // Use the dynamic API route for serving the file
-        mediaUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/uploads/audio/${filename}`;
+        // USAR URL ESTÁTICO em vez de rota API
+        mediaUrl = `${process.env.NEXT_PUBLIC_APP_URL}/media/audio/${filename}`;
       }
     }
 
