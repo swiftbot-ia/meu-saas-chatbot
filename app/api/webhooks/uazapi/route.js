@@ -666,7 +666,8 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
           messageId,
           {
             mimetype: messageInfo.documentMessage.mimetype,
-            fileName: messageInfo.documentMessage.fileName
+            fileName: messageInfo.documentMessage.fileName,
+            instanceToken: instanceToken || connection.instance_token
           }
         );
 

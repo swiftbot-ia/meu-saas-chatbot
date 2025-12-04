@@ -108,6 +108,7 @@ export default function MessageBubble({ message, isOwn, contact, connectionAvata
           </>
         ) : null;
       case 'audio':
+        const transcriptionText = message.transcription || message.message_content;
         return (
           <div className="mb-2">
             {mediaUrl && (
@@ -118,7 +119,7 @@ export default function MessageBubble({ message, isOwn, contact, connectionAvata
                 contactName={isOwn ? 'Você' : (contact?.name || contact?.whatsapp_number)}
               />
             )}
-            {message.transcription && (
+            {transcriptionText && (
               <div className="mt-2">
                 <button
                   onClick={() => setShowTranscription(!showTranscription)}
@@ -131,7 +132,7 @@ export default function MessageBubble({ message, isOwn, contact, connectionAvata
                 {showTranscription && (
                   <div className={`mt-2 p-2 rounded text-xs italic ${isOwn ? 'bg-[#00FF99]/10 text-gray-300' : 'bg-white/5 text-gray-400'
                     }`}>
-                    "{message.transcription}"
+                    "{transcriptionText}"
                   </div>
                 )
                 }
