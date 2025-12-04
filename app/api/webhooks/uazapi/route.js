@@ -756,18 +756,36 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
     } catch (error) {
       // Handle duplicate key error (race condition)
       if (error.code === '23505') { // Postgres unique_violation code
-        log(requestId, 'info', 'ℹ️', `Mensagem já existe (race condition): ${messageId}`); // Kept original messageId
-        const { data: existing } = await chatSupabaseAdmin // Changed to chatSupabaseAdmin
+        log(requestId, 'info', 'ℹ️', `Mensagem já existe (race condition): ${messageId}`);
+
+        // Fetch existing message with processing status
+        const { data: existing } = await chatSupabaseAdmin
           .from('whatsapp_messages')
           .select('*')
-          .eq('message_id', messageId) // Kept original messageId
+          .eq('message_id', messageId)
           .maybeSingle();
 
-        // Se encontrou a mensagem existente, retorna ela e para por aqui
-        // Não precisa atualizar conversa nem disparar gatilhos novamente
         if (existing) {
+          // CRITICAL FIX: Update transcription if we have a new one and existing doesn't
+          if (transcription && !existing.transcription) {
+            const { error: updateError } = await chatSupabaseAdmin
+              .from('whatsapp_messages')
+              .update({
+                transcription,
+                ai_interpretation,
+                updated_at: new Date().toISOString()
+              })
+              .eq('message_id', messageId);
+
+            if (updateError) {
+              log(requestId, 'error', '❌', `Failed to update transcription: ${updateError.message}`);
+            } else {
+              log(requestId, 'info', '✅', `Transcription updated for: ${messageId}`);
+            }
+          }
+
           log(requestId, 'info', 'ℹ️', `Mensagem existente retornada: ${messageId}`);
-          return; // Return early as per instruction
+          return; // Return early - message already processed
         }
       }
       throw error;
