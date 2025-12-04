@@ -4,17 +4,29 @@ import { NextResponse } from 'next/server';
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(request) {
     const supabase = createChatSupabaseClient();
 
     try {
-        // Fetch conversations with contact details
+        // Get instance_name from query parameters
+        const { searchParams } = new URL(request.url);
+        const instanceName = searchParams.get('instance_name');
+
+        if (!instanceName) {
+            return NextResponse.json(
+                { error: 'instance_name parameter is required' },
+                { status: 400 }
+            );
+        }
+
+        // Fetch conversations filtered by instance_name with contact details
         const { data: conversations, error } = await supabase
             .from('whatsapp_conversations')
             .select(`
         *,
         contact:whatsapp_contacts(*)
       `)
+            .eq('instance_name', instanceName) // CRITICAL: Filter by connection
             .order('funnel_position', { ascending: true })
             .order('last_message_at', { ascending: false });
 

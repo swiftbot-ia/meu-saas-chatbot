@@ -35,14 +35,60 @@ const SalesFunnelPage = () => {
     const [selectedLead, setSelectedLead] = useState(null);
     const [loading, setLoading] = useState(true);
     const [currentDragDestination, setCurrentDragDestination] = useState(null);
+    const [selectedConnection, setSelectedConnection] = useState(null);
 
+    // Read active connection ID and fetch connection details
     useEffect(() => {
-        fetchLeads();
+        const fetchConnectionDetails = async () => {
+            const activeId = localStorage.getItem('activeConnectionId');
+            if (!activeId) {
+                console.warn('No activeConnectionId in localStorage');
+                setLoading(false);
+                return;
+            }
+
+            try {
+                // Fetch all connections
+                const response = await axios.get('/api/whatsapp/connections');
+                const connections = response.data.connections || response.data; // Handle both formats
+                const connection = connections.find(conn => conn.id === activeId);
+
+                if (connection) {
+                    setSelectedConnection(connection);
+
+                    // DEBUG: Alert showing connection details
+                    alert(`Conexão Ativa:\nID: ${connection.id}\nNome: ${connection.instance_name}`);
+                } else {
+                    console.error('Connection not found for ID:', activeId);
+                    setLoading(false);
+                }
+            } catch (error) {
+                console.error('Error fetching connection details:', error);
+                setLoading(false);
+            }
+        };
+
+        fetchConnectionDetails();
     }, []);
 
+    // Fetch leads when connection changes
+    useEffect(() => {
+        if (selectedConnection) {
+            fetchLeads();
+        }
+    }, [selectedConnection]);
+
     const fetchLeads = async () => {
+        if (!selectedConnection) {
+            console.warn('Cannot fetch leads: no connection selected');
+            setLoading(false);
+            return;
+        }
+
         try {
-            const response = await axios.get('/api/funnels/vendas');
+            const response = await axios.get('/api/funnels/vendas', {
+                params: { instance_name: selectedConnection.instance_name }
+            });
             setLeads(response.data);
         } catch (error) {
             console.error('Error fetching leads:', error);
