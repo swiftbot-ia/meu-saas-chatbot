@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ConversationList from '../../components/chat/ConversationList';
 import ChatWindow from '../../components/chat/ChatWindow';
@@ -15,7 +15,20 @@ import { createChatSupabaseClient } from '@/lib/supabase/chat-client';
 
 const chatSupabase = createChatSupabaseClient();
 
-export default function ChatPage() {
+// Loading fallback for Suspense
+function ChatLoadingFallback() {
+  return (
+    <div className="flex items-center justify-center h-screen bg-[#111111]">
+      <div className="text-center">
+        <Loader2 className="animate-spin text-[#00FF99] mx-auto mb-4" size={48} />
+        <p className="text-gray-400">Carregando chat...</p>
+      </div>
+    </div>
+  );
+}
+
+// Main chat content component
+function ChatContent() {
   const searchParams = useSearchParams();
   const conversationIdParam = searchParams.get('conversation');
 
@@ -300,5 +313,14 @@ export default function ChatPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Export with Suspense wrapper to handle useSearchParams
+export default function ChatPage() {
+  return (
+    <Suspense fallback={<ChatLoadingFallback />}>
+      <ChatContent />
+    </Suspense>
   );
 }
