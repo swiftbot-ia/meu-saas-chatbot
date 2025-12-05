@@ -545,6 +545,20 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
     const fromMe = messageKey.fromMe;
     const whatsappNumber = remoteJid.split('@')[0];
 
+    // 3.1 VERIFICAR SE O REMOTE JID É OUTRA CONEXÃO DO MESMO USUÁRIO
+    // Se for, não devemos processar - evita criar contato "Sostenes" quando Sostenes conversa com Caio
+    const { data: isOwnConnection } = await supabaseAdmin
+      .from('whatsapp_connections')
+      .select('id')
+      .eq('user_id', connection.user_id)
+      .eq('phone_number', whatsappNumber)
+      .maybeSingle();
+
+    if (isOwnConnection) {
+      log(requestId, 'info', 'ℹ️', `Ignorando: remoteJid (${whatsappNumber}) é outra conexão do mesmo usuário`);
+      return; // Não processar - a outra instância vai processar corretamente
+    }
+
     // 7. OBTER OU CRIAR CONTATO
     // IMPORTANTE: Só atualizar nome/foto do contato quando mensagem é RECEBIDA (fromMe=false)
     // Quando fromMe=true, pushName é o nome do REMETENTE (nós), não do contato
