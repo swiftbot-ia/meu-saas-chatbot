@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
-import { ensureSuperAccountBypass } from '@/lib/super-account-setup'
+import { createServerSupabaseClient } from '../../../../lib/supabase/server.js'
+import { ensureSuperAccountBypass } from '../../../../lib/super-account-setup'
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
@@ -23,7 +23,7 @@ export async function POST(request) {
         console.log('🔧 [API] Garantindo bypass para userId:', userId)
 
         // Verificar autenticação (o próprio usuário ou admin)
-        const supabase = await createClient()
+        const supabase = createServerSupabaseClient()
         const { data: { user }, error: authError } = await supabase.auth.getUser()
 
         if (authError || !user) {
