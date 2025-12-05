@@ -540,6 +540,11 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
       connection.instance_token = instanceToken;
     }
 
+    // 3. IDENTIFICAR CONTATO
+    const remoteJid = messageKey.remoteJid;
+    const fromMe = messageKey.fromMe;
+    const whatsappNumber = remoteJid.split('@')[0];
+
     // 7. OBTER OU CRIAR CONTATO
     // IMPORTANTE: Só atualizar nome/foto do contato quando mensagem é RECEBIDA (fromMe=false)
     // Quando fromMe=true, pushName é o nome do REMETENTE (nós), não do contato
