@@ -162,7 +162,10 @@ const DashboardContent: React.FC = () => {
     const connectionsCountText = `${summary.currentActiveConnections} de ${summary.subscription.connectionLimit} ativas`;
 
     // Encontrar conexão principal para exibir
+    // Prioridade: 1) isConnected=true, 2) status connected/open, 3) connecting/pending_qr
     const mainConnection = summary.connections.find(c =>
+        c.isConnected === true
+    ) || summary.connections.find(c =>
         c.status === 'connected' || c.status === 'open'
     ) || summary.connections.find(c =>
         c.status === 'connecting' || c.status === 'pending_qr'
@@ -261,7 +264,7 @@ const DashboardContent: React.FC = () => {
                     </button>
 
                     {/* Botão de Sincronização - aparece quando conectado */}
-                    {mainConnection && (mainConnection.status === 'connected' || mainConnection.status === 'open') && (
+                    {mainConnection && (mainConnection.status === 'connected' || mainConnection.status === 'open' || mainConnection.isConnected) && (
                         <div className="mt-4">
                             <SyncButton
                                 connectionId={mainConnection.id}

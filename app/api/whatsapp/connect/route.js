@@ -419,9 +419,10 @@ export async function GET(request) {
           const status = instanceInfo.status || 'unknown'
 
           console.log('📊 [Connect-GET] Status UAZAPI:', status)
+          console.log('📊 [Connect-GET] loggedIn:', statusData.loggedIn, 'status.connected:', statusData.status?.connected)
 
-          // Se conectou (status 'open' ou loggedIn true)
-          if (status === 'open' || statusData.status?.loggedIn) {
+          // Se conectou (status 'open' OU loggedIn true OU status.connected true)
+          if (status === 'open' || statusData.loggedIn === true || statusData.status?.connected === true) {
             console.log('✅ [Connect-GET] Conexão detectada!')
 
             // Atualizar banco
