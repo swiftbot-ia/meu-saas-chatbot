@@ -126,10 +126,11 @@ export async function GET(request) {
             console.error('Erro ao buscar origens:', originsError);
         }
 
-        // Get all tags
+        // Get all tags for this user
         const { data: allTags, error: tagsError } = await chatSupabase
             .from('contact_tags')
             .select('*')
+            .eq('user_id', userId)
             .order('name');
 
         if (tagsError) {
