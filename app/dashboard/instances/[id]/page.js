@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../../../lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
 import WhatsAppConnectModal from '../../../components/WhatsAppConnectModal'
+import SyncButton from '../../../components/SyncButton'
 import {
   ArrowLeft,
   Loader2,
@@ -331,6 +332,17 @@ export default function InstanceDetailPage() {
                     </p>
                   </div>
                 </div>
+
+                {/* Sync Button - aparece apenas quando conectado */}
+                {isConnected && (
+                  <div className="mb-6">
+                    <SyncButton
+                      connectionId={instance.id}
+                      isConnected={isConnected}
+                      onSyncComplete={() => console.log('Sync concluído!')}
+                    />
+                  </div>
+                )}
 
                 {/* Action buttons */}
                 <div className="flex flex-col sm:flex-row gap-4">
