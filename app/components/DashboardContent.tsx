@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import WhatsAppConnectModal from './WhatsAppConnectModal';
+import SyncButton from './SyncButton';
 
 // ============================================================================
 // MOCK: Hook de Autenticação
@@ -258,6 +259,20 @@ const DashboardContent: React.FC = () => {
                     >
                         {isLoading ? 'Carregando...' : buttonText}
                     </button>
+
+                    {/* Botão de Sincronização - aparece quando conectado */}
+                    {mainConnection && (mainConnection.status === 'connected' || mainConnection.status === 'open') && (
+                        <div className="mt-4">
+                            <SyncButton
+                                connectionId={mainConnection.id}
+                                isConnected={true}
+                                onSyncComplete={() => {
+                                    console.log('✅ [Dashboard] Sync concluído!');
+                                    fetchDashboardSummary();
+                                }}
+                            />
+                        </div>
+                    )}
 
                     {/* Outros Painéis */}
                     <div className="mt-8 space-y-4">
