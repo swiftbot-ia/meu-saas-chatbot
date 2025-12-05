@@ -62,8 +62,8 @@ function SyncProgressBar({ connectionId }) {
 
   return (
     <div className={`rounded-xl p-4 mb-4 border transition-all duration-300 ${isComplete ? 'bg-green-900/20 border-green-500/30' :
-        isFailed ? 'bg-red-900/20 border-red-500/30' :
-          'bg-[#1A1A1A] border-[#333]'
+      isFailed ? 'bg-red-900/20 border-red-500/30' :
+        'bg-[#1A1A1A] border-[#333]'
       }`}>
       <div className="flex items-center gap-2 mb-2">
         {isComplete ? (
@@ -123,6 +123,7 @@ export default function Dashboard() {
   const [whatsappStatus, setWhatsappStatus] = useState('disconnected')
   const [qrCode, setQrCode] = useState(null)
   const [connecting, setConnecting] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
   const [agentConfigured, setAgentConfigured] = useState(false)
   const [stats, setStats] = useState({
     mensagensHoje: 0,
@@ -760,6 +761,49 @@ export default function Dashboard() {
       ))
     } finally {
       setConnecting(false)
+    }
+  }
+
+  // ============================================================================
+  // INICIAR SINCRONIZAÇÃO
+  // ============================================================================
+  const handleStartSync = async (connectionId) => {
+    if (!connectionId || isSyncing) return
+
+    try {
+      setIsSyncing(true)
+      console.log('🔄 [Sync] Iniciando sincronização para:', connectionId)
+
+      const response = await fetch('/api/whatsapp/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connectionId })
+      })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao iniciar sincronização')
+      }
+
+      console.log('✅ [Sync] Job iniciado:', result.jobId)
+
+      // O SyncProgressBar vai fazer polling e mostrar o progresso
+      // Após alguns segundos, recarregar conexões para atualizar has_synced
+      setTimeout(async () => {
+        if (user?.id) {
+          await loadConnections(user.id)
+        }
+      }, 5000)
+
+    } catch (error) {
+      console.error('❌ [Sync] Erro:', error)
+      setModalConfig(createModalConfig.error(
+        'Erro na Sincronização',
+        `Não foi possível iniciar a sincronização: ${error.message}`
+      ))
+    } finally {
+      setIsSyncing(false)
     }
   }
 
@@ -1720,6 +1764,29 @@ export default function Dashboard() {
 
             {/* Sync Progress - Exibido durante sincronização */}
             <SyncProgressBar connectionId={activeConnection?.id} />
+
+            {/* Botão de Sincronização - aparece quando conectado E ainda não sincronizou */}
+            {activeConnection && whatsappStatus === 'connected' && !activeConnection.has_synced && (
+              <button
+                onClick={() => handleStartSync(activeConnection.id)}
+                disabled={isSyncing}
+                className="w-full mb-4 bg-gradient-to-r from-[#10E57C] to-[#00BFFF] hover:from-[#0BCB6B] hover:to-[#00A8E8] text-white font-medium py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isSyncing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                    Sincronizando...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Sincronizar Contatos e Mensagens
+                  </>
+                )}
+              </button>
+            )}
 
             {/* Action Button - BOTÃO FANTASMA (Ghost) */}
             {whatsappStatus === 'connected' ? (
