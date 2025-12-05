@@ -545,20 +545,6 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
     const fromMe = messageKey.fromMe;
     const whatsappNumber = remoteJid.split('@')[0];
 
-    // 3.1 VERIFICAR SE O REMOTE JID É OUTRA CONEXÃO DO MESMO USUÁRIO
-    // Se for, não devemos processar - evita criar contato "Sostenes" quando Sostenes conversa com Caio
-    const { data: isOwnConnection } = await supabaseAdmin
-      .from('whatsapp_connections')
-      .select('id')
-      .eq('user_id', connection.user_id)
-      .eq('phone_number', whatsappNumber)
-      .maybeSingle();
-
-    if (isOwnConnection) {
-      log(requestId, 'info', 'ℹ️', `Ignorando: remoteJid (${whatsappNumber}) é outra conexão do mesmo usuário`);
-      return; // Não processar - a outra instância vai processar corretamente
-    }
-
     // 7. OBTER OU CRIAR CONTATO
     // IMPORTANTE: Só atualizar nome/foto do contato quando mensagem é RECEBIDA (fromMe=false)
     // Quando fromMe=true, pushName é o nome do REMETENTE (nós), não do contato
@@ -813,8 +799,20 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
             }
           }
 
-          log(requestId, 'info', 'ℹ️', `Mensagem existente retornada: ${messageId}`);
-          return; // Return early - message already processed
+          // IMPORTANTE: Mesmo com duplicata, atualizar ESTA conversa para que o outro lado veja a mensagem
+          const preview = existing.message_content
+            ? existing.message_content.substring(0, 100)
+            : `[${existing.message_type}]`;
+
+          await ConversationService.updateConversation(conversation.id, {
+            last_message_at: existing.received_at,
+            last_message_preview: preview,
+            unread_count: fromMe ? 0 : ((conversation.unread_count || 0) + 1),
+            updated_at: new Date().toISOString()
+          }, chatSupabaseAdmin);
+
+          log(requestId, 'info', '📬', `Conversa atualizada com mensagem existente: ${messageId}`);
+          return; // Return early - message already processed but conversation updated
         }
       }
       throw error;
