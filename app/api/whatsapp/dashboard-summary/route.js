@@ -156,6 +156,7 @@ export async function GET(request) {
       instanceName: conn.instance_name,
       status: conn.status,
       isConnected: conn.is_connected,
+      hasSynced: conn.has_synced || false,
       profileName: conn.profile_name,
       profilePicUrl: conn.profile_pic_url,
       phoneNumber: conn.phone_number,

@@ -22,6 +22,7 @@ interface ConnectionData {
     instanceName: string;
     status: string;
     isConnected: boolean;
+    hasSynced: boolean;
     profileName: string | null;
     profilePicUrl: string | null;
     phoneNumber: string | null;
@@ -263,19 +264,21 @@ const DashboardContent: React.FC = () => {
                         {isLoading ? 'Carregando...' : buttonText}
                     </button>
 
-                    {/* Botão de Sincronização - aparece quando conectado */}
-                    {mainConnection && (mainConnection.status === 'connected' || mainConnection.status === 'open' || mainConnection.isConnected) && (
-                        <div className="mt-4">
-                            <SyncButton
-                                connectionId={mainConnection.id}
-                                isConnected={true}
-                                onSyncComplete={() => {
-                                    console.log('✅ [Dashboard] Sync concluído!');
-                                    fetchDashboardSummary();
-                                }}
-                            />
-                        </div>
-                    )}
+                    {/* Botão de Sincronização - aparece quando conectado E ainda não sincronizou */}
+                    {mainConnection &&
+                        (mainConnection.status === 'connected' || mainConnection.status === 'open' || mainConnection.isConnected) &&
+                        !mainConnection.hasSynced && (
+                            <div className="mt-4">
+                                <SyncButton
+                                    connectionId={mainConnection.id}
+                                    isConnected={true}
+                                    onSyncComplete={() => {
+                                        console.log('✅ [Dashboard] Sync concluído!');
+                                        fetchDashboardSummary();
+                                    }}
+                                />
+                            </div>
+                        )}
 
                     {/* Outros Painéis */}
                     <div className="mt-8 space-y-4">
