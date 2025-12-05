@@ -545,6 +545,23 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
     const fromMe = messageKey.fromMe;
     const whatsappNumber = remoteJid.split('@')[0];
 
+    // 3.1 VERIFICAR SE É MENSAGEM RECEBIDA DE OUTRA CONEXÃO DO MESMO USUÁRIO
+    // Se Caio recebe mensagem de Sostenes (ambas conexões do mesmo usuário),
+    // ignoramos aqui - a instância do Sostenes (remetente) vai processar
+    if (!fromMe) {
+      const { data: isOwnConnection } = await supabaseAdmin
+        .from('whatsapp_connections')
+        .select('id')
+        .eq('user_id', connection.user_id)
+        .eq('phone_number', whatsappNumber)
+        .maybeSingle();
+
+      if (isOwnConnection) {
+        log(requestId, 'info', 'ℹ️', `Ignorando: mensagem recebida de outra conexão própria (${whatsappNumber})`);
+        return; // A instância remetente vai processar corretamente
+      }
+    }
+
     // 7. OBTER OU CRIAR CONTATO
     // IMPORTANTE: Só atualizar nome/foto do contato quando mensagem é RECEBIDA (fromMe=false)
     // Quando fromMe=true, pushName é o nome do REMETENTE (nós), não do contato
