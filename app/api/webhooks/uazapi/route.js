@@ -233,6 +233,15 @@ async function handleConnectionUpdate(requestId, instanceName, payload) {
 
     log(requestId, 'success', '✅', `Status atualizado: ${instanceName} → ${status}`);
 
+    // 🔄 Se acabou de conectar, iniciar sincronização em background
+    if (isConnected && connection.instance_token) {
+      import('@/lib/SyncService').then(({ default: SyncService }) => {
+        SyncService.runFullSync(connection.id, connection.instance_token)
+          .then(job => log(requestId, 'info', '🔄', `Sync iniciado: ${job?.id || 'unknown'}`))
+          .catch(err => log(requestId, 'warn', '⚠️', `Erro ao iniciar sync: ${err.message}`));
+      }).catch(err => log(requestId, 'warn', '⚠️', `Erro ao importar SyncService: ${err.message}`));
+    }
+
   } catch (error) {
     log(requestId, 'error', '❌', 'Erro em handleConnectionUpdate', { error: error.message });
     throw error;
