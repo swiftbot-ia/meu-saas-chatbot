@@ -147,6 +147,9 @@ export async function POST(request) {
 async function processEvent(requestId, eventType, instanceName, payload) {
   switch (eventType) {
     case 'CONNECTION_UPDATE':
+    case 'connection.update':
+    case 'connection':
+    case 'status':
       await handleConnectionUpdate(requestId, instanceName, payload);
       break;
 
@@ -232,6 +235,15 @@ async function handleConnectionUpdate(requestId, instanceName, payload) {
       .eq('id', connection.id);
 
     log(requestId, 'success', '✅', `Status atualizado: ${instanceName} → ${status}`);
+
+    // 🔄 Se acabou de conectar, iniciar sincronização em background
+    if (isConnected && connection.instance_token) {
+      import('@/lib/SyncService').then(({ default: SyncService }) => {
+        SyncService.runFullSync(connection.id, connection.instance_token)
+          .then(job => log(requestId, 'info', '🔄', `Sync iniciado: ${job?.id || 'unknown'}`))
+          .catch(err => log(requestId, 'warn', '⚠️', `Erro ao iniciar sync: ${err.message}`));
+      }).catch(err => log(requestId, 'warn', '⚠️', `Erro ao importar SyncService: ${err.message}`));
+    }
 
   } catch (error) {
     log(requestId, 'error', '❌', 'Erro em handleConnectionUpdate', { error: error.message });
