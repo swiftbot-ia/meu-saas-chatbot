@@ -147,6 +147,9 @@ export async function POST(request) {
 async function processEvent(requestId, eventType, instanceName, payload) {
   switch (eventType) {
     case 'CONNECTION_UPDATE':
+    case 'connection.update':
+    case 'connection':
+    case 'status':
       await handleConnectionUpdate(requestId, instanceName, payload);
       break;
 
