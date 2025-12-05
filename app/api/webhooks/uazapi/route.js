@@ -540,23 +540,21 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
       connection.instance_token = instanceToken;
     }
 
-    // 3. IDENTIFICAR CONTATO
-    const remoteJid = messageKey.remoteJid;
-    const fromMe = messageKey.fromMe;
-    const whatsappNumber = remoteJid.split('@')[0];
-
     // 7. OBTER OU CRIAR CONTATO
+    // IMPORTANTE: Só atualizar nome/foto do contato quando mensagem é RECEBIDA (fromMe=false)
+    // Quando fromMe=true, pushName é o nome do REMETENTE (nós), não do contato
+    const contactData = fromMe
+      ? {} // Não passar nome quando é mensagem enviada por nós
+      : { name: messageData.pushName, profilePicUrl: null };
+
     const contact = await ConversationService.getOrCreateContact(
       whatsappNumber,
-      {
-        name: messageData.pushName,
-        profilePicUrl: null // Webhook doesn't provide profile pic
-      },
+      contactData,
       chatSupabaseAdmin
     );
 
-    // Sync contact info if missing (name or profile pic)
-    if (!contact.profile_pic_url || !contact.name || contact.name === whatsappNumber) {
+    // Sync contact info if missing (name or profile pic) - APENAS para mensagens recebidas
+    if (!fromMe && (!contact.profile_pic_url || !contact.name || contact.name === whatsappNumber)) {
       // Fire and forget - don't await to avoid blocking response
       ConversationService.syncContactInfo(
         contact.id,
@@ -803,17 +801,49 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
       throw error;
     }
 
-    // 9. ATUALIZAR CONVERSA
+    // 9. ATUALIZAR TODAS AS CONVERSAS COM O MESMO CONTATO
+    // Isso garante que todos os usuários vejam a mensagem em suas conversas
     const preview = messageContent
       ? messageContent.substring(0, 100)
       : `[${messageType}]`;
 
-    await ConversationService.updateConversation(conversation.id, {
-      last_message_at: new Date(messageTimestamp * 1000).toISOString(),
-      last_message_preview: preview,
-      unread_count: fromMe ? 0 : ((conversation.unread_count || 0) + 1), // Não incrementar se fromMe
-      updated_at: new Date().toISOString()
-    }, chatSupabaseAdmin);
+    const messageTimestampISO = new Date(messageTimestamp * 1000).toISOString();
+
+    // Buscar TODAS as conversas com este contact_id
+    const { data: allConversations, error: convFetchError } = await chatSupabaseAdmin
+      .from('whatsapp_conversations')
+      .select('id, user_id, unread_count')
+      .eq('contact_id', contact.id);
+
+    if (convFetchError) {
+      log(requestId, 'error', '❌', 'Erro ao buscar conversas do contato', { error: convFetchError.message });
+    } else if (allConversations && allConversations.length > 0) {
+      // Atualizar cada conversa
+      for (const conv of allConversations) {
+        // Não incrementar unread se for mensagem enviada (fromMe) ou se for a conversa do remetente
+        const shouldIncrementUnread = !fromMe && conv.user_id !== connection.user_id;
+
+        await chatSupabaseAdmin
+          .from('whatsapp_conversations')
+          .update({
+            last_message_at: messageTimestampISO,
+            last_message_preview: preview,
+            unread_count: shouldIncrementUnread ? ((conv.unread_count || 0) + 1) : (fromMe ? 0 : (conv.unread_count || 0) + 1),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', conv.id);
+      }
+
+      log(requestId, 'info', '📬', `Atualizadas ${allConversations.length} conversas com o mesmo contato`);
+    } else {
+      // Fallback: atualizar apenas a conversa atual
+      await ConversationService.updateConversation(conversation.id, {
+        last_message_at: messageTimestampISO,
+        last_message_preview: preview,
+        unread_count: fromMe ? 0 : ((conversation.unread_count || 0) + 1),
+        updated_at: new Date().toISOString()
+      }, chatSupabaseAdmin);
+    }
 
     // 10. ATUALIZAR CONTATO
     await chatSupabaseAdmin
