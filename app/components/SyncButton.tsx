@@ -39,18 +39,22 @@ export default function SyncButton({
     const [error, setError] = useState<string | null>(null)
     const [hasSynced, setHasSynced] = useState(false)
 
-    // Verificar se já sincronizou antes
+    // Verificar se há sync em andamento
     useEffect(() => {
         const checkSyncStatus = async () => {
             try {
                 const response = await fetch(`/api/whatsapp/sync?connectionId=${connectionId}`)
                 const data = await response.json()
 
-                // Se já tem sync ativo ou completado, marcar como já sincronizado
-                if (data.hasActiveSync || data.lastSync) {
-                    setHasSynced(true)
-                    setStatus('completed')
+                console.log('🔍 [SyncButton] Status check:', data)
+
+                // Se tem sync ativo, mostrar progresso
+                if (data.hasActiveSync && data.job) {
+                    setStatus('syncing')
+                    setProgress(data.job.progress)
+                    setStats(data.job.stats)
                 }
+                // REMOVIDO: não esconder mais se já fez sync
             } catch (err) {
                 console.error('Erro ao verificar status de sync:', err)
             }
@@ -139,8 +143,7 @@ export default function SyncButton({
     // Não mostrar se não está conectado
     if (!isConnected) return null
 
-    // Já sincronizou - não mostrar mais
-    if (hasSynced && status === 'completed' && !progress) return null
+    // REMOVIDO: condição que escondia o botão após sync
 
     // Calcular porcentagem
     const percentage = progress && progress.total > 0
