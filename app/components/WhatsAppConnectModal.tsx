@@ -8,7 +8,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 // ============================================================================
 interface ConnectionResponse {
   success: boolean
-  status: 'connected' | 'connecting' | 'disconnected' | 'pending_qr'
+  status: 'connected' | 'connecting' | 'disconnected' | 'pending_qr' | 'open'
   connected: boolean
   qrCode?: string | null
   instanceToken?: string
@@ -36,20 +36,18 @@ interface SyncStats {
   errors: number
 }
 
-interface SyncJob {
-  id: string
-  status: 'pending' | 'processing' | 'completed' | 'failed'
-  progress: SyncProgress
-  stats: SyncStats
-}
-
 type ModalStep = 'connecting' | 'syncing' | 'completed'
 
+// Props flexíveis - aceita userId OU connectionId
 interface WhatsAppConnectModalProps {
   isOpen: boolean
   onClose: () => void
-  onSuccess: () => void
-  userId: string
+  // Modo 1: Criar nova conexão (passa userId)
+  userId?: string
+  onSuccess?: () => void
+  // Modo 2: Reconectar existente (passa connectionId)
+  connectionId?: string
+  onConnectionSuccess?: (data: any) => void
 }
 
 // ============================================================================
@@ -57,7 +55,7 @@ interface WhatsAppConnectModalProps {
 // ============================================================================
 const POLLING_INTERVAL = 5000 // 5 segundos
 const SYNC_POLLING_INTERVAL = 3000 // 3 segundos para sync
-const TIMEOUT_DURATION = 30000 // 30 segundos
+const TIMEOUT_DURATION = 60000 // 60 segundos (aumentado para dar tempo de escanear)
 
 // ============================================================================
 // COMPONENTE PRINCIPAL
@@ -65,12 +63,14 @@ const TIMEOUT_DURATION = 30000 // 30 segundos
 export default function WhatsAppConnectModal({
   isOpen,
   onClose,
+  userId,
   onSuccess,
-  userId
+  connectionId: propConnectionId,
+  onConnectionSuccess
 }: WhatsAppConnectModalProps) {
   // Estados de conexão
   const [connectionData, setConnectionData] = useState<ConnectionResponse | null>(null)
-  const [connectionId, setConnectionId] = useState<string | null>(null)
+  const [connectionId, setConnectionId] = useState<string | null>(propConnectionId || null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isConnected, setIsConnected] = useState(false)
@@ -109,6 +109,26 @@ export default function WhatsAppConnectModal({
       console.log('🧹 [Modal] Timeout cancelado')
     }
   }, [])
+
+  // ========================================================================
+  // FUNÇÃO: Callback de sucesso (compatível com ambos os modos)
+  // ========================================================================
+  const handleSuccess = useCallback((data?: any) => {
+    console.log('✅ [Modal] Conexão concluída com sucesso!')
+
+    // Chamar callbacks apropriados
+    if (onConnectionSuccess) {
+      onConnectionSuccess(data || connectionData)
+    }
+    if (onSuccess) {
+      onSuccess()
+    }
+
+    // Fechar modal após delay
+    setTimeout(() => {
+      onClose()
+    }, 2000)
+  }, [onConnectionSuccess, onSuccess, onClose, connectionData])
 
   // ========================================================================
   // FUNÇÃO: Iniciar Sincronização
@@ -152,12 +172,7 @@ export default function WhatsAppConnectModal({
                 }
 
                 setStep('completed')
-
-                // Fechar modal após 3 segundos
-                setTimeout(() => {
-                  onSuccess()
-                  onClose()
-                }, 3000)
+                handleSuccess(connectionData)
               }
             } else if (!statusData.hasActiveSync) {
               // Job não existe mais (pode ter completado muito rápido)
@@ -168,11 +183,7 @@ export default function WhatsAppConnectModal({
               }
               setStep('completed')
               setSyncStatus('completed')
-
-              setTimeout(() => {
-                onSuccess()
-                onClose()
-              }, 3000)
+              handleSuccess(connectionData)
             }
           } catch (err) {
             console.error('❌ [Modal] Erro ao verificar sync:', err)
@@ -188,20 +199,14 @@ export default function WhatsAppConnectModal({
         console.error('❌ [Modal] Erro ao iniciar sync:', data.error)
         // Mesmo com erro, prosseguir para completed
         setStep('completed')
-        setTimeout(() => {
-          onSuccess()
-          onClose()
-        }, 3000)
+        handleSuccess(connectionData)
       }
     } catch (err) {
       console.error('❌ [Modal] Erro ao iniciar sync:', err)
       setStep('completed')
-      setTimeout(() => {
-        onSuccess()
-        onClose()
-      }, 3000)
+      handleSuccess(connectionData)
     }
-  }, [onSuccess, onClose])
+  }, [handleSuccess, connectionData])
 
   // ========================================================================
   // FUNÇÃO: Polling - Verificar Status da Conexão
@@ -237,8 +242,13 @@ export default function WhatsAppConnectModal({
 
       setConnectionData(data)
 
+      // Atualizar QR code se disponível
+      if (data.qrCode) {
+        setConnectionData(prev => ({ ...prev, qrCode: data.qrCode } as ConnectionResponse))
+      }
+
       // Verificar se conectou com sucesso
-      if (data.connected && data.status === 'connected') {
+      if (data.connected || data.status === 'connected' || data.status === 'open') {
         console.log('✅ [Modal-Polling] CONECTADO! Iniciando sincronização...')
 
         hasCompletedRef.current = true
@@ -273,25 +283,72 @@ export default function WhatsAppConnectModal({
       checkConnectionStatus(connId)
     }, POLLING_INTERVAL)
 
-    // Configurar timeout de 30 segundos
+    // Configurar timeout
     timeoutRef.current = setTimeout(() => {
       if (!hasCompletedRef.current) {
-        console.log('⏰ [Modal] TIMEOUT - 30 segundos sem conexão')
-
+        console.log('⏰ [Modal] TIMEOUT - tempo limite atingido')
         hasCompletedRef.current = true
         setHasTimedOut(true)
         clearAllTimers()
-
-        // Fechar modal após 3 segundos
-        setTimeout(() => {
-          onClose()
-        }, 3000)
       }
     }, TIMEOUT_DURATION)
-  }, [checkConnectionStatus, clearAllTimers, onClose])
+  }, [checkConnectionStatus, clearAllTimers])
 
   // ========================================================================
-  // FUNÇÃO: Criar Conexão Inicial
+  // FUNÇÃO: Iniciar Conexão (POST)
+  // ========================================================================
+  const startConnection = useCallback(async (connId: string) => {
+    try {
+      console.log('🔌 [Modal] Iniciando conexão WhatsApp...', connId)
+
+      const connectResponse = await fetch('/api/whatsapp/connect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          connectionId: connId
+        })
+      })
+
+      if (!connectResponse.ok) {
+        const errorData = await connectResponse.json()
+        throw new Error(errorData.error || 'Erro ao conectar WhatsApp')
+      }
+
+      const connectData: ConnectionResponse = await connectResponse.json()
+      console.log('✅ [Modal] Resposta da conexão:', {
+        status: connectData.status,
+        connected: connectData.connected,
+        hasQR: !!connectData.qrCode
+      })
+
+      setConnectionData(connectData)
+
+      // Se já veio conectado
+      if (connectData.connected || connectData.status === 'connected' || connectData.status === 'open') {
+        console.log('✅ [Modal] Já conectado imediatamente! Iniciando sync...')
+        hasCompletedRef.current = true
+        setIsConnected(true)
+        setStep('syncing')
+
+        setTimeout(() => {
+          startSync(connId)
+        }, 2000)
+      } else {
+        // Iniciar polling
+        console.log('🔄 [Modal] QR Code recebido, iniciando polling...')
+        startPolling(connId)
+      }
+
+    } catch (err: any) {
+      console.error('❌ [Modal] Erro ao conectar:', err)
+      setError(err.message || 'Erro ao conectar WhatsApp. Tente novamente.')
+    }
+  }, [startPolling, startSync])
+
+  // ========================================================================
+  // FUNÇÃO: Criar Nova Conexão (quando passa userId)
   // ========================================================================
   const createConnection = useCallback(async () => {
     if (loading || !userId) return
@@ -305,7 +362,7 @@ export default function WhatsAppConnectModal({
     try {
       console.log('📝 [Modal] Criando conexão para userId:', userId)
 
-      // Primeiro, criar registro no Supabase (se não existir)
+      // Criar registro no Supabase
       const createResponse = await fetch('/api/whatsapp/connections', {
         method: 'POST',
         headers: {
@@ -331,48 +388,8 @@ export default function WhatsAppConnectModal({
       console.log('✅ [Modal] Conexão criada:', newConnectionId)
       setConnectionId(newConnectionId)
 
-      // Agora, iniciar a conexão na UAZAPI
-      console.log('🔌 [Modal] Iniciando conexão WhatsApp...')
-
-      const connectResponse = await fetch('/api/whatsapp/connect', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          connectionId: newConnectionId
-        })
-      })
-
-      if (!connectResponse.ok) {
-        const errorData = await connectResponse.json()
-        throw new Error(errorData.error || 'Erro ao conectar WhatsApp')
-      }
-
-      const connectData: ConnectionResponse = await connectResponse.json()
-      console.log('✅ [Modal] Resposta da conexão:', {
-        status: connectData.status,
-        connected: connectData.connected,
-        hasQR: !!connectData.qrCode
-      })
-
-      setConnectionData(connectData)
-
-      // Se já veio conectado
-      if (connectData.connected) {
-        console.log('✅ [Modal] Já conectado imediatamente! Iniciando sync...')
-        hasCompletedRef.current = true
-        setIsConnected(true)
-        setStep('syncing')
-
-        setTimeout(() => {
-          startSync(newConnectionId)
-        }, 2000)
-      } else {
-        // Iniciar polling
-        console.log('🔄 [Modal] Iniciando polling...')
-        startPolling(newConnectionId)
-      }
+      // Iniciar a conexão
+      await startConnection(newConnectionId)
 
     } catch (err: any) {
       console.error('❌ [Modal] Erro ao criar conexão:', err)
@@ -380,14 +397,45 @@ export default function WhatsAppConnectModal({
     } finally {
       setLoading(false)
     }
-  }, [userId, loading, startPolling, onSuccess, onClose])
+  }, [userId, loading, startConnection])
 
   // ========================================================================
-  // EFEITO: Criar Conexão Quando Modal Abre
+  // FUNÇÃO: Usar Conexão Existente (quando passa connectionId)
+  // ========================================================================
+  const useExistingConnection = useCallback(async () => {
+    if (loading || !propConnectionId) return
+
+    setLoading(true)
+    setError(null)
+    hasCompletedRef.current = false
+    setIsConnected(false)
+    setHasTimedOut(false)
+    setConnectionId(propConnectionId)
+
+    try {
+      console.log('🔌 [Modal] Usando conexão existente:', propConnectionId)
+      await startConnection(propConnectionId)
+    } catch (err: any) {
+      console.error('❌ [Modal] Erro:', err)
+      setError(err.message || 'Erro ao conectar WhatsApp. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }, [propConnectionId, loading, startConnection])
+
+  // ========================================================================
+  // EFEITO: Iniciar quando modal abre
   // ========================================================================
   useEffect(() => {
-    if (isOpen && !connectionId && !loading) {
-      createConnection()
+    if (isOpen && !loading && !hasCompletedRef.current) {
+      // Modo 1: Criar nova conexão
+      if (userId && !propConnectionId) {
+        createConnection()
+      }
+      // Modo 2: Reconectar existente
+      else if (propConnectionId) {
+        useExistingConnection()
+      }
     }
 
     // Cleanup ao fechar modal
@@ -419,265 +467,185 @@ export default function WhatsAppConnectModal({
   }, [clearAllTimers, onClose])
 
   // ========================================================================
-  // RENDERIZAÇÃO
+  // FUNÇÃO: Tentar Novamente
+  // ========================================================================
+  const handleRetry = useCallback(() => {
+    setError(null)
+    setHasTimedOut(false)
+    hasCompletedRef.current = false
+
+    if (propConnectionId) {
+      useExistingConnection()
+    } else if (userId) {
+      createConnection()
+    }
+  }, [propConnectionId, userId, useExistingConnection, createConnection])
+
+  // ========================================================================
+  // RENDER: Não mostrar se modal fechado
   // ========================================================================
   if (!isOpen) return null
 
-  // Calcular progresso percentual
-  const progressPercent = syncProgress && syncProgress.total > 0
-    ? Math.round((syncProgress.processed / syncProgress.total) * 100)
-    : 0
-
+  // ========================================================================
+  // RENDER: Modal
+  // ========================================================================
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-[#1A1A1A] rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden border border-gray-800">
         {/* Header */}
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-gray-800">
+        <div className="flex items-center justify-between p-6 border-b border-gray-800">
+          <h2 className="text-xl font-bold text-white">
             {step === 'connecting' && 'Conectar WhatsApp'}
             {step === 'syncing' && 'Sincronizando Dados'}
-            {step === 'completed' && 'Sincronização Completa'}
+            {step === 'completed' && 'Conexão Concluída'}
           </h2>
           <button
             onClick={handleClose}
-            className="text-gray-500 hover:text-gray-700 text-2xl font-bold leading-none"
             disabled={loading || step === 'syncing'}
+            className="text-gray-400 hover:text-white transition-colors disabled:opacity-50"
           >
-            ×
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
-        {/* ============================================================ */}
-        {/* STEP: CONNECTING */}
-        {/* ============================================================ */}
-        {step === 'connecting' && (
-          <>
-            {/* Status Icon */}
-            <div className="flex justify-center mb-4">
-              {loading && (
-                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
-              )}
-              {!loading && !error && !isConnected && !hasTimedOut && (
-                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-green-500"></div>
-              )}
-              {isConnected && (
-                <div className="text-green-500 text-6xl">✓</div>
-              )}
-              {error && (
-                <div className="text-red-500 text-6xl">✗</div>
-              )}
-              {hasTimedOut && (
-                <div className="text-orange-500 text-6xl">⏰</div>
-              )}
+        {/* Content */}
+        <div className="p-6">
+          {/* Loading State */}
+          {loading && (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#00FF99] border-t-transparent mx-auto mb-4"></div>
+              <p className="text-gray-400">Gerando QR Code...</p>
             </div>
+          )}
 
-            {/* QR Code */}
-            {connectionData?.qrCode && !isConnected && !hasTimedOut && !error && (
-              <div className="flex justify-center mb-4">
+          {/* Error State */}
+          {error && (
+            <div className="text-center py-6">
+              <div className="text-5xl mb-4">❌</div>
+              <p className="text-red-400 mb-4">{error}</p>
+              <button
+                onClick={handleRetry}
+                className="px-6 py-2 bg-[#00FF99] text-black font-semibold rounded-lg hover:bg-[#00E88C] transition-colors"
+              >
+                🔄 Tentar Novamente
+              </button>
+            </div>
+          )}
+
+          {/* Timeout State */}
+          {hasTimedOut && !error && (
+            <div className="text-center py-6">
+              <div className="text-5xl mb-4">⏰</div>
+              <h3 className="text-lg font-bold text-white mb-2">Tempo Limite Atingido</h3>
+              <p className="text-gray-400 mb-4">A conexão não foi estabelecida a tempo.</p>
+              <button
+                onClick={handleRetry}
+                className="px-6 py-2 bg-[#00FF99] text-black font-semibold rounded-lg hover:bg-[#00E88C] transition-colors"
+              >
+                🔄 Tentar Novamente
+              </button>
+            </div>
+          )}
+
+          {/* Step: Connecting (QR Code) */}
+          {step === 'connecting' && !loading && !error && !hasTimedOut && connectionData?.qrCode && (
+            <div className="text-center">
+              {/* QR Code */}
+              <div className="bg-white rounded-xl p-4 inline-block mb-4">
                 <img
                   src={connectionData.qrCode}
                   alt="QR Code WhatsApp"
-                  className="w-64 h-64 border-4 border-gray-300 rounded-lg shadow-lg"
+                  className="w-56 h-56"
                 />
               </div>
-            )}
 
-            {/* Mensagem de Status */}
-            <p className="text-center text-gray-700 mb-4 font-medium">
-              {loading && 'Iniciando conexão...'}
-              {!loading && !isConnected && !error && !hasTimedOut && connectionData?.message}
-              {isConnected && 'WhatsApp conectado com sucesso!'}
-              {error && error}
-              {hasTimedOut && 'Tempo esgotado. Por favor, tente novamente.'}
-            </p>
-
-            {/* Informações do Perfil (quando conectado) */}
-            {isConnected && connectionData?.profileName && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                <div className="flex items-center">
-                  {connectionData.profilePicUrl && (
-                    <img
-                      src={connectionData.profilePicUrl}
-                      alt="Foto de perfil"
-                      className="w-12 h-12 rounded-full mr-3"
-                    />
-                  )}
-                  <div>
-                    <p className="font-semibold text-gray-800">
-                      {connectionData.profileName}
-                    </p>
-                    {connectionData.phoneNumber && (
-                      <p className="text-sm text-gray-600">
-                        {connectionData.phoneNumber}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Instruções */}
-            {!loading && !error && !isConnected && !hasTimedOut && connectionData?.qrCode && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                <p className="text-sm text-gray-700 font-semibold mb-2">
-                  Como conectar:
-                </p>
-                <ol className="text-sm text-gray-700 list-decimal list-inside space-y-1">
-                  <li>Abra o WhatsApp no seu celular</li>
-                  <li>Toque em <strong>Mais opções</strong> ou <strong>Configurações</strong></li>
-                  <li>Toque em <strong>Aparelhos conectados</strong></li>
-                  <li>Toque em <strong>Conectar um aparelho</strong></li>
-                  <li>Aponte seu celular para esta tela para ler o QR Code</li>
+              {/* Instructions */}
+              <div className="text-left bg-[#272727] rounded-xl p-4 mb-4">
+                <p className="text-white font-medium mb-2">📱 Escaneie o QR Code:</p>
+                <ol className="text-sm text-gray-400 space-y-1 list-decimal list-inside">
+                  <li>Abra o WhatsApp no seu telefone</li>
+                  <li>Toque em <strong className="text-white">Configurações</strong></li>
+                  <li>Toque em <strong className="text-white">Aparelhos conectados</strong></li>
+                  <li>Toque em <strong className="text-white">Conectar um aparelho</strong></li>
+                  <li>Aponte a câmera para este QR Code</li>
                 </ol>
               </div>
-            )}
 
-            {/* Botão de Fechar (erro ou timeout) */}
-            {(error || hasTimedOut) && (
-              <button
-                onClick={handleClose}
-                className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg transition-colors"
-              >
-                Fechar
-              </button>
-            )}
-
-            {/* Indicador de Polling */}
-            {!loading && !error && !isConnected && !hasTimedOut && (
-              <div className="text-center text-sm text-gray-500">
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="animate-pulse w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span>Aguardando leitura do QR Code...</span>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* ============================================================ */}
-        {/* STEP: SYNCING */}
-        {/* ============================================================ */}
-        {step === 'syncing' && (
-          <>
-            {/* Icon de Sync */}
-            <div className="flex justify-center mb-6">
-              <div className="relative">
-                <div className="animate-spin rounded-full h-20 w-20 border-t-4 border-b-4 border-[#00FF99]"></div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-2xl">🔄</span>
-                </div>
+              {/* Status */}
+              <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+                <div className="animate-pulse w-2 h-2 bg-[#00FF99] rounded-full"></div>
+                <span>Aguardando leitura do QR Code...</span>
               </div>
             </div>
+          )}
 
-            {/* Mensagem Principal */}
-            <div className="text-center mb-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                Preparando seu assistente de IA
-              </h3>
-              <p className="text-sm text-gray-600">
-                Estamos sincronizando seus contatos e mensagens para que a SwiftBot AI possa oferecer a melhor experiência.
+          {/* Step: Syncing */}
+          {step === 'syncing' && (
+            <div className="text-center py-6">
+              <div className="text-5xl mb-4">🔄</div>
+              <h3 className="text-lg font-bold text-white mb-2">Sincronizando seus dados</h3>
+              <p className="text-gray-400 mb-4">
+                Estamos importando seus contatos e conversas...
               </p>
-            </div>
 
-            {/* Barra de Progresso */}
-            <div className="mb-4">
-              <div className="flex justify-between text-sm text-gray-600 mb-1">
-                <span>
-                  {syncProgress?.currentPhase === 'contacts' && '👥 Sincronizando contatos...'}
-                  {syncProgress?.currentPhase === 'messages' && '💬 Sincronizando mensagens...'}
-                  {!syncProgress?.currentPhase && '🔄 Iniciando...'}
-                </span>
-                <span>{progressPercent}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-3">
-                <div
-                  className="bg-gradient-to-r from-[#00FF99] to-[#00CC7A] h-3 rounded-full transition-all duration-300"
-                  style={{ width: `${progressPercent}%` }}
-                ></div>
-              </div>
-            </div>
-
-            {/* Estatísticas */}
-            {syncStats && (
-              <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-2 gap-3 text-center">
-                <div>
-                  <p className="text-2xl font-bold text-gray-800">{syncStats.contactsTotal || 0}</p>
-                  <p className="text-xs text-gray-500">Contatos</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-800">{syncStats.conversationsCreated || 0}</p>
-                  <p className="text-xs text-gray-500">Conversas</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-800">{syncStats.messagesProcessed || 0}</p>
-                  <p className="text-xs text-gray-500">Mensagens</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-[#00FF99]">
-                    {syncProgress?.processed || 0}/{syncProgress?.total || 0}
+              {/* Progress bar */}
+              {syncProgress && (
+                <div className="mb-4">
+                  <div className="w-full bg-[#272727] rounded-full h-3 mb-2">
+                    <div
+                      className="bg-[#00FF99] h-3 rounded-full transition-all duration-300"
+                      style={{
+                        width: `${syncProgress.total > 0
+                          ? Math.round((syncProgress.processed / syncProgress.total) * 100)
+                          : 0}%`
+                      }}
+                    ></div>
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    {syncProgress.currentPhase === 'contacts' && '📇 Sincronizando contatos...'}
+                    {syncProgress.currentPhase === 'messages' && '💬 Sincronizando mensagens...'}
+                    {syncProgress.currentPhase === 'completed' && '✅ Concluído!'}
+                    {' '}
+                    ({syncProgress.processed}/{syncProgress.total})
                   </p>
-                  <p className="text-xs text-gray-500">Progresso</p>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Aviso */}
-            <p className="text-center text-xs text-gray-400 mt-4">
-              Por favor, não feche esta janela durante a sincronização.
-            </p>
-          </>
-        )}
-
-        {/* ============================================================ */}
-        {/* STEP: COMPLETED */}
-        {/* ============================================================ */}
-        {step === 'completed' && (
-          <>
-            {/* Icon de Sucesso */}
-            <div className="flex justify-center mb-6">
-              <div className="bg-[#00FF99] rounded-full p-4">
-                <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
+              {/* Stats */}
+              {syncStats && syncStats.contactsCreated > 0 && (
+                <div className="bg-[#272727] rounded-xl p-4 text-sm text-gray-400">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>📇 Contatos: {syncStats.contactsCreated}</div>
+                    <div>💬 Conversas: {syncStats.conversationsCreated}</div>
+                  </div>
+                </div>
+              )}
             </div>
+          )}
 
-            {/* Mensagem de Sucesso */}
-            <div className="text-center mb-6">
-              <h3 className="text-xl font-bold text-gray-800 mb-2">
-                🎉 Tudo Pronto!
+          {/* Step: Completed */}
+          {step === 'completed' && (
+            <div className="text-center py-6">
+              <div className="text-5xl mb-4">✅</div>
+              <h3 className="text-lg font-bold text-[#00FF99] mb-2">
+                Conectado com sucesso!
               </h3>
-              <p className="text-gray-600">
-                Seu WhatsApp foi conectado e seus dados foram sincronizados com sucesso.
+              {connectionData?.profileName && (
+                <p className="text-white mb-2">
+                  Olá, <strong>{connectionData.profileName}</strong>!
+                </p>
+              )}
+              <p className="text-gray-400 text-sm">
+                Seu WhatsApp está conectado e sincronizado.
+              </p>
+              <p className="text-gray-500 text-xs mt-4">
+                Fechando automaticamente...
               </p>
             </div>
-
-            {/* Estatísticas Finais */}
-            {syncStats && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <p className="text-xl font-bold text-green-600">{syncStats.contactsTotal || 0}</p>
-                    <p className="text-xs text-gray-600">Contatos</p>
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-green-600">{syncStats.conversationsCreated || 0}</p>
-                    <p className="text-xs text-gray-600">Conversas</p>
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-green-600">{syncStats.messagesProcessed || 0}</p>
-                    <p className="text-xs text-gray-600">Mensagens</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Fechando automaticamente */}
-            <p className="text-center text-sm text-gray-500">
-              Fechando automaticamente...
-            </p>
-          </>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )
