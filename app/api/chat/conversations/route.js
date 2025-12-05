@@ -64,6 +64,8 @@ export async function GET(request) {
       offset
     });
 
+    console.log(`📋 [Conversations] userId=${userId}, connectionId=${connectionId}, total=${result.total}`);
+
     return NextResponse.json(result);
 
   } catch (error) {

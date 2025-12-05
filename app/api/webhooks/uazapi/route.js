@@ -540,6 +540,28 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
       connection.instance_token = instanceToken;
     }
 
+    // 3. IDENTIFICAR CONTATO
+    const remoteJid = messageKey.remoteJid;
+    const fromMe = messageKey.fromMe;
+    const whatsappNumber = remoteJid.split('@')[0];
+
+    // 3.1 VERIFICAR SE É MENSAGEM RECEBIDA DE OUTRA CONEXÃO DO MESMO USUÁRIO
+    // Se Caio recebe mensagem de Sostenes (ambas conexões do mesmo usuário),
+    // ignoramos aqui - a instância do Sostenes (remetente) vai processar
+    if (!fromMe) {
+      const { data: isOwnConnection } = await supabaseAdmin
+        .from('whatsapp_connections')
+        .select('id')
+        .eq('user_id', connection.user_id)
+        .eq('phone_number', whatsappNumber)
+        .maybeSingle();
+
+      if (isOwnConnection) {
+        log(requestId, 'info', 'ℹ️', `Ignorando: mensagem recebida de outra conexão própria (${whatsappNumber})`);
+        return; // A instância remetente vai processar corretamente
+      }
+    }
+
     // 7. OBTER OU CRIAR CONTATO
     // IMPORTANTE: Só atualizar nome/foto do contato quando mensagem é RECEBIDA (fromMe=false)
     // Quando fromMe=true, pushName é o nome do REMETENTE (nós), não do contato
@@ -794,8 +816,20 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
             }
           }
 
-          log(requestId, 'info', 'ℹ️', `Mensagem existente retornada: ${messageId}`);
-          return; // Return early - message already processed
+          // IMPORTANTE: Mesmo com duplicata, atualizar ESTA conversa para que o outro lado veja a mensagem
+          const preview = existing.message_content
+            ? existing.message_content.substring(0, 100)
+            : `[${existing.message_type}]`;
+
+          await ConversationService.updateConversation(conversation.id, {
+            last_message_at: existing.received_at,
+            last_message_preview: preview,
+            unread_count: fromMe ? 0 : ((conversation.unread_count || 0) + 1),
+            updated_at: new Date().toISOString()
+          }, chatSupabaseAdmin);
+
+          log(requestId, 'info', '📬', `Conversa atualizada com mensagem existente: ${messageId}`);
+          return; // Return early - message already processed but conversation updated
         }
       }
       throw error;
