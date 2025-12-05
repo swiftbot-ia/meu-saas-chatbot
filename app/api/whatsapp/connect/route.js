@@ -365,3 +365,127 @@ async function processConnectionResult(connectResult, connectionId, instanceName
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }
+
+// ----------------------------------------------------------------------------
+// ROTA GET (Para Polling de Status)
+// ----------------------------------------------------------------------------
+export async function GET(request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const connectionId = searchParams.get('connectionId')
+
+    if (!connectionId) {
+      return NextResponse.json({ success: false, error: 'ID da conexão faltando' }, { status: 400 })
+    }
+
+    console.log('🔍 [Connect-GET] Verificando status para:', connectionId)
+
+    // Buscar conexão no banco
+    const { data: connection, error: dbError } = await supabaseAdmin
+      .from('whatsapp_connections')
+      .select('*')
+      .eq('id', connectionId)
+      .single()
+
+    if (dbError || !connection) {
+      return NextResponse.json({ success: false, error: 'Conexão não encontrada' }, { status: 404 })
+    }
+
+    // Se já está conectado no banco, retornar isso
+    if (connection.is_connected && connection.status === 'connected') {
+      console.log('✅ [Connect-GET] Conexão já confirmada no banco')
+      return NextResponse.json({
+        success: true,
+        connected: true,
+        status: 'connected',
+        profileName: connection.profile_name,
+        profilePicUrl: connection.profile_pic_url,
+        phoneNumber: connection.phone_number,
+        message: 'Conectado com sucesso'
+      })
+    }
+
+    // Se tem token, verificar status atual na UAZAPI
+    if (connection.instance_token && connection.instance_name) {
+      try {
+        const statusResponse = await fetch(`${UAZAPI_URL}/instance/status`, {
+          method: 'GET',
+          headers: { 'token': connection.instance_token }
+        })
+
+        if (statusResponse.ok) {
+          const statusData = await statusResponse.json()
+          const instanceInfo = statusData.instance || {}
+          const status = instanceInfo.status || 'unknown'
+
+          console.log('📊 [Connect-GET] Status UAZAPI:', status)
+
+          // Se conectou (status 'open' ou loggedIn true)
+          if (status === 'open' || statusData.status?.loggedIn) {
+            console.log('✅ [Connect-GET] Conexão detectada!')
+
+            // Atualizar banco
+            const updateData = {
+              status: 'connected',
+              is_connected: true,
+              updated_at: new Date().toISOString()
+            }
+
+            if (instanceInfo.profileName) {
+              updateData.profile_name = instanceInfo.profileName
+              updateData.profile_pic_url = instanceInfo.profilePicUrl || null
+              updateData.phone_number = instanceInfo.owner ? instanceInfo.owner.replace('@s.whatsapp.net', '') : null
+            }
+
+            await supabaseAdmin
+              .from('whatsapp_connections')
+              .update(updateData)
+              .eq('id', connectionId)
+
+            console.log('💾 [Connect-GET] Banco atualizado para connected')
+
+            // 🔄 Iniciar sincronização em background
+            import('@/lib/SyncService').then(({ default: SyncService }) => {
+              SyncService.runFullSync(connectionId, connection.instance_token)
+                .then(job => console.log('🔄 [Connect-GET] Sync iniciado:', job.id))
+                .catch(err => console.error('⚠️ [Connect-GET] Erro sync:', err.message))
+            }).catch(err => console.error('⚠️ [Connect-GET] Erro import SyncService:', err.message))
+
+            return NextResponse.json({
+              success: true,
+              connected: true,
+              status: 'connected',
+              profileName: instanceInfo.profileName,
+              profilePicUrl: instanceInfo.profilePicUrl,
+              phoneNumber: instanceInfo.owner ? instanceInfo.owner.replace('@s.whatsapp.net', '') : null,
+              message: 'Conectado com sucesso'
+            })
+          }
+
+          // Retornar QR Code se ainda conectando
+          return NextResponse.json({
+            success: true,
+            connected: false,
+            status: status,
+            qrCode: instanceInfo.qrcode || null,
+            message: 'Aguardando leitura do QR Code...'
+          })
+        }
+      } catch (uazapiError) {
+        console.error('⚠️ [Connect-GET] Erro ao verificar UAZAPI:', uazapiError.message)
+      }
+    }
+
+    // Retornar status atual do banco
+    return NextResponse.json({
+      success: true,
+      connected: connection.is_connected || false,
+      status: connection.status || 'unknown',
+      message: 'Aguardando conexão...'
+    })
+
+  } catch (error) {
+    console.error('❌ [Connect-GET] Erro:', error)
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  }
+}
