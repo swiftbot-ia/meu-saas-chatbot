@@ -21,7 +21,8 @@ import {
   X,
   Plus,
   Clock,
-  MapPin
+  MapPin,
+  Trash2
 } from 'lucide-react';
 import NoSubscription from '../../components/NoSubscription'
 
@@ -186,6 +187,8 @@ export default function ContactsPage() {
   const [showCreateTagModal, setShowCreateTagModal] = useState(false);
   const [showCreateOriginModal, setShowCreateOriginModal] = useState(false);
   const [tagLoading, setTagLoading] = useState(false);
+  const [showDeleteTagConfirm, setShowDeleteTagConfirm] = useState(false);
+  const [tagToDelete, setTagToDelete] = useState(null);
 
   // New tag/origin form
   const [newTagName, setNewTagName] = useState('');
@@ -251,43 +254,43 @@ export default function ContactsPage() {
       setError('Erro ao carregar conexões');
     }
   };
-const loadSubscription = async (userId) => {
-  try {
-    console.log('🔍 [CONTACTS] Carregando subscription para userId:', userId)
-    
-    const { data, error } = await supabase
-      .from('user_subscriptions')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-    
-    console.log('📦 [CONTACTS] Resultado da query:', { data, error })
-    if (!error && data) {
-      const isActive = ['active', 'trial', 'trialing'].includes(data.status) || data.stripe_subscription_id === 'super_account_bypass'
-      const isExpired = data.trial_end_date && new Date() > new Date(data.trial_end_date)
-      
-      console.log('✅ [CONTACTS] Validação:', { 
-        status: data.status, 
-        isActive, 
-        isExpired,
-        trial_end_date: data.trial_end_date 
-      })
-      
-      if (isActive && !isExpired) {
-        setSubscription(data)
-        console.log('✅ [CONTACTS] Subscription definida!')
+  const loadSubscription = async (userId) => {
+    try {
+      console.log('🔍 [CONTACTS] Carregando subscription para userId:', userId)
+
+      const { data, error } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      console.log('📦 [CONTACTS] Resultado da query:', { data, error })
+      if (!error && data) {
+        const isActive = ['active', 'trial', 'trialing'].includes(data.status) || data.stripe_subscription_id === 'super_account_bypass'
+        const isExpired = data.trial_end_date && new Date() > new Date(data.trial_end_date)
+
+        console.log('✅ [CONTACTS] Validação:', {
+          status: data.status,
+          isActive,
+          isExpired,
+          trial_end_date: data.trial_end_date
+        })
+
+        if (isActive && !isExpired) {
+          setSubscription(data)
+          console.log('✅ [CONTACTS] Subscription definida!')
+        } else {
+          console.log('❌ [CONTACTS] Subscription não é ativa ou está expirada')
+        }
       } else {
-        console.log('❌ [CONTACTS] Subscription não é ativa ou está expirada')
+        console.log('❌ [CONTACTS] Nenhuma subscription encontrada ou erro:', error)
       }
-    } else {
-      console.log('❌ [CONTACTS] Nenhuma subscription encontrada ou erro:', error)
+    } catch (error) {
+      console.error('❌ [CONTACTS] Erro ao carregar assinatura:', error)
     }
-  } catch (error) {
-    console.error('❌ [CONTACTS] Erro ao carregar assinatura:', error)
   }
-}
   // Handle connection selection with localStorage sync
   const handleConnectionSelect = (connectionId) => {
     setSelectedConnection(connectionId);
@@ -473,6 +476,34 @@ const loadSubscription = async (userId) => {
     }
   };
 
+  // Delete tag permanently from system
+  const handleDeleteTag = async () => {
+    if (!tagToDelete) return;
+
+    setTagLoading(true);
+    try {
+      const response = await fetch(`/api/contacts/tags/${tagToDelete.id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        // Reload contacts to update tag list
+        await loadContacts();
+        // Close modal
+        setShowDeleteTagConfirm(false);
+        setTagToDelete(null);
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Erro ao excluir tag');
+      }
+    } catch (err) {
+      console.error('Erro ao excluir tag:', err);
+      alert('Erro ao excluir tag');
+    } finally {
+      setTagLoading(false);
+    }
+  };
+
   // Set origin for contact
   const handleSetOrigin = async (originId) => {
     if (!selectedContact) return;
@@ -577,17 +608,17 @@ const loadSubscription = async (userId) => {
   // Predefined colors for tags
   const tagColors = ['#00FF99', '#00BFFF', '#FFD700', '#FF6B6B', '#A78BFA', '#F472B6', '#34D399', '#FBBF24'];
 
-if (!loading && !subscription) {
-  return <NoSubscription />
-}
+  if (!loading && !subscription) {
+    return <NoSubscription />
+  }
   // No connections state
   if (loading) {
-  return (
-    <div className="flex items-center justify-center h-screen bg-[#0A0A0A]">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00FF99]"></div>
-    </div>
-  );
-}
+    return (
+      <div className="flex items-center justify-center h-screen bg-[#0A0A0A]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00FF99]"></div>
+      </div>
+    );
+  }
   if (!loading && connections.length === 0) {
     return (
       <div className="flex items-center justify-center h-screen bg-[#111111]">
@@ -719,8 +750,7 @@ if (!loading && !subscription) {
                     draggable
                     onDragStart={(e) => handleTagDragStart(e, tag)}
                     onDragEnd={handleTagDragEnd}
-                    onClick={() => setSelectedTag(tag.id)}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2 cursor-grab active:cursor-grabbing select-none ${selectedTag === tag.id
+                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2 group ${selectedTag === tag.id
                       ? 'bg-[#00FF99]/10 text-[#00FF99]'
                       : 'text-gray-400 hover:bg-[#1E1E1E] hover:text-white'
                       } ${draggedTag?.id === tag.id ? 'opacity-50' : ''}`}
@@ -729,10 +759,23 @@ if (!loading && !subscription) {
                       className="w-2 h-2 rounded-full flex-shrink-0"
                       style={{ backgroundColor: tag.color || '#00FF99' }}
                     />
-                    <span className="truncate">{tag.name}</span>
-                    <svg className="w-3 h-3 ml-auto text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M8 6h.01M8 12h.01M8 18h.01M16 6h.01M16 12h.01M16 18h.01" />
-                    </svg>
+                    <span
+                      className="truncate flex-1 cursor-grab active:cursor-grabbing select-none"
+                      onClick={() => setSelectedTag(tag.id)}
+                    >
+                      {tag.name}
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTagToDelete(tag);
+                        setShowDeleteTagConfirm(true);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-all p-1"
+                      title="Excluir tag"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 ))}
                 {tags.length === 0 && (
@@ -1203,6 +1246,74 @@ if (!loading && !subscription) {
                 className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-semibold py-3 rounded-xl hover:shadow-[0_0_20px_rgba(0,255,153,0.3)] transition-all disabled:opacity-50"
               >
                 {tagLoading ? 'Criando...' : 'Criar Origem'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ========================================== */}
+      {/* MODAL: CONFIRMAR EXCLUSÃO DE TAG */}
+      {/* ========================================== */}
+      {showDeleteTagConfirm && tagToDelete && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => {
+            setShowDeleteTagConfirm(false);
+            setTagToDelete(null);
+          }} />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-[#111111] rounded-2xl p-6 z-50 w-96">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Trash2 size={20} className="text-red-400" />
+                Excluir Tag
+              </h3>
+              <button
+                onClick={() => {
+                  setShowDeleteTagConfirm(false);
+                  setTagToDelete(null);
+                }}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-gray-300 mb-2">
+                Tem certeza que deseja excluir a tag <span className="text-white font-semibold">"{tagToDelete.name}"</span>?
+              </p>
+              <p className="text-sm text-gray-500">
+                Esta ação irá remover a tag de todos os contatos e não pode ser desfeita.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteTagConfirm(false);
+                  setTagToDelete(null);
+                }}
+                className="flex-1 bg-[#1E1E1E] text-white py-3 rounded-xl hover:bg-[#2A2A2A] transition-colors"
+                disabled={tagLoading}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteTag}
+                className="flex-1 bg-red-500 text-white py-3 rounded-xl hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+                disabled={tagLoading}
+              >
+                {tagLoading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Excluindo...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={16} />
+                    Excluir
+                  </>
+                )}
               </button>
             </div>
           </div>

@@ -48,6 +48,7 @@ export async function GET() {
         const { data: tags, error } = await chatSupabase
             .from('contact_tags')
             .select('*')
+            .eq('user_id', session.user.id)
             .order('name');
 
         if (error) {
