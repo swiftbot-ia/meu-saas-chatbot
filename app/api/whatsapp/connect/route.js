@@ -33,7 +33,7 @@ async function createUazapiInstance(instanceName, userId, connectionId) {
       },
       body: JSON.stringify({
         name: instanceName,
-        systemName: 'Swiftbot 1.0',
+        systemName: 'Swiftbot 1.78',
         adminField01: userId,
         adminField02: connectionId
       })
