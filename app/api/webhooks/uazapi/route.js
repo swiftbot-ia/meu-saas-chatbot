@@ -835,40 +835,41 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
       throw error;
     }
 
-    // 9. ATUALIZAR TODAS AS CONVERSAS COM O MESMO CONTATO
-    // Isso garante que todos os usuários vejam a mensagem em suas conversas
+    // 9. ATUALIZAR APENAS A CONVERSA DESTA INSTÂNCIA
+    // IMPORTANTE: Só atualizamos a conversa da mesma instance_name
+    // para evitar poluição de dados entre conexões diferentes
     const preview = messageContent
       ? messageContent.substring(0, 100)
       : `[${messageType}]`;
 
     const messageTimestampISO = new Date(messageTimestamp * 1000).toISOString();
 
-    // Buscar TODAS as conversas com este contact_id
-    const { data: allConversations, error: convFetchError } = await chatSupabaseAdmin
+    // Buscar APENAS a conversa desta instância com este contact_id
+    const { data: instanceConversations, error: convFetchError } = await chatSupabaseAdmin
       .from('whatsapp_conversations')
       .select('id, user_id, unread_count')
-      .eq('contact_id', contact.id);
+      .eq('contact_id', contact.id)
+      .eq('instance_name', instanceName);  // CRITICAL: Filter by instance_name!
 
     if (convFetchError) {
       log(requestId, 'error', '❌', 'Erro ao buscar conversas do contato', { error: convFetchError.message });
-    } else if (allConversations && allConversations.length > 0) {
-      // Atualizar cada conversa
-      for (const conv of allConversations) {
-        // Não incrementar unread se for mensagem enviada (fromMe) ou se for a conversa do remetente
-        const shouldIncrementUnread = !fromMe && conv.user_id !== connection.user_id;
+    } else if (instanceConversations && instanceConversations.length > 0) {
+      // Atualizar cada conversa desta instância
+      for (const conv of instanceConversations) {
+        const shouldIncrementUnread = !fromMe;
 
         await chatSupabaseAdmin
           .from('whatsapp_conversations')
           .update({
             last_message_at: messageTimestampISO,
             last_message_preview: preview,
-            unread_count: shouldIncrementUnread ? ((conv.unread_count || 0) + 1) : (fromMe ? 0 : (conv.unread_count || 0) + 1),
+            unread_count: shouldIncrementUnread ? ((conv.unread_count || 0) + 1) : 0,
             updated_at: new Date().toISOString()
           })
           .eq('id', conv.id);
       }
 
-      log(requestId, 'info', '📬', `Atualizadas ${allConversations.length} conversas com o mesmo contato`);
+      log(requestId, 'info', '📬', `Atualizada(s) ${instanceConversations.length} conversa(s) da instância ${instanceName}`);
     } else {
       // Fallback: atualizar apenas a conversa atual
       await ConversationService.updateConversation(conversation.id, {
