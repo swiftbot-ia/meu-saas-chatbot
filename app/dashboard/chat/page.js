@@ -144,11 +144,15 @@ function ChatContent() {
   const loadConversations = async () => {
     if (!selectedConnection) return;
 
+    console.log('🔍 [DEBUG] loadConversations called with connectionId:', selectedConnection);
+
     try {
       const params = new URLSearchParams({
         connectionId: selectedConnection,
         limit: '100'
       });
+
+      console.log('🔍 [DEBUG] API URL:', `/api/chat/conversations?${params}`);
 
       const response = await fetch(`/api/chat/conversations?${params}`);
       const data = await response.json();
