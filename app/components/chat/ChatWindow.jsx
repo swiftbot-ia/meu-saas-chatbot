@@ -61,54 +61,114 @@ export default function ChatWindow({
       markAsRead();
 
       // Setup real-time subscription for message updates
+      // Use instance_name filter (like sidebar does) and filter by contact_id in JS
+      const contactId = conversation.contact?.id;
+      const instanceName = conversation.instance_name;
+
+      console.log('🔔 [ChatWindow] Setting up realtime subscription:', {
+        contactId,
+        instanceName,
+        contactName: conversation.contact?.name || conversation.contact?.whatsapp_number
+      });
+
+      if (!instanceName) {
+        console.error('❌ [ChatWindow] Missing instance_name, cannot subscribe');
+        return;
+      }
+
+      // Subscribe to ALL messages for this instance (like sidebar does)
+      // Then filter by contact_id in the callback
       const channel = chatSupabase
-        .channel(`messages:${conversation.id}`)
+        .channel(`chat-messages:${instanceName}:${contactId}`)
         .on(
           'postgres_changes',
           {
-            event: 'INSERT',
+            event: '*',
             schema: 'public',
             table: 'whatsapp_messages',
-            filter: `conversation_id=eq.${conversation.id}`
+            filter: `instance_name=eq.${instanceName}` // Use instance_name filter like sidebar
           },
           (payload) => {
-            const newMessage = payload.new;
+            // Filter by contact_id in JavaScript
+            if (payload.new?.contact_id !== contactId) {
+              // Different contact, skip silently
+              return;
+            }
 
-            setMessages(prev => {
-              // Check if we have an optimistic message to replace
-              const tempIndex = prev.findIndex(m => {
-                if (m.status !== 'sending' || m.direction !== 'outbound') return false;
+            console.log('📩 [ChatWindow] Message for this contact:', {
+              eventType: payload.eventType,
+              id: payload.new?.id,
+              content: payload.new?.message_content?.substring(0, 30),
+              direction: payload.new?.direction
+            });
 
-                // For text, match content exactly
-                if (m.message_type === 'text' && newMessage.message_type === 'text') {
-                  return m.message_content === newMessage.message_content;
-                }
-
-                // For media (audio, image, video), match by type
-                // This handles cases where content changes (e.g. audio transcription)
-                if (m.message_type === newMessage.message_type) {
-                  return true;
-                }
-
-                return false;
+            if (payload.eventType === 'INSERT') {
+              // Nova mensagem recebida
+              const newMessage = payload.new;
+              console.log('➕ [Realtime] INSERT - New message:', {
+                id: newMessage.id,
+                content: newMessage.message_content?.substring(0, 50),
+                contact_id: newMessage.contact_id,
+                instance_name: newMessage.instance_name,
+                direction: newMessage.direction
               });
 
-              if (tempIndex >= 0) {
-                // Replace optimistic message with real one
-                const updated = [...prev];
-                updated[tempIndex] = {
-                  ...newMessage,
-                  status: 'sent'  // ✓✓ Confirmed!
-                };
-                return updated;
-              }
+              setMessages(prev => {
+                // Verificar se já existe (evitar duplicatas)
+                const isDuplicate = prev.some(m => m.id === newMessage.id);
+                if (isDuplicate) {
+                  console.log('⚠️ [Realtime] Duplicate message ID, skipping:', newMessage.id);
+                  return prev;
+                }
 
-              // New inbound message - add it
-              return [...prev, newMessage];
-            });
+                // Check if we have an optimistic message to replace
+                const tempIndex = prev.findIndex(m => {
+                  if (m.status !== 'sending' || m.direction !== 'outbound') return false;
+
+                  // For text, match content exactly
+                  if (m.message_type === 'text' && newMessage.message_type === 'text') {
+                    return m.message_content === newMessage.message_content;
+                  }
+
+                  // For media (audio, image, video), match by type
+                  if (m.message_type === newMessage.message_type) {
+                    return true;
+                  }
+
+                  return false;
+                });
+
+                if (tempIndex >= 0) {
+                  // Replace optimistic message with real one
+                  console.log('🔄 [Realtime] Replacing optimistic message at index:', tempIndex);
+                  const updated = [...prev];
+                  updated[tempIndex] = {
+                    ...newMessage,
+                    status: 'sent'  // ✓✓ Confirmed!
+                  };
+                  return updated;
+                }
+
+                // New inbound message - add it
+                console.log('✅ [Realtime] Adding new inbound message');
+                return [...prev, newMessage];
+              });
+            } else if (payload.eventType === 'UPDATE') {
+              // Atualização de mensagem existente (ex: status de 'sending' para 'sent')
+              const updatedMessage = payload.new;
+              console.log('🔄 [Realtime] UPDATE - Message status:', updatedMessage.status);
+              setMessages(prev => prev.map(m =>
+                m.id === updatedMessage.id ? { ...m, ...updatedMessage } : m
+              ));
+            }
           }
         )
-        .subscribe();
+        .subscribe((status, err) => {
+          console.log('🔔 [Realtime] Subscription status:', status);
+          if (err) {
+            console.error('❌ [Realtime] Subscription error:', err);
+          }
+        });
 
       return () => {
         chatSupabase.removeChannel(channel);
@@ -149,19 +209,37 @@ export default function ChatWindow({
       } else {
         // Merge with existing messages to avoid duplicates
         setMessages(prev => {
+          const apiMessages = data.messages || [];
+          console.log('📥 [LoadMessages] API returned:', apiMessages.length, 'messages');
+          console.log('📥 [LoadMessages] Current state has:', prev.length, 'messages');
+
           if (prev.length === 0) {
-            // First load
-            return data.messages;
+            // First load - just use API messages as-is
+            console.log('📥 [LoadMessages] First load, using API messages');
+            return apiMessages;
           }
 
-          // Create a map of existing messages by ID
-          const existingIds = new Set(prev.map(m => m.id));
+          // Create a set of API message IDs for quick lookup
+          const apiMessageIds = new Set(apiMessages.map(m => m.id));
 
-          // Add only new messages
-          const newMessages = data.messages.filter(m => !existingIds.has(m.id));
+          // Find realtime messages that are NOT in the API response yet
+          // These are very recent messages that arrived via realtime but haven't been persisted/returned yet
+          const realtimeOnlyMessages = prev.filter(m => !apiMessageIds.has(m.id));
 
-          // Merge and sort by received_at
-          return [...prev, ...newMessages].sort((a, b) =>
+          if (realtimeOnlyMessages.length > 0) {
+            console.log('📥 [LoadMessages] Keeping', realtimeOnlyMessages.length, 'realtime-only messages');
+            realtimeOnlyMessages.forEach(m => {
+              console.log('   -', m.message_content?.substring(0, 20), '(status:', m.status, ')');
+            });
+          }
+
+          // Combine: API messages (source of truth) + realtime-only messages
+          const allMessages = [...apiMessages, ...realtimeOnlyMessages];
+
+          console.log('📥 [LoadMessages] Total after merge:', allMessages.length, 'messages');
+
+          // Sort by received_at ascending (oldest first)
+          return allMessages.sort((a, b) =>
             new Date(a.received_at) - new Date(b.received_at)
           );
         });
@@ -485,7 +563,6 @@ export default function ChatWindow({
       <div className="absolute bottom-0 left-0 right-0">
         <ChatInput
           onSend={handleSend}
-          disabled={sending}
         />
       </div>
     </div>

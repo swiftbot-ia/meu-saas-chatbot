@@ -19,8 +19,8 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Helper para criar cliente Supabase com cookies (para autenticação)
-function createAuthClient() {
-  const cookieStore = cookies()
+async function createAuthClient() {
+  const cookieStore = await cookies()
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -45,7 +45,7 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(request) {
   try {
-    const supabase = createAuthClient();
+    const supabase = await createAuthClient();
 
     // Get authenticated user
     const { data: { session }, error: authError } = await supabase.auth.getSession();

@@ -9,23 +9,29 @@ export default function ChatInput({ onSend, disabled = false }) {
   const [sending, setSending] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const fileInputRef = useRef(null);
+  const textareaRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!message.trim() || sending || disabled) return;
+    // Only check message content and disabled, allow parallel sends
+    if (!message.trim() || disabled) return;
 
-    setSending(true);
+    // Clear input immediately (optimistic UI) so user can type next message right away
+    const messageToSend = message;
+    setMessage('');
+
+    // Focus back to input immediately
+    setTimeout(() => textareaRef.current?.focus(), 0);
+
+    // Send message in background (don't block UI)
     try {
-      await onSend({ text: message });
-      setMessage('');
+      await onSend({ text: messageToSend });
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
-      alert('Erro ao enviar mensagem. Tente novamente.');
-    } finally {
-      setSending(false);
+      alert('Erro ao enviar mensagem: ' + messageToSend);
     }
   };
 
@@ -111,13 +117,13 @@ export default function ChatInput({ onSend, disabled = false }) {
                 <Paperclip size={20} />
               </button>
 
-              {/* Message input */}
               <textarea
+                ref={textareaRef}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Digite uma mensagem..."
-                disabled={sending || disabled}
+                disabled={disabled}
                 rows={1}
                 className="flex-1 bg-transparent text-white placeholder-gray-500 px-3 py-2 outline-none resize-none disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{

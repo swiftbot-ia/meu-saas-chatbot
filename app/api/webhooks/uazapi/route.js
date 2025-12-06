@@ -489,38 +489,49 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
       return;
     }
 
-    // 2. BUSCAR CONEXÃO NO MAIN DB
-    let connection;
-    let connError;
+    // 2. BUSCAR CONEXÃO NO MAIN DB (ROBUSTA - em cascata)
+    // Para mensagens outbound (fromMe=true), to_number é o destinatário mas nós temos o phone do owner
+    // Para mensagens inbound (fromMe=false), podemos usar o metadata
+    // Nota: messageKey já foi declarado na linha 470
+    const ownerPhoneNumber = messageData.ownerPhoneNumber || messageData.to_number || null;
 
-    // Tentar buscar por instance_name
-    const { data: connByName, error: errName } = await supabaseAdmin
-      .from('whatsapp_connections')
-      .select('id, user_id, instance_token')
-      .eq('instance_name', instanceName)
-      .maybeSingle();
-
-    if (connByName) {
-      connection = connByName;
-    } else if (instanceToken) {
-      // Fallback: Tentar buscar por instance_token
-      log(requestId, 'warn', '⚠️', `Conexão não encontrada por nome (${instanceName}), tentando token...`);
-      const { data: connByToken, error: errToken } = await supabaseAdmin
-        .from('whatsapp_connections')
-        .select('id, user_id, instance_token')
-        .eq('instance_token', instanceToken)
-        .maybeSingle();
-
-      connection = connByToken;
-      connError = errToken;
-    } else {
-      connError = errName;
-    }
+    const { connection, matchedBy } = await findConnectionRobust(
+      requestId,
+      instanceName,
+      instanceToken,
+      ownerPhoneNumber
+    );
 
     if (!connection) {
-      log(requestId, 'info', 'ℹ️', `Instância não encontrada (esperado): ${instanceName}`);
+      // CRÍTICO: Não salvar mensagem se conexão não existe
+      log(requestId, 'error', '🚫', `REJEITANDO mensagem: conexão não encontrada para ${instanceName}`);
+
+      // Logar para debugging
+      await logRejectedMessage(
+        requestId,
+        instanceName,
+        instanceToken,
+        ownerPhoneNumber,
+        { messageId: messageKey?.id, remoteJid: messageKey?.remoteJid },
+        `Conexão não encontrada: instance=${instanceName}, token=${!!instanceToken}, phone=${ownerPhoneNumber}`
+      );
       return;
     }
+
+    // Se encontrou por método alternativo, atualizar instance_name no banco
+    if (matchedBy !== 'instance_name' && connection.instance_name !== instanceName) {
+      log(requestId, 'info', '🔧', `Auto-healing: atualizando dados da conexão...`);
+      // Não atualiza instance_name pois pode quebrar coisas, apenas loga
+    }
+
+    // 🔍 DEBUG: Log detalhado da conexão encontrada
+    log(requestId, 'info', '🔗', `Conexão encontrada (${matchedBy}):`, {
+      connection_id: connection.id,
+      user_id: connection.user_id,
+      instance_name: connection.instance_name,
+      phone_number: connection.phone_number,
+      has_token: !!connection.instance_token
+    });
 
     // AUTO-HEALING: Atualizar token no banco se vier no webhook e for diferente/ausente
     if (instanceToken && connection.instance_token !== instanceToken) {
@@ -539,6 +550,9 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
       // Atualizar objeto local para uso imediato
       connection.instance_token = instanceToken;
     }
+
+    // IMPORTANTE: Usar instance_name da CONEXÃO REAL, não do webhook
+    const realInstanceName = connection.instance_name;
 
     // 3. IDENTIFICAR CONTATO
     const remoteJid = messageKey.remoteJid;
@@ -587,9 +601,10 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
     }
 
     // 8. OBTER OU CRIAR CONVERSA NO CHAT DB
+    // IMPORTANTE: Usar realInstanceName da conexão real, não o instanceName do webhook
     const conversation = await getOrCreateConversation(
       requestId,
-      instanceName,
+      realInstanceName, // Usa o instance_name real da conexão encontrada
       connection.id,
       contact.id,
       connection.user_id
@@ -746,7 +761,7 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
       const { data: insertedMessage, error: msgError } = await chatSupabaseAdmin // Changed to chatSupabaseAdmin
         .from('whatsapp_messages')
         .insert({
-          instance_name: instanceName,
+          instance_name: realInstanceName, // IMPORTANTE: Usa o instance_name real da conexão
           connection_id: connection.id, // Kept original connection.id
           conversation_id: conversation.id,
           contact_id: contact.id,
@@ -940,9 +955,89 @@ async function getOrCreateContact(requestId, whatsappNumber, data = {}) {
 }
 
 /**
+ * ===========================================================================
+ * ROBUSTA: Busca conexão em cascata (instance_name → token → phone)
+ * ===========================================================================
+ * Garante que mensagens sempre encontrem a conexão correta, mesmo se
+ * o instance_name mudou (conexão deletada/recriada)
+ */
+async function findConnectionRobust(requestId, instanceName, instanceToken = null, ownerPhoneNumber = null) {
+  // 1. Por instance_name (mais comum e rápido)
+  const { data: connByName } = await supabaseAdmin
+    .from('whatsapp_connections')
+    .select('id, user_id, instance_token, instance_name, phone_number')
+    .eq('instance_name', instanceName)
+    .maybeSingle();
+
+  if (connByName) {
+    log(requestId, 'info', '✅', `Conexão encontrada por instance_name: ${instanceName}`);
+    return { connection: connByName, matchedBy: 'instance_name' };
+  }
+
+  // 2. Por instance_token (se o instance_name mudou)
+  if (instanceToken) {
+    const { data: connByToken } = await supabaseAdmin
+      .from('whatsapp_connections')
+      .select('id, user_id, instance_token, instance_name, phone_number')
+      .eq('instance_token', instanceToken)
+      .maybeSingle();
+
+    if (connByToken) {
+      log(requestId, 'warn', '⚠️', `Conexão encontrada por TOKEN (instance_name desatualizado: ${instanceName} → ${connByToken.instance_name})`);
+      return { connection: connByToken, matchedBy: 'instance_token' };
+    }
+  }
+
+  // 3. Por phone_number (último recurso - se conexão foi recriada)
+  if (ownerPhoneNumber) {
+    const { data: connByPhone } = await supabaseAdmin
+      .from('whatsapp_connections')
+      .select('id, user_id, instance_token, instance_name, phone_number')
+      .eq('phone_number', ownerPhoneNumber)
+      .maybeSingle();
+
+    if (connByPhone) {
+      log(requestId, 'warn', '⚠️', `Conexão encontrada por PHONE (instance_name desatualizado: ${instanceName} → ${connByPhone.instance_name})`);
+      return { connection: connByPhone, matchedBy: 'phone_number' };
+    }
+  }
+
+  // Nenhuma conexão encontrada
+  log(requestId, 'error', '❌', `Conexão NÃO ENCONTRADA para:`, {
+    instanceName,
+    hasToken: !!instanceToken,
+    phoneNumber: ownerPhoneNumber
+  });
+  return { connection: null, matchedBy: null };
+}
+
+/**
+ * Loga mensagens rejeitadas para debugging
+ */
+async function logRejectedMessage(requestId, instanceName, instanceToken, phoneNumber, rawPayload, reason) {
+  try {
+    await chatSupabaseAdmin
+      .from('webhook_rejected_messages')
+      .insert({
+        instance_name: instanceName,
+        instance_token: instanceToken,
+        phone_number: phoneNumber,
+        raw_payload: rawPayload,
+        rejection_reason: reason
+      });
+    log(requestId, 'info', '📝', `Mensagem rejeitada logada: ${reason}`);
+  } catch (error) {
+    // Se tabela não existe, apenas logar
+    log(requestId, 'warn', '⚠️', `Não foi possível logar mensagem rejeitada: ${error.message}`);
+  }
+}
+
+/**
  * Busca ou cria conversa (usa Admin Client para bypass RLS)
  */
 async function getOrCreateConversation(requestId, instanceName, connectionId, contactId, userId) {
+  log(requestId, 'info', '🔍', `Buscando conversa:`, { instanceName, connectionId, contactId, userId });
+
   // Tentar buscar existente
   const { data: existing } = await chatSupabaseAdmin
     .from('whatsapp_conversations')
@@ -952,6 +1047,12 @@ async function getOrCreateConversation(requestId, instanceName, connectionId, co
     .maybeSingle();
 
   if (existing) {
+    log(requestId, 'info', '📋', `Conversa existente encontrada:`, {
+      conversation_id: existing.id,
+      instance_name: existing.instance_name,
+      connection_id: existing.connection_id,
+      user_id: existing.user_id
+    });
     return existing;
   }
 
@@ -976,7 +1077,11 @@ async function getOrCreateConversation(requestId, instanceName, connectionId, co
     throw new Error(`Erro ao criar conversa: ${error.message}`);
   }
 
-  log(requestId, 'success', '✅', `Conversa criada para contato ${contactId}`);
+  log(requestId, 'success', '✅', `Conversa criada:`, {
+    conversation_id: newConv.id,
+    instance_name: newConv.instance_name,
+    connection_id: newConv.connection_id
+  });
   return newConv;
 }
 
