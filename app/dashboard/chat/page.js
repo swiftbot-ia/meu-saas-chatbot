@@ -183,6 +183,13 @@ function ChatContent() {
   };
 
   const handleConnectionSelect = (connectionId) => {
+    // Clear selected conversation when switching connections
+    // This prevents showing messages from the wrong connection
+    if (selectedConnection !== connectionId) {
+      setSelectedConversation(null);
+      console.log('🔄 [Chat] Switching connection, clearing selected conversation');
+    }
+
     setSelectedConnection(connectionId);
 
     if (typeof window !== 'undefined') {
@@ -218,13 +225,16 @@ function ChatContent() {
     if (selectedConnection) {
       loadConversations();
 
-      const interval = setInterval(loadConversations, 10000);
+      // Polling apenas como fallback - realtime deve ser primário
+      const interval = setInterval(loadConversations, 60000); // 60s ao invés de 10s
 
       const connection = connections.find(c => c.id === selectedConnection);
-      let channel = null;
+      let conversationsChannel = null;
+      let messagesChannel = null;
 
       if (connection) {
-        channel = chatSupabase
+        // Subscribe to conversations updates
+        conversationsChannel = chatSupabase
           .channel(`conversations:${connection.instance_name}`)
           .on(
             'postgres_changes',
@@ -234,16 +244,40 @@ function ChatContent() {
               table: 'whatsapp_conversations',
               filter: `instance_name=eq.${connection.instance_name}`
             },
-            () => {
+            (payload) => {
+              console.log('📋 [Realtime] Conversation update:', payload.eventType);
               loadConversations();
             }
           )
-          .subscribe();
+          .subscribe((status) => {
+            console.log('📋 [Realtime] Conversations subscription:', status);
+          });
+
+        // ALSO subscribe to messages updates to refresh conversation list
+        messagesChannel = chatSupabase
+          .channel(`messages-sidebar:${connection.instance_name}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'whatsapp_messages',
+              filter: `instance_name=eq.${connection.instance_name}`
+            },
+            (payload) => {
+              console.log('📨 [Realtime] New message for sidebar:', payload.new?.message_content?.substring(0, 30));
+              loadConversations();
+            }
+          )
+          .subscribe((status) => {
+            console.log('📨 [Realtime] Messages sidebar subscription:', status);
+          });
       }
 
       return () => {
         clearInterval(interval);
-        if (channel) chatSupabase.removeChannel(channel);
+        if (conversationsChannel) chatSupabase.removeChannel(conversationsChannel);
+        if (messagesChannel) chatSupabase.removeChannel(messagesChannel);
       };
     }
   }, [selectedConnection, connections]);

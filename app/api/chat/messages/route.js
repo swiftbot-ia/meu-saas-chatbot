@@ -9,8 +9,8 @@ import { createServerClient } from '@supabase/ssr';
 import MessageService from '@/lib/MessageService';
 
 // Helper para criar cliente Supabase com cookies (para autenticação)
-function createAuthClient() {
-  const cookieStore = cookies()
+async function createAuthClient() {
+  const cookieStore = await cookies()
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -35,7 +35,7 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(request) {
   try {
-    const supabase = createAuthClient();
+    const supabase = await createAuthClient();
 
     // Get authenticated user
     const { data: { session }, error: authError } = await supabase.auth.getSession();
@@ -63,14 +63,28 @@ export async function GET(request) {
     }
 
     // List messages
+    console.log(`🔍 [API/messages] Requesting messages for:`, {
+      conversationId,
+      userId,
+      limit,
+      before
+    });
+
     const messages = await MessageService.listMessages(conversationId, userId, {
       limit,
       before
     });
 
+    console.log(`✅ [API/messages] Returning ${messages.length} messages for conversation ${conversationId}`);
+
     return NextResponse.json({
       messages,
-      count: messages.length
+      count: messages.length,
+      debug: {
+        conversationId,
+        limit,
+        before
+      }
     });
 
   } catch (error) {
