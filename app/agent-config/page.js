@@ -347,29 +347,39 @@ function AgentConfigContent() {
     setIsGenerating(true)
 
     try {
-      // Buscar configuração sugerida do backend
-      const response = await fetch(`/api/conversation-analysis/agent-config/${connectionId}`)
+      // Chamar endpoint que gera config com IA baseado na análise
+      const response = await fetch(`/api/conversation-analysis/agent-config/${connectionId}/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          style: aiSelectedStyle || 'amigavel',
+          objective: aiSelectedObjective || 'vendas_qualificacao'
+        })
+      })
+
       const data = await response.json()
 
       if (!response.ok) {
         if (response.status === 404) {
-          // Não há relatório - sugerir sincronizar primeiro
           setShowAIModal(false)
           alert('Não há análise de conversas disponível.\n\nSincronize suas conversas primeiro para ativar a geração automática com IA.')
           return
         }
-        throw new Error(data.error || 'Erro ao buscar configuração')
+        throw new Error(data.error || 'Erro ao gerar configuração')
       }
 
-      // Preencher formulário com os valores sugeridos
+      // Preencher formulário com os valores gerados pela IA
       const formValues = data.form_values || {}
       setFormData(prev => ({
         ...prev,
         companyName: formValues.companyName || prev.companyName,
         businessSector: formValues.businessSector || prev.businessSector,
-        personality: aiSelectedStyle || formValues.personality || prev.personality,
-        botObjective: aiSelectedObjective || formValues.botObjective || prev.botObjective,
+        personality: formValues.personality || aiSelectedStyle || prev.personality,
+        botObjective: formValues.botObjective || aiSelectedObjective || prev.botObjective,
         welcomeMessage: formValues.welcomeMessage || prev.welcomeMessage,
+        defaultResponse: formValues.defaultResponse || prev.defaultResponse,
         productDescription: formValues.productDescription || prev.productDescription,
         priceRange: formValues.priceRange || prev.priceRange,
         agentName: formValues.agentName || prev.agentName,
