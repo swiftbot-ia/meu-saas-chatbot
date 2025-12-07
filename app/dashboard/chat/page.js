@@ -41,6 +41,7 @@ function ChatContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [subscription, setSubscription] = useState(null);
+  const [subscriptionChecked, setSubscriptionChecked] = useState(false);
   const [pendingConversationId, setPendingConversationId] = useState(conversationIdParam);
 
   // 2. FUNÇÕES
@@ -138,6 +139,8 @@ function ChatContent() {
       }
     } catch (error) {
       console.error('Erro ao carregar assinatura:', error);
+    } finally {
+      setSubscriptionChecked(true);
     }
   };
 
@@ -291,7 +294,7 @@ function ChatContent() {
     );
   }
 
-  if (!loading && !subscription) {
+  if (!loading && subscriptionChecked && !subscription) {
     return <NoSubscription />;
   }
   // No connections state

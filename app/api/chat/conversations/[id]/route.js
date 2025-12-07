@@ -48,7 +48,7 @@ export async function GET(request, { params }) {
     }
 
     const userId = session.user.id;
-    const conversationId = params.id;
+    const { id: conversationId } = await params;
 
     // Get conversation
     const conversation = await ConversationService.getConversation(conversationId, userId);
@@ -86,7 +86,7 @@ export async function PATCH(request, { params }) {
     }
 
     const userId = session.user.id;
-    const conversationId = params.id;
+    const { id: conversationId } = await params;
     const body = await request.json();
 
     // Handle different actions
@@ -139,7 +139,7 @@ export async function DELETE(request, { params }) {
     }
 
     const userId = session.user.id;
-    const conversationId = params.id;
+    const { id: conversationId } = await params;
 
     await ConversationService.deleteConversation(conversationId, userId);
 

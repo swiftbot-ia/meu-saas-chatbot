@@ -165,6 +165,7 @@ export default function ContactsPage() {
 
   // States
   const [subscription, setSubscription] = useState(null)
+  const [subscriptionChecked, setSubscriptionChecked] = useState(false)
   const [contacts, setContacts] = useState([]);
   const [connections, setConnections] = useState([]);
   const [selectedConnection, setSelectedConnection] = useState(null);
@@ -289,6 +290,8 @@ export default function ContactsPage() {
       }
     } catch (error) {
       console.error('❌ [CONTACTS] Erro ao carregar assinatura:', error)
+    } finally {
+      setSubscriptionChecked(true)
     }
   }
   // Handle connection selection with localStorage sync
@@ -608,7 +611,7 @@ export default function ContactsPage() {
   // Predefined colors for tags
   const tagColors = ['#00FF99', '#00BFFF', '#FFD700', '#FF6B6B', '#A78BFA', '#F472B6', '#34D399', '#FBBF24'];
 
-  if (!loading && !subscription) {
+  if (!loading && subscriptionChecked && !subscription) {
     return <NoSubscription />
   }
   // No connections state
