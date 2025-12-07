@@ -14,8 +14,9 @@ import { createChatSupabaseAdminClient } from '@/lib/supabase/chat-server';
 export const dynamic = 'force-dynamic';
 
 // Helper para criar cliente Supabase com cookies (para autenticação)
-function createAuthClient() {
-    const cookieStore = cookies();
+// NOTA: No Next.js 16, cookies() retorna uma Promise
+async function createAuthClient() {
+    const cookieStore = await cookies();
     return createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -39,7 +40,7 @@ export async function GET(request, { params }) {
     try {
         const { id } = await params;
 
-        const supabase = createAuthClient();
+        const supabase = await createAuthClient();
         const { data: { session }, error: authError } = await supabase.auth.getSession();
 
         if (authError || !session) {
@@ -81,7 +82,7 @@ export async function POST(request, { params }) {
     try {
         const { id } = await params;
 
-        const supabase = createAuthClient();
+        const supabase = await createAuthClient();
         const { data: { session }, error: authError } = await supabase.auth.getSession();
 
         if (authError || !session) {
@@ -136,7 +137,7 @@ export async function DELETE(request, { params }) {
         const { searchParams } = new URL(request.url);
         const tagId = searchParams.get('tagId');
 
-        const supabase = createAuthClient();
+        const supabase = await createAuthClient();
         const { data: { session }, error: authError } = await supabase.auth.getSession();
 
         if (authError || !session) {
