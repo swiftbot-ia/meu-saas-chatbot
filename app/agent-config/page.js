@@ -212,27 +212,27 @@ function AgentConfigContent() {
     }
     setLoading(false)
   }
-const loadSubscription = async (userId) => {
-  try {
-    const { data, error } = await supabase
-      .from('user_subscriptions')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-    if (!error && data) {
-      const isActive = ['active', 'trial', 'trialing'].includes(data.status) || data.stripe_subscription_id === 'super_account_bypass'
-      const isExpired = data.trial_end_date && new Date() > new Date(data.trial_end_date)
-      
-      if (isActive && !isExpired) {
-        setSubscription(data)
+  const loadSubscription = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+      if (!error && data) {
+        const isActive = ['active', 'trial', 'trialing'].includes(data.status) || data.stripe_subscription_id === 'super_account_bypass'
+        const isExpired = data.trial_end_date && new Date() > new Date(data.trial_end_date)
+
+        if (isActive && !isExpired) {
+          setSubscription(data)
+        }
       }
+    } catch (error) {
+      console.error('Erro ao carregar assinatura:', error)
     }
-  } catch (error) {
-    console.error('Erro ao carregar assinatura:', error)
   }
-}
   const loadExistingConfig = async (userId) => {
     try {
       let query = supabase.from('ai_agents').select('*').eq('user_id', userId)
@@ -338,20 +338,59 @@ const loadSubscription = async (userId) => {
   }
 
   // Handler para gerar agente com IA
-  const handleGenerateWithAI = () => {
-    if (!aiSelectedStyle || !aiSelectedObjective) return
+  const handleGenerateWithAI = async () => {
+    if (!connectionId) {
+      alert('Selecione uma conexão antes de gerar com IA')
+      return
+    }
 
     setIsGenerating(true)
-    // Simular loading - a lógica real será implementada no backend
-    setTimeout(() => {
-      setIsGenerating(false)
+
+    try {
+      // Buscar configuração sugerida do backend
+      const response = await fetch(`/api/conversation-analysis/agent-config/${connectionId}`)
+      const data = await response.json()
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          // Não há relatório - sugerir sincronizar primeiro
+          setShowAIModal(false)
+          alert('Não há análise de conversas disponível.\n\nSincronize suas conversas primeiro para ativar a geração automática com IA.')
+          return
+        }
+        throw new Error(data.error || 'Erro ao buscar configuração')
+      }
+
+      // Preencher formulário com os valores sugeridos
+      const formValues = data.form_values || {}
+      setFormData(prev => ({
+        ...prev,
+        companyName: formValues.companyName || prev.companyName,
+        businessSector: formValues.businessSector || prev.businessSector,
+        personality: aiSelectedStyle || formValues.personality || prev.personality,
+        botObjective: aiSelectedObjective || formValues.botObjective || prev.botObjective,
+        welcomeMessage: formValues.welcomeMessage || prev.welcomeMessage,
+        productDescription: formValues.productDescription || prev.productDescription,
+        priceRange: formValues.priceRange || prev.priceRange,
+        agentName: formValues.agentName || prev.agentName,
+        objectionsQA: formValues.objectionsQA?.length > 0 ? formValues.objectionsQA : prev.objectionsQA,
+        objectiveQuestions: formValues.objectiveQuestions?.length > 0 ? formValues.objectiveQuestions : prev.objectiveQuestions,
+        salesCTA: formValues.salesCTA || prev.salesCTA
+      }))
+
       setShowAIModal(false)
-      // Reset selections
       setAiSelectedStyle('')
       setAiSelectedObjective('')
-      // Aqui virá a lógica de integração com o backend
-      console.log('AI Generation requested:', { style: aiSelectedStyle, objective: aiSelectedObjective })
-    }, 1500)
+
+      // Scroll para o topo para ver os campos preenchidos
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+
+    } catch (error) {
+      console.error('Erro ao gerar com IA:', error)
+      alert('Erro ao gerar configuração: ' + error.message)
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -577,9 +616,9 @@ const loadSubscription = async (userId) => {
       </div>
     )
   }
-if (!subscription) {
-  return <NoSubscription />
-}
+  if (!subscription) {
+    return <NoSubscription />
+  }
   return (
     <div className="min-h-screen bg-[#0A0A0A]">
       <main className="relative z-10 max-w-6xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
