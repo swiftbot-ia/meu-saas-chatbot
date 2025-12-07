@@ -158,6 +158,7 @@ function AgentConfigContent() {
   const [aiSelectedStyle, setAiSelectedStyle] = useState('')
   const [aiSelectedObjective, setAiSelectedObjective] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [formKey, setFormKey] = useState(0) // Force re-render when AI generates
 
   // ID do Agente para controle de UPDATE vs INSERT
   const [agentId, setAgentId] = useState(null)
@@ -372,6 +373,8 @@ function AgentConfigContent() {
 
       // Preencher formulário com os valores gerados pela IA
       const formValues = data.form_values || {}
+
+      // Aplicar valores ao formulário
       setFormData(prev => ({
         ...prev,
         companyName: formValues.companyName || prev.companyName,
@@ -383,10 +386,17 @@ function AgentConfigContent() {
         productDescription: formValues.productDescription || prev.productDescription,
         priceRange: formValues.priceRange || prev.priceRange,
         agentName: formValues.agentName || prev.agentName,
-        objectionsQA: formValues.objectionsQA?.length > 0 ? formValues.objectionsQA : prev.objectionsQA,
-        objectiveQuestions: formValues.objectiveQuestions?.length > 0 ? formValues.objectiveQuestions : prev.objectiveQuestions,
+        objectionsQA: Array.isArray(formValues.objectionsQA) && formValues.objectionsQA.length > 0
+          ? formValues.objectionsQA
+          : prev.objectionsQA,
+        objectiveQuestions: Array.isArray(formValues.objectiveQuestions) && formValues.objectiveQuestions.length > 0
+          ? formValues.objectiveQuestions
+          : prev.objectiveQuestions,
         salesCTA: formValues.salesCTA || prev.salesCTA
       }))
+
+      // Force re-render of form components
+      setFormKey(prev => prev + 1)
 
       setShowAIModal(false)
       setAiSelectedStyle('')
@@ -776,9 +786,9 @@ function AgentConfigContent() {
                   </span>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-4" key={`objections-${formKey}`}>
                   {formData.objectionsQA.map((item, index) => (
-                    <div key={index} className="bg-[#1E1E1E] rounded-3xl p-6 relative group hover:bg-[#222222] transition-all">
+                    <div key={`obj-${formKey}-${index}`} className="bg-[#1E1E1E] rounded-3xl p-6 relative group hover:bg-[#222222] transition-all">
                       <div className="flex justify-between items-start mb-4">
                         <span className="text-sm font-bold text-gray-500 uppercase tracking-wider">Objeção #{index + 1}</span>
                         <button type="button" onClick={() => removeArrayItem('objectionsQA', index)} className="text-gray-600 hover:text-red-500 transition-colors">
