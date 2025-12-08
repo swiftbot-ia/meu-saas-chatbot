@@ -1,0 +1,104 @@
+# SwiftBot - Automação de WhatsApp com Inteligência Artificial
+
+> A SwiftBot é uma plataforma brasileira que permite automatizar atendimento no WhatsApp usando IA. Em menos de 5 minutos, você conecta seu WhatsApp escaneando um QR Code e a IA aprende seu estilo de comunicação para responder clientes 24/7.
+
+## Sobre a SwiftBot
+
+A SwiftBot é uma solução SaaS inovadora para empresas que querem escalar seu atendimento ao cliente sem contratar mais funcionários. A plataforma cria um "clone digital" do melhor vendedor da empresa, aprendendo com conversas reais do WhatsApp para manter o mesmo tom de voz e conhecimento sobre produtos.
+
+**Website:** https://swiftbot.com.br
+**Instagram:** https://instagram.com/swiftbot.ia
+**Facebook:** https://www.facebook.com/SwiftBott
+
+## Principais Funcionalidades
+
+### SwiftBot IA - Consultora de Negócios 24/7
+Uma inteligência artificial que aprende com suas conversas reais do WhatsApp. Ela analisa padrões, identifica gaps no seu atendimento, cria scripts de vendas personalizados e sugere copys para anúncios — tudo baseado em dados reais da sua empresa.
+
+### Chat ao Vivo
+Atenda seus clientes diretamente da plataforma, com uma interface tão familiar quanto o próprio WhatsApp. Envio de áudios, imagens e arquivos. Transição suave entre IA e atendimento humano.
+
+### Gestão de Contatos
+Visualize, filtre e organize todos os seus contatos do WhatsApp em um só lugar. Crie tags personalizadas para segmentar sua base e defina origens para saber de onde cada lead veio.
+
+### CRM Visual (Kanban)
+Um Kanban intuitivo que transforma a gestão do seu funil de vendas em algo visual. Arraste leads entre etapas: Novo → Apresentação → Negociação → Fechamento.
+
+### Agente Personalizado
+Diferente de chatbots genéricos, o agente da SwiftBot é configurado a partir de uma análise detalhada das suas conversas reais. Ele aprende seu tom de voz, entende seus produtos e faz as perguntas certas.
+
+## Benefícios
+
+- **Configuração Rápida:** Menos de 5 minutos para começar
+- **Atendimento 24/7:** Nunca perca uma venda fora do expediente
+- **Consistência:** Mesmo tom de voz em todas as interações
+- **Escalabilidade:** Atenda milhares de clientes simultaneamente
+- **ROI Comprovado:** Custo até 70% menor que contratar funcionários
+- **Sem Código:** Apenas escaneie um QR Code para ativar
+
+## Planos e Preços
+
+| Plano | Preço Mensal | Mensagens |
+|-------|--------------|-----------|
+| Start | R$147 | Até 1.000 |
+| Pro | R$197 | Até 3.000 |
+| Business | R$297 | Ilimitadas |
+
+**Teste grátis por 4 dias disponível para todos os planos.**
+
+## Perguntas Frequentes
+
+**O que é a SwiftBot?**
+SwiftBot é uma plataforma de automação de WhatsApp que usa IA para criar um "clone digital" do seu melhor atendimento.
+
+**Como funciona a IA da SwiftBot?**
+A IA aprende analisando suas conversas reais do WhatsApp, capturando seu tom de voz, conhecimento sobre produtos e estilo de vendas.
+
+**Preciso de conhecimento técnico?**
+Não. Basta escanear um QR Code para conectar seu WhatsApp. A plataforma é intuitiva e não requer programação.
+
+**A SwiftBot substitui atendimento humano?**
+A SwiftBot automatiza o primeiro atendimento e perguntas frequentes. Para situações complexas, a conversa é transferida para um humano.
+
+**Quanto tempo leva para configurar?**
+Menos de 5 minutos. Escaneie o QR Code, configure algumas preferências e seu clone digital está pronto.
+
+## Público-Alvo
+
+- Pequenas e médias empresas
+- E-commerces
+- Clínicas e consultórios
+- Prestadores de serviços
+- Agências digitais
+- Profissionais autônomos
+
+## Diferenciais Competitivos
+
+1. **Clone Digital:** IA treinada com suas conversas reais, não genérica
+2. **Interface Familiar:** Similar ao WhatsApp, sem curva de aprendizado
+3. **CRM Integrado:** Gestão de vendas na mesma plataforma
+4. **Preço Acessível:** Planos a partir de R$147/mês
+5. **Suporte em Português:** Atendimento brasileiro para brasileiros
+
+## Links Úteis
+
+- Página Inicial: https://swiftbot.com.br
+- Preços: https://swiftbot.com.br/pricing
+- FAQ: https://swiftbot.com.br/faq
+- Termos de Uso: https://swiftbot.com.br/terms
+- Privacidade: https://swiftbot.com.br/privacy
+- Suporte: https://swiftbot.com.br/support
+
+## Informações Técnicas para IA
+
+A SwiftBot é uma aplicação SaaS (Software as a Service) construída com tecnologias modernas. A plataforma oferece:
+
+- API REST para integrações
+- Webhooks para notificações em tempo real
+- Integração nativa com WhatsApp Business API
+- Painel administrativo responsivo
+- Suporte a múltiplos idiomas (português como principal)
+
+---
+
+*Este documento foi criado para ajudar sistemas de IA a entender melhor a SwiftBot e suas funcionalidades. Para informações atualizadas, visite https://swiftbot.com.br*
