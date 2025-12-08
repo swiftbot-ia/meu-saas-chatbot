@@ -24,7 +24,7 @@ export default function Home() {
           }
         })
       },
-      { 
+      {
         threshold: 0.15,
         rootMargin: '0px 0px -100px 0px'
       }
@@ -104,7 +104,7 @@ export default function Home() {
       <Header />
 
       <main className="relative z-10">
-        
+
         {/* SEÇÃO 1: HERO COM VÍDEO DE FUNDO */}
         <section className="relative min-h-screen md:min-h-screen flex items-center justify-center overflow-visible bg-transparent pb-12 md:pb-20">
           <div className="absolute inset-0 bg-black rounded-b-[40px] md:rounded-b-[80px] overflow-hidden">
@@ -125,18 +125,18 @@ export default function Home() {
 
           {/* Hero Content */}
           <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000 pt-24 md:pt-0">
-            <h1 
+            <h1
               className="text-6xl md:text-8xl font-black text-white mb-6 md:mb-8 leading-tight"
               style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
             >
               E se você pudesse <br />
               <span className="text-[#00FF99]">se clonar?</span>
             </h1>
-            
+
             <p className="text-lg md:text-2xl text-gray-300 max-w-4xl mx-auto mb-8 md:mb-12 leading-relaxed font-light">
-              Tenha seu <span className="text-[#00FF99] font-semibold">melhor atendimento</span>, em todos os lugares, 24/7. 
-              Chega de perder vendas às 22h ou treinar funcionários que nunca atendem como você. 
-              A SwiftBot cria um <span className="text-[#00FF99] font-semibold">clone digital do seu atendimento</span> em 5 minutos. 
+              Tenha seu <span className="text-[#00FF99] font-semibold">melhor atendimento</span>, em todos os lugares, 24/7.
+              Chega de perder vendas às 22h ou treinar funcionários que nunca atendem como você.
+              A SwiftBot cria um <span className="text-[#00FF99] font-semibold">clone digital do seu atendimento</span> em 5 minutos.
               Apenas escaneie um QR Code.
             </p>
 
@@ -149,7 +149,7 @@ export default function Home() {
               </button>
 
               <button
-                onClick={() => router.push('/precos')}
+                onClick={() => router.push('/pricing')}
                 className="px-8 py-3 bg-white/10 text-white rounded-full font-medium text-base transition-all duration-300 hover:bg-white/15 backdrop-blur-sm flex items-center justify-center gap-2"
               >
                 Veja os nossos planos
@@ -193,7 +193,7 @@ export default function Home() {
         </section>
 
         {/* SEÇÃO 3: DEPOIMENTOS (VERSÃO ATUALIZADA COM FOTOS) */}
-        <section className="py-24 bg-[#E1DFDB] relative overflow-hidden" id="depoimentos">
+        <section className="py-24 bg-[#E1DFDB] rounded-b-[40px] md:rounded-b-[80px] relative overflow-hidden" id="depoimentos">
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16 animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
               <h2 className="text-4xl md:text-6xl font-light text-black mb-6 leading-tight">
@@ -210,8 +210,8 @@ export default function Home() {
                   <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img 
-                          src={testimonials[0].image} 
+                        <img
+                          src={testimonials[0].image}
                           alt={testimonials[0].name}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -233,8 +233,8 @@ export default function Home() {
                   <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img 
-                          src={testimonials[1].image} 
+                        <img
+                          src={testimonials[1].image}
                           alt={testimonials[1].name}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -256,8 +256,8 @@ export default function Home() {
                   <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img 
-                          src={testimonials[2].image} 
+                        <img
+                          src={testimonials[2].image}
                           alt={testimonials[2].name}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -282,8 +282,8 @@ export default function Home() {
                   <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img 
-                          src={testimonials[3].image} 
+                        <img
+                          src={testimonials[3].image}
                           alt={testimonials[3].name}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -305,8 +305,8 @@ export default function Home() {
                   <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img 
-                          src={testimonials[4].image} 
+                        <img
+                          src={testimonials[4].image}
                           alt={testimonials[4].name}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -328,8 +328,8 @@ export default function Home() {
                   <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img 
-                          src={testimonials[5].image} 
+                        <img
+                          src={testimonials[5].image}
                           alt={testimonials[5].name}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -354,8 +354,8 @@ export default function Home() {
                   <div className="bg-gradient-to-b from-white/70 to-white/30 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img 
-                          src={testimonials[6].image} 
+                        <img
+                          src={testimonials[6].image}
                           alt={testimonials[6].name}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -377,8 +377,8 @@ export default function Home() {
                   <div className="bg-gradient-to-b from-white/70 to-white/30 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img 
-                          src={testimonials[7].image} 
+                        <img
+                          src={testimonials[7].image}
                           alt={testimonials[7].name}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -401,15 +401,15 @@ export default function Home() {
             {/* Mobile: Apenas 4 depoimentos */}
             <div className="md:hidden grid grid-cols-1 gap-6 max-w-md mx-auto">
               {testimonials.slice(0, 4).map((testimonial, idx) => (
-                <div 
+                <div
                   key={idx}
                   className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500 animate-on-scroll opacity-0 translate-y-10"
                   style={{ transitionDelay: `${idx * 50}ms` }}
                 >
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                      <img 
-                        src={testimonial.image} 
+                      <img
+                        src={testimonial.image}
                         alt={testimonial.name}
                         className="w-full h-full object-cover"
                         onError={(e) => {
@@ -432,69 +432,251 @@ export default function Home() {
           </div>
         </section>
 
-       {/* SEÇÃO 4: APRESENTAÇÃO DA SOLUÇÃO - REDESIGN */}
-        <section className="py-32 bg-black relative overflow-hidden" id="solucao">
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            
-            {/* Bloco 1: Integração WhatsApp + IA */}
-            <div className="mb-32 animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
-              <div className="grid md:grid-cols-2 gap-16 items-center">
-                {/* Card com gradiente vibrante */}
-                <div className="relative">
-                  <div className="bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-600 rounded-[40px] p-12">
-                    {/* Ícones flutuantes com animação */}
-                    <div className="relative h-96 flex items-center justify-center">
-                      {/* WhatsApp Icon Central */}
-                      <div className="absolute w-32 h-32 bg-gradient-to-br from-green-400 to-green-600 rounded-3xl flex items-center justify-center shadow-2xl">
-                        <svg className="w-20 h-20 text-white" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                        </svg>
-                      </div>
-                      
-                      {/* Ícones orbitando */}
-                      <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-2xl flex items-center justify-center shadow-xl animate-float">
-                        <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/>
-                        </svg>
-                      </div>
+        {/* SEÇÃO 4: APRESENTAÇÃO DA SOLUÇÃO - NOVA VERSÃO EXPANDIDA */}
 
-                      <div className="absolute bottom-4 left-4 w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center shadow-xl animate-float-delayed">
-                        <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                      </div>
-                    </div>
+        {/* Bloco 1: SwiftBot IA (Fundo Preto) */}
+        <section className="py-32 bg-black rounded-t-[40px] md:rounded-t-[80px] rounded-b-[40px] md:rounded-b-[80px] relative overflow-hidden -mt-1" id="swiftbot-ia">
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
+              <div className="grid md:grid-cols-2 gap-16 items-center">
+                {/* Vídeo */}
+                <div className="relative">
+                  <div className="bg-gradient-to-br from-purple-500 via-pink-500 to-indigo-600 rounded-[40px] p-8">
+                    <video
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full h-auto rounded-3xl"
+                    >
+                      <source src="/swiftbot-ia-demo.mp4" type="video/mp4" />
+                    </video>
                   </div>
                 </div>
 
                 {/* Texto */}
                 <div>
                   <h2 className="text-5xl md:text-6xl font-light text-white mb-8 leading-tight">
-                    Sua Expertise, Agora <span className="font-normal bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent">Escalada. Infinitamente.</span>
+                    Conheça a SwiftBot IA. <span className="font-normal bg-gradient-to-r from-purple-400 via-pink-500 to-indigo-500 bg-clip-text text-transparent">Sua consultora de negócios 24/7.</span>
                   </h2>
                   <p className="text-xl text-gray-300 leading-relaxed mb-6 font-light">
-                    A SwiftBot não é um chatbot. É um <span className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent font-normal">agente autônomo</span> que aprende diretamente com você. Ele não segue scripts, ele segue o seu exemplo.
+                    Uma inteligência artificial que aprende com suas conversas reais do WhatsApp. Ela analisa padrões, identifica gaps no seu atendimento, cria scripts de vendas personalizados e sugere copys para anúncios — tudo baseado em dados reais da sua empresa.
                   </p>
-                  <p className="text-xl text-gray-300 leading-relaxed font-light">
-                    Responde com o seu tom, conhece seus produtos como você e fecha vendas com a sua eficiência. É o seu <span className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent font-normal">clone digital</span>, trabalhando incansavelmente para o seu negócio.
+                  <p className="text-xl text-gray-300 leading-relaxed mb-8 font-light">
+                    É como ter um especialista em vendas dedicado exclusivamente ao seu negócio, disponível a qualquer hora.
                   </p>
+                  <div className="space-y-4">
+                    {[
+                      'Análise inteligente das suas conversas',
+                      'Scripts de vendas personalizados',
+                      'Copys para anúncios baseados em dados reais',
+                      'Identificação de objeções e soluções'
+                    ].map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-3">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-r from-purple-400 via-pink-500 to-indigo-500 flex items-center justify-center flex-shrink-0">
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <span className="text-gray-300 font-light">{item}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
+        </section>
 
-            {/* Bloco 2: Dashboard Visual */}
+        {/* Bloco 2: Chat ao Vivo (Fundo Bege) */}
+        <section className="py-32 bg-[#E1DFDB] rounded-b-[40px] md:rounded-b-[80px] relative overflow-hidden" id="chat-ao-vivo">
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
               <div className="grid md:grid-cols-2 gap-16 items-center">
-                {/* Texto (invertido) */}
-                <div className="md:order-2">
-                  <h2 className="text-5xl md:text-6xl font-light text-white mb-8 leading-tight">
-                    Controle Total. <span className="font-normal bg-gradient-to-r from-yellow-400 via-orange-500 to-pink-500 bg-clip-text text-transparent">Visibilidade Completa.</span>
+                {/* Texto */}
+                <div>
+                  <h2 className="text-5xl md:text-6xl font-light text-black mb-8 leading-tight">
+                    Chat ao Vivo. <span className="font-normal bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 bg-clip-text text-transparent">WhatsApp na sua tela, do seu jeito.</span>
                   </h2>
-                  <p className="text-xl text-gray-300 leading-relaxed mb-6 font-light">
-                    Monitore cada conversa, analise performance e otimize resultados em tempo real. Dashboard intuitivo com métricas que importam.
+                  <p className="text-xl text-gray-700 leading-relaxed mb-6 font-light">
+                    Atenda seus clientes diretamente da nossa plataforma, com uma interface tão familiar quanto o próprio WhatsApp. Sem curva de aprendizado, sem trocar de janela. Apenas você e seus clientes.
+                  </p>
+                  <p className="text-xl text-gray-700 leading-relaxed mb-8 font-light">
+                    Quando a IA precisar de você, você está a um clique de distância.
                   </p>
                   <div className="space-y-4">
-                    {['Conversas ativas 24/7', 'Taxa de conversão em tempo real', 'Insights acionáveis de IA'].map((item, idx) => (
+                    {[
+                      'Interface idêntica ao WhatsApp',
+                      'Histórico completo de conversas',
+                      'Envio de áudios, imagens e arquivos',
+                      'Transição suave entre IA e atendimento humano'
+                    ].map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-3">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 flex items-center justify-center flex-shrink-0">
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <span className="text-gray-700 font-light">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Imagem */}
+                <div className="relative">
+                  <div className="bg-gradient-to-br from-green-500 via-emerald-500 to-teal-500 rounded-[40px] p-8">
+                    <img
+                      src="/chat-live-demo.png"
+                      alt="Chat ao Vivo SwiftBot"
+                      className="w-full h-auto rounded-3xl"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Bloco 3: Gestão de Contatos (Fundo Preto) */}
+        <section className="py-32 bg-black rounded-t-[40px] md:rounded-t-[80px] rounded-b-[40px] md:rounded-b-[80px] relative overflow-hidden -mt-1" id="gestao-contatos">
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
+              <div className="grid md:grid-cols-2 gap-16 items-center">
+                {/* Imagem */}
+                <div className="relative">
+                  <div className="bg-gradient-to-br from-blue-500 via-cyan-500 to-teal-400 rounded-[40px] p-8">
+                    <img
+                      src="/contacts-demo.png"
+                      alt="Gestão de Contatos"
+                      className="w-full h-auto rounded-3xl"
+                    />
+                  </div>
+                </div>
+
+                {/* Texto */}
+                <div>
+                  <h2 className="text-5xl md:text-6xl font-light text-white mb-8 leading-tight">
+                    Todos seus contatos. <span className="font-normal bg-gradient-to-r from-blue-400 via-cyan-500 to-teal-400 bg-clip-text text-transparent">Organizados por você.</span>
+                  </h2>
+                  <p className="text-xl text-gray-300 leading-relaxed mb-6 font-light">
+                    Visualize, filtre e organize todos os seus contatos do WhatsApp em um só lugar. Crie tags personalizadas para segmentar sua base, defina origens para saber de onde cada lead veio e tenha controle total sobre seu público.
+                  </p>
+                  <p className="text-xl text-gray-300 leading-relaxed mb-8 font-light">
+                    Arraste e solte para organizar — simples assim.
+                  </p>
+                  <div className="space-y-4">
+                    {[
+                      'Filtros por tags e origem',
+                      'Visualização de histórico de conversas',
+                      'Drag & drop para organização',
+                      'Acesso rápido ao chat direto'
+                    ].map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-3">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-r from-blue-400 via-cyan-500 to-teal-400 flex items-center justify-center flex-shrink-0">
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <span className="text-gray-300 font-light">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Bloco 4: CRM Visual (Fundo Bege) */}
+        <section className="py-32 bg-[#E1DFDB] relative overflow-hidden" id="crm-visual">
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
+              <div className="grid md:grid-cols-2 gap-16 items-center">
+                {/* Texto */}
+                <div>
+                  <h2 className="text-5xl md:text-6xl font-light text-black mb-8 leading-tight">
+                    CRM Visual. <span className="font-normal bg-gradient-to-r from-orange-500 via-pink-500 to-purple-500 bg-clip-text text-transparent">Veja suas vendas acontecendo.</span>
+                  </h2>
+                  <p className="text-xl text-gray-700 leading-relaxed mb-6 font-light">
+                    Um Kanban intuitivo que transforma a gestão do seu funil de vendas em algo visual e simples. Arraste leads entre etapas, acompanhe o progresso de cada negociação e tenha clareza total sobre onde está cada oportunidade.
+                  </p>
+                  <p className="text-xl text-gray-700 leading-relaxed mb-8 font-light">
+                    Novo → Apresentação → Negociação → Fechamento. <br />
+                    O caminho do seu cliente, visível para você.
+                  </p>
+                  <div className="space-y-4">
+                    {[
+                      '4 etapas personalizáveis',
+                      'Drag & drop para mover leads',
+                      'Visualização de valor por etapa',
+                      'Integração com conversas do WhatsApp'
+                    ].map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-3">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-r from-orange-500 via-pink-500 to-purple-500 flex items-center justify-center flex-shrink-0">
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <span className="text-gray-700 font-light">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Vídeo */}
+                <div className="relative">
+                  <div className="bg-gradient-to-br from-orange-500 via-pink-500 to-purple-500 rounded-[40px] p-8">
+                    <video
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full h-auto rounded-3xl"
+                    >
+                      <source src="/crm-kanban-demo.mp4" type="video/mp4" />
+                    </video>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Bloco 5: Agente Personalizado (Fundo Preto) */}
+        <section className="py-32 bg-black rounded-t-[40px] md:rounded-t-[80px] relative overflow-hidden -mt-1" id="agente-personalizado">
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
+              <div className="grid md:grid-cols-2 gap-16 items-center">
+                {/* Imagem */}
+                <div className="relative">
+                  <div className="bg-gradient-to-br from-yellow-400 via-orange-500 to-pink-500 rounded-[40px] p-8">
+                    <img
+                      src="/agent-config-demo.png"
+                      alt="Configuração do Agente"
+                      className="w-full h-auto rounded-3xl"
+                    />
+                  </div>
+                </div>
+
+                {/* Texto */}
+                <div>
+                  <h2 className="text-5xl md:text-6xl font-light text-white mb-8 leading-tight">
+                    Seu Clone Digital. <span className="font-normal bg-gradient-to-r from-yellow-400 via-orange-500 to-pink-500 bg-clip-text text-transparent">Construído com os seus dados.</span>
+                  </h2>
+                  <p className="text-xl text-gray-300 leading-relaxed mb-6 font-light">
+                    Diferente de chatbots genéricos, o agente da SwiftBot é configurado a partir de uma análise detalhada das suas conversas reais. Ele aprende seu tom de voz, entende seus produtos e faz as perguntas certas — como se fosse você atendendo.
+                  </p>
+                  <p className="text-xl text-gray-300 leading-relaxed mb-8 font-light">
+                    Não é um robô. É a versão escalável de você.
+                  </p>
+                  <div className="space-y-4">
+                    {[
+                      'Análise de conversas reais para aprendizado',
+                      'Personalização de tom e estilo',
+                      'Respostas contextualmente inteligentes',
+                      'Melhoria contínua com feedback'
+                    ].map((item, idx) => (
                       <div key={idx} className="flex items-center gap-3">
                         <div className="w-6 h-6 rounded-full bg-gradient-to-r from-yellow-400 via-orange-500 to-pink-500 flex items-center justify-center flex-shrink-0">
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -506,24 +688,12 @@ export default function Home() {
                     ))}
                   </div>
                 </div>
-
-                {/* Card com imagem do dashboard */}
-                <div className="relative md:order-1">
-                  <div className="bg-gradient-to-br from-yellow-400 via-orange-500 to-pink-500 rounded-[40px] p-8">
-                    <img 
-                      src="/dashboard.png" 
-                      alt="SwiftBot Dashboard"
-                      className="w-full h-auto rounded-2xl"
-                    />
-                  </div>
-                </div>
               </div>
             </div>
-
           </div>
         </section>
 
-{/* SEÇÃO 5: SETUP EM 3 PASSOS */}
+        {/* SEÇÃO 5: SETUP EM 3 PASSOS */}
         <section className="py-32 bg-black rounded-b-[40px] md:rounded-b-[80px] relative overflow-hidden" id="setup">
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-20 animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
@@ -559,7 +729,7 @@ export default function Home() {
                   icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 }
               ].map((step, idx) => (
-                <div 
+                <div
                   key={idx}
                   className="relative animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000"
                   style={{ transitionDelay: `${idx * 150}ms` }}
@@ -571,14 +741,14 @@ export default function Home() {
                       <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br ${step.gradient} mb-6`}>
                         <span className="text-2xl font-black text-black">{step.num}</span>
                       </div>
-                      
+
                       {/* Ícone */}
                       <div className="mb-6">
                         <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24">
                           <defs>
                             <linearGradient id={`gradient-${idx}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                              <stop offset="0%" style={{stopColor: idx === 0 ? '#4ade80' : idx === 1 ? '#c084fc' : '#22d3ee'}} />
-                              <stop offset="100%" style={{stopColor: idx === 0 ? '#10b981' : idx === 1 ? '#ec4899' : '#3b82f6'}} />
+                              <stop offset="0%" style={{ stopColor: idx === 0 ? '#4ade80' : idx === 1 ? '#c084fc' : '#22d3ee' }} />
+                              <stop offset="100%" style={{ stopColor: idx === 0 ? '#10b981' : idx === 1 ? '#ec4899' : '#3b82f6' }} />
                             </linearGradient>
                           </defs>
                           <g stroke={`url(#gradient-${idx})`} strokeWidth="1.5">
@@ -586,7 +756,7 @@ export default function Home() {
                           </g>
                         </svg>
                       </div>
-                      
+
                       {/* Texto */}
                       <h3 className="text-2xl font-medium text-white mb-4">
                         {step.title}
@@ -607,7 +777,7 @@ export default function Home() {
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-20 animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
               <h2 className="text-5xl md:text-6xl font-light text-black mb-6 leading-tight">
-                Inteligência que vai <span className="font-normal bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent">além das palavras.</span>
+                Tudo que você precisa. <span className="font-normal text-black">Em uma única plataforma.</span>
               </h2>
             </div>
 
@@ -615,43 +785,94 @@ export default function Home() {
               {[
                 {
                   icon: (
-                    <svg className="w-10 h-10" fill="none" stroke="url(#gradient1)" viewBox="0 0 24 24">
+                    <svg className="w-10 h-10" fill="none" stroke="url(#gradient-swiftbot)" viewBox="0 0 24 24">
                       <defs>
-                        <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#ec4899" />
-                          <stop offset="50%" stopColor="#a855f7" />
+                        <linearGradient id="gradient-swiftbot" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#a855f7" />
+                          <stop offset="50%" stopColor="#ec4899" />
                           <stop offset="100%" stopColor="#6366f1" />
+                        </linearGradient>
+                      </defs>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  ),
+                  title: "SwiftBot IA",
+                  text: "Sua consultora de negócios pessoal. Analisa dados, cria scripts e identifica oportunidades.",
+                  delay: "0ms"
+                },
+                {
+                  icon: (
+                    <svg className="w-10 h-10" fill="none" stroke="url(#gradient-chat)" viewBox="0 0 24 24">
+                      <defs>
+                        <linearGradient id="gradient-chat" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#10b981" />
+                          <stop offset="50%" stopColor="#059669" />
+                          <stop offset="100%" stopColor="#14b8a6" />
                         </linearGradient>
                       </defs>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                     </svg>
                   ),
-                  title: "IA Conversacional Avançada",
-                  text: "Nunca mais deixe um cliente se repetir. Nossa IA mantém o contexto completo de cada conversa, entende gírias e regionalismos, e oferece respostas personalizadas que parecem ter sido escritas por um humano experiente.",
+                  title: "Chat ao Vivo",
+                  text: "Interface familiar do WhatsApp. Atenda quando a IA precisar de você.",
+                  delay: "100ms"
+                },
+                {
+                  icon: (
+                    <svg className="w-10 h-10" fill="none" stroke="url(#gradient-crm)" viewBox="0 0 24 24">
+                      <defs>
+                        <linearGradient id="gradient-crm" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#f97316" />
+                          <stop offset="50%" stopColor="#ec4899" />
+                          <stop offset="100%" stopColor="#a855f7" />
+                        </linearGradient>
+                      </defs>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                    </svg>
+                  ),
+                  title: "CRM Visual",
+                  text: "Kanban intuitivo para visualizar e gerenciar seu funil de vendas.",
+                  delay: "200ms"
+                },
+                {
+                  icon: (
+                    <svg className="w-10 h-10" fill="none" stroke="url(#gradient-contacts)" viewBox="0 0 24 24">
+                      <defs>
+                        <linearGradient id="gradient-contacts" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#3b82f6" />
+                          <stop offset="50%" stopColor="#06b6d4" />
+                          <stop offset="100%" stopColor="#14b8a6" />
+                        </linearGradient>
+                      </defs>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  ),
+                  title: "Gestão de Contatos",
+                  text: "Organize sua base com tags, origens e filtros inteligentes.",
                   delay: "0ms"
                 },
                 {
                   icon: (
-                    <svg className="w-10 h-10" fill="none" stroke="url(#gradient2)" viewBox="0 0 24 24">
+                    <svg className="w-10 h-10" fill="none" stroke="url(#gradient-agent)" viewBox="0 0 24 24">
                       <defs>
-                        <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <linearGradient id="gradient-agent" x1="0%" y1="0%" x2="100%" y2="100%">
                           <stop offset="0%" stopColor="#fbbf24" />
                           <stop offset="50%" stopColor="#f97316" />
                           <stop offset="100%" stopColor="#ec4899" />
                         </linearGradient>
                       </defs>
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   ),
-                  title: "Aprendizado Contínuo",
-                  text: "Seu clone fica mais inteligente a cada dia. A IA aprende com cada nova interação e incorpora seu feedback, melhorando automaticamente para se adaptar a novos produtos, promoções e perguntas dos clientes.",
+                  title: "Agente Personalizado",
+                  text: "IA treinada com suas conversas reais. Atende como você atenderia.",
                   delay: "100ms"
                 },
                 {
                   icon: (
-                    <svg className="w-10 h-10" fill="none" stroke="url(#gradient3)" viewBox="0 0 24 24">
+                    <svg className="w-10 h-10" fill="none" stroke="url(#gradient-security)" viewBox="0 0 24 24">
                       <defs>
-                        <linearGradient id="gradient3" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <linearGradient id="gradient-security" x1="0%" y1="0%" x2="100%" y2="100%">
                           <stop offset="0%" stopColor="#22d3ee" />
                           <stop offset="50%" stopColor="#3b82f6" />
                           <stop offset="100%" stopColor="#a855f7" />
@@ -660,12 +881,12 @@ export default function Home() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                   ),
-                  title: "Segurança de Nível Bancário",
-                  text: "Proteja o que mais importa: seus dados e os de seus clientes. Com criptografia de ponta-a-ponta e conformidade total com a LGPD, suas conversas estão seguras em uma fortaleza digital.",
+                  title: "Segurança LGPD",
+                  text: "Criptografia de ponta a ponta. Seus dados protegidos como em banco.",
                   delay: "200ms"
                 }
               ].map((feature, idx) => (
-                <div 
+                <div
                   key={idx}
                   className="bg-white/70 backdrop-blur-sm rounded-3xl p-8 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500 animate-on-scroll opacity-0 translate-y-10"
                   style={{ transitionDelay: feature.delay }}
@@ -685,7 +906,7 @@ export default function Home() {
           </div>
         </section>
 
-{/* SEÇÃO 7: SEGMENTOS DE CLIENTES */}
+        {/* SEÇÃO 7: SEGMENTOS DE CLIENTES */}
         <section className="py-24 bg-[#E1DFDB] relative overflow-hidden" id="segmentos">
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-20 animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
@@ -746,7 +967,7 @@ export default function Home() {
                   delay: "200ms"
                 }
               ].map((segment, idx) => (
-                <div 
+                <div
                   key={idx}
                   className="bg-white/70 backdrop-blur-sm rounded-3xl p-8 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500 animate-on-scroll opacity-0 translate-y-10"
                   style={{ transitionDelay: segment.delay }}
@@ -816,7 +1037,7 @@ export default function Home() {
                   delay: "200ms"
                 }
               ].map((segment, idx) => (
-                <div 
+                <div
                   key={idx}
                   className="bg-white/70 backdrop-blur-sm rounded-3xl p-8 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500 animate-on-scroll opacity-0 translate-y-10"
                   style={{ transitionDelay: segment.delay }}
@@ -836,7 +1057,7 @@ export default function Home() {
           </div>
         </section>
 
-{/* SEÇÃO 8: CTA FINAL COM VÍDEO DE FUNDO */}
+        {/* SEÇÃO 8: CTA FINAL COM VÍDEO DE FUNDO */}
         <section className="py-32 bg-black rounded-t-[40px] md:rounded-t-[80px] relative overflow-hidden -mt-1">
           {/* Video Background */}
           <video
@@ -851,27 +1072,30 @@ export default function Home() {
 
           {/* Overlay com gradiente sutil */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/90" />
-          
+
           <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center animate-on-scroll opacity-0 scale-95 transition-all duration-1000">
-              
+
               {/* Badge superior */}
               <div className="inline-flex items-center gap-2 bg-white/5 backdrop-blur-sm rounded-full px-6 py-2 mb-8">
                 <div className="w-2 h-2 bg-[#00FF99] rounded-full animate-pulse" />
-                <span className="text-sm text-gray-300 font-light">Mais de 5.000 empresas já escalaram sua expertise</span>
+                <span className="text-sm text-gray-300 font-light">Hub completo de IA para sua empresa</span>
               </div>
 
               {/* Título principal */}
               <h2 className="text-5xl md:text-7xl font-light text-white mb-6 leading-tight">
-                Você pode contratar mais um funcionário. <br />
+                Uma plataforma. Cinco soluções. <br />
                 <span className="font-normal bg-gradient-to-r from-[#00FF99] via-[#00E88C] to-[#00D97F] bg-clip-text text-transparent">
-                  Ou pode clonar o melhor que você já tem.
+                  Resultados que você vai ver.
                 </span>
               </h2>
 
               <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto mb-12 leading-relaxed font-light">
-                Junte-se a empresas que transformaram seu WhatsApp em uma máquina de crescimento autônoma. 
-                Cancele quando quiser. Suporte completo incluído.
+                WhatsApp inteligente • Chat ao vivo • CRM visual • Gestão de contatos • IA personalizada
+                <br />
+                <span className="text-base mt-2 block">
+                  Tudo isso por um valor que cabe no seu bolso.
+                </span>
               </p>
 
               {/* CTA Button */}
@@ -879,7 +1103,7 @@ export default function Home() {
                 onClick={() => router.push('/login')}
                 className="group relative px-12 py-5 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black rounded-full font-semibold text-lg transition-all duration-300 hover:shadow-[0_0_60px_rgba(0,255,153,0.6)] hover:scale-105 mb-10"
               >
-                <span className="relative z-10">Criar Meu Clone Digital Grátis</span>
+                <span className="relative z-10">Começar meu teste grátis</span>
                 <div className="absolute inset-0 bg-white/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </button>
 
@@ -911,37 +1135,37 @@ export default function Home() {
 
       </main>
 
-{/* Footer */}
-{/* Footer */}
+      {/* Footer */}
+      {/* Footer */}
       <footer className="relative z-10 bg-black border-t border-white/10 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-5 gap-12 mb-12">
-            
+
             {/* Coluna 1: Logo e descrição */}
             <div className="md:col-span-2">
               <div className="flex items-center mb-6">
                 <div className="w-8 h-8 mr-3 flex items-center justify-center">
                   <svg width="32" height="32" viewBox="0 0 1564 1564" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1001.683,23.139L433.941,727.705C433.941,727.705 414.727,752.657 429.123,757.818C454,766.738 783.43,754.723 771.86,756.415C771.86,756.415 799.555,753.473 791.713,787.082C784.04,819.968 735.527,1088.176 721.925,1130.644C708.323,1173.112 714.745,1159.731 714.745,1159.731C712.575,1159.731 711.288,1182.876 723.478,1185.568C736.204,1188.379 743.209,1188.065 756.911,1174.333C771.677,1159.534 861.262,1028.542 863.24,1028.542L1226.88,546.873C1227.906,548.514 1248.393,525.692 1221.45,522.235M1221.45,522.235L1115.236,520.972L902.566,520.972C902.566,520.972 885.36,525.188 897.567,497.267C909.774,469.345 912.072,456.497 912.072,456.497L1022.331,70.647L1028.875,32.645C1028.875,32.645 1026.615,9.308 1001.808,23.139" fill="#04F5A0"/>
-                     <path d="M507.177,1105.829C493.786,1121.663 477.201,1132.121 457.867,1137.955L690.658,1372.989C705.266,1359.456 721.561,1351.518 738.923,1347.115L507.177,1105.829ZM429.844,939.939C485.576,939.939 530.824,985.187 530.824,1040.92C530.824,1096.653 485.576,1141.901 429.844,1141.901C374.111,1141.901 328.863,1096.653 328.863,1040.92C328.863,985.187 374.111,939.939 429.844,939.939ZM429.844,981.253C462.775,981.253 489.511,1007.989 489.511,1040.92C489.511,1073.851 462.775,1100.587 429.844,1100.587C396.912,1100.587 370.176,1073.851 370.176,1040.92C370.176,1007.989 396.912,981.253 429.844,981.253ZM1028.441,1105.372L797.555,1352.091C814.771,1359.117 830.462,1370.383 842.586,1387.319L1073.308,1136.429C1056.017,1130.603 1041.204,1119.974 1028.441,1105.372ZM760.432,1345.038C816.124,1345.076 861.398,1390.3 861.413,1446.019C861.428,1501.752 816.165,1547 760.432,1547C704.699,1547 659.451,1501.752 659.451,1446.019C659.451,1390.286 704.699,1345 760.432,1345.038ZM760.432,1386.352C793.363,1386.352 820.1,1413.088 820.1,1446.019C820.1,1478.951 793.363,1505.687 760.432,1505.687C727.501,1505.687 700.765,1478.951 700.765,1446.019C700.765,1413.088 727.501,1386.352 760.432,1386.352ZM1106.156,939.939C1161.889,939.939 1207.137,985.187 1207.137,1040.92C1207.137,1096.653 1161.889,1141.901 1106.156,1106.156C1050.424,1141.901 1005.176,1096.653 1005.176,1040.92C1005.176,985.187 1050.424,939.939 1106.156,939.939ZM1106.156,981.253C1139.088,981.253 1165.824,1007.989 1165.824,1040.92C1165.824,1073.851 1139.088,1100.587 1106.156,1100.587C1073.225,1100.587 1046.489,1073.851 1046.489,1040.92C1046.489,1007.989 1073.225,981.253 1106.156,981.253Z" fill="#04F5A0" stroke="#04F5A0" strokeWidth="1"/>
+                    <path d="M1001.683,23.139L433.941,727.705C433.941,727.705 414.727,752.657 429.123,757.818C454,766.738 783.43,754.723 771.86,756.415C771.86,756.415 799.555,753.473 791.713,787.082C784.04,819.968 735.527,1088.176 721.925,1130.644C708.323,1173.112 714.745,1159.731 714.745,1159.731C712.575,1159.731 711.288,1182.876 723.478,1185.568C736.204,1188.379 743.209,1188.065 756.911,1174.333C771.677,1159.534 861.262,1028.542 863.24,1028.542L1226.88,546.873C1227.906,548.514 1248.393,525.692 1221.45,522.235M1221.45,522.235L1115.236,520.972L902.566,520.972C902.566,520.972 885.36,525.188 897.567,497.267C909.774,469.345 912.072,456.497 912.072,456.497L1022.331,70.647L1028.875,32.645C1028.875,32.645 1026.615,9.308 1001.808,23.139" fill="#04F5A0" />
+                    <path d="M507.177,1105.829C493.786,1121.663 477.201,1132.121 457.867,1137.955L690.658,1372.989C705.266,1359.456 721.561,1351.518 738.923,1347.115L507.177,1105.829ZM429.844,939.939C485.576,939.939 530.824,985.187 530.824,1040.92C530.824,1096.653 485.576,1141.901 429.844,1141.901C374.111,1141.901 328.863,1096.653 328.863,1040.92C328.863,985.187 374.111,939.939 429.844,939.939ZM429.844,981.253C462.775,981.253 489.511,1007.989 489.511,1040.92C489.511,1073.851 462.775,1100.587 429.844,1100.587C396.912,1100.587 370.176,1073.851 370.176,1040.92C370.176,1007.989 396.912,981.253 429.844,981.253ZM1028.441,1105.372L797.555,1352.091C814.771,1359.117 830.462,1370.383 842.586,1387.319L1073.308,1136.429C1056.017,1130.603 1041.204,1119.974 1028.441,1105.372ZM760.432,1345.038C816.124,1345.076 861.398,1390.3 861.413,1446.019C861.428,1501.752 816.165,1547 760.432,1547C704.699,1547 659.451,1501.752 659.451,1446.019C659.451,1390.286 704.699,1345 760.432,1345.038ZM760.432,1386.352C793.363,1386.352 820.1,1413.088 820.1,1446.019C820.1,1478.951 793.363,1505.687 760.432,1505.687C727.501,1505.687 700.765,1478.951 700.765,1446.019C700.765,1413.088 727.501,1386.352 760.432,1386.352ZM1106.156,939.939C1161.889,939.939 1207.137,985.187 1207.137,1040.92C1207.137,1096.653 1161.889,1141.901 1106.156,1106.156C1050.424,1141.901 1005.176,1096.653 1005.176,1040.92C1005.176,985.187 1050.424,939.939 1106.156,939.939ZM1106.156,981.253C1139.088,981.253 1165.824,1007.989 1165.824,1040.92C1165.824,1073.851 1139.088,1100.587 1106.156,1100.587C1073.225,1100.587 1046.489,1073.851 1046.489,1040.92C1046.489,1007.989 1073.225,981.253 1106.156,981.253Z" fill="#04F5A0" stroke="#04F5A0" strokeWidth="1" />
                   </svg>
                 </div>
                 <span className="text-xl font-semibold text-white">SwiftBot</span>
               </div>
               <p className="text-gray-400 leading-relaxed mb-6 font-light max-w-sm">
-                Clone seu atendimento e escale sua expertise infinitamente. 
+                Clone seu atendimento e escale sua expertise infinitamente.
                 Transforme seu WhatsApp em uma máquina de crescimento autônoma.
               </p>
               <div className="flex space-x-4">
                 {/* Social Icons */}
                 <a href="https://www.facebook.com/SwiftBott" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all duration-300 hover:border-[#00FF99]">
                   <svg className="w-5 h-5 text-gray-400 hover:text-[#00FF99]" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                   </svg>
                 </a>
                 <a href="https://www.instagram.com/swiftbot.ia" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all duration-300 hover:border-[#00FF99]">
                   <svg className="w-5 h-5 text-gray-400 hover:text-[#00FF99]" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
                   </svg>
                 </a>
               </div>
@@ -953,7 +1177,7 @@ export default function Home() {
               <ul className="space-y-3">
                 <li><a href="#funcionalidades" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Funcionalidades</a></li>
                 <li><a href="#segmentos" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Segmentos</a></li>
-                <li><a href="/precos" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Preços</a></li>
+                <li><a href="/pricing" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Preços</a></li>
               </ul>
             </div>
 
@@ -985,8 +1209,8 @@ export default function Home() {
               © 2025 SwiftBot. Todos os direitos reservados.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-6">
-              <a href="/privacidade" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Privacidade</a>
-              <a href="/termos" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Termos de Uso</a>
+              <a href="/privacy" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Privacidade</a>
+              <a href="/terms" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Termos de Uso</a>
               <a href="/cookies" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Política de Cookies/LGPD</a>
             </div>
           </div>

@@ -54,31 +54,31 @@ export default function Sidebar() {
     {
       icon: Trello,
       label: 'CRM',
-      href: '/dashboard/sales-funnel',
+      href: '/crm',
       badge: null
     },
     {
       icon: Users,
       label: 'Contatos',
-      href: '/dashboard/contacts',
+      href: '/contacts',
       badge: null
     },
     {
       icon: MessageCircle,
       label: 'Chat ao vivo',
-      href: '/dashboard/chat',
+      href: '/chat',
       badge: null
     },
     {
       icon: Bot,
       label: 'Automações',
-      href: '/dashboard/automations',
+      href: '/automations',
       badge: '🚧'
     },
     {
       icon: Settings,
       label: 'Configurações',
-      href: '/dashboard/settings',
+      href: '/settings',
       badge: '🚧'
     }
   ]
@@ -102,13 +102,13 @@ export default function Sidebar() {
     {
       icon: Lightbulb,
       label: 'Central de Sugestões',
-      href: '/sugestao',
+      href: '/suggestions',
       badge: null
     },
     {
       icon: HelpCircle,
       label: 'Central de Ajuda',
-      href: '/suporte',
+      href: '/support',
       badge: null
     }
   ]
