@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Menu, X, Plus, MessageCircle, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
 import NoSubscription from '../components/NoSubscription'
+import SwiftBotTrial from '../components/SwiftBotTrial'
 // ==================================================================================
 // SWIFTBOT IA
 // ==================================================================================
@@ -32,14 +33,10 @@ export default function SwiftbotProPage() {
   const [activeChatId, setActiveChatId] = useState(null)
   const [isMobile, setIsMobile] = useState(false)
 
-  // Mock de histórico de chats
-  const mockChatHistory = [
-    { id: 1, title: 'Script de vendas para SaaS', date: 'Hoje', preview: 'Gere um script de vendas...' },
-    { id: 2, title: 'Objeções sobre preço', date: 'Hoje', preview: 'Quais são as principais...' },
-    { id: 3, title: 'Copy para WhatsApp', date: 'Ontem', preview: 'Sugira textos de copy...' },
-    { id: 4, title: 'Análise de mercado', date: 'Ontem', preview: 'Analise meu mercado...' },
-    { id: 5, title: 'Estratégia de follow-up', date: '23 Nov', preview: 'Como fazer follow-up...' },
-  ]
+  // Novos estados para API real
+  const [credits, setCredits] = useState({ balance: 0, formatted: '0' })
+  const [connectionId, setConnectionId] = useState(null)
+  const [creditsError, setCreditsError] = useState(false)
 
   // Sugestões de prompts
   const suggestions = [
@@ -81,15 +78,57 @@ export default function SwiftbotProPage() {
     }
   ]
 
-  // ferramenta BOLD
-const formatMessage = (content) => {
-  return content.split(/(\*\*.*?\*\*)/g).map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i} className="font-semibold text-white">{part.slice(2, -2)}</strong>
-    }
-    return part
-  })
-}
+  // Formatação de Markdown para HTML
+  const formatMessage = (content) => {
+    if (!content) return null
+
+    // Divide por linhas para processar headings
+    const lines = content.split('\n')
+
+    return lines.map((line, lineIndex) => {
+      // Headings
+      if (line.startsWith('### ')) {
+        return <h3 key={lineIndex} className="text-lg font-bold text-white mt-4 mb-2">{formatInline(line.slice(4))}</h3>
+      }
+      if (line.startsWith('## ')) {
+        return <h2 key={lineIndex} className="text-xl font-bold text-white mt-4 mb-2">{formatInline(line.slice(3))}</h2>
+      }
+      if (line.startsWith('# ')) {
+        return <h1 key={lineIndex} className="text-2xl font-bold text-white mt-4 mb-2">{formatInline(line.slice(2))}</h1>
+      }
+
+      // Lista com -
+      if (line.trim().startsWith('- ')) {
+        return (
+          <div key={lineIndex} className="flex gap-2 ml-2 my-1">
+            <span className="text-[#00FF99]">•</span>
+            <span>{formatInline(line.trim().slice(2))}</span>
+          </div>
+        )
+      }
+
+      // Linha vazia
+      if (line.trim() === '') {
+        return <div key={lineIndex} className="h-2" />
+      }
+
+      // Texto normal
+      return <p key={lineIndex} className="my-1">{formatInline(line)}</p>
+    })
+  }
+
+  // Formata elementos inline (bold, italic)
+  const formatInline = (text) => {
+    if (!text) return text
+
+    // Processa **bold**
+    return text.split(/(\*\*.*?\*\*)/g).map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={i} className="font-semibold text-white">{part.slice(2, -2)}</strong>
+      }
+      return part
+    })
+  }
   // Scroll para última mensagem
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -99,34 +138,96 @@ const formatMessage = (content) => {
     scrollToBottom()
   }, [messages])
 
-  // Carregar histórico de chats mock
+  // Carregar dados reais da API
   useEffect(() => {
-    setChatHistory(mockChatHistory)
-  }, [])
+    if (user) {
+      loadCredits()
+      loadConversations()
+      loadActiveConnection()
+    }
+  }, [user])
 
   // Verificar usuário
   useEffect(() => {
     checkUser()
   }, [])
 
-const toggleMessageExpand = (index) => {
-  setExpandedMessages(prev => ({ ...prev, [index]: !prev[index] }))
-}
+  const toggleMessageExpand = (index) => {
+    setExpandedMessages(prev => ({ ...prev, [index]: !prev[index] }))
+  }
 
-const MESSAGE_PREVIEW_LENGTH = 280
- // Detectar mobile
-useEffect(() => {
-  const checkMobile = () => setIsMobile(window.innerWidth < 768)
-  checkMobile()
-  window.addEventListener('resize', checkMobile)
-  return () => window.removeEventListener('resize', checkMobile)
-}, [])
+  const MESSAGE_PREVIEW_LENGTH = 280
+  // Detectar mobile
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  // Carregar créditos do usuário
+  const loadCredits = async () => {
+    try {
+      const res = await fetch('/api/swiftbot-ia/credits')
+      const data = await res.json()
+      if (data.exists) {
+        setCredits({ balance: data.balance, formatted: data.formatted })
+      } else {
+        // Inicializar créditos se não existir
+        const initRes = await fetch('/api/swiftbot-ia/credits', { method: 'POST' })
+        const initData = await initRes.json()
+        setCredits({ balance: initData.balance, formatted: initData.formatted })
+      }
+    } catch (error) {
+      console.error('Erro ao carregar créditos:', error)
+    }
+  }
+
+  // Carregar conversas do usuário
+  const loadConversations = async () => {
+    try {
+      const res = await fetch('/api/swiftbot-ia/conversations')
+      const data = await res.json()
+      if (data.conversations) {
+        setChatHistory(data.conversations)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar conversas:', error)
+    }
+  }
+
+  // Carregar conexão ativa do localStorage ou buscar do banco
+  const loadActiveConnection = async () => {
+    // Primeiro tenta localStorage
+    const savedConnectionId = localStorage.getItem('selectedWhatsappConnectionId')
+    if (savedConnectionId) {
+      console.log('[SwiftBot IA] Connection from localStorage:', savedConnectionId)
+      setConnectionId(savedConnectionId)
+      return
+    }
+
+    // Fallback: buscar primeira conexão do usuário
+    try {
+      const res = await fetch('/api/whatsapp/connections')
+      const data = await res.json()
+      if (data.connections?.length > 0) {
+        const firstConnection = data.connections[0]
+        console.log('[SwiftBot IA] Connection from database:', firstConnection.id)
+        setConnectionId(firstConnection.id)
+        // Salvar para próximas vezes
+        localStorage.setItem('selectedWhatsappConnectionId', firstConnection.id)
+      } else {
+        console.log('[SwiftBot IA] No connections found')
+      }
+    } catch (error) {
+      console.error('Erro ao carregar conexão:', error)
+    }
+  }
 
   const checkUser = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        // router.push('/login')
         return
       }
       setUser(user)
@@ -143,131 +244,157 @@ useEffect(() => {
       }
     } catch (error) {
       console.error('Erro ao verificar usuário:', error)
-      // router.push('/login')
     } finally {
       setLoading(false)
     }
   }
-const loadSubscription = async (userId) => {
-  try {
-    const { data, error } = await supabase
-      .from('user_subscriptions')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-    if (!error && data) {
-      const isActive = ['active', 'trial', 'trialing'].includes(data.status) || data.stripe_subscription_id === 'super_account_bypass'
-      const isExpired = data.trial_end_date && new Date() > new Date(data.trial_end_date)
-      
-      if (isActive && !isExpired) {
-        setSubscription(data)
+
+  const loadSubscription = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+      if (!error && data) {
+        const isActive = ['active', 'trial', 'trialing'].includes(data.status) || data.stripe_subscription_id === 'super_account_bypass'
+        const isExpired = data.trial_end_date && new Date() > new Date(data.trial_end_date)
+
+        if (isActive && !isExpired) {
+          setSubscription(data)
+        }
       }
+    } catch (error) {
+      console.error('Erro ao carregar assinatura:', error)
     }
-  } catch (error) {
-    console.error('Erro ao carregar assinatura:', error)
   }
-}
-  // Criar novo chat
-  const handleNewChat = () => {
+  // Criar novo chat - agora cria via API
+  const handleNewChat = async () => {
     setChatStarted(false)
     setMessages([])
     setActiveChatId(null)
     setInputValue('')
+    setCreditsError(false)
   }
 
-  // Selecionar chat existente
-  const handleSelectChat = (chatId) => {
-    setActiveChatId(chatId)
-    setChatStarted(true)
-    setMessages([
-      { role: 'user', content: 'Pergunta do chat anterior...' },
-      { role: 'assistant', content: 'Resposta mockada do assistente para demonstração.' }
-    ])
-  }
+  // Selecionar chat existente - carrega mensagens da API
+  const handleSelectChat = async (chatId) => {
+    try {
+      setActiveChatId(chatId)
+      setChatStarted(true)
 
-  // Simular resposta da IA
-  const simulateAIResponse = async (userMessage) => {
-    setIsTyping(true)
-    await new Promise(resolve => setTimeout(resolve, 2000))
+      const res = await fetch(`/api/swiftbot-ia/conversations/${chatId}`)
+      const data = await res.json()
 
-    let aiResponse = ''
+      if (data.conversation?.messages) {
+        setMessages(data.conversation.messages.map(m => ({
+          role: m.role,
+          content: m.content
+        })))
+      }
 
-    if (userMessage.toLowerCase().includes('script') || userMessage.toLowerCase().includes('vendas')) {
-      aiResponse = `**Script de Vendas Sugerido:**
-
-1. **Abertura:** "Olá! Vi que você demonstrou interesse em [produto]. Posso te ajudar a encontrar a melhor solução?"
-
-2. **Qualificação:** "Para te ajudar melhor, me conta: qual é o seu maior desafio atualmente com [área do problema]?"
-
-3. **Apresentação:** "Baseado no que você me contou, nosso [produto] pode te ajudar porque [benefício principal]..."
-
-4. **Fechamento:** "Que tal começarmos com [oferta especial]? Posso garantir [benefício] se você fechar hoje."
-
-*Dica: Personalize este script com informações do seu produto configurado no agente.*`
-    } else if (userMessage.toLowerCase().includes('objeç') || userMessage.toLowerCase().includes('objecao')) {
-      aiResponse = `**Principais Objeções e Respostas:**
-
-**1. "Está muito caro"**
-> "Entendo sua preocupação com o investimento. Mas me deixa te mostrar: considerando [benefício], o retorno que você terá é de X vezes o valor investido..."
-
-**2. "Preciso pensar"**
-> "Claro! Enquanto você pensa, posso te enviar um material com casos de sucesso? Ah, e hoje temos uma condição especial que expira em [prazo]..."
-
-**3. "Já uso outra solução"**
-> "Que bom que você já investe nisso! Me conta: o que você mais gosta da solução atual? E o que poderia ser melhor?"`
-    } else if (userMessage.toLowerCase().includes('copy') || userMessage.toLowerCase().includes('mensagem')) {
-      aiResponse = `**Sugestões de Copy para WhatsApp:**
-
-**Para Primeiro Contato:**
-"Oi [Nome]! Tudo bem? Sou [seu nome] da [empresa]. Vi que você se interessou por [produto/serviço]. Posso te mostrar como [benefício principal] em apenas [tempo]?"
-
-**Para Follow-up:**
-"Oi [Nome]! Lembra que conversamos sobre [assunto]? Tenho uma novidade que pode te interessar..."
-
-**Para Reengajar:**
-"[Nome], sentimos sua falta! Preparamos algo especial para você: [oferta]. Válido só até [data]."`
-    } else {
-      aiResponse = `Analisei sua solicitação sobre "${userMessage.substring(0, 50)}..."
-
-**Algumas observações:**
-
-1. Para uma análise mais precisa, recomendo que você configure seu agente IA com informações detalhadas sobre seu produto e mercado.
-
-2. Baseado nas melhores práticas de atendimento via WhatsApp:
-   - Respostas rápidas aumentam conversão em até 400%
-   - Mensagens personalizadas têm 26% mais engajamento
-   - Follow-ups estratégicos recuperam 30% dos leads perdidos
-
-Posso te ajudar com algo mais específico?`
+      if (isMobile) {
+        setChatSidebarOpen(false)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar conversa:', error)
+      setMessages([])
     }
-
-    setIsTyping(false)
-    setMessages(prev => [...prev, { role: 'assistant', content: aiResponse }])
   }
 
-  // Enviar mensagem
+  // Enviar mensagem - usa API real
   const handleSendMessage = async (message) => {
     if (!message.trim()) return
+    if (isTyping) return
 
     const userMessage = message.trim()
     setInputValue('')
+    setCreditsError(false)
 
-    if (!chatStarted) {
-      setChatStarted(true)
-      const newChat = {
-        id: Date.now(),
-        title: userMessage.substring(0, 30) + (userMessage.length > 30 ? '...' : ''),
-        date: 'Agora',
-        preview: userMessage
+    let currentConversationId = activeChatId
+
+    // Se não tem conversa ativa, criar uma nova
+    if (!chatStarted || !currentConversationId) {
+      try {
+        const createRes = await fetch('/api/swiftbot-ia/conversations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ connectionId })
+        })
+        const createData = await createRes.json()
+
+        if (createData.conversation) {
+          currentConversationId = createData.conversation.id
+          setActiveChatId(currentConversationId)
+          setChatStarted(true)
+          setChatHistory(prev => [createData.conversation, ...prev])
+        }
+      } catch (error) {
+        console.error('Erro ao criar conversa:', error)
+        return
       }
-      setChatHistory(prev => [newChat, ...prev])
-      setActiveChatId(newChat.id)
     }
 
+    // Adicionar mensagem do usuário ao chat
     setMessages(prev => [...prev, { role: 'user', content: userMessage }])
-    await simulateAIResponse(userMessage)
+    setIsTyping(true)
+
+    try {
+      // Chamar API de chat
+      const chatRes = await fetch('/api/swiftbot-ia/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId: currentConversationId,
+          connectionId,
+          message: userMessage,
+          history: messages
+        })
+      })
+
+      const chatData = await chatRes.json()
+
+      if (!chatRes.ok) {
+        if (chatData.code === 'INSUFFICIENT_CREDITS') {
+          setCreditsError(true)
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: '⚠️ **Créditos insuficientes**\n\nVocê não possui créditos suficientes para continuar. Considere adquirir mais créditos para usar o SwiftBot IA.'
+          }])
+        } else {
+          throw new Error(chatData.error || 'Erro ao processar mensagem')
+        }
+      } else {
+        // Adicionar resposta da IA
+        setMessages(prev => [...prev, { role: 'assistant', content: chatData.message }])
+
+        // Atualizar créditos
+        if (chatData.newBalance !== undefined) {
+          setCredits({
+            balance: chatData.newBalance,
+            formatted: chatData.formattedBalance || chatData.newBalance.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+          })
+        }
+
+        // Atualizar título na lista se for a primeira mensagem
+        if (messages.length === 0) {
+          const title = userMessage.substring(0, 40) + (userMessage.length > 40 ? '...' : '')
+          setChatHistory(prev => prev.map(c =>
+            c.id === currentConversationId ? { ...c, title } : c
+          ))
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao enviar mensagem:', error)
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: '❌ **Erro**\n\nDesculpe, ocorreu um erro ao processar sua mensagem. Tente novamente.'
+      }])
+    } finally {
+      setIsTyping(false)
+    }
   }
 
   const handleSubmit = (e) => {
@@ -286,9 +413,17 @@ Posso te ajudar com algo mais específico?`
       </div>
     )
   }
-if (!subscription) {
-  return <NoSubscription />
-}
+  if (!subscription) {
+    return <NoSubscription />
+  }
+
+  // Check if user is on trial (not yet paid)
+  const isTrialUser = subscription.status === 'trial' || subscription.status === 'trialing'
+  const isSuperAccount = subscription.stripe_subscription_id === 'super_account_bypass'
+
+  if (isTrialUser && !isSuperAccount) {
+    return <SwiftBotTrial trialEndDate={subscription.trial_end_date} />
+  }
   const userName = userProfile?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'Usuário'
 
   return (
@@ -297,102 +432,113 @@ if (!subscription) {
       {/* ============================================
           SIDEBAR DE CHATS (dentro do fluxo, não fixa)
           ============================================ */}
-{/* Overlay mobile */}
-{isMobile && chatSidebarOpen && (
-  <div
-    className="fixed inset-0 bg-black/50 z-40 md:hidden"
-    onClick={() => setChatSidebarOpen(false)}
-  />
-)}
+      {/* Overlay mobile */}
+      {isMobile && chatSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setChatSidebarOpen(false)}
+        />
+      )}
 
-<aside
-  className={`
+      <aside
+        className={`
     fixed left-0 top-0 h-full bg-[#1F1F1F] z-50
     transition-all duration-300 ease-in-out
     ${chatSidebarOpen ? 'w-[280px]' : 'w-[80px]'}
     ${isMobile && !chatSidebarOpen ? '-translate-x-full' : 'translate-x-0'}
     flex flex-col
   `}
->
-  {/* Header */}
-  <div className="flex items-center justify-between p-6 border-b border-gray-700">
-    {chatSidebarOpen ? (
-      <>
-        <div className="flex items-center gap-2">
-          <svg width="32" height="32" viewBox="0 0 1564 1564" xmlns="http://www.w3.org/2000/svg">
-            <path d="M1001.683,23.139L433.941,727.705C433.941,727.705 414.727,752.657 429.123,757.818C454,766.738 783.43,754.723 771.86,756.415C771.86,756.415 799.555,753.473 791.713,787.082C784.04,819.968 735.527,1088.176 721.925,1130.644C708.323,1173.112 714.745,1159.731 714.745,1159.731C712.575,1159.731 711.288,1182.876 723.478,1185.568C736.204,1188.379 743.209,1188.065 756.911,1174.333C771.677,1159.534 861.262,1028.542 863.24,1028.542L1226.88,546.873C1227.906,548.514 1248.393,525.692 1221.45,522.235M1221.45,522.235L1115.236,520.972L902.566,520.972C902.566,520.972 885.36,525.188 897.567,497.267C909.774,469.345 912.072,456.497 912.072,456.497L1022.331,70.647L1028.875,32.645C1028.875,32.645 1026.615,9.308 1001.808,23.139" fill="#00FF99"/>
-            <path d="M507.177,1105.829C493.786,1121.663 477.201,1132.121 457.867,1137.955L690.658,1372.989C705.266,1359.456 721.561,1351.518 738.923,1347.115L507.177,1105.829ZM429.844,939.939C485.576,939.939 530.824,985.187 530.824,1040.92C530.824,1096.653 485.576,1141.901 429.844,1141.901C374.111,1141.901 328.863,1096.653 328.863,1040.92C328.863,985.187 374.111,939.939 429.844,939.939ZM429.844,981.253C462.775,981.253 489.511,1007.989 489.511,1040.92C489.511,1073.851 462.775,1100.587 429.844,1100.587C396.912,1100.587 370.176,1073.851 370.176,1040.92C370.176,1007.989 396.912,981.253 429.844,981.253ZM1028.441,1105.372L797.555,1352.091C814.771,1359.117 830.462,1370.383 842.586,1387.319L1073.308,1136.429C1056.017,1130.603 1041.204,1119.974 1028.441,1105.372ZM760.432,1345.038C816.124,1345.076 861.398,1390.3 861.413,1446.019C861.428,1501.752 816.165,1547 760.432,1547C704.699,1547 659.451,1501.752 659.451,1446.019C659.451,1390.286 704.699,1345 760.432,1345.038ZM760.432,1386.352C793.363,1386.352 820.1,1413.088 820.1,1446.019C820.1,1478.951 793.363,1505.687 760.432,1505.687C727.501,1505.687 700.765,1478.951 700.765,1446.019C700.765,1413.088 727.501,1386.352 760.432,1386.352ZM1106.156,939.939C1161.889,939.939 1207.137,985.187 1207.137,1040.92C1207.137,1096.653 1161.889,1141.901 1106.156,1106.156C1050.424,1141.901 1005.176,1096.653 1005.176,1040.92C1005.176,985.187 1050.424,939.939 1106.156,939.939ZM1106.156,981.253C1139.088,981.253 1165.824,1007.989 1165.824,1040.92C1165.824,1073.851 1139.088,1100.587 1106.156,1100.587C1073.225,1100.587 1046.489,1073.851 1046.489,1040.92C1046.489,1007.989 1073.225,981.253 1106.156,981.253Z" fill="#00FF99" stroke="#00FF99" strokeWidth="1"/>
-          </svg>
-          <span className="text-white font-bold text-lg">SwiftBot IA</span>
-        </div>
-        <button onClick={() => setChatSidebarOpen(false)} className="text-gray-400 hover:text-white transition-colors">
-          <X size={24} />
-        </button>
-      </>
-    ) : (
-      <button onClick={() => setChatSidebarOpen(true)} className="text-gray-400 hover:text-white transition-colors mx-auto">
-        <Menu size={24} />
-      </button>
-    )}
-  </div>
-
-  {/* Navegação */}
-  <nav className="flex-1 overflow-y-auto py-6">
-    <div className="px-3 mb-4">
-      {chatSidebarOpen && (
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-3">Conversas</h3>
-      )}
-      
-      <button
-        onClick={handleNewChat}
-        className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg mb-2 bg-[#00FF99]/10 text-[#00FF99] hover:bg-[#00FF99]/20 transition-all duration-200 ${!chatSidebarOpen && 'justify-center'}`}
       >
-        <Plus size={20} className="flex-shrink-0" />
-        {chatSidebarOpen && <span className="text-sm font-medium">Novo chat</span>}
-      </button>
-
-      {chatSidebarOpen && (
-        <ul className="space-y-1 mt-4">
-          {chatHistory.map((chat) => (
-            <li key={chat.id}>
-              <button
-                onClick={() => handleSelectChat(chat.id)}
-                className={`w-full text-left flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 ${activeChatId === chat.id ? 'bg-[#00FF99]/10 border-l-4 border-[#00FF99] text-[#00FF99]' : 'text-gray-400 hover:bg-[#272727] hover:text-white'}`}
-              >
-                <MessageCircle size={18} className="flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{chat.title}</p>
-                  <p className="text-xs text-gray-500">{chat.date}</p>
-                </div>
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-700">
+          {chatSidebarOpen ? (
+            <>
+              <div className="flex items-center gap-2">
+                <svg width="32" height="32" viewBox="0 0 1564 1564" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1001.683,23.139L433.941,727.705C433.941,727.705 414.727,752.657 429.123,757.818C454,766.738 783.43,754.723 771.86,756.415C771.86,756.415 799.555,753.473 791.713,787.082C784.04,819.968 735.527,1088.176 721.925,1130.644C708.323,1173.112 714.745,1159.731 714.745,1159.731C712.575,1159.731 711.288,1182.876 723.478,1185.568C736.204,1188.379 743.209,1188.065 756.911,1174.333C771.677,1159.534 861.262,1028.542 863.24,1028.542L1226.88,546.873C1227.906,548.514 1248.393,525.692 1221.45,522.235M1221.45,522.235L1115.236,520.972L902.566,520.972C902.566,520.972 885.36,525.188 897.567,497.267C909.774,469.345 912.072,456.497 912.072,456.497L1022.331,70.647L1028.875,32.645C1028.875,32.645 1026.615,9.308 1001.808,23.139" fill="#00FF99" />
+                  <path d="M507.177,1105.829C493.786,1121.663 477.201,1132.121 457.867,1137.955L690.658,1372.989C705.266,1359.456 721.561,1351.518 738.923,1347.115L507.177,1105.829ZM429.844,939.939C485.576,939.939 530.824,985.187 530.824,1040.92C530.824,1096.653 485.576,1141.901 429.844,1141.901C374.111,1141.901 328.863,1096.653 328.863,1040.92C328.863,985.187 374.111,939.939 429.844,939.939ZM429.844,981.253C462.775,981.253 489.511,1007.989 489.511,1040.92C489.511,1073.851 462.775,1100.587 429.844,1100.587C396.912,1100.587 370.176,1073.851 370.176,1040.92C370.176,1007.989 396.912,981.253 429.844,981.253ZM1028.441,1105.372L797.555,1352.091C814.771,1359.117 830.462,1370.383 842.586,1387.319L1073.308,1136.429C1056.017,1130.603 1041.204,1119.974 1028.441,1105.372ZM760.432,1345.038C816.124,1345.076 861.398,1390.3 861.413,1446.019C861.428,1501.752 816.165,1547 760.432,1547C704.699,1547 659.451,1501.752 659.451,1446.019C659.451,1390.286 704.699,1345 760.432,1345.038ZM760.432,1386.352C793.363,1386.352 820.1,1413.088 820.1,1446.019C820.1,1478.951 793.363,1505.687 760.432,1505.687C727.501,1505.687 700.765,1478.951 700.765,1446.019C700.765,1413.088 727.501,1386.352 760.432,1386.352ZM1106.156,939.939C1161.889,939.939 1207.137,985.187 1207.137,1040.92C1207.137,1096.653 1161.889,1141.901 1106.156,1106.156C1050.424,1141.901 1005.176,1096.653 1005.176,1040.92C1005.176,985.187 1050.424,939.939 1106.156,939.939ZM1106.156,981.253C1139.088,981.253 1165.824,1007.989 1165.824,1040.92C1165.824,1073.851 1139.088,1100.587 1106.156,1100.587C1073.225,1100.587 1046.489,1073.851 1046.489,1040.92C1046.489,1007.989 1073.225,981.253 1106.156,981.253Z" fill="#00FF99" stroke="#00FF99" strokeWidth="1" />
+                </svg>
+                <span className="text-white font-bold text-lg">SwiftBot IA</span>
+              </div>
+              <button onClick={() => setChatSidebarOpen(false)} className="text-gray-400 hover:text-white transition-colors">
+                <X size={24} />
               </button>
-            </li>
-          ))}
-        </ul>
+            </>
+          ) : (
+            <button onClick={() => setChatSidebarOpen(true)} className="text-gray-400 hover:text-white transition-colors mx-auto">
+              <Menu size={24} />
+            </button>
+          )}
+        </div>
+
+        {/* Navegação */}
+        <nav className="flex-1 overflow-y-auto py-6">
+          <div className="px-3 mb-4">
+            {chatSidebarOpen && (
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-3">Conversas</h3>
+            )}
+
+            <button
+              onClick={handleNewChat}
+              className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg mb-2 bg-[#00FF99]/10 text-[#00FF99] hover:bg-[#00FF99]/20 transition-all duration-200 ${!chatSidebarOpen && 'justify-center'}`}
+            >
+              <Plus size={20} className="flex-shrink-0" />
+              {chatSidebarOpen && <span className="text-sm font-medium">Novo chat</span>}
+            </button>
+
+            {chatSidebarOpen && (
+              <ul className="space-y-1 mt-4">
+                {chatHistory.map((chat) => (
+                  <li key={chat.id}>
+                    <button
+                      onClick={() => handleSelectChat(chat.id)}
+                      className={`w-full text-left flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 ${activeChatId === chat.id ? 'bg-[#00FF99]/10 border-l-4 border-[#00FF99] text-[#00FF99]' : 'text-gray-400 hover:bg-[#272727] hover:text-white'}`}
+                    >
+                      <MessageCircle size={18} className="flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{chat.title}</p>
+                        <p className="text-xs text-gray-500">{chat.date}</p>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </nav>
+
+        {/* Footer */}
+        <div className="border-t border-gray-700 p-4">
+          {/* Credits Display */}
+          {chatSidebarOpen && (
+            <div className="mb-3 px-3 py-2 bg-[#272727] rounded-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500">Créditos</span>
+                <span className={`text-sm font-bold ${credits.balance < 100 ? 'text-orange-400' : 'text-[#00FF99]'}`}>
+                  {credits.formatted}
+                </span>
+              </div>
+            </div>
+          )}
+          <Link
+            href="/dashboard"
+            className={`flex items-center gap-3 px-3 py-3 rounded-lg text-gray-400 hover:bg-[#272727] hover:text-white transition-all duration-200 ${!chatSidebarOpen && 'justify-center'}`}
+          >
+            <ArrowLeft size={20} className="flex-shrink-0" />
+            {chatSidebarOpen && <span className="text-sm font-medium">Voltar ao Dashboard</span>}
+          </Link>
+        </div>
+      </aside>
+
+      {/* Botão flutuante mobile */}
+      {isMobile && !chatSidebarOpen && (
+        <button
+          onClick={() => setChatSidebarOpen(true)}
+          className="fixed bottom-24 left-6 z-40 bg-[#00FF99] text-black p-4 rounded-full shadow-lg md:hidden hover:bg-[#00E88C] transition-colors"
+        >
+          <Menu size={24} />
+        </button>
       )}
-    </div>
-  </nav>
-
-  {/* Footer */}
-  <div className="border-t border-gray-700 p-4">
-    <Link
-      href="/dashboard"
-      className={`flex items-center gap-3 px-3 py-3 rounded-lg text-gray-400 hover:bg-[#272727] hover:text-white transition-all duration-200 ${!chatSidebarOpen && 'justify-center'}`}
-    >
-      <ArrowLeft size={20} className="flex-shrink-0" />
-      {chatSidebarOpen && <span className="text-sm font-medium">Voltar ao Dashboard</span>}
-    </Link>
-  </div>
-</aside>
-
-{/* Botão flutuante mobile */}
-{isMobile && !chatSidebarOpen && (
-  <button
-    onClick={() => setChatSidebarOpen(true)}
-    className="fixed bottom-24 left-6 z-40 bg-[#00FF99] text-black p-4 rounded-full shadow-lg md:hidden hover:bg-[#00E88C] transition-colors"
-  >
-    <Menu size={24} />
-  </button>
-)}
 
       {/* ============================================
           CONTEÚDO PRINCIPAL
@@ -448,15 +594,15 @@ if (!subscription) {
                       rows={3}
                       className="w-full bg-[#1E1E1E] text-white placeholder-gray-500 rounded-3xl px-6 py-5 pr-14 outline-none resize-none ring-1 ring-inset ring-[#1E1E1E] focus:bg-[#282828] focus:ring-white/10 focus:shadow-[0_0_20px_rgba(255,255,255,0.05)] transition-[background-color,box-shadow,ring-color] duration-200 ease-out"
                     />
-<button
-  type="submit"
-  disabled={!inputValue.trim()}
-  className="absolute right-4 bottom-4 p-2 rounded-xl bg-[#1a3d2e] text-[#00FF99] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#224d3a] hover:shadow-[0_0_20px_rgba(0,255,153,0.3)] transition-all"
->
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-  </svg>
-</button>
+                    <button
+                      type="submit"
+                      disabled={!inputValue.trim()}
+                      className="absolute right-4 bottom-4 p-2 rounded-xl bg-[#1a3d2e] text-[#00FF99] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#224d3a] hover:shadow-[0_0_20px_rgba(0,255,153,0.3)] transition-all"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                      </svg>
+                    </button>
                   </div>
                 </form>
 
@@ -466,7 +612,7 @@ if (!subscription) {
                     <button
                       key={index}
                       onClick={() => handleSuggestionClick(suggestion.prompt)}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#111111] border border-white/10 text-[#B0B0B0] hover:border-[#00FF99]/30 hover:text-white hover:bg-[#151515] transition-all duration-300 group"
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#111111] text-[#B0B0B0] hover:text-white hover:bg-[#1a1a1a] transition-all duration-300 group"
                     >
                       <span className="text-[#00FF99] group-hover:scale-110 transition-transform">
                         {suggestion.icon}
@@ -483,87 +629,87 @@ if (!subscription) {
                ============================================ */
             <div className="max-w-4xl mx-auto px-4 py-8">
               <div className="space-y-6">
-{messages.map((message, index) => (
-  <div
-    key={index}
-    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-  >
-    {/* Mensagem do Assistente - sem balão */}
-    {message.role === 'assistant' && (
-      <div className="flex gap-3 max-w-[85%]">
-        <div
-          className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mt-1 overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #00FF99 0%, #8B5CF6 100%)' }}
-        >
-          <svg width="18" height="18" viewBox="0 0 1564 1564" xmlns="http://www.w3.org/2000/svg">
-            <path d="M1001.683,23.139L433.941,727.705C433.941,727.705 414.727,752.657 429.123,757.818C454,766.738 783.43,754.723 771.86,756.415C771.86,756.415 799.555,753.473 791.713,787.082C784.04,819.968 735.527,1088.176 721.925,1130.644C708.323,1173.112 714.745,1159.731 714.745,1159.731C712.575,1159.731 711.288,1182.876 723.478,1185.568C736.204,1188.379 743.209,1188.065 756.911,1174.333C771.677,1159.534 861.262,1028.542 863.24,1028.542L1226.88,546.873C1227.906,548.514 1248.393,525.692 1221.45,522.235M1221.45,522.235L1115.236,520.972L902.566,520.972C902.566,520.972 885.36,525.188 897.567,497.267C909.774,469.345 912.072,456.497 912.072,456.497L1022.331,70.647L1028.875,32.645C1028.875,32.645 1026.615,9.308 1001.808,23.139" fill="#ffffff"/>
-            <path d="M507.177,1105.829C493.786,1121.663 477.201,1132.121 457.867,1137.955L690.658,1372.989C705.266,1359.456 721.561,1351.518 738.923,1347.115L507.177,1105.829ZM429.844,939.939C485.576,939.939 530.824,985.187 530.824,1040.92C530.824,1096.653 485.576,1141.901 429.844,1141.901C374.111,1141.901 328.863,1096.653 328.863,1040.92C328.863,985.187 374.111,939.939 429.844,939.939ZM429.844,981.253C462.775,981.253 489.511,1007.989 489.511,1040.92C489.511,1073.851 462.775,1100.587 429.844,1100.587C396.912,1100.587 370.176,1073.851 370.176,1040.92C370.176,1007.989 396.912,981.253 429.844,981.253ZM1028.441,1105.372L797.555,1352.091C814.771,1359.117 830.462,1370.383 842.586,1387.319L1073.308,1136.429C1056.017,1130.603 1041.204,1119.974 1028.441,1105.372ZM760.432,1345.038C816.124,1345.076 861.398,1390.3 861.413,1446.019C861.428,1501.752 816.165,1547 760.432,1547C704.699,1547 659.451,1501.752 659.451,1446.019C659.451,1390.286 704.699,1345 760.432,1345.038ZM760.432,1386.352C793.363,1386.352 820.1,1413.088 820.1,1446.019C820.1,1478.951 793.363,1505.687 760.432,1505.687C727.501,1505.687 700.765,1478.951 700.765,1446.019C700.765,1413.088 727.501,1386.352 760.432,1386.352ZM1106.156,939.939C1161.889,939.939 1207.137,985.187 1207.137,1040.92C1207.137,1096.653 1161.889,1141.901 1106.156,1106.156C1050.424,1141.901 1005.176,1096.653 1005.176,1040.92C1005.176,985.187 1050.424,939.939 1106.156,939.939ZM1106.156,981.253C1139.088,981.253 1165.824,1007.989 1165.824,1040.92C1165.824,1073.851 1139.088,1100.587 1106.156,1100.587C1073.225,1100.587 1046.489,1073.851 1046.489,1040.92C1046.489,1007.989 1073.225,981.253 1106.156,981.253Z" fill="#ffffff" stroke="#ffffff" strokeWidth="1"/>
-          </svg>
-        </div>
-<div className="text-white text-sm leading-relaxed whitespace-pre-wrap pt-1">
-  {formatMessage(message.content)}
-</div>
-      </div>
-    )}
-
-    {/* Mensagem do Usuário - com balão expansível */}
-    {message.role === 'user' && (
-      <div className="max-w-[85%]">
-        <div className="bg-[#1D4C38] border border-white/10 text-white rounded-2xl rounded-tr-none p-4">
-          <div className="text-sm leading-relaxed">
-            {message.content.length > MESSAGE_PREVIEW_LENGTH && !expandedMessages[index] ? (
-              <>
-                {message.content.substring(0, MESSAGE_PREVIEW_LENGTH)}...
-                <button
-                  onClick={() => toggleMessageExpand(index)}
-                  className="flex items-center gap-1 mt-2 text-[#00FF99] text-xs hover:underline"
-                >
-                  <span>Mostrar mais</span>
-                  <ChevronDown size={14} />
-                </button>
-              </>
-            ) : (
-              <>
-                {message.content}
-                {message.content.length > MESSAGE_PREVIEW_LENGTH && (
-                  <button
-                    onClick={() => toggleMessageExpand(index)}
-                    className="flex items-center gap-1 mt-2 text-[#00FF99] text-xs hover:underline"
+                {messages.map((message, index) => (
+                  <div
+                    key={index}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
-                    <span>Mostrar menos</span>
-                    <ChevronUp size={14} />
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    )}
-  </div>
-))}
+                    {/* Mensagem do Assistente - sem balão */}
+                    {message.role === 'assistant' && (
+                      <div className="flex gap-3 max-w-[85%]">
+                        <div
+                          className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mt-1 overflow-hidden"
+                          style={{ background: 'linear-gradient(135deg, #00FF99 0%, #8B5CF6 100%)' }}
+                        >
+                          <svg width="18" height="18" viewBox="0 0 1564 1564" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M1001.683,23.139L433.941,727.705C433.941,727.705 414.727,752.657 429.123,757.818C454,766.738 783.43,754.723 771.86,756.415C771.86,756.415 799.555,753.473 791.713,787.082C784.04,819.968 735.527,1088.176 721.925,1130.644C708.323,1173.112 714.745,1159.731 714.745,1159.731C712.575,1159.731 711.288,1182.876 723.478,1185.568C736.204,1188.379 743.209,1188.065 756.911,1174.333C771.677,1159.534 861.262,1028.542 863.24,1028.542L1226.88,546.873C1227.906,548.514 1248.393,525.692 1221.45,522.235M1221.45,522.235L1115.236,520.972L902.566,520.972C902.566,520.972 885.36,525.188 897.567,497.267C909.774,469.345 912.072,456.497 912.072,456.497L1022.331,70.647L1028.875,32.645C1028.875,32.645 1026.615,9.308 1001.808,23.139" fill="#ffffff" />
+                            <path d="M507.177,1105.829C493.786,1121.663 477.201,1132.121 457.867,1137.955L690.658,1372.989C705.266,1359.456 721.561,1351.518 738.923,1347.115L507.177,1105.829ZM429.844,939.939C485.576,939.939 530.824,985.187 530.824,1040.92C530.824,1096.653 485.576,1141.901 429.844,1141.901C374.111,1141.901 328.863,1096.653 328.863,1040.92C328.863,985.187 374.111,939.939 429.844,939.939ZM429.844,981.253C462.775,981.253 489.511,1007.989 489.511,1040.92C489.511,1073.851 462.775,1100.587 429.844,1100.587C396.912,1100.587 370.176,1073.851 370.176,1040.92C370.176,1007.989 396.912,981.253 429.844,981.253ZM1028.441,1105.372L797.555,1352.091C814.771,1359.117 830.462,1370.383 842.586,1387.319L1073.308,1136.429C1056.017,1130.603 1041.204,1119.974 1028.441,1105.372ZM760.432,1345.038C816.124,1345.076 861.398,1390.3 861.413,1446.019C861.428,1501.752 816.165,1547 760.432,1547C704.699,1547 659.451,1501.752 659.451,1446.019C659.451,1390.286 704.699,1345 760.432,1345.038ZM760.432,1386.352C793.363,1386.352 820.1,1413.088 820.1,1446.019C820.1,1478.951 793.363,1505.687 760.432,1505.687C727.501,1505.687 700.765,1478.951 700.765,1446.019C700.765,1413.088 727.501,1386.352 760.432,1386.352ZM1106.156,939.939C1161.889,939.939 1207.137,985.187 1207.137,1040.92C1207.137,1096.653 1161.889,1141.901 1106.156,1106.156C1050.424,1141.901 1005.176,1096.653 1005.176,1040.92C1005.176,985.187 1050.424,939.939 1106.156,939.939ZM1106.156,981.253C1139.088,981.253 1165.824,1007.989 1165.824,1040.92C1165.824,1073.851 1139.088,1100.587 1106.156,1100.587C1073.225,1100.587 1046.489,1073.851 1046.489,1040.92C1046.489,1007.989 1073.225,981.253 1106.156,981.253Z" fill="#ffffff" stroke="#ffffff" strokeWidth="1" />
+                          </svg>
+                        </div>
+                        <div className="text-white text-sm leading-relaxed whitespace-pre-wrap pt-1">
+                          {formatMessage(message.content)}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Mensagem do Usuário - com balão expansível */}
+                    {message.role === 'user' && (
+                      <div className="max-w-[85%]">
+                        <div className="bg-[#1D4C38] text-white rounded-2xl rounded-tr-none p-4">
+                          <div className="text-sm leading-relaxed">
+                            {message.content.length > MESSAGE_PREVIEW_LENGTH && !expandedMessages[index] ? (
+                              <>
+                                {message.content.substring(0, MESSAGE_PREVIEW_LENGTH)}...
+                                <button
+                                  onClick={() => toggleMessageExpand(index)}
+                                  className="flex items-center gap-1 mt-2 text-[#00FF99] text-xs hover:underline"
+                                >
+                                  <span>Mostrar mais</span>
+                                  <ChevronDown size={14} />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                {message.content}
+                                {message.content.length > MESSAGE_PREVIEW_LENGTH && (
+                                  <button
+                                    onClick={() => toggleMessageExpand(index)}
+                                    className="flex items-center gap-1 mt-2 text-[#00FF99] text-xs hover:underline"
+                                  >
+                                    <span>Mostrar menos</span>
+                                    <ChevronUp size={14} />
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
 
                 {/* Typing Indicator */}
-{isTyping && (
-  <div className="flex justify-start">
-    <div className="flex gap-3 max-w-[85%]">
-      <div
-        className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center overflow-hidden"
-        style={{ background: 'linear-gradient(135deg, #00FF99 0%, #8B5CF6 100%)' }}
-      >
-        <svg width="18" height="18" viewBox="0 0 1564 1564" xmlns="http://www.w3.org/2000/svg">
-          <path d="M1001.683,23.139L433.941,727.705C433.941,727.705 414.727,752.657 429.123,757.818C454,766.738 783.43,754.723 771.86,756.415C771.86,756.415 799.555,753.473 791.713,787.082C784.04,819.968 735.527,1088.176 721.925,1130.644C708.323,1173.112 714.745,1159.731 714.745,1159.731C712.575,1159.731 711.288,1182.876 723.478,1185.568C736.204,1188.379 743.209,1188.065 756.911,1174.333C771.677,1159.534 861.262,1028.542 863.24,1028.542L1226.88,546.873C1227.906,548.514 1248.393,525.692 1221.45,522.235M1221.45,522.235L1115.236,520.972L902.566,520.972C902.566,520.972 885.36,525.188 897.567,497.267C909.774,469.345 912.072,456.497 912.072,456.497L1022.331,70.647L1028.875,32.645C1028.875,32.645 1026.615,9.308 1001.808,23.139" fill="#ffffff"/>
-          <path d="M507.177,1105.829C493.786,1121.663 477.201,1132.121 457.867,1137.955L690.658,1372.989C705.266,1359.456 721.561,1351.518 738.923,1347.115L507.177,1105.829ZM429.844,939.939C485.576,939.939 530.824,985.187 530.824,1040.92C530.824,1096.653 485.576,1141.901 429.844,1141.901C374.111,1141.901 328.863,1096.653 328.863,1040.92C328.863,985.187 374.111,939.939 429.844,939.939ZM429.844,981.253C462.775,981.253 489.511,1007.989 489.511,1040.92C489.511,1073.851 462.775,1100.587 429.844,1100.587C396.912,1100.587 370.176,1073.851 370.176,1040.92C370.176,1007.989 396.912,981.253 429.844,981.253ZM1028.441,1105.372L797.555,1352.091C814.771,1359.117 830.462,1370.383 842.586,1387.319L1073.308,1136.429C1056.017,1130.603 1041.204,1119.974 1028.441,1105.372ZM760.432,1345.038C816.124,1345.076 861.398,1390.3 861.413,1446.019C861.428,1501.752 816.165,1547 760.432,1547C704.699,1547 659.451,1501.752 659.451,1446.019C659.451,1390.286 704.699,1345 760.432,1345.038ZM760.432,1386.352C793.363,1386.352 820.1,1413.088 820.1,1446.019C820.1,1478.951 793.363,1505.687 760.432,1505.687C727.501,1505.687 700.765,1478.951 700.765,1446.019C700.765,1413.088 727.501,1386.352 760.432,1386.352ZM1106.156,939.939C1161.889,939.939 1207.137,985.187 1207.137,1040.92C1207.137,1096.653 1161.889,1141.901 1106.156,1106.156C1050.424,1141.901 1005.176,1096.653 1005.176,1040.92C1005.176,985.187 1050.424,939.939 1106.156,939.939ZM1106.156,981.253C1139.088,981.253 1165.824,1007.989 1165.824,1040.92C1165.824,1073.851 1139.088,1100.587 1106.156,1100.587C1073.225,1100.587 1046.489,1073.851 1046.489,1040.92C1046.489,1007.989 1073.225,981.253 1106.156,981.253Z" fill="#ffffff" stroke="#ffffff" strokeWidth="1"/>
-        </svg>
-      </div>
-      <div className="flex items-center gap-1.5 pt-2">
-        <div className="w-2 h-2 rounded-full bg-[#00FF99] animate-bounce" style={{ animationDelay: '0ms' }} />
-        <div className="w-2 h-2 rounded-full bg-[#00FF99] animate-bounce" style={{ animationDelay: '150ms' }} />
-        <div className="w-2 h-2 rounded-full bg-[#00FF99] animate-bounce" style={{ animationDelay: '300ms' }} />
-      </div>
-    </div>
-  </div>
-)}
+                {isTyping && (
+                  <div className="flex justify-start">
+                    <div className="flex gap-3 max-w-[85%]">
+                      <div
+                        className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center overflow-hidden"
+                        style={{ background: 'linear-gradient(135deg, #00FF99 0%, #8B5CF6 100%)' }}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 1564 1564" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1001.683,23.139L433.941,727.705C433.941,727.705 414.727,752.657 429.123,757.818C454,766.738 783.43,754.723 771.86,756.415C771.86,756.415 799.555,753.473 791.713,787.082C784.04,819.968 735.527,1088.176 721.925,1130.644C708.323,1173.112 714.745,1159.731 714.745,1159.731C712.575,1159.731 711.288,1182.876 723.478,1185.568C736.204,1188.379 743.209,1188.065 756.911,1174.333C771.677,1159.534 861.262,1028.542 863.24,1028.542L1226.88,546.873C1227.906,548.514 1248.393,525.692 1221.45,522.235M1221.45,522.235L1115.236,520.972L902.566,520.972C902.566,520.972 885.36,525.188 897.567,497.267C909.774,469.345 912.072,456.497 912.072,456.497L1022.331,70.647L1028.875,32.645C1028.875,32.645 1026.615,9.308 1001.808,23.139" fill="#ffffff" />
+                          <path d="M507.177,1105.829C493.786,1121.663 477.201,1132.121 457.867,1137.955L690.658,1372.989C705.266,1359.456 721.561,1351.518 738.923,1347.115L507.177,1105.829ZM429.844,939.939C485.576,939.939 530.824,985.187 530.824,1040.92C530.824,1096.653 485.576,1141.901 429.844,1141.901C374.111,1141.901 328.863,1096.653 328.863,1040.92C328.863,985.187 374.111,939.939 429.844,939.939ZM429.844,981.253C462.775,981.253 489.511,1007.989 489.511,1040.92C489.511,1073.851 462.775,1100.587 429.844,1100.587C396.912,1100.587 370.176,1073.851 370.176,1040.92C370.176,1007.989 396.912,981.253 429.844,981.253ZM1028.441,1105.372L797.555,1352.091C814.771,1359.117 830.462,1370.383 842.586,1387.319L1073.308,1136.429C1056.017,1130.603 1041.204,1119.974 1028.441,1105.372ZM760.432,1345.038C816.124,1345.076 861.398,1390.3 861.413,1446.019C861.428,1501.752 816.165,1547 760.432,1547C704.699,1547 659.451,1501.752 659.451,1446.019C659.451,1390.286 704.699,1345 760.432,1345.038ZM760.432,1386.352C793.363,1386.352 820.1,1413.088 820.1,1446.019C820.1,1478.951 793.363,1505.687 760.432,1505.687C727.501,1505.687 700.765,1478.951 700.765,1446.019C700.765,1413.088 727.501,1386.352 760.432,1386.352ZM1106.156,939.939C1161.889,939.939 1207.137,985.187 1207.137,1040.92C1207.137,1096.653 1161.889,1141.901 1106.156,1106.156C1050.424,1141.901 1005.176,1096.653 1005.176,1040.92C1005.176,985.187 1050.424,939.939 1106.156,939.939ZM1106.156,981.253C1139.088,981.253 1165.824,1007.989 1165.824,1040.92C1165.824,1073.851 1139.088,1100.587 1106.156,1100.587C1073.225,1100.587 1046.489,1073.851 1046.489,1040.92C1046.489,1007.989 1073.225,981.253 1106.156,981.253Z" fill="#ffffff" stroke="#ffffff" strokeWidth="1" />
+                        </svg>
+                      </div>
+                      <div className="flex items-center gap-1.5 pt-2">
+                        <div className="w-2 h-2 rounded-full bg-[#00FF99] animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <div className="w-2 h-2 rounded-full bg-[#00FF99] animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <div className="w-2 h-2 rounded-full bg-[#00FF99] animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div ref={messagesEndRef} />
               </div>
@@ -571,7 +717,7 @@ if (!subscription) {
           )}
         </main>
 
-{/* Input Fixo (apenas no estado de chat) */}
+        {/* Input Fixo (apenas no estado de chat) */}
         {chatStarted && (
           <div className="flex-shrink-0 bg-[#0A0A0A]/90 backdrop-blur-xl border-t border-white/5 p-4">
             <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
