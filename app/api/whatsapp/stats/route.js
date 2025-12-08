@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '../../../../lib/supabase/server.js'
+import { createChatSupabaseClient } from '../../../../lib/supabase/chat-client.js'
 
 // ============================================================================
 // POST: Obter estatísticas de uma conexão específica
@@ -47,12 +48,61 @@ export async function POST(request) {
     }
 
     // ========================================================================
-    // 2. RETORNAR ESTATÍSTICAS BÁSICAS
+    // 2. BUSCAR ESTATÍSTICAS REAIS DO BANCO DE CHAT
     // ========================================================================
-    // Por enquanto, retornamos dados básicos da conexão
-    // Futuramente, podemos integrar com endpoints da UAZAPI para obter
-    // estatísticas mais detalhadas (mensagens enviadas, recebidas, etc.)
+    const chatSupabase = createChatSupabaseClient()
+    const instanceName = connection.instance_name
 
+    // Data de início do dia atual (meia-noite)
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const todayStartISO = todayStart.toISOString()
+
+    // 2.1 Conversas de Hoje: contatos que enviaram mensagem hoje
+    const { count: conversationsToday, error: todayError } = await chatSupabase
+      .from('whatsapp_conversations')
+      .select('*', { count: 'exact', head: true })
+      .eq('instance_name', instanceName)
+      .gte('last_message_at', todayStartISO)
+
+    if (todayError) {
+      console.error('❌ [Stats] Erro ao buscar conversas de hoje:', todayError)
+    }
+
+    // 2.2 Contagem por etapa do funil (CRM)
+    const { count: apresentacaoCount, error: apresentacaoError } = await chatSupabase
+      .from('whatsapp_conversations')
+      .select('*', { count: 'exact', head: true })
+      .eq('instance_name', instanceName)
+      .eq('funnel_stage', 'apresentacao')
+
+    if (apresentacaoError) {
+      console.error('❌ [Stats] Erro ao buscar apresentacao:', apresentacaoError)
+    }
+
+    const { count: negociacaoCount, error: negociacaoError } = await chatSupabase
+      .from('whatsapp_conversations')
+      .select('*', { count: 'exact', head: true })
+      .eq('instance_name', instanceName)
+      .eq('funnel_stage', 'negociacao')
+
+    if (negociacaoError) {
+      console.error('❌ [Stats] Erro ao buscar negociacao:', negociacaoError)
+    }
+
+    const { count: fechamentoCount, error: fechamentoError } = await chatSupabase
+      .from('whatsapp_conversations')
+      .select('*', { count: 'exact', head: true })
+      .eq('instance_name', instanceName)
+      .eq('funnel_stage', 'fechamento')
+
+    if (fechamentoError) {
+      console.error('❌ [Stats] Erro ao buscar fechamento:', fechamentoError)
+    }
+
+    // ========================================================================
+    // 3. MONTAR RESPOSTA COM ESTATÍSTICAS REAIS
+    // ========================================================================
     const stats = {
       connectionId: connection.id,
       instanceName: connection.instance_name,
@@ -60,16 +110,12 @@ export async function POST(request) {
       isConnected: connection.is_connected,
       profileName: connection.profile_name,
       phoneNumber: connection.phone_number,
-      lastConnectedAt: connection.last_connected_at,
-      createdAt: connection.created_at,
-      updatedAt: connection.updated_at,
 
-      // Estatísticas simuladas (a serem implementadas com dados reais futuramente)
-      totalMessages: 0,
-      totalContacts: 0,
-      messagesLastDay: 0,
-      messagesLastWeek: 0,
-      messagesLastMonth: 0
+      // Estatísticas reais do dashboard
+      conversations_today: conversationsToday || 0,
+      apresentacao_count: apresentacaoCount || 0,
+      negociacao_count: negociacaoCount || 0,
+      fechamento_count: fechamentoCount || 0
     }
 
     return NextResponse.json({
