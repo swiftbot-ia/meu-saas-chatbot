@@ -23,6 +23,7 @@ import { supabaseAdmin } from '@/lib/supabase/server'; // Main DB Admin
 import { chatSupabaseAdmin } from '@/lib/supabase/chat-server'; // Chat DB Admin
 import ConversationService from '@/lib/ConversationService';
 import MediaServiceVPS from '@/lib/MediaServiceVPS';
+import N8nWebhookService from '@/lib/N8nWebhookService';
 import { randomUUID } from 'crypto';
 
 // Force dynamic rendering
@@ -903,6 +904,25 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
         updated_at: new Date().toISOString()
       })
       .eq('id', contact.id);
+
+    // 11. ENVIAR PARA N8N (agente de IA)
+    // Fire and forget - não bloqueia o webhook
+    // Apenas mensagens inbound são enviadas (filtrado internamente)
+    N8nWebhookService.sendToN8n(
+      savedMessage,
+      connection,
+      contact,
+      conversation,
+      messageData // Payload original do webhook
+    ).then(result => {
+      if (result.success) {
+        log(requestId, 'info', '🤖', 'Enviado para n8n com sucesso');
+      } else if (result.reason === 'queued_for_retry') {
+        log(requestId, 'info', '⏳', 'Adicionado à fila de retry do n8n');
+      }
+    }).catch(err => {
+      log(requestId, 'error', '❌', `Erro ao enviar para n8n: ${err.message}`);
+    });
 
   } catch (error) {
     log(requestId, 'error', '❌', `Erro em processIncomingMessage`, { error: error.message, stack: error.stack });
