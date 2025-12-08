@@ -126,10 +126,10 @@ export default function Dashboard() {
   const [isSyncing, setIsSyncing] = useState(false)
   const [agentConfigured, setAgentConfigured] = useState(false)
   const [stats, setStats] = useState({
-    mensagensHoje: 0,
-    conversasAtivas: 0,
-    taxaResposta: 0,
-    clientesAtendidos: 0
+    conversationsToday: 0,
+    apresentacao: 0,
+    negociacao: 0,
+    fechamento: 0
   })
   const [statsLoading, setStatsLoading] = useState(false)
   const [showQRModal, setShowQRModal] = useState(false)
@@ -480,10 +480,10 @@ export default function Dashboard() {
 
       if (data.success) {
         setStats({
-          mensagensHoje: data.stats.messages_today || 0,
-          conversasAtivas: data.stats.active_conversations || 0,
-          taxaResposta: data.stats.response_rate || 0,
-          clientesAtendidos: data.stats.total_contacts || 0
+          conversationsToday: data.stats.conversations_today || 0,
+          apresentacao: data.stats.apresentacao_count || 0,
+          negociacao: data.stats.negociacao_count || 0,
+          fechamento: data.stats.fechamento_count || 0
         })
       }
     } catch (error) {
@@ -641,10 +641,10 @@ export default function Dashboard() {
       loadDashboardStats(connection)
     } else {
       setStats({
-        mensagensHoje: 0,
-        conversasAtivas: 0,
-        taxaResposta: 0,
-        clientesAtendidos: 0
+        conversationsToday: 0,
+        apresentacao: 0,
+        negociacao: 0,
+        fechamento: 0
       })
       setAgentConfigured(false)
     }
@@ -692,6 +692,7 @@ export default function Dashboard() {
       ))
     }
   }
+
 
   // ============================================================================
   // DESCONECTAR WHATSAPP
@@ -1935,10 +1936,10 @@ export default function Dashboard() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { value: stats.mensagensHoje, label: 'Mensagens Hoje' },
-              { value: stats.conversasAtivas, label: 'Conversas Ativas' },
-              { value: `${stats.taxaResposta}%`, label: 'Taxa de Resposta' },
-              { value: stats.clientesAtendidos, label: 'Clientes Atendidos' }
+              { value: stats.conversationsToday, label: 'Conversas Hoje' },
+              { value: stats.apresentacao, label: 'Apresentação' },
+              { value: stats.negociacao, label: 'Negociação' },
+              { value: stats.fechamento, label: 'Fechamento' }
             ].map((stat, index) => (
               <div key={index} className="bg-[#111111] rounded-xl p-6 text-center border border-[#333333] hover:border-[#555555] transition-all duration-300">
                 <div className="text-5xl font-bold text-white mb-2">

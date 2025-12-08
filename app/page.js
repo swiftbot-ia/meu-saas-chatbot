@@ -511,7 +511,7 @@ export default function Home() {
                 <div className="relative md:order-1">
                   <div className="bg-gradient-to-br from-yellow-400 via-orange-500 to-pink-500 rounded-[40px] p-8">
                     <img 
-                      src="/macbook.png" 
+                      src="/dashboard.png" 
                       alt="SwiftBot Dashboard"
                       className="w-full h-auto rounded-2xl"
                     />
