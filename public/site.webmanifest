@@ -1,0 +1,24 @@
+{
+    "name": "SwiftBot",
+    "short_name": "SwiftBot",
+    "description": "Agente de WhatsApp com Inteligência Artificial",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#000000",
+    "theme_color": "#04F5A0",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "/swiftbot/web-app-manifest-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "/swiftbot/web-app-manifest-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}

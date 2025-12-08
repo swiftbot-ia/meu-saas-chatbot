@@ -17,7 +17,7 @@ export const AnimatedBackground = ({ variant = 'purple' }) => {
     <>
       <div className="absolute inset-0 opacity-20 pointer-events-none">
         <div className={`absolute top-0 left-0 w-32 h-32 bg-gradient-to-br ${variants[variant]} rounded-full blur-3xl animate-pulse`} />
-        <div className={`absolute bottom-0 right-0 w-24 h-24 bg-gradient-to-br ${variants[variant]} rounded-full blur-2xl animate-pulse`} style={{animationDelay: '1s'}} />
+        <div className={`absolute bottom-0 right-0 w-24 h-24 bg-gradient-to-br ${variants[variant]} rounded-full blur-2xl animate-pulse`} style={{ animationDelay: '1s' }} />
       </div>
       <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 backdrop-blur-sm pointer-events-none rounded-3xl" />
     </>
@@ -60,7 +60,7 @@ export const StatCard = ({ value, label, color, bgColor, loading }) => {
   return (
     <div className={`${bgColor} backdrop-blur-sm border border-white/10 rounded-2xl p-6 text-center hover:border-[#00FF99]/30 transition-all duration-300 group relative overflow-hidden`}>
       <AnimatedBackground variant={variant} />
-      
+
       <div className="relative z-10">
         <div className={`text-4xl font-light ${color} mb-2 group-hover:scale-110 transition-transform duration-300`}>
           {loading ? '...' : value}
@@ -76,17 +76,17 @@ export const StatCard = ({ value, label, color, bgColor, loading }) => {
 // ====================================================================
 // CARD DE AÇÃO (WhatsApp, Agente IA, Chat)
 // ====================================================================
-export const ActionCard = ({ 
-  title, 
-  emoji, 
-  description, 
-  status, 
-  statusText, 
-  buttonText, 
-  buttonVariant = 'primary', 
-  onClick, 
-  disabled, 
-  loading, 
+export const ActionCard = ({
+  title,
+  emoji,
+  description,
+  status,
+  statusText,
+  buttonText,
+  buttonVariant = 'primary',
+  onClick,
+  disabled,
+  loading,
   children,
   backgroundVariant = 'purple'
 }) => {
@@ -100,7 +100,7 @@ export const ActionCard = ({
   return (
     <div className="glass-card p-6 group relative overflow-visible">
       <AnimatedBackground variant={backgroundVariant} />
-      
+
       <div className="relative z-20">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-normal text-white group-hover:text-[#00FF99] transition-colors duration-300">
@@ -108,25 +108,25 @@ export const ActionCard = ({
           </h3>
           <span className="text-2xl group-hover:scale-110 transition-transform duration-300">{emoji}</span>
         </div>
-        
+
         {description && (
           <p className="text-gray-400 font-light mb-4 group-hover:text-gray-300 transition-colors duration-300">
             {description}
           </p>
         )}
-        
+
         {children && (
           <div className="mb-4">
             {children}
           </div>
         )}
-        
+
         {statusText && (
           <div className="mb-4">
             <StatusBadge status={status} text={statusText} />
           </div>
         )}
-        
+
         {buttonText && (
           <button
             onClick={onClick}
@@ -198,7 +198,7 @@ export const Icons = {
 export const AccountDropdown = ({ user, userProfile, onLogout }) => {
   const [isOpen, setIsOpen] = useState(false)
   const router = useRouter()
-  
+
   const displayName = userProfile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário'
   const avatarUrl = userProfile?.avatar_url
   const initials = displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
@@ -206,8 +206,8 @@ export const AccountDropdown = ({ user, userProfile, onLogout }) => {
   const menuItems = [
     { icon: Icons.Profile, label: 'Configurar Conta', path: '/account/profile' },
     { icon: Icons.Subscription, label: 'Gerenciar Assinatura', path: '/account/subscription' },
-    { icon: Icons.Suggestion, label: 'Central de Sugestões', path: '/sugestao' },
-    { icon: Icons.Help, label: 'Central de Ajuda', path: '/suporte' }
+    { icon: Icons.Suggestion, label: 'Central de Sugestões', path: '/suggestions' },
+    { icon: Icons.Help, label: 'Central de Ajuda', path: '/support' }
   ]
 
   return (
@@ -217,7 +217,7 @@ export const AccountDropdown = ({ user, userProfile, onLogout }) => {
         className="flex items-center gap-3 glass-card px-3 py-2 hover:border-[#00FF99]/30 relative z-[210]"
       >
         <AnimatedBackground variant="green" />
-        
+
         <div className="relative z-10 flex items-center gap-3">
           {avatarUrl ? (
             <img
@@ -238,7 +238,7 @@ export const AccountDropdown = ({ user, userProfile, onLogout }) => {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-[220]" onClick={() => setIsOpen(false)} />
-          
+
           <div className="absolute right-0 mt-2 w-64 glass-card z-[230] overflow-hidden">
             <div className="p-4 border-b border-white/10">
               <div className="flex items-center gap-3">
@@ -270,7 +270,7 @@ export const AccountDropdown = ({ user, userProfile, onLogout }) => {
                   <span className="ml-3">{item.label}</span>
                 </button>
               ))}
-              
+
               <div className="border-t border-white/10 mt-2 pt-2">
                 <button
                   onClick={() => {
@@ -300,17 +300,17 @@ export const QRCodeModal = ({ qrCode, onClose }) => {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
-      
+
       <div className="relative glass-card p-8 max-w-md w-full mx-4 shadow-[0_0_50px_rgba(0,255,153,0.2)]">
         <AnimatedBackground variant="green" />
-        
+
         <button
           onClick={onClose}
           className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full transition-all duration-300 border border-white/20"
         >
           <Icons.Close />
         </button>
-        
+
         <div className="relative z-10 text-center">
           <h3 className="text-2xl font-normal text-white mb-2">
             📱 Conectar WhatsApp
@@ -318,11 +318,11 @@ export const QRCodeModal = ({ qrCode, onClose }) => {
           <p className="text-gray-400 font-light mb-6">
             Escaneie o QR Code com seu WhatsApp
           </p>
-          
+
           <div className="bg-white rounded-2xl p-4 mb-4 inline-block">
             <img src={qrCode} alt="QR Code WhatsApp" className="w-64 h-64" />
           </div>
-          
+
           <div className="bg-[#00FF99]/10 border border-[#00FF99]/30 rounded-xl p-4 backdrop-blur-sm">
             <p className="text-sm text-gray-300 mb-2 font-normal">📲 Como conectar:</p>
             <ol className="text-xs text-gray-400 font-light space-y-1 text-left">
@@ -344,7 +344,7 @@ export const QRCodeModal = ({ qrCode, onClose }) => {
 // ====================================================================
 export const ConnectionsDropdown = ({ connections, activeConnection, subscription, onSelect, onConnect, onConfigure, onUpgrade, onAddNew }) => {
   const [isOpen, setIsOpen] = useState(false)
-  
+
   const getStatusText = (connection) => {
     if (!connection) return '🔴 Inativa'
     switch (connection.status) {
@@ -365,7 +365,7 @@ export const ConnectionsDropdown = ({ connections, activeConnection, subscriptio
         className="glass-card px-6 py-4 hover:border-[#00FF99]/30 w-full group relative"
       >
         <AnimatedBackground variant="purple" />
-        
+
         <div className="relative z-10 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-2xl">📱</span>
@@ -385,7 +385,7 @@ export const ConnectionsDropdown = ({ connections, activeConnection, subscriptio
       {isOpen && (
         <>
           <div className="fixed inset-0 z-[245]" onClick={() => setIsOpen(false)} />
-          
+
           <div className="absolute top-full left-0 right-0 mt-2 glass-card z-[250] max-h-[400px] overflow-y-auto">
             <div className="p-2">
               {connections.length === 0 ? (
@@ -396,11 +396,10 @@ export const ConnectionsDropdown = ({ connections, activeConnection, subscriptio
                 connections.map((conn) => (
                   <div
                     key={conn.id}
-                    className={`p-4 rounded-xl mb-2 cursor-pointer transition-all duration-300 ${
-                      activeConnection?.id === conn.id
+                    className={`p-4 rounded-xl mb-2 cursor-pointer transition-all duration-300 ${activeConnection?.id === conn.id
                         ? 'bg-[#00FF99]/10 border border-[#00FF99]/30'
                         : 'bg-white/5 border border-white/10 hover:bg-white/10'
-                    }`}
+                      }`}
                     onClick={() => {
                       onSelect(conn)
                       setIsOpen(false)
@@ -410,9 +409,9 @@ export const ConnectionsDropdown = ({ connections, activeConnection, subscriptio
                       <span className="text-white font-normal">
                         📱 Conexão {conn.connection_number}
                       </span>
-                      <StatusBadge 
-                        status={conn.status === 'connected' ? 'connected' : conn.status === 'pending_qr' ? 'pending' : 'error'} 
-                        text={getStatusText(conn)} 
+                      <StatusBadge
+                        status={conn.status === 'connected' ? 'connected' : conn.status === 'pending_qr' ? 'pending' : 'error'}
+                        text={getStatusText(conn)}
                       />
                     </div>
                     {conn.phone_number && (
@@ -447,7 +446,7 @@ export const ConnectionsDropdown = ({ connections, activeConnection, subscriptio
                   </div>
                 ))
               )}
-              
+
               <div className="border-t border-white/10 pt-3 mt-3 space-y-2">
                 {connections.length < totalSlots && (
                   <button

@@ -16,20 +16,32 @@ const inter = {
 };
 
 export const metadata = {
-  title: "SwiftBot - Chatbot WhatsApp com IA",
+  title: "SwiftBot",
   description: "Revolucione seu WhatsApp com Inteligência Artificial. Configure em minutos, funcione 24/7. A solução completa para automatizar seu atendimento.",
   keywords: "chatbot, whatsapp, inteligencia artificial, automação, atendimento, bot, ia, swift",
   authors: [{ name: "SwiftBot" }],
   creator: "SwiftBot",
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '32x32', type: 'image/x-icon' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+    shortcut: '/favicon.ico',
+  },
+  manifest: '/site.webmanifest',
   openGraph: {
-    title: "SwiftBot - Chatbot WhatsApp com IA",
+    title: "SwiftBot",
     description: "Revolucione seu WhatsApp com Inteligência Artificial. Configure em minutos, funcione 24/7.",
     type: "website",
     locale: "pt_BR",
   },
   twitter: {
     card: "summary_large_image",
-    title: "SwiftBot - Chatbot WhatsApp com IA",
+    title: "SwiftBot",
     description: "Revolucione seu WhatsApp com Inteligência Artificial. Configure em minutos, funcione 24/7.",
   },
 };

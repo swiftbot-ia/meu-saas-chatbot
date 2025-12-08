@@ -15,17 +15,17 @@ export default function CookiePolicyPage() {
   return (
     // MODIFICADO: Fundo preto, removidos efeitos
     <div className="min-h-screen bg-black text-gray-700 relative overflow-x-hidden">
-      
+
       {/* ADICIONADO: Header Padrão */}
       <Header />
 
       {/* Main Content */}
       <main className="relative z-10">
-        
+
         {/* SEÇÃO 1: HERO (FUNDO PRETO) */}
         <section className="py-20 relative overflow-hidden bg-black">
           <div className="absolute inset-0 bg-gradient-to-b from-purple-900/20 via-black/50 to-black" />
-          
+
           <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
             <div className="text-center mb-12">
               <div className="inline-block bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-6 py-2 mb-4">
@@ -44,13 +44,13 @@ export default function CookiePolicyPage() {
         {/* SEÇÃO 2: CONTEÚDO (FUNDO BEGE) */}
         <section className="py-24 bg-[#E1DFDB] rounded-t-[40px] md:rounded-t-[80px] relative overflow-visible -mt-16 md:-mt-20">
           <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-            
+
             {/* Card Branco com o conteúdo */}
             <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-8 md:p-12 border border-black/5">
-              
+
               {/* MODIFICADO: Estilo do conteúdo de texto */}
               <div className="space-y-8 text-gray-700 font-light leading-relaxed">
-                
+
                 {/* Seção 1 */}
                 <section>
                   <h2 className="text-3xl font-semibold text-black mb-4">
@@ -58,8 +58,8 @@ export default function CookiePolicyPage() {
                   </h2>
                   <div className="pl-0 md:pl-8 space-y-3">
                     <p>
-                      Cookies são pequenos arquivos de texto que são armazenados no seu dispositivo quando você visita nosso site. 
-                      Eles são amplamente utilizados para fazer os sites funcionarem de forma mais eficiente, bem como para fornecer 
+                      Cookies são pequenos arquivos de texto que são armazenados no seu dispositivo quando você visita nosso site.
+                      Eles são amplamente utilizados para fazer os sites funcionarem de forma mais eficiente, bem como para fornecer
                       informações aos proprietários do site.
                     </p>
                     <p>
@@ -81,7 +81,7 @@ export default function CookiePolicyPage() {
                     2. Tipos de Cookies que Utilizamos
                   </h2>
                   <div className="pl-0 md:pl-8 space-y-6">
-                    
+
                     {/* Cookie 1 */}
                     <div className="bg-white/50 border border-black/10 rounded-xl p-6">
                       <h3 className="text-xl font-semibold text-black mb-3 flex items-center gap-2">
@@ -111,7 +111,7 @@ export default function CookiePolicyPage() {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="bg-gray-100 rounded-lg p-4 mt-3 space-y-2 text-sm">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
@@ -213,16 +213,16 @@ export default function CookiePolicyPage() {
                     <p>
                       Em alguns casos, também utilizamos cookies fornecidos por terceiros confiáveis. Os principais são:
                     </p>
-                    
+
                     <div className="space-y-4">
                       <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-lg">
                         <h4 className="font-semibold text-black mb-2">Supabase</h4>
                         <p className="text-sm">
-                          Plataforma de backend que gerencia autenticação, banco de dados e armazenamento. 
+                          Plataforma de backend que gerencia autenticação, banco de dados e armazenamento.
                           Cookies usados para manter sessões seguras.
                         </p>
-                        <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer" 
-                           className="text-green-600 hover:underline text-sm inline-flex items-center mt-2">
+                        <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer"
+                          className="text-green-600 hover:underline text-sm inline-flex items-center mt-2">
                           Ver Política de Privacidade
                           <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -233,11 +233,11 @@ export default function CookiePolicyPage() {
                       <div className="bg-purple-50 border-l-4 border-purple-500 p-4 rounded-r-lg">
                         <h4 className="font-semibold text-black mb-2">Stripe</h4>
                         <p className="text-sm">
-                          Processador de pagamentos que utiliza cookies para detectar e prevenir fraudes, 
+                          Processador de pagamentos que utiliza cookies para detectar e prevenir fraudes,
                           além de processar transações de forma segura.
                         </p>
-                        <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" 
-                           className="text-green-600 hover:underline text-sm inline-flex items-center mt-2">
+                        <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer"
+                          className="text-green-600 hover:underline text-sm inline-flex items-center mt-2">
                           Ver Política de Privacidade
                           <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -248,11 +248,11 @@ export default function CookiePolicyPage() {
                       <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg">
                         <h4 className="font-semibold text-black mb-2">Google Fonts</h4>
                         <p className="text-sm">
-                          Utilizamos fontes do Google para melhorar a tipografia do site. 
+                          Utilizamos fontes do Google para melhorar a tipografia do site.
                           O Google pode usar cookies para análise de uso de fontes.
                         </p>
-                        <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" 
-                           className="text-green-600 hover:underline text-sm inline-flex items-center mt-2">
+                        <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer"
+                          className="text-green-600 hover:underline text-sm inline-flex items-center mt-2">
                           Ver Política de Privacidade
                           <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -277,7 +277,7 @@ export default function CookiePolicyPage() {
                       <li>Alterar as configurações do seu navegador para bloquear cookies</li>
                       <li>Excluir cookies já armazenados no seu dispositivo</li>
                     </ul>
-                    
+
                     <div className="bg-yellow-100 border border-yellow-300 rounded-xl p-4 mt-4">
                       <div className="flex items-start">
                         <svg className="w-6 h-6 text-yellow-600 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -286,7 +286,7 @@ export default function CookiePolicyPage() {
                         <div>
                           <strong className="text-yellow-800">Atenção:</strong>
                           <p className="text-yellow-700 text-sm mt-1">
-                            Bloquear alguns tipos de cookies pode afetar sua experiência no site e os serviços que podemos oferecer. 
+                            Bloquear alguns tipos de cookies pode afetar sua experiência no site e os serviços que podemos oferecer.
                             Cookies essenciais não podem ser desativados pois são necessários para o funcionamento básico do site.
                           </p>
                         </div>
@@ -360,7 +360,7 @@ export default function CookiePolicyPage() {
                   </h2>
                   <div className="pl-0 md:pl-8 space-y-3">
                     <p>
-                      Se você tiver dúvidas sobre nossa Política de Cookies ou sobre como gerenciamos seus dados, 
+                      Se você tiver dúvidas sobre nossa Política de Cookies ou sobre como gerenciamos seus dados,
                       entre em contato:
                     </p>
                     <div className="bg-green-50 border-l-4 border-green-500 rounded-r-xl p-6 space-y-3">
@@ -387,7 +387,7 @@ export default function CookiePolicyPage() {
                       <strong className="text-black">Última atualização:</strong> {new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}
                     </p>
                     <p className="text-gray-500 text-xs mt-2">
-                      Reservamos o direito de atualizar esta política periodicamente. 
+                      Reservamos o direito de atualizar esta política periodicamente.
                       Recomendamos revisar esta página regularmente.
                     </p>
                   </div>
@@ -422,36 +422,36 @@ export default function CookiePolicyPage() {
         </section>
       </main>
 
-{/* Footer */}
+      {/* Footer */}
       <footer className="relative z-10 bg-black border-t border-white/10 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-5 gap-12 mb-12">
-            
+
             {/* Coluna 1: Logo e descrição */}
             <div className="md:col-span-2">
               <div className="flex items-center mb-6">
                 <div className="w-8 h-8 mr-3 flex items-center justify-center">
                   <svg width="32" height="32" viewBox="0 0 1564 1564" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1001.683,23.139L433.941,727.705C433.941,727.705 414.727,752.657 429.123,757.818C454,766.738 783.43,754.723 771.86,756.415C771.86,756.415 799.555,753.473 791.713,787.082C784.04,819.968 735.527,1088.176 721.925,1130.644C708.323,1173.112 714.745,1159.731 714.745,1159.731C712.575,1159.731 711.288,1182.876 723.478,1185.568C736.204,1188.379 743.209,1188.065 756.911,1174.333C771.677,1159.534 861.262,1028.542 863.24,1028.542L1226.88,546.873C1227.906,548.514 1248.393,525.692 1221.45,522.235M1221.45,522.235L1115.236,520.972L902.566,520.972C902.566,520.972 885.36,525.188 897.567,497.267C909.774,469.345 912.072,456.497 912.072,456.497L1022.331,70.647L1028.875,32.645C1028.875,32.645 1026.615,9.308 1001.808,23.139" fill="#04F5A0"/>
-                     <path d="M507.177,1105.829C493.786,1121.663 477.201,1132.121 457.867,1137.955L690.658,1372.989C705.266,1359.456 721.561,1351.518 738.923,1347.115L507.177,1105.829ZM429.844,939.939C485.576,939.939 530.824,985.187 530.824,1040.92C530.824,1096.653 485.576,1141.901 429.844,1141.901C374.111,1141.901 328.863,1096.653 328.863,1040.92C328.863,985.187 374.111,939.939 429.844,939.939ZM429.844,981.253C462.775,981.253 489.511,1007.989 489.511,1040.92C489.511,1073.851 462.775,1100.587 429.844,1100.587C396.912,1100.587 370.176,1073.851 370.176,1040.92C370.176,1007.989 396.912,981.253 429.844,981.253ZM1028.441,1105.372L797.555,1352.091C814.771,1359.117 830.462,1370.383 842.586,1387.319L1073.308,1136.429C1056.017,1130.603 1041.204,1119.974 1028.441,1105.372ZM760.432,1345.038C816.124,1345.076 861.398,1390.3 861.413,1446.019C861.428,1501.752 816.165,1547 760.432,1547C704.699,1547 659.451,1501.752 659.451,1446.019C659.451,1390.286 704.699,1345 760.432,1345.038ZM760.432,1386.352C793.363,1386.352 820.1,1413.088 820.1,1446.019C820.1,1478.951 793.363,1505.687 760.432,1505.687C727.501,1505.687 700.765,1478.951 700.765,1446.019C700.765,1413.088 727.501,1386.352 760.432,1386.352ZM1106.156,939.939C1161.889,939.939 1207.137,985.187 1207.137,1040.92C1207.137,1096.653 1161.889,1141.901 1106.156,1106.156C1050.424,1141.901 1005.176,1096.653 1005.176,1040.92C1005.176,985.187 1050.424,939.939 1106.156,939.939ZM1106.156,981.253C1139.088,981.253 1165.824,1007.989 1165.824,1040.92C1165.824,1073.851 1139.088,1100.587 1106.156,1100.587C1073.225,1100.587 1046.489,1073.851 1046.489,1040.92C1046.489,1007.989 1073.225,981.253 1106.156,981.253Z" fill="#04F5A0" stroke="#04F5A0" strokeWidth="1"/>
+                    <path d="M1001.683,23.139L433.941,727.705C433.941,727.705 414.727,752.657 429.123,757.818C454,766.738 783.43,754.723 771.86,756.415C771.86,756.415 799.555,753.473 791.713,787.082C784.04,819.968 735.527,1088.176 721.925,1130.644C708.323,1173.112 714.745,1159.731 714.745,1159.731C712.575,1159.731 711.288,1182.876 723.478,1185.568C736.204,1188.379 743.209,1188.065 756.911,1174.333C771.677,1159.534 861.262,1028.542 863.24,1028.542L1226.88,546.873C1227.906,548.514 1248.393,525.692 1221.45,522.235M1221.45,522.235L1115.236,520.972L902.566,520.972C902.566,520.972 885.36,525.188 897.567,497.267C909.774,469.345 912.072,456.497 912.072,456.497L1022.331,70.647L1028.875,32.645C1028.875,32.645 1026.615,9.308 1001.808,23.139" fill="#04F5A0" />
+                    <path d="M507.177,1105.829C493.786,1121.663 477.201,1132.121 457.867,1137.955L690.658,1372.989C705.266,1359.456 721.561,1351.518 738.923,1347.115L507.177,1105.829ZM429.844,939.939C485.576,939.939 530.824,985.187 530.824,1040.92C530.824,1096.653 485.576,1141.901 429.844,1141.901C374.111,1141.901 328.863,1096.653 328.863,1040.92C328.863,985.187 374.111,939.939 429.844,939.939ZM429.844,981.253C462.775,981.253 489.511,1007.989 489.511,1040.92C489.511,1073.851 462.775,1100.587 429.844,1100.587C396.912,1100.587 370.176,1073.851 370.176,1040.92C370.176,1007.989 396.912,981.253 429.844,981.253ZM1028.441,1105.372L797.555,1352.091C814.771,1359.117 830.462,1370.383 842.586,1387.319L1073.308,1136.429C1056.017,1130.603 1041.204,1119.974 1028.441,1105.372ZM760.432,1345.038C816.124,1345.076 861.398,1390.3 861.413,1446.019C861.428,1501.752 816.165,1547 760.432,1547C704.699,1547 659.451,1501.752 659.451,1446.019C659.451,1390.286 704.699,1345 760.432,1345.038ZM760.432,1386.352C793.363,1386.352 820.1,1413.088 820.1,1446.019C820.1,1478.951 793.363,1505.687 760.432,1505.687C727.501,1505.687 700.765,1478.951 700.765,1446.019C700.765,1413.088 727.501,1386.352 760.432,1386.352ZM1106.156,939.939C1161.889,939.939 1207.137,985.187 1207.137,1040.92C1207.137,1096.653 1161.889,1141.901 1106.156,1106.156C1050.424,1141.901 1005.176,1096.653 1005.176,1040.92C1005.176,985.187 1050.424,939.939 1106.156,939.939ZM1106.156,981.253C1139.088,981.253 1165.824,1007.989 1165.824,1040.92C1165.824,1073.851 1139.088,1100.587 1106.156,1100.587C1073.225,1100.587 1046.489,1073.851 1046.489,1040.92C1046.489,1007.989 1073.225,981.253 1106.156,981.253Z" fill="#04F5A0" stroke="#04F5A0" strokeWidth="1" />
                   </svg>
                 </div>
                 <span className="text-xl font-semibold text-white">SwiftBot</span>
               </div>
               <p className="text-gray-400 leading-relaxed mb-6 font-light max-w-sm">
-                Clone seu atendimento e escale sua expertise infinitamente. 
+                Clone seu atendimento e escale sua expertise infinitamente.
                 Transforme seu WhatsApp em uma máquina de crescimento autônoma.
               </p>
               <div className="flex space-x-4">
                 {/* Social Icons */}
                 <a href="https://www.facebook.com/SwiftBott" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center transition-all duration-300 hover:border-[#00FF99]">
                   <svg className="w-5 h-5 text-gray-400 hover:text-[#00FF99]" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                   </svg>
                 </a>
                 <a href="https://www.instagram.com/swiftbot.ia" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center transition-all duration-300 hover:border-[#00FF99]">
                   <svg className="w-5 h-5 text-gray-400 hover:text-[#00FF99]" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
                   </svg>
                 </a>
               </div>
@@ -463,7 +463,7 @@ export default function CookiePolicyPage() {
               <ul className="space-y-3">
                 <li><a href="#funcionalidades" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Funcionalidades</a></li>
                 <li><a href="#segmentos" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Segmentos</a></li>
-                <li><a href="/precos" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Preços</a></li>
+                <li><a href="/pricing" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Preços</a></li>
               </ul>
             </div>
 
@@ -495,8 +495,8 @@ export default function CookiePolicyPage() {
               © 2025 SwiftBot. Todos os direitos reservados.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-6">
-              <a href="/privacidade" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Privacidade</a>
-              <a href="/termos" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Termos de Uso</a>
+              <a href="/privacy" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Privacidade</a>
+              <a href="/terms" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Termos de Uso</a>
               <a href="/cookies" className="text-gray-400 hover:text-[#00FF99] transition-colors text-sm font-light">Política de Cookies/LGPD</a>
             </div>
           </div>
