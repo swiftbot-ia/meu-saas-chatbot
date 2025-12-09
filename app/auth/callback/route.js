@@ -1,131 +1,88 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+// app/auth/callback/route.js
+// Conforme documentação oficial: https://supabase.com/docs/guides/auth/social-login/auth-google
+
+import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
+
 export async function GET(request) {
-  const requestUrl = new URL(request.url)
-  const code = requestUrl.searchParams.get('code')
-  const next = requestUrl.searchParams.get('next') ?? '/dashboard'
-  const origin = 'https://swiftbot.com.br'
-  if (!code) {
-    return new Response(`
-      <html><head><meta http-equiv="refresh" content="0;url=${origin}/login"></head></html>
-    `, { headers: { 'Content-Type': 'text/html' } })
+  const { searchParams, origin } = new URL(request.url)
+  const code = searchParams.get('code')
+
+  // Se "next" está no param, usa como redirect URL
+  let next = searchParams.get('next') ?? '/dashboard'
+  if (!next.startsWith('/')) {
+    next = '/'
   }
-  try {
-    const cookieStore = await cookies()
 
-    // 🔍 DEBUG: Log dos cookies recebidos
-    const allCookies = cookieStore.getAll()
-    console.log('📦 [Callback] Todos os cookies recebidos:', allCookies.map(c => c.name))
+  // URL de produção fixa
+  const productionUrl = 'https://swiftbot.com.br'
 
-    // Verificar se há cookie de code_verifier (nome pode variar)
-    const pkceRelated = allCookies.filter(c =>
-      c.name.includes('pkce') ||
-      c.name.includes('verifier') ||
-      c.name.includes('sb-') ||
-      c.name.includes('auth')
-    )
-    console.log('🔐 [Callback] Cookies PKCE/Auth:', pkceRelated.map(c => ({ name: c.name, valueLen: c.value?.length })))
-
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      {
-        cookies: {
-          getAll() {
-            console.log('📖 [Callback] getAll chamado')
-            return cookieStore.getAll()
-          },
-          setAll(cookiesToSet) {
-            console.log('💾 [Callback] setAll chamado:', cookiesToSet.map(c => c.name))
-            cookiesToSet.forEach(({ name, value, options }) => {
-              try { cookieStore.set(name, value, options) } catch { }
-            })
-          },
-        },
-      }
-    )
-
-    console.log('🔄 [Callback] Tentando exchangeCodeForSession...')
+  if (code) {
+    const supabase = await createClient()
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
-    if (error) {
-      console.error('Erro de troca de sessão:', error)
-      return new Response(`
-        <html><head><meta http-equiv="refresh" content="0;url=${origin}/login?error=auth-exchange-error"></head></html>
-      `, { headers: { 'Content-Type': 'text/html' } })
-    }
-    // ✅ Lógica completa de perfil
-    if (data?.user) {
+    if (!error && data?.user) {
+      // ✅ Login com sucesso - verificar perfil
       try {
-        let { data: profile, error: profileError } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('user_profiles')
           .select('company_name, full_name, phone')
           .eq('user_id', data.user.id)
           .single()
+
         // Criar perfil se não existir
         if (profileError && profileError.code === 'PGRST116') {
-          const newProfile = {
-            user_id: data.user.id,
-            full_name: data.user.user_metadata?.full_name || '',
-            company_name: '',
-            phone: '',
-            email: data.user.email,
-            avatar_url: data.user.user_metadata?.avatar_url || '',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-          const { data: createdProfile } = await supabase
+          await supabase
             .from('user_profiles')
-            .insert([newProfile])
-            .select()
-            .single()
-          if (createdProfile) profile = createdProfile
+            .insert([{
+              user_id: data.user.id,
+              full_name: data.user.user_metadata?.full_name || '',
+              company_name: '',
+              phone: '',
+              email: data.user.email,
+              avatar_url: data.user.user_metadata?.avatar_url || '',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }])
+
+          // Novo usuário precisa completar perfil
+          return NextResponse.redirect(`${productionUrl}/complete-profile`)
         }
+
         // Verificar se precisa completar cadastro
         const needsCompletion = !profile ||
           !profile.company_name ||
           !profile.full_name ||
           !profile.phone
+
         if (needsCompletion) {
-          return new Response(`
-            <!DOCTYPE html>
-            <html>
-              <head>
-                <script>window.location.href = '${origin}/complete-profile';</script>
-                <meta http-equiv="refresh" content="0;url=${origin}/complete-profile">
-              </head>
-              <body>Redirecionando para completar perfil...</body>
-            </html>
-          `, {
-            status: 200,
-            headers: { 'Content-Type': 'text/html' }
-          })
+          return NextResponse.redirect(`${productionUrl}/complete-profile`)
         }
       } catch (profileErr) {
         console.error('Erro ao verificar perfil:', profileErr)
-        // Continua o fluxo para não travar o usuário
+        // Continua para dashboard mesmo com erro de perfil
+      }
+
+      // Tudo OK - redirecionar para dashboard
+      const forwardedHost = request.headers.get('x-forwarded-host')
+      const isLocalEnv = process.env.NODE_ENV === 'development'
+
+      if (isLocalEnv) {
+        return NextResponse.redirect(`${origin}${next}`)
+      } else if (forwardedHost) {
+        return NextResponse.redirect(`https://${forwardedHost}${next}`)
+      } else {
+        return NextResponse.redirect(`${productionUrl}${next}`)
       }
     }
-    // Redirect final
-    return new Response(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <script>window.location.href = '${origin}${next}';</script>
-          <meta http-equiv="refresh" content="0;url=${origin}${next}">
-        </head>
-        <body>Login realizado! Redirecionando...</body>
-      </html>
-    `, {
-      status: 200,
-      headers: { 'Content-Type': 'text/html' }
-    })
-  } catch (err) {
-    console.error('CRITICAL ERROR in Callback:', err)
-    return new Response(`
-      <html><head><meta http-equiv="refresh" content="0;url=${origin}/login?error=server-error"></head></html>
-    `, { headers: { 'Content-Type': 'text/html' } })
+
+    // Erro no exchange
+    console.error('Erro de troca de sessão:', error)
   }
+
+  // Erro - retornar para login
+  return NextResponse.redirect(`${productionUrl}/login?error=auth-callback-error`)
 }
