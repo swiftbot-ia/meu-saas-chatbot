@@ -31,7 +31,7 @@ export async function GET(request) {
                 .select(`*, contact:whatsapp_contacts(*)`)
                 .eq('instance_name', instanceName)
                 .eq('funnel_stage', stage || 'novo')
-                .gt('message_count', 0); // Apenas conversas com mensagens
+                .not('last_message_at', 'is', null); // Apenas conversas com mensagens
 
             // If cursor provided, paginate
             if (cursor) {
@@ -86,7 +86,7 @@ export async function GET(request) {
                 .select(`*, contact:whatsapp_contacts(*)`)
                 .eq('instance_name', instanceName)
                 .eq('funnel_stage', stageKey)
-                .gt('message_count', 0) // Apenas conversas com mensagens
+                .not('last_message_at', 'is', null) // Apenas conversas com mensagens
                 .order('funnel_position', { ascending: true })
                 .order('last_message_at', { ascending: false })
                 .limit(limit + 1); // Fetch one extra to check if there's more
