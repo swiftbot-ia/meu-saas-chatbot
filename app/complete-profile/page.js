@@ -216,6 +216,22 @@ export default function CompleteProfile() {
 
       if (error) throw error
 
+      // Enviar lead para n8n (fire and forget)
+      fetch('/api/webhooks/n8n-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.id,
+          email: user.email,
+          full_name: fullName,
+          company_name: companyName,
+          business_sector: finalBusinessSector,
+          phone: phone
+        })
+      }).then(res => {
+        if (res.ok) console.log('✅ Lead enviado para n8n')
+      }).catch(err => console.warn('Lead webhook failed:', err))
+
       setMessage('✅ Perfil atualizado!')
       setTimeout(() => {
         router.push('/dashboard')
@@ -372,8 +388,8 @@ export default function CompleteProfile() {
               {/* Feedback Message */}
               {message && (
                 <div className={`p-4 rounded-2xl text-sm border text-center font-medium animate-in fade-in zoom-in duration-300 ${message.includes('✅')
-                    ? 'bg-[#00FF99]/10 text-[#00FF99] border-[#00FF99]/20'
-                    : 'bg-red-500/10 text-red-400 border-red-500/20'
+                  ? 'bg-[#00FF99]/10 text-[#00FF99] border-[#00FF99]/20'
+                  : 'bg-red-500/10 text-red-400 border-red-500/20'
                   }`}>
                   {message}
                 </div>
