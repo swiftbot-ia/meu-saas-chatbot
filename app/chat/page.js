@@ -6,7 +6,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import ConversationList from '../components/chat/ConversationList';
 import ChatWindow from '../components/chat/ChatWindow';
 import { Loader2, AlertCircle } from 'lucide-react';
@@ -31,6 +31,7 @@ function ChatLoadingFallback() {
 // Main chat content component
 function ChatContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const conversationIdParam = searchParams.get('conversation');
 
   // 1. ESTADOS
@@ -47,6 +48,13 @@ function ChatContent() {
   // 2. FUNÇÕES
   const loadConnections = async () => {
     try {
+      // ✅ Check authentication first
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        router.push('/login');
+        return;
+      }
+
       const response = await fetch('/api/whatsapp/connections');
       const data = await response.json();
 

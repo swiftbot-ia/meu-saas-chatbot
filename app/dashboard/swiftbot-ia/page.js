@@ -284,6 +284,7 @@ export default function SwiftbotProPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
+        router.push('/login')
         return
       }
       setUser(user)

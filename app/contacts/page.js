@@ -214,6 +214,13 @@ export default function ContactsPage() {
 
   const loadConnections = async () => {
     try {
+      // ✅ Check authentication first
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        router.push('/login');
+        return;
+      }
+
       const response = await fetch('/api/whatsapp/connections');
       const data = await response.json();
 
