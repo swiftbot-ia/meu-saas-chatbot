@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { DragDropContext } from '@hello-pangea/dnd';
 import KanbanColumn from './components/KanbanColumn';
 import LeadModal from './components/LeadModal';
@@ -32,6 +33,7 @@ const SALES_STAGES = {
 };
 
 const SalesFunnelPage = () => {
+    const router = useRouter();
     const [columns, setColumns] = useState(SALES_STAGES);
     const [leads, setLeads] = useState({});
     const [selectedLead, setSelectedLead] = useState(null);
@@ -50,6 +52,13 @@ const SalesFunnelPage = () => {
     // Read active connection ID and fetch connection details
     useEffect(() => {
         const fetchConnectionDetails = async () => {
+            // ✅ Check authentication first
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                router.push('/login');
+                return;
+            }
+
             const activeId = localStorage.getItem('activeConnectionId');
 
             try {
