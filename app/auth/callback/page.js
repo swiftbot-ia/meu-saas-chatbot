@@ -102,7 +102,7 @@ export default function AuthCallbackPage() {
             minHeight: '100vh',
             backgroundColor: '#0a0a0a',
             color: 'white',
-            fontFamily: 'system-ui, sans-serif'
+            fontFamily: 'Inter, system-ui, -apple-system, sans-serif'
         }}>
             <div style={{
                 width: '40px',
@@ -113,7 +113,7 @@ export default function AuthCallbackPage() {
                 animation: 'spin 1s linear infinite',
                 marginBottom: '20px'
             }} />
-            <p style={{ fontSize: '18px' }}>{status}</p>
+            <p style={{ fontSize: '16px', fontWeight: '500', letterSpacing: '-0.01em' }}>{status}</p>
             <style jsx>{`
         @keyframes spin {
           to { transform: rotate(360deg); }
