@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 
-export async function middleware(request) {
+export async function proxy(request) {
     let supabaseResponse = NextResponse.next({
         request,
     })
@@ -20,19 +20,20 @@ export async function middleware(request) {
                         request,
                     })
                     cookiesToSet.forEach(({ name, value, options }) =>
-                        supabaseResponse.cookies.set(name, value, options)
+                        supabaseResponse.cookies.set(name, value, {
+                            ...options,
+                            // Garantir que cookies funcionem com redirects externos (OAuth)
+                            sameSite: 'lax',
+                            secure: true,
+                        })
                     )
                 },
             },
         }
     )
 
-    // IMPORTANTE: NÃO use getSession() pois não valida o token
-    // Use getUser() que valida o JWT
-    // Isso também faz o refresh automático do token se necessário
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    // Refresh da sessão - não bloqueia nenhuma rota
+    const { data: { user } } = await supabase.auth.getUser()
 
     return supabaseResponse
 }
