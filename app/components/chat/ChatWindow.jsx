@@ -8,7 +8,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
-import { Phone, MoreVertical, Archive, Trash2, X, MessageSquare } from 'lucide-react';
+import { Phone, MoreVertical, Archive, Trash2, X, MessageSquare, Bot } from 'lucide-react';
 import { createChatSupabaseClient } from '@/lib/supabase/chat-client';
 
 const chatSupabase = createChatSupabaseClient();
@@ -26,6 +26,10 @@ export default function ChatWindow({
   const [sending, setSending] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [previousMessageCount, setPreviousMessageCount] = useState(0);
+
+  // Agent toggle state
+  const [agentEnabled, setAgentEnabled] = useState(true);
+  const [agentLoading, setAgentLoading] = useState(false);
 
   // Auto-scroll to bottom when new messages arrive (only if near bottom)
   useEffect(() => {
@@ -59,6 +63,7 @@ export default function ChatWindow({
     if (conversation) {
       loadMessages();
       markAsRead();
+      loadAgentStatus();
 
       // Setup real-time subscription for message updates
       // Use instance_name filter (like sidebar does) and filter by contact_id in JS
@@ -276,6 +281,56 @@ export default function ChatWindow({
       });
     } catch (error) {
       console.error('Erro ao marcar como lida:', error);
+    }
+  };
+
+  // Load agent status for this conversation
+  const loadAgentStatus = async () => {
+    if (!conversation?.id) return;
+
+    try {
+      const response = await fetch(`/api/chat/agent-settings?conversationId=${conversation.id}`);
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setAgentEnabled(data.agentEnabled);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar status do agente:', error);
+      // Default to enabled on error
+      setAgentEnabled(true);
+    }
+  };
+
+  // Toggle agent for this conversation
+  const toggleAgent = async () => {
+    if (!conversation?.id || agentLoading) return;
+
+    setAgentLoading(true);
+    const newState = !agentEnabled;
+
+    try {
+      const response = await fetch('/api/chat/agent-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId: conversation.id,
+          agentEnabled: newState
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setAgentEnabled(newState);
+      } else {
+        alert('Erro ao alterar status do agente');
+      }
+    } catch (error) {
+      console.error('Erro ao alterar agente:', error);
+      alert('Erro ao alterar status do agente');
+    } finally {
+      setAgentLoading(false);
     }
   };
 
@@ -497,6 +552,30 @@ export default function ChatWindow({
 
         {/* Actions */}
         <div className="flex items-center space-x-2">
+          {/* Agent Toggle Button */}
+          <button
+            onClick={toggleAgent}
+            disabled={agentLoading}
+            className={`p-2 rounded-full transition-all duration-200 flex items-center justify-center ${agentLoading
+              ? 'opacity-50 cursor-not-allowed'
+              : 'hover:bg-white/10'
+              }`}
+            title={agentEnabled ? 'Agente IA ativo - Clique para desativar' : 'Agente IA desativado - Clique para ativar'}
+          >
+            <div className="relative">
+              <Bot
+                size={20}
+                className={`transition-colors ${agentEnabled ? 'text-[#00FF99]' : 'text-gray-500'
+                  }`}
+              />
+              {!agentEnabled && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-[2px] h-6 bg-red-500 rotate-45 transform origin-center" />
+                </div>
+              )}
+            </div>
+          </button>
+
           {/* Menu */}
           <div className="relative">
             <button
