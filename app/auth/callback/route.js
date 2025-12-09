@@ -14,22 +14,42 @@ export async function GET(request) {
   }
   try {
     const cookieStore = await cookies()
+
+    // 🔍 DEBUG: Log dos cookies recebidos
+    const allCookies = cookieStore.getAll()
+    console.log('📦 [Callback] Todos os cookies recebidos:', allCookies.map(c => c.name))
+
+    // Verificar se há cookie de code_verifier (nome pode variar)
+    const pkceRelated = allCookies.filter(c =>
+      c.name.includes('pkce') ||
+      c.name.includes('verifier') ||
+      c.name.includes('sb-') ||
+      c.name.includes('auth')
+    )
+    console.log('🔐 [Callback] Cookies PKCE/Auth:', pkceRelated.map(c => ({ name: c.name, valueLen: c.value?.length })))
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       {
         cookies: {
-          getAll() { return cookieStore.getAll() },
+          getAll() {
+            console.log('📖 [Callback] getAll chamado')
+            return cookieStore.getAll()
+          },
           setAll(cookiesToSet) {
+            console.log('💾 [Callback] setAll chamado:', cookiesToSet.map(c => c.name))
             cookiesToSet.forEach(({ name, value, options }) => {
-              try { cookieStore.set(name, value, options) } catch {}
+              try { cookieStore.set(name, value, options) } catch { }
             })
           },
         },
       }
     )
+
+    console.log('🔄 [Callback] Tentando exchangeCodeForSession...')
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-    
+
     if (error) {
       console.error('Erro de troca de sessão:', error)
       return new Response(`
@@ -78,9 +98,9 @@ export async function GET(request) {
               </head>
               <body>Redirecionando para completar perfil...</body>
             </html>
-          `, { 
+          `, {
             status: 200,
-            headers: { 'Content-Type': 'text/html' } 
+            headers: { 'Content-Type': 'text/html' }
           })
         }
       } catch (profileErr) {
@@ -98,9 +118,9 @@ export async function GET(request) {
         </head>
         <body>Login realizado! Redirecionando...</body>
       </html>
-    `, { 
+    `, {
       status: 200,
-      headers: { 'Content-Type': 'text/html' } 
+      headers: { 'Content-Type': 'text/html' }
     })
   } catch (err) {
     console.error('CRITICAL ERROR in Callback:', err)
