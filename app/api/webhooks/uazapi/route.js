@@ -265,7 +265,7 @@ async function handleMessagesUpsert(requestId, instanceName, payload) {
     const messages = Array.isArray(messageData) ? messageData : [messageData];
 
     for (const message of messages) {
-      await processIncomingMessage(requestId, instanceName, message);
+      await processIncomingMessage(requestId, instanceName, message, null, payload);
     }
 
   } catch (error) {
@@ -343,7 +343,7 @@ async function handleNewFormatMessage(requestId, instanceName, payload) {
         break;
     }
 
-    await processIncomingMessage(requestId, instanceName, convertedMessage, instanceToken);
+    await processIncomingMessage(requestId, instanceName, convertedMessage, instanceToken, payload);
 
   } catch (error) {
     log(requestId, 'error', '❌', 'Erro em handleNewFormatMessage', { error: error.message });
@@ -466,7 +466,7 @@ async function handleConnectionLost(requestId, instanceName, payload) {
  * ===========================================================================
  * MUDANÇA CRÍTICA: Aceita fromMe=true e false para formar conversa completa
  */
-async function processIncomingMessage(requestId, instanceName, messageData, instanceToken = null) {
+async function processIncomingMessage(requestId, instanceName, messageData, instanceToken = null, fullPayload = null) {
   try {
     const messageKey = messageData.key;
     const messageInfo = messageData.message;
@@ -913,7 +913,7 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
       connection,
       contact,
       conversation,
-      messageData // Payload original do webhook
+      fullPayload || messageData // Payload completo do UAZAPI
     ).then(result => {
       if (result.success) {
         log(requestId, 'info', '🤖', 'Enviado para n8n com sucesso');
