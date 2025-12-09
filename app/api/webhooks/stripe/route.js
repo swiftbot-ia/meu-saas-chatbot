@@ -5,6 +5,7 @@ import { supabase } from '../../../../lib/supabase'
 import crypto from 'crypto'
 
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET
+const N8N_WEBHOOK_PAYMENT_URL = process.env.N8N_WEBHOOK_PAYMENT_URL
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
@@ -13,7 +14,7 @@ export async function POST(request) {
   try {
     const body = await request.text()
     const signature = request.headers.get('stripe-signature')
-    
+
     console.log('📡 Webhook Stripe recebido')
 
     // ✅ VERIFICAR ASSINATURA DO WEBHOOK (CRÍTICO PARA SEGURANÇA)
@@ -32,7 +33,7 @@ export async function POST(request) {
     }
 
     const event = JSON.parse(body)
-    
+
     console.log('📡 Evento Stripe:', {
       type: event.type,
       id: event.id,
@@ -45,7 +46,7 @@ export async function POST(request) {
       case 'customer.subscription.created':
         await handleSubscriptionCreated(event.data.object)
         break
-      
+
       // ============================================
       // INÍCIO DO MERGE - SWITCH
       // Este case agora chama o NOVO handler
@@ -56,21 +57,21 @@ export async function POST(request) {
       // ============================================
       // FIM DO MERGE - SWITCH (case duplicado removido)
       // ============================================
-      
+
       case 'customer.subscription.deleted':
         await handleSubscriptionDeleted(event.data.object)
         break
-      
+
       case 'customer.subscription.trial_will_end':
         await handleTrialWillEnd(event.data.object)
         break
-        
+
       // ============================================
       // INÍCIO DO MERGE - SWITCH
       // Este case agora chama o NOVO handler
       // ============================================
       case 'invoice.paid':
-          await handleInvoicePaidWithProration(event.data.object)
+        await handleInvoicePaidWithProration(event.data.object)
         break
 
       case 'subscription_schedule.updated':
@@ -88,7 +89,7 @@ export async function POST(request) {
       case 'invoice.payment_succeeded':
         await handleInvoicePaymentSucceeded(event.data.object)
         break
-      
+
       case 'invoice.payment_failed':
         await handleInvoicePaymentFailed(event.data.object)
         break
@@ -133,13 +134,13 @@ function verifyStripeSignature(payload, header, secret) {
   try {
     const timestamp = header.split(',')[0].split('=')[1]
     const signatures = header.split(',').slice(1).map(s => s.split('=')[1])
-    
+
     const signedPayload = `${timestamp}.${payload}`
     const expectedSignature = crypto
       .createHmac('sha256', secret)
       .update(signedPayload)
       .digest('hex')
-    
+
     return signatures.some(sig => crypto.timingSafeEqual(
       Buffer.from(sig),
       Buffer.from(expectedSignature)
@@ -158,11 +159,11 @@ function verifyStripeSignature(payload, header, secret) {
 async function handleSubscriptionCreated(subscription) {
   try {
     console.log('📝 Assinatura criada via webhook:', subscription.id)
-    
+
     // Atualizar status no banco local
     const { error } = await supabase
       .from('user_subscriptions')
-      .update({ 
+      .update({
         status: mapStripeStatus(subscription.status),
         updated_at: new Date().toISOString()
       })
@@ -211,7 +212,7 @@ async function handleSubscriptionDeleted(subscription) {
     const now = new Date().toISOString()
     const { error: updateError } = await supabase
       .from('user_subscriptions')
-      .update({ 
+      .update({
         status: 'canceled',
         canceled_at: now,
         updated_at: now
@@ -263,7 +264,7 @@ async function handleSubscriptionDeleted(subscription) {
 async function handleTrialWillEnd(subscription) {
   try {
     console.log('⏰ Trial vai terminar em breve:', subscription.id)
-    
+
     // Buscar dados do usuário
     const { data: localSubscription } = await supabase
       .from('user_subscriptions')
@@ -289,7 +290,7 @@ async function handleTrialWillEnd(subscription) {
 async function handleInvoicePaymentSucceeded(invoice) {
   try {
     console.log('💰 Fatura paga via webhook:', invoice.id)
-    
+
     if (!invoice.subscription) {
       console.log('⚠️ Fatura sem subscription_id associado')
       return
@@ -349,6 +350,11 @@ async function handleInvoicePaymentSucceeded(invoice) {
 
     console.log('✅ Pagamento processado com sucesso')
 
+    // Enviar para n8n (fire and forget)
+    sendPaymentToN8n(localSubscription, invoice).catch(err => {
+      console.warn('⚠️ [N8nPayment] Erro ao enviar:', err.message)
+    })
+
   } catch (error) {
     console.error('❌ Erro ao processar fatura paga:', error)
   }
@@ -358,7 +364,7 @@ async function handleInvoicePaymentSucceeded(invoice) {
 async function handleInvoicePaymentFailed(invoice) {
   try {
     console.log('❌ Falha no pagamento da fatura:', invoice.id)
-    
+
     if (!invoice.subscription) {
       console.log('⚠️ Fatura sem subscription_id associado')
       return
@@ -459,7 +465,7 @@ async function handlePaymentIntentFailed(paymentIntent) {
 async function handleCustomerDeleted(customer) {
   try {
     console.log('👤 Customer deletado:', customer.id)
-    
+
     // Limpar dados relacionados ao customer
     const { error } = await supabase
       .from('user_subscriptions')
@@ -489,7 +495,7 @@ async function handleCustomerDeleted(customer) {
 async function handleSubscriptionUpdated(subscription) {
   try {
     console.log('🔄 [WEBHOOK] customer.subscription.updated:', subscription.id)
-    
+
     // Buscar assinatura no banco
     const { data: localSubscription, error: localSubError } = await supabase
       .from('user_subscriptions')
@@ -504,33 +510,33 @@ async function handleSubscriptionUpdated(subscription) {
 
     // Extrair dados do novo plano dos metadados da Stripe
     // IMPORTANTE: Seus Prices na Stripe DEVEM ter esses metadados
-    const newConnections = subscription.metadata?.connections 
-      ? parseInt(subscription.metadata.connections) 
+    const newConnections = subscription.metadata?.connections
+      ? parseInt(subscription.metadata.connections)
       : null
-      
-    const newBillingPeriod = subscription.metadata?.billing_period 
+
+    const newBillingPeriod = subscription.metadata?.billing_period
       || null
 
     if (!newConnections || !newBillingPeriod) {
-        console.error('❌ ERRO CRÍTICO: Metadados (connections, billing_period) não encontrados no Price da Stripe. Abortando sincronização.')
-        console.error('💡 SOLUÇÃO: Verifique se os Prices na Stripe têm metadata: { connections: "1", billing_period: "monthly" }')
-        return
+      console.error('❌ ERRO CRÍTICO: Metadados (connections, billing_period) não encontrados no Price da Stripe. Abortando sincronização.')
+      console.error('💡 SOLUÇÃO: Verifique se os Prices na Stripe têm metadata: { connections: "1", billing_period: "monthly" }')
+      return
     }
 
     // Verificar se houve mudança real
-    const hasChanged = 
+    const hasChanged =
       newConnections !== localSubscription.connections_purchased ||
       newBillingPeriod !== localSubscription.billing_period
 
     const now = new Date().toISOString()
     const updateData = {
       status: subscription.status === 'trialing' ? 'trial' : 'active',
-      next_billing_date: subscription.current_period_end 
+      next_billing_date: subscription.current_period_end
         ? new Date(subscription.current_period_end * 1000).toISOString()
         : localSubscription.next_billing_date,
       updated_at: now
     }
-    
+
     let eventType = 'plan_sync' // Evento de log padrão
     let isDowngrade = false
 
@@ -555,7 +561,7 @@ async function handleSubscriptionUpdated(subscription) {
       if (localSubscription.status === 'trial' && subscription.status === 'active') {
         updateData.trial_end_date = null
       }
-      
+
       // =======================================================
       // ✅ CORREÇÃO CRÍTICA 1: DESCONECTAR WHATSAPP EM DOWNGRADE
       // =======================================================
@@ -563,16 +569,16 @@ async function handleSubscriptionUpdated(subscription) {
         console.log('📉 Detectado DOWNGRADE. Desconectando conexões excedentes...')
         eventType = 'plan_downgrade_applied'
         isDowngrade = true
-        
+
         // ✅ CHAMADA CRÍTICA (não bloquear o webhook por isso)
         disconnectExcessWhatsApp(
-          localSubscription.user_id, 
-          localSubscription.connections_purchased, 
+          localSubscription.user_id,
+          localSubscription.connections_purchased,
           newConnections
         ).catch(err => {
-            console.error('❌ Erro ao fundo ao desconectar WhatsApp:', err)
+          console.error('❌ Erro ao fundo ao desconectar WhatsApp:', err)
         })
-        
+
       } else if (newConnections > localSubscription.connections_purchased || newBillingPeriod !== localSubscription.billing_period) {
         console.log('🚀 Detectado UPGRADE.')
         eventType = 'plan_upgrade_confirmed'
@@ -620,7 +626,7 @@ async function handleSubscriptionUpdated(subscription) {
           },
           created_at: now
         }])
-      
+
       console.log(`✅ Log registrado: ${eventType}`)
     }
 
@@ -633,7 +639,7 @@ async function handleSubscriptionUpdated(subscription) {
 async function handleInvoicePaidWithProration(invoice) {
   try {
     console.log('💰 [WEBHOOK] invoice.paid:', invoice.id)
-    
+
     if (!invoice.subscription) {
       console.log('⚠️ Fatura sem subscription_id associado')
       return
@@ -694,7 +700,7 @@ async function handleInvoicePaidWithProration(invoice) {
         .update({
           status: 'active',
           updated_at: new Date().toISOString(),
-          next_billing_date: invoice.period_end 
+          next_billing_date: invoice.period_end
             ? new Date(invoice.period_end * 1000).toISOString()
             : localSubscription.next_billing_date
         })
@@ -711,7 +717,7 @@ async function handleInvoicePaidWithProration(invoice) {
 async function handleSubscriptionScheduleUpdated(schedule) {
   try {
     console.log('📅 [WEBHOOK] subscription_schedule.updated:', schedule.id)
-    
+
     if (!schedule.subscription) {
       console.log('⚠️ Schedule sem subscription_id associado')
       return
@@ -727,41 +733,41 @@ async function handleSubscriptionScheduleUpdated(schedule) {
       console.log('⚠️ Assinatura não encontrada para schedule')
       return
     }
-    
+
     // Verificar se é um agendamento ativo (phase futura)
     if (schedule.phases && schedule.phases.length > 1 && schedule.status === 'active') {
       const futurePhase = schedule.phases[1]
-      
+
       // =======================================================
       // ✅ CORREÇÃO CRÍTICA 2: RECONCILER - EXTRAIR DA STRIPE
       // =======================================================
-      
+
       // Opção 1: Usar metadados do schedule (você precisa adicioná-los na API)
-      const pendingConnections = schedule.metadata?.pending_connections 
-        ? parseInt(schedule.metadata.pending_connections) 
+      const pendingConnections = schedule.metadata?.pending_connections
+        ? parseInt(schedule.metadata.pending_connections)
         : null
-        
-      const pendingBillingPeriod = schedule.metadata?.pending_billing_period 
+
+      const pendingBillingPeriod = schedule.metadata?.pending_billing_period
         || null
 
       if (!pendingConnections || !pendingBillingPeriod) {
-          console.error(`❌ ERRO CRÍTICO: Metadados (pending_connections, pending_billing_period) não encontrados no SCHEDULE da Stripe.`)
-          console.error(`💡 SOLUÇÃO: Na API /downgrade, adicione metadata ao criar o schedule:`)
-          console.error(`   metadata: { pending_connections: "3", pending_billing_period: "monthly" }`)
-          return
+        console.error(`❌ ERRO CRÍTICO: Metadados (pending_connections, pending_billing_period) não encontrados no SCHEDULE da Stripe.`)
+        console.error(`💡 SOLUÇÃO: Na API /downgrade, adicione metadata ao criar o schedule:`)
+        console.error(`   metadata: { pending_connections: "3", pending_billing_period: "monthly" }`)
+        return
       }
-      
+
       console.log('✅ Downgrade agendado confirmado via webhook')
       console.log(`📊 Plano futuro: ${pendingConnections} ${pendingBillingPeriod}`)
       console.log(`📅 Efetivo em: ${new Date(futurePhase.start_date * 1000).toISOString()}`)
 
       // ✅ RECONCILER: Atualizar flags apenas se estiver diferente
       if (localSubscription.pending_change_type !== 'downgrade' ||
-          localSubscription.pending_connections !== pendingConnections ||
-          localSubscription.pending_billing_period !== pendingBillingPeriod) {
-            
+        localSubscription.pending_connections !== pendingConnections ||
+        localSubscription.pending_billing_period !== pendingBillingPeriod) {
+
         console.log('🔄 Sincronizando flags de mudança pendente no DB (RECONCILER)...')
-        
+
         await supabase
           .from('user_subscriptions')
           .update({
@@ -771,7 +777,7 @@ async function handleSubscriptionScheduleUpdated(schedule) {
             updated_at: new Date().toISOString()
           })
           .eq('id', localSubscription.id)
-          
+
         console.log('✅ Flags de mudança pendente (re)sincronizadas no DB via RECONCILER.')
       } else {
         console.log('ℹ️ Flags de mudança pendente já estão corretas no DB.')
@@ -787,7 +793,7 @@ async function handleSubscriptionScheduleUpdated(schedule) {
 async function handleSubscriptionScheduleReleased(schedule) {
   try {
     console.log('🔓 [WEBHOOK] subscription_schedule.released:', schedule.id)
-    
+
     if (!schedule.subscription) {
       console.log('⚠️ Schedule sem subscription_id associado')
       return
@@ -897,7 +903,7 @@ async function disconnectExcessWhatsApp(userId, currentConnections, newConnectio
               'apikey': evolutionKey
             }
           })
-          
+
           if (logoutResponse.ok) {
             console.log(`✅ Evolution API: Logout de ${conn.instance_name}`)
           } else {
@@ -1022,5 +1028,71 @@ async function disconnectUserWhatsApp(userId) {
   } catch (error) {
     console.error('❌ Erro ao desconectar WhatsApp via webhook:', error)
     return false
+  }
+}
+
+// ============================================================================
+// ENVIAR PAGAMENTO PARA N8N
+// ============================================================================
+async function sendPaymentToN8n(subscription, invoice) {
+  if (!N8N_WEBHOOK_PAYMENT_URL) {
+    console.warn('⚠️ [N8nPayment] N8N_WEBHOOK_PAYMENT_URL não configurada')
+    return
+  }
+
+  try {
+    // Buscar dados do usuário
+    const { data: user } = await supabase
+      .from('user_profiles')
+      .select('email, full_name, company_name, phone')
+      .eq('user_id', subscription.user_id)
+      .single()
+
+    const payload = {
+      event: 'payment_confirmed',
+      timestamp: new Date().toISOString(),
+
+      payment: {
+        invoice_id: invoice.id,
+        amount: invoice.amount_paid / 100,
+        currency: invoice.currency,
+        paid_at: new Date().toISOString()
+      },
+
+      subscription: {
+        id: subscription.id,
+        status: subscription.status,
+        plan_type: subscription.billing_period,
+        connections: subscription.connections_purchased,
+        next_billing_date: subscription.next_billing_date
+      },
+
+      customer: {
+        user_id: subscription.user_id,
+        email: user?.email,
+        full_name: user?.full_name,
+        company_name: user?.company_name,
+        phone: user?.phone
+      }
+    }
+
+    console.log('🚀 [N8nPayment] Enviando para n8n:', {
+      invoice_id: invoice.id,
+      amount: invoice.amount_paid / 100
+    })
+
+    const response = await fetch(N8N_WEBHOOK_PAYMENT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+
+    if (response.ok) {
+      console.log('✅ [N8nPayment] Pagamento enviado com sucesso')
+    } else {
+      console.error('❌ [N8nPayment] Erro:', response.status)
+    }
+  } catch (error) {
+    console.error('❌ [N8nPayment] Erro ao enviar:', error.message)
   }
 }
