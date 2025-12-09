@@ -905,24 +905,41 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
       })
       .eq('id', contact.id);
 
-    // 11. ENVIAR PARA N8N (agente de IA)
+    // 11. VERIFICAR SE AGENTE ESTÁ HABILITADO PARA ESTE CONTATO
+    // Buscar configuração de agente para este contato específico
+    const { data: agentSettings } = await supabaseAdmin
+      .from('contact_agent_settings')
+      .select('agent_enabled')
+      .eq('connection_id', connection.id)
+      .eq('whatsapp_number', whatsappNumber)
+      .maybeSingle();
+
+    // Se não existe registro OU agent_enabled = true, enviar para n8n
+    // Por padrão (sem registro), agente está ATIVADO
+    const shouldSendToAgent = !agentSettings || agentSettings.agent_enabled !== false;
+
+    // 12. ENVIAR PARA N8N (agente de IA)
     // Fire and forget - não bloqueia o webhook
     // Apenas mensagens inbound são enviadas (filtrado internamente)
-    N8nWebhookService.sendToN8n(
-      savedMessage,
-      connection,
-      contact,
-      conversation,
-      fullPayload || messageData // Payload completo do UAZAPI
-    ).then(result => {
-      if (result.success) {
-        log(requestId, 'info', '🤖', 'Enviado para n8n com sucesso');
-      } else if (result.reason === 'queued_for_retry') {
-        log(requestId, 'info', '⏳', 'Adicionado à fila de retry do n8n');
-      }
-    }).catch(err => {
-      log(requestId, 'error', '❌', `Erro ao enviar para n8n: ${err.message}`);
-    });
+    if (shouldSendToAgent) {
+      N8nWebhookService.sendToN8n(
+        savedMessage,
+        connection,
+        contact,
+        conversation,
+        fullPayload || messageData // Payload completo do UAZAPI
+      ).then(result => {
+        if (result.success) {
+          log(requestId, 'info', '🤖', 'Enviado para n8n com sucesso');
+        } else if (result.reason === 'queued_for_retry') {
+          log(requestId, 'info', '⏳', 'Adicionado à fila de retry do n8n');
+        }
+      }).catch(err => {
+        log(requestId, 'error', '❌', `Erro ao enviar para n8n: ${err.message}`);
+      });
+    } else {
+      log(requestId, 'info', '🔇', `Agente desabilitado para contato: ${whatsappNumber} (connection: ${connection.id})`);
+    }
 
   } catch (error) {
     log(requestId, 'error', '❌', `Erro em processIncomingMessage`, { error: error.message, stack: error.stack });
