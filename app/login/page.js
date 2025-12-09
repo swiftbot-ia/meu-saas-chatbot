@@ -209,26 +209,19 @@ export default function AuthPage() {
   const handleSocialLogin = async (provider) => {
     setSocialLoading(provider)
     try {
-      // ✅ CRÍTICO: Usar skipBrowserRedirect para garantir que cookies sejam salvos
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      // Conforme documentação oficial: https://supabase.com/docs/guides/auth/social-login/auth-google
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: provider,
         options: {
           redirectTo: `${SITE_URL}/auth/callback`,
-          skipBrowserRedirect: true, // Não redirecionar automaticamente
         }
       })
 
       if (error) {
         setMessage(`❌ Erro no login com ${provider}: ${translateError(error.message)}`)
         setSocialLoading('')
-        return
       }
-
-      // ✅ Redirect manual após cookies serem salvos
-      if (data?.url) {
-        console.log('🔐 OAuth URL gerada, redirecionando para:', data.url)
-        window.location.href = data.url
-      }
+      // Se não houver erro, o supabase automaticamente redireciona
     } catch (error) {
       setMessage(`❌ ${translateError(error.message)}`)
       setSocialLoading('')
@@ -306,8 +299,8 @@ export default function AuthPage() {
 
                     {message && (
                       <div className={`p-4 rounded-2xl text-sm border text-center font-medium ${message.includes('✅')
-                          ? 'bg-[#00FF99]/10 text-[#00FF99] border-[#00FF99]/20'
-                          : 'bg-red-500/10 text-red-400 border-red-500/20'
+                        ? 'bg-[#00FF99]/10 text-[#00FF99] border-[#00FF99]/20'
+                        : 'bg-red-500/10 text-red-400 border-red-500/20'
                         }`}>
                         {message}
                       </div>
@@ -389,8 +382,8 @@ export default function AuthPage() {
                     <button
                       onClick={() => { setAuthView('login'); setMessage(''); setErrors({}); }}
                       className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${authView === 'login'
-                          ? 'bg-[#2A2A2A] text-white shadow-lg'
-                          : 'text-gray-500 hover:text-white'
+                        ? 'bg-[#2A2A2A] text-white shadow-lg'
+                        : 'text-gray-500 hover:text-white'
                         }`}
                     >
                       Entrar
@@ -398,8 +391,8 @@ export default function AuthPage() {
                     <button
                       onClick={() => { setAuthView('register'); setMessage(''); setErrors({}); }}
                       className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${authView === 'register'
-                          ? 'bg-[#2A2A2A] text-white shadow-lg'
-                          : 'text-gray-500 hover:text-white'
+                        ? 'bg-[#2A2A2A] text-white shadow-lg'
+                        : 'text-gray-500 hover:text-white'
                         }`}
                     >
                       Cadastrar
@@ -479,8 +472,8 @@ export default function AuthPage() {
 
                     {message && (
                       <div className={`p-4 rounded-2xl text-sm border text-center font-medium ${message.includes('✅')
-                          ? 'bg-[#00FF99]/10 text-[#00FF99] border-[#00FF99]/20'
-                          : 'bg-red-500/10 text-red-400 border-red-500/20'
+                        ? 'bg-[#00FF99]/10 text-[#00FF99] border-[#00FF99]/20'
+                        : 'bg-red-500/10 text-red-400 border-red-500/20'
                         }`}>
                         {message}
                       </div>
