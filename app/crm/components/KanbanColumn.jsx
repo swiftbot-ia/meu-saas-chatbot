@@ -7,6 +7,7 @@ const KanbanColumn = ({
     stageId,
     stage,
     leads,
+    totalCount,
     onCardClick,
     currentDragDestination,
     allStages,
@@ -48,7 +49,7 @@ const KanbanColumn = ({
                             {stage.name}
                         </h3>
                         <span className="bg-white/20 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full min-w-[32px] text-center">
-                            {leads.length}
+                            {totalCount}
                         </span>
                     </div>
 
