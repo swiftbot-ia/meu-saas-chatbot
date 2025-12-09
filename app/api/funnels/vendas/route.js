@@ -81,6 +81,14 @@ export async function GET(request) {
         const groupedConversations = {};
 
         for (const stageKey of SALES_STAGES) {
+            // Buscar contagem total primeiro
+            const { count: totalCount } = await supabase
+                .from('whatsapp_conversations')
+                .select('*', { count: 'exact', head: true })
+                .eq('instance_name', instanceName)
+                .eq('funnel_stage', stageKey)
+                .not('last_message_at', 'is', null);
+
             const query = supabase
                 .from('whatsapp_conversations')
                 .select(`*, contact:whatsapp_contacts(*)`)
@@ -119,7 +127,8 @@ export async function GET(request) {
                     created_at: conv.created_at
                 })),
                 hasMore,
-                nextCursor
+                nextCursor,
+                totalCount: totalCount || 0
             };
         }
 

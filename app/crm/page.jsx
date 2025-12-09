@@ -48,6 +48,12 @@ const SalesFunnelPage = () => {
         negociacao: { cursor: null, hasMore: true, loading: false },
         fechamento: { cursor: null, hasMore: true, loading: false }
     });
+    const [stageCounts, setStageCounts] = useState({
+        novo: 0,
+        apresentacao: 0,
+        negociacao: 0,
+        fechamento: 0
+    });
 
     // Read active connection ID and fetch connection details
     useEffect(() => {
@@ -156,6 +162,7 @@ const SalesFunnelPage = () => {
             const stagesData = response.data;
             const leadsData = {};
             const paginationData = {};
+            const countsData = {};
 
             Object.keys(SALES_STAGES).forEach(stageKey => {
                 const stageData = stagesData[stageKey];
@@ -166,6 +173,7 @@ const SalesFunnelPage = () => {
                         hasMore: stageData.hasMore || false,
                         loading: false
                     };
+                    countsData[stageKey] = stageData.totalCount || 0;
                 } else {
                     leadsData[stageKey] = [];
                     paginationData[stageKey] = {
@@ -173,11 +181,13 @@ const SalesFunnelPage = () => {
                         hasMore: false,
                         loading: false
                     };
+                    countsData[stageKey] = 0;
                 }
             });
 
             setLeads(leadsData);
             setPagination(paginationData);
+            setStageCounts(countsData);
         } catch (error) {
             console.error('Error fetching leads:', error);
         } finally {
@@ -316,7 +326,7 @@ const SalesFunnelPage = () => {
                     </div>
 
                     <div className="bg-[#00FF99]/10 text-[#00FF99] px-6 py-3 rounded-2xl text-sm font-bold whitespace-nowrap mt-2 sm:mt-0">
-                        Total: {Object.values(leads).flat().length} Leads
+                        Total: {Object.values(stageCounts).reduce((a, b) => a + b, 0)} Leads
                     </div>
                 </div>
 
@@ -334,6 +344,7 @@ const SalesFunnelPage = () => {
                                     stageId={stage.id}
                                     stage={stage}
                                     leads={leads[stage.id] || []}
+                                    totalCount={stageCounts[stage.id] || 0}
                                     onCardClick={setSelectedLead}
                                     currentDragDestination={currentDragDestination}
                                     allStages={SALES_STAGES}
