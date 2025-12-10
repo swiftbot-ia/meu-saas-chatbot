@@ -191,7 +191,7 @@ const TabNavigation = ({ activeTab, onTabChange }) => {
 // ============================================================================
 // AUTOMATION CARD
 // ============================================================================
-const AutomationCard = ({ automation, onToggle, onEdit, onDelete }) => {
+const AutomationCard = ({ automation, onToggle, onEdit, onDuplicate, onDelete }) => {
   const [showMenu, setShowMenu] = useState(false)
 
   const keywords = automation.automation_keywords || []
@@ -289,7 +289,7 @@ const AutomationCard = ({ automation, onToggle, onEdit, onDelete }) => {
                     <Edit3 size={14} /> Editar
                   </button>
                   <button
-                    onClick={() => setShowMenu(false)}
+                    onClick={() => { onDuplicate(automation); setShowMenu(false) }}
                     className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-white/5 flex items-center gap-2"
                   >
                     <Copy size={14} /> Duplicar
@@ -314,7 +314,7 @@ const AutomationCard = ({ automation, onToggle, onEdit, onDelete }) => {
 // ============================================================================
 // SEQUENCE CARD
 // ============================================================================
-const SequenceCard = ({ sequence, onToggle, onEdit, onDelete }) => {
+const SequenceCard = ({ sequence, onToggle, onEdit, onDuplicate, onDelete }) => {
   const [showMenu, setShowMenu] = useState(false)
 
   return (
@@ -379,6 +379,12 @@ const SequenceCard = ({ sequence, onToggle, onEdit, onDelete }) => {
                   >
                     <Edit3 size={14} /> Editar
                   </button>
+                  <button
+                    onClick={() => { onDuplicate(sequence); setShowMenu(false) }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-white/5 flex items-center gap-2"
+                  >
+                    <Copy size={14} /> Duplicar
+                  </button>
                   <hr className="border-white/10 my-1" />
                   <button
                     onClick={() => { onDelete(sequence.id); setShowMenu(false) }}
@@ -397,22 +403,96 @@ const SequenceCard = ({ sequence, onToggle, onEdit, onDelete }) => {
 }
 
 // ============================================================================
+// TEMPLATE CARD
+// ============================================================================
+const TemplateCard = ({ template, onEdit, onDuplicate, onDelete }) => {
+  const [showMenu, setShowMenu] = useState(false)
+
+  return (
+    <div className="bg-[#1A1A1A] rounded-xl p-4 border border-white/5 hover:border-white/20 transition-colors">
+      <div className="flex items-start justify-between gap-4">
+        {/* Left side - Name and content */}
+        <div className="flex-1 min-w-0">
+          <h3 className="text-white font-medium mb-1">{template.name}</h3>
+          <p className="text-gray-400 text-sm line-clamp-2 mb-2">{template.content}</p>
+          <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full">
+            {template.type === 'text' ? 'Texto' : template.type}
+          </span>
+        </div>
+
+        {/* Menu */}
+        <div className="relative">
+          <button
+            onClick={() => setShowMenu(!showMenu)}
+            className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+          >
+            <MoreVertical size={16} />
+          </button>
+
+          {showMenu && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+              <div className="absolute right-0 top-full mt-1 bg-[#252525] rounded-xl shadow-xl z-50 py-1 min-w-[150px]">
+                <button
+                  onClick={() => { onEdit(template); setShowMenu(false) }}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-white/5 flex items-center gap-2"
+                >
+                  <Edit3 size={14} /> Editar
+                </button>
+                <button
+                  onClick={() => { onDuplicate(template); setShowMenu(false) }}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-white/5 flex items-center gap-2"
+                >
+                  <Copy size={14} /> Duplicar
+                </button>
+                <hr className="border-white/10 my-1" />
+                <button
+                  onClick={() => { onDelete(template.id); setShowMenu(false) }}
+                  className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-red-500/10 flex items-center gap-2"
+                >
+                  <Trash2 size={14} /> Excluir
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
 // CREATE TEMPLATE MODAL
 // ============================================================================
-const CreateTemplateModal = ({ isOpen, onClose, onSave }) => {
+const CreateTemplateModal = ({ isOpen, onClose, onSave, template = null }) => {
   const [name, setName] = useState('')
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
+  const isEditing = !!template
+
+  useEffect(() => {
+    if (template) {
+      setName(template.name || '')
+      setContent(template.content || '')
+    } else {
+      setName('')
+      setContent('')
+    }
+  }, [template, isOpen])
 
   const handleSubmit = async () => {
     if (!name.trim() || !content.trim()) return
     setLoading(true)
     try {
-      await onSave({ name: name.trim(), content: content.trim() })
+      await onSave({
+        id: template?.id,
+        name: name.trim(),
+        content: content.trim()
+      })
       setName('')
       setContent('')
     } catch (error) {
-      console.error('Erro ao criar template:', error)
+      console.error('Erro ao salvar template:', error)
     } finally {
       setLoading(false)
     }
@@ -424,7 +504,9 @@ const CreateTemplateModal = ({ isOpen, onClose, onSave }) => {
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
       <div className="bg-[#1A1A1A] rounded-2xl w-full max-w-lg">
         <div className="flex items-center justify-between p-6 border-b border-white/10">
-          <h2 className="text-xl font-semibold text-white">Novo Template</h2>
+          <h2 className="text-xl font-semibold text-white">
+            {isEditing ? 'Editar Template' : 'Novo Template'}
+          </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white">
             <X size={20} />
           </button>
@@ -471,7 +553,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onSave }) => {
             className="flex-1 px-4 py-3 bg-[#00FF99] text-black rounded-xl font-medium hover:bg-[#00E88C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading && <Loader2 className="animate-spin" size={18} />}
-            Criar Template
+            {isEditing ? 'Salvar' : 'Criar Template'}
           </button>
         </div>
       </div>
@@ -482,10 +564,22 @@ const CreateTemplateModal = ({ isOpen, onClose, onSave }) => {
 // ============================================================================
 // CREATE SEQUENCE MODAL
 // ============================================================================
-const CreateSequenceModal = ({ isOpen, onClose, onSave, templates = [] }) => {
+const CreateSequenceModal = ({ isOpen, onClose, onSave, templates = [], tags = [], origins = [] }) => {
   const [name, setName] = useState('')
+  const [triggerType, setTriggerType] = useState('manual')
+  const [triggerTagId, setTriggerTagId] = useState('')
+  const [triggerOriginId, setTriggerOriginId] = useState('')
+  const [triggerKeywords, setTriggerKeywords] = useState('')
   const [steps, setSteps] = useState([])
   const [loading, setLoading] = useState(false)
+
+  const triggerTypes = [
+    { value: 'manual', label: 'Manual (inscrever pelo sistema)', icon: '👤' },
+    { value: 'new_contact', label: 'Novo contato (primeira mensagem)', icon: '🆕' },
+    { value: 'has_tag', label: 'Quando receber tag', icon: '🏷️' },
+    { value: 'has_origin', label: 'Quando tiver origem', icon: '📍' },
+    { value: 'keyword', label: 'Palavra-chave na mensagem', icon: '🔑' }
+  ]
 
   const delayUnits = [
     { value: 'immediately', label: 'Imediatamente' },
@@ -548,6 +642,10 @@ const CreateSequenceModal = ({ isOpen, onClose, onSave, templates = [] }) => {
     try {
       await onSave({
         name: name.trim(),
+        triggerType,
+        triggerTagId: triggerType === 'has_tag' ? triggerTagId : null,
+        triggerOriginId: triggerType === 'has_origin' ? triggerOriginId : null,
+        triggerKeywords: triggerType === 'keyword' ? triggerKeywords.split(',').map(k => k.trim()).filter(Boolean) : [],
         steps: steps.map(s => ({
           templateId: s.templateId,
           delayValue: s.delayUnit === 'immediately' ? 0 : s.delayValue,
@@ -559,6 +657,10 @@ const CreateSequenceModal = ({ isOpen, onClose, onSave, templates = [] }) => {
         }))
       })
       setName('')
+      setTriggerType('manual')
+      setTriggerTagId('')
+      setTriggerOriginId('')
+      setTriggerKeywords('')
       setSteps([])
     } catch (error) {
       console.error('Erro ao criar sequência:', error)
@@ -592,6 +694,71 @@ const CreateSequenceModal = ({ isOpen, onClose, onSave, templates = [] }) => {
               placeholder="Ex: Follow-up Vendas, Boas-vindas..."
               className="w-full bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
             />
+          </div>
+
+          {/* Trigger Type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Quando inscrever na sequência?
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {triggerTypes.map(trigger => (
+                <button
+                  key={trigger.value}
+                  onClick={() => setTriggerType(trigger.value)}
+                  className={`p-3 rounded-xl text-left text-sm transition-colors ${triggerType === trigger.value
+                    ? 'bg-[#00FF99]/20 border border-[#00FF99]/50 text-white'
+                    : 'bg-[#252525] border border-white/5 text-gray-400 hover:border-white/20'
+                    }`}
+                >
+                  <span className="mr-2">{trigger.icon}</span>
+                  {trigger.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Trigger-specific fields */}
+            {triggerType === 'has_tag' && (
+              <div className="mt-3">
+                <select
+                  value={triggerTagId}
+                  onChange={(e) => setTriggerTagId(e.target.value)}
+                  className="w-full bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+                >
+                  <option value="">Selecione uma tag...</option>
+                  {tags.map(tag => (
+                    <option key={tag.id} value={tag.id}>{tag.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {triggerType === 'has_origin' && (
+              <div className="mt-3">
+                <select
+                  value={triggerOriginId}
+                  onChange={(e) => setTriggerOriginId(e.target.value)}
+                  className="w-full bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+                >
+                  <option value="">Selecione uma origem...</option>
+                  {origins.map(origin => (
+                    <option key={origin.id} value={origin.id}>{origin.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {triggerType === 'keyword' && (
+              <div className="mt-3">
+                <input
+                  type="text"
+                  value={triggerKeywords}
+                  onChange={(e) => setTriggerKeywords(e.target.value)}
+                  placeholder="Ex: promoção, desconto, quero saber (separadas por vírgula)"
+                  className="w-full bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+                />
+              </div>
+            )}
           </div>
 
           {/* Steps */}
@@ -1381,6 +1548,8 @@ export default function AutomationsPage() {
   const [sequences, setSequences] = useState([])
   const [templates, setTemplates] = useState([])
   const [folders, setFolders] = useState([])
+  const [tags, setTags] = useState([])
+  const [origins, setOrigins] = useState([])
 
   // UI
   const [activeTab, setActiveTab] = useState('keywords')
@@ -1403,6 +1572,7 @@ export default function AutomationsPage() {
       loadAutomations()
       loadSequences()
       loadTemplates()
+      loadTagsAndOrigins()
     }
   }, [selectedConnection])
 
@@ -1504,17 +1674,43 @@ export default function AutomationsPage() {
     }
   }
 
+  const loadTagsAndOrigins = async () => {
+    try {
+      // Load tags
+      const tagsRes = await fetch('/api/contacts/tags')
+      const tagsData = await tagsRes.json()
+      if (tagsRes.ok) {
+        setTags(tagsData.tags || [])
+      }
+
+      // Load origins
+      const originsRes = await fetch('/api/contacts/origins')
+      const originsData = await originsRes.json()
+      if (originsRes.ok) {
+        setOrigins(originsData.origins || [])
+      }
+    } catch (error) {
+      console.error('Erro ao carregar tags/origins:', error)
+    }
+  }
+
   const handleCreateTemplate = async (templateData) => {
-    const response = await fetch('/api/automations/templates', {
-      method: 'POST',
+    const isEdit = !!templateData.id
+    const url = isEdit
+      ? `/api/automations/templates/${templateData.id}`
+      : '/api/automations/templates'
+
+    const response = await fetch(url, {
+      method: isEdit ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...templateData, connectionId: selectedConnection })
     })
     if (response.ok) {
       await loadTemplates()
       setShowTemplateModal(false)
+      setEditingTemplate(null)
     } else {
-      throw new Error('Erro ao criar template')
+      throw new Error('Erro ao salvar template')
     }
   }
 
@@ -1522,6 +1718,27 @@ export default function AutomationsPage() {
     if (!confirm('Excluir este template?')) return
     await fetch(`/api/automations/templates/${id}`, { method: 'DELETE' })
     await loadTemplates()
+  }
+
+  const handleEditTemplate = (template) => {
+    setEditingTemplate(template)
+    setShowTemplateModal(true)
+  }
+
+  const handleDuplicateTemplate = async (template) => {
+    const response = await fetch('/api/automations/templates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: `${template.name} (cópia)`,
+        content: template.content,
+        type: template.type,
+        connectionId: selectedConnection
+      })
+    })
+    if (response.ok) {
+      await loadTemplates()
+    }
   }
 
   const handleCreateSequence = async (sequenceData) => {
@@ -1571,6 +1788,27 @@ export default function AutomationsPage() {
     await loadAutomations()
   }
 
+  const handleDuplicateAutomation = async (automation) => {
+    const keywords = automation.automation_keywords?.map(k => k.keyword) || []
+    const response = await fetch('/api/automations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        connectionId: selectedConnection,
+        name: `${automation.name} (cópia)`,
+        triggerType: automation.trigger_type,
+        keywords: keywords,
+        responseType: automation.response_type,
+        responseContent: automation.response_content,
+        responseMediaUrl: automation.response_media_url,
+        isActive: false
+      })
+    })
+    if (response.ok) {
+      await loadAutomations()
+    }
+  }
+
   const handleEditAutomation = async (data) => {
     const response = await fetch(`/api/automations/${editingAutomation.id}`, {
       method: 'PUT',
@@ -1598,6 +1836,31 @@ export default function AutomationsPage() {
     if (!confirm('Tem certeza que deseja excluir esta sequência?')) return
     await fetch(`/api/automations/sequences/${id}`, { method: 'DELETE' })
     await loadSequences()
+  }
+
+  const handleDuplicateSequence = async (sequence) => {
+    const response = await fetch('/api/automations/sequences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        connectionId: selectedConnection,
+        name: `${sequence.name} (cópia)`,
+        description: sequence.description,
+        steps: (sequence.automation_sequence_steps || []).map(step => ({
+          templateId: step.template_id,
+          automationId: step.automation_id,
+          delayValue: step.delay_value || 1,
+          delayUnit: step.delay_unit || 'hours',
+          timeWindowStart: step.time_window_start,
+          timeWindowEnd: step.time_window_end,
+          allowedDays: step.allowed_days,
+          isActive: step.is_active
+        }))
+      })
+    })
+    if (response.ok) {
+      await loadSequences()
+    }
   }
 
   // Loading state
@@ -1659,13 +1922,6 @@ export default function AutomationsPage() {
                   onSelectConnection={handleConnectionSelect}
                 />
               </div>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="flex items-center gap-2 bg-[#00FF99] text-black px-4 py-2.5 rounded-xl font-medium hover:bg-[#00E88C] transition-colors"
-              >
-                <Plus size={18} />
-                Nova Automação
-              </button>
             </div>
           </div>
 
@@ -1731,15 +1987,26 @@ export default function AutomationsPage() {
                 </button>
               </div>
             ) : (
-              sequences.map(seq => (
-                <SequenceCard
-                  key={seq.id}
-                  sequence={seq}
-                  onToggle={handleToggleSequence}
-                  onEdit={() => { }}
-                  onDelete={handleDeleteSequence}
-                />
-              ))
+              <>
+                <div className="flex justify-end mb-4">
+                  <button
+                    onClick={() => setShowSequenceModal(true)}
+                    className="inline-flex items-center gap-2 bg-[#00FF99] text-black px-4 py-2 rounded-xl font-medium hover:bg-[#00E88C] transition-colors"
+                  >
+                    <Plus size={18} /> Nova Sequência
+                  </button>
+                </div>
+                {sequences.map(seq => (
+                  <SequenceCard
+                    key={seq.id}
+                    sequence={seq}
+                    onToggle={handleToggleSequence}
+                    onEdit={() => { }}
+                    onDuplicate={handleDuplicateSequence}
+                    onDelete={handleDeleteSequence}
+                  />
+                ))}
+              </>
             )}
           </div>
         ) : activeTab === 'templates' ? (
@@ -1768,28 +2035,13 @@ export default function AutomationsPage() {
                   </button>
                 </div>
                 {templates.map(template => (
-                  <div
+                  <TemplateCard
                     key={template.id}
-                    className="bg-[#1A1A1A] rounded-xl p-4 border border-white/5 hover:border-white/10 transition-colors"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="text-white font-medium mb-1">{template.name}</h3>
-                        <p className="text-gray-400 text-sm line-clamp-2">{template.content}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full">
-                            {template.type === 'text' ? 'Texto' : template.type}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleDeleteTemplate(template.id)}
-                        className="p-2 text-gray-400 hover:text-red-400 transition-colors"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
+                    template={template}
+                    onEdit={handleEditTemplate}
+                    onDuplicate={handleDuplicateTemplate}
+                    onDelete={handleDeleteTemplate}
+                  />
                 ))}
               </>
             )}
@@ -1810,15 +2062,26 @@ export default function AutomationsPage() {
                 </button>
               </div>
             ) : (
-              keywordAutomations.map(automation => (
-                <AutomationCard
-                  key={automation.id}
-                  automation={automation}
-                  onToggle={handleToggleAutomation}
-                  onEdit={(automation) => setEditingAutomation(automation)}
-                  onDelete={handleDeleteAutomation}
-                />
-              ))
+              <>
+                <div className="flex justify-end mb-4">
+                  <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="inline-flex items-center gap-2 bg-[#00FF99] text-black px-4 py-2 rounded-xl font-medium hover:bg-[#00E88C] transition-colors"
+                  >
+                    <Plus size={18} /> Nova Automação
+                  </button>
+                </div>
+                {keywordAutomations.map(automation => (
+                  <AutomationCard
+                    key={automation.id}
+                    automation={automation}
+                    onToggle={handleToggleAutomation}
+                    onEdit={(automation) => setEditingAutomation(automation)}
+                    onDuplicate={handleDuplicateAutomation}
+                    onDelete={handleDeleteAutomation}
+                  />
+                ))}
+              </>
             )}
           </div>
         )}
@@ -1832,11 +2095,12 @@ export default function AutomationsPage() {
         connectionId={selectedConnection}
       />
 
-      {/* Create template modal */}
+      {/* Create/Edit template modal */}
       <CreateTemplateModal
         isOpen={showTemplateModal}
-        onClose={() => setShowTemplateModal(false)}
+        onClose={() => { setShowTemplateModal(false); setEditingTemplate(null) }}
         onSave={handleCreateTemplate}
+        template={editingTemplate}
       />
 
       {/* Create sequence modal */}
@@ -1845,6 +2109,8 @@ export default function AutomationsPage() {
         onClose={() => setShowSequenceModal(false)}
         onSave={handleCreateSequence}
         templates={templates}
+        tags={tags}
+        origins={origins}
       />
 
       {/* Edit modal */}

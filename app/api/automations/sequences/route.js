@@ -93,7 +93,16 @@ export async function POST(request) {
         }
 
         const body = await request.json()
-        const { connectionId, name, description, steps = [] } = body
+        const {
+            connectionId,
+            name,
+            description,
+            steps = [],
+            triggerType = 'manual',
+            triggerTagId = null,
+            triggerOriginId = null,
+            triggerKeywords = []
+        } = body
 
         if (!connectionId) {
             return NextResponse.json({ error: 'connectionId é obrigatório' }, { status: 400 })
@@ -122,7 +131,11 @@ export async function POST(request) {
                 connection_id: connectionId,
                 name: name.trim(),
                 description: description?.trim() || null,
-                is_active: true
+                is_active: true,
+                trigger_type: triggerType,
+                trigger_tag_id: triggerTagId || null,
+                trigger_origin_id: triggerOriginId || null,
+                trigger_keywords: triggerKeywords || []
             })
             .select()
             .single()
