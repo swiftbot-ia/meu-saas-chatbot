@@ -22,9 +22,11 @@ import {
   Plus,
   Clock,
   MapPin,
-  Trash2
+  Trash2,
+  UserPlus
 } from 'lucide-react';
 import NoSubscription from '../components/NoSubscription'
+import NewOpportunityModal from '../crm/components/NewOpportunityModal'
 
 
 // ============================================================================
@@ -199,6 +201,9 @@ export default function ContactsPage() {
   // Drag and drop state
   const [draggedTag, setDraggedTag] = useState(null);
   const [dragOverContactId, setDragOverContactId] = useState(null);
+
+  // New contact modal
+  const [showNewContactModal, setShowNewContactModal] = useState(false);
 
   // Load connections on mount
   useEffect(() => {
@@ -390,6 +395,13 @@ export default function ContactsPage() {
   const handleCreateTag = async () => {
     if (!newTagName.trim()) return;
 
+    // Get instance_name from selected connection
+    const selectedConn = connections.find(c => c.id === selectedConnection);
+    if (!selectedConn?.instance_name) {
+      console.error('No connection selected');
+      return;
+    }
+
     setTagLoading(true);
     try {
       const response = await fetch('/api/contacts/tags', {
@@ -397,7 +409,8 @@ export default function ContactsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: newTagName.trim(),
-          color: newTagColor
+          color: newTagColor,
+          instance_name: selectedConn.instance_name
         })
       });
 
@@ -498,7 +511,15 @@ export default function ContactsPage() {
   // Open chat with contact
   const handleOpenChat = () => {
     if (selectedContact?.conversation_id) {
+      // Has conversation_id - redirect with conversation parameter
       router.push(`/chat?conversation=${selectedContact.conversation_id}`);
+    } else if (selectedContact?.whatsapp_number) {
+      // No conversation_id but has phone - redirect to chat with phone parameter
+      // The chat page should create/find conversation for this contact
+      router.push(`/chat?phone=${encodeURIComponent(selectedContact.whatsapp_number)}`);
+    } else {
+      // Fallback - just go to chat page
+      router.push('/chat');
     }
   };
 
@@ -770,13 +791,23 @@ export default function ContactsPage() {
 
         {/* Header */}
         <div className="p-4 border-b border-white/5">
-          <h2 className="text-xl font-bold text-white flex items-center">
-            <Users className="mr-2" size={24} />
-            Contatos
-            <span className="ml-2 text-sm font-normal text-[#B0B0B0]">
-              ({filteredContacts.length})
-            </span>
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-white flex items-center">
+              <Users className="mr-2" size={24} />
+              Contatos
+              <span className="ml-2 text-sm font-normal text-[#B0B0B0]">
+                ({filteredContacts.length})
+              </span>
+            </h2>
+            <button
+              onClick={() => setShowNewContactModal(true)}
+              className="flex items-center gap-1 px-3 py-2 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold text-sm rounded-xl hover:shadow-[0_0_15px_rgba(0,255,153,0.3)] transition-all"
+              title="Novo Contato"
+            >
+              <UserPlus size={16} />
+              <span className="hidden sm:inline">Novo</span>
+            </button>
+          </div>
         </div>
 
         {/* Search Bar */}
@@ -1291,6 +1322,15 @@ export default function ContactsPage() {
           <button onClick={() => setError(null)} className="ml-4 hover:bg-red-600/50 px-2 py-1 rounded">✕</button>
         </div>
       )}
+
+      {/* New Contact Modal */}
+      <NewOpportunityModal
+        isOpen={showNewContactModal}
+        onClose={() => setShowNewContactModal(false)}
+        onSuccess={() => loadContacts()}
+        instanceName={connections.find(c => c.id === selectedConnection)?.instance_name}
+        origins={origins}
+      />
     </div>
   );
 }

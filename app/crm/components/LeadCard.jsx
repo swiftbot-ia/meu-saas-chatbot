@@ -1,9 +1,13 @@
 import React from 'react';
 import { Draggable } from '@hello-pangea/dnd';
-import { Mail, Phone, Calendar, User } from 'lucide-react';
+import { Mail, Phone, Calendar, User, Trophy, XCircle } from 'lucide-react';
 import Avatar from '@/app/components/Avatar';
 
 const LeadCard = ({ lead, index, onClick, currentStageId, currentDragDestination, allStages }) => {
+    // Check if lead is won or lost
+    const isWon = !!lead.won_at;
+    const isLost = !!lead.lost_at;
+
     // Determina qual gradiente usar baseado em onde o card está sendo arrastado
     const getActiveGradient = (isDragging) => {
         if (!isDragging) return null;
@@ -21,6 +25,19 @@ const LeadCard = ({ lead, index, onClick, currentStageId, currentDragDestination
         return null;
     };
 
+    // Get background color based on status
+    const getBackgroundColor = () => {
+        if (isWon) return 'bg-green-900/30';
+        if (isLost) return 'bg-red-900/30';
+        return 'bg-[#2A2A2A]';
+    };
+
+    const getHoverColor = () => {
+        if (isWon) return 'hover:bg-green-900/40';
+        if (isLost) return 'hover:bg-red-900/40';
+        return 'hover:bg-[#333333]';
+    };
+
     return (
         <Draggable draggableId={lead.id} index={index}>
             {(provided, snapshot) => {
@@ -33,8 +50,8 @@ const LeadCard = ({ lead, index, onClick, currentStageId, currentDragDestination
                         {...provided.dragHandleProps}
                         onClick={() => onClick(lead)}
                         className={`
-                            bg-[#2A2A2A] p-3 sm:p-4 rounded-xl mb-3 
-                            hover:bg-[#333333] cursor-grab active:cursor-grabbing
+                            ${getBackgroundColor()} p-3 sm:p-4 rounded-xl mb-3 
+                            ${getHoverColor()} cursor-grab active:cursor-grabbing
                             ${snapshot.isDragging ? 'scale-105' : ''}
                         `}
                         style={{
@@ -45,26 +62,36 @@ const LeadCard = ({ lead, index, onClick, currentStageId, currentDragDestination
                                 backgroundOrigin: 'border-box',
                                 backgroundClip: 'padding-box, border-box',
                                 boxShadow: `0 0 30px rgba(138, 43, 226, 0.4)`,
-                                // REMOVIDO: transition para melhorar performance
-                                // willChange para otimizar GPU rendering
                                 willChange: 'transform',
                             }),
                         }}
                     >
                         <div className="flex items-start gap-2 sm:gap-3">
                             {/* Avatar */}
-                            <div className="flex-shrink-0">
+                            <div className="flex-shrink-0 relative">
                                 <Avatar
                                     src={lead.profile_pic_url}
                                     name={lead.name}
                                     size={40}
                                 />
+                                {/* Status indicator */}
+                                {isWon && (
+                                    <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-0.5">
+                                        <Trophy size={10} className="text-white" />
+                                    </div>
+                                )}
+                                {isLost && (
+                                    <div className="absolute -bottom-1 -right-1 bg-red-500 rounded-full p-0.5">
+                                        <XCircle size={10} className="text-white" />
+                                    </div>
+                                )}
                             </div>
 
                             {/* Content */}
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-start mb-1">
-                                    <h4 className="font-semibold text-white truncate text-xs sm:text-sm" title={lead.name}>
+                                    <h4 className={`font-semibold truncate text-xs sm:text-sm ${isWon ? 'text-green-300' : isLost ? 'text-red-300' : 'text-white'
+                                        }`} title={lead.name}>
                                         {lead.name}
                                     </h4>
                                     {lead.unread_count > 0 && (
