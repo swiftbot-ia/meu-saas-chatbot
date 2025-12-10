@@ -27,12 +27,17 @@ export async function GET(request) {
         automation_sequence_steps (
           id, 
           automation_id, 
+          template_id,
           delay_value, 
-          delay_unit, 
+          delay_unit,
+          time_window_start,
+          time_window_end,
+          allowed_days,
           is_active, 
           order_index,
           sent_count,
           click_count,
+          message_templates (id, name, content),
           automations (id, name)
         )
       `)
@@ -132,11 +137,13 @@ export async function POST(request) {
             const stepsToInsert = steps.map((step, index) => ({
                 sequence_id: sequence.id,
                 automation_id: step.automationId || null,
+                template_id: step.templateId || null,
                 delay_value: step.delayValue || 1,
-                delay_unit: step.delayUnit || 'days',
-                send_time: step.sendTime || null,
-                send_day: step.sendDay || 'any',
-                is_active: true,
+                delay_unit: step.delayUnit || 'hours',
+                time_window_start: step.timeWindowStart || null,
+                time_window_end: step.timeWindowEnd || null,
+                allowed_days: step.allowedDays || ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
+                is_active: step.isActive !== false,
                 order_index: index
             }))
 
