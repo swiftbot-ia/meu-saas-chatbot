@@ -25,7 +25,10 @@ import {
   Loader2,
   X,
   Play,
-  Pause
+  Pause,
+  Tag,
+  Link,
+  Send
 } from 'lucide-react'
 
 // ============================================================================
@@ -557,6 +560,324 @@ const CreateAutomationModal = ({ isOpen, onClose, onCreate, connectionId }) => {
 }
 
 // ============================================================================
+// EDIT AUTOMATION MODAL - Com configurações de ações (tags, webhook)
+// ============================================================================
+const EditAutomationModal = ({ isOpen, onClose, automation, onSave, connectionId }) => {
+  const [name, setName] = useState('')
+  const [triggerType, setTriggerType] = useState('message_contains')
+  const [keywords, setKeywords] = useState([])
+  const [keywordInput, setKeywordInput] = useState('')
+  const [responseContent, setResponseContent] = useState('')
+  const [webhookUrl, setWebhookUrl] = useState('')
+  const [webhookEnabled, setWebhookEnabled] = useState(false)
+  const [tagInput, setTagInput] = useState('')
+  const [tagsToAdd, setTagsToAdd] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [activeSection, setActiveSection] = useState('trigger') // 'trigger', 'response', 'actions'
+
+  // Carregar dados da automação quando abrir
+  useEffect(() => {
+    if (automation && isOpen) {
+      setName(automation.name || '')
+      setTriggerType(automation.trigger_type || 'message_contains')
+      setKeywords(automation.automation_keywords?.map(k => k.keyword) || [])
+      setResponseContent(automation.automation_responses?.[0]?.content || '')
+      setWebhookUrl(automation.action_webhook_url || '')
+      setWebhookEnabled(automation.action_webhook_enabled || false)
+      // Tags seriam carregadas aqui se tivéssemos uma tabela de tags
+      setTagsToAdd([])
+    }
+  }, [automation, isOpen])
+
+  const handleAddKeyword = () => {
+    if (keywordInput.trim() && !keywords.includes(keywordInput.trim())) {
+      setKeywords([...keywords, keywordInput.trim()])
+      setKeywordInput('')
+    }
+  }
+
+  const handleRemoveKeyword = (kw) => {
+    setKeywords(keywords.filter(k => k !== kw))
+  }
+
+  const handleAddTag = () => {
+    if (tagInput.trim() && !tagsToAdd.includes(tagInput.trim())) {
+      setTagsToAdd([...tagsToAdd, tagInput.trim()])
+      setTagInput('')
+    }
+  }
+
+  const handleRemoveTag = (tag) => {
+    setTagsToAdd(tagsToAdd.filter(t => t !== tag))
+  }
+
+  const handleSubmit = async () => {
+    if (!name.trim()) return
+    setLoading(true)
+    try {
+      await onSave({
+        name: name.trim(),
+        triggerType,
+        keywords: keywords.map(k => ({ keyword: k, matchType: triggerType.replace('message_', '') })),
+        responses: responseContent ? [{ type: 'text', content: responseContent }] : [],
+        actionWebhookUrl: webhookUrl,
+        actionWebhookEnabled: webhookEnabled,
+        actionAddTags: tagsToAdd
+      })
+      onClose()
+    } catch (error) {
+      console.error('Erro ao salvar automação:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!isOpen || !automation) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-[#1A1A1A] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-white/10 flex-shrink-0">
+          <h2 className="text-xl font-semibold text-white">Editar Automação</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Tabs de navegação */}
+        <div className="flex border-b border-white/10 flex-shrink-0">
+          <button
+            onClick={() => setActiveSection('trigger')}
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 border-b-2 ${activeSection === 'trigger' ? 'text-[#00FF99] border-[#00FF99]' : 'text-gray-400 border-transparent hover:text-white'
+              }`}
+          >
+            <Zap size={16} /> Gatilho
+          </button>
+          <button
+            onClick={() => setActiveSection('response')}
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 border-b-2 ${activeSection === 'response' ? 'text-[#00FF99] border-[#00FF99]' : 'text-gray-400 border-transparent hover:text-white'
+              }`}
+          >
+            <Send size={16} /> Resposta
+          </button>
+          <button
+            onClick={() => setActiveSection('actions')}
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 border-b-2 ${activeSection === 'actions' ? 'text-[#00FF99] border-[#00FF99]' : 'text-gray-400 border-transparent hover:text-white'
+              }`}
+          >
+            <Tag size={16} /> Ações
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 space-y-6 overflow-y-auto flex-1">
+          {/* SEÇÃO: GATILHO */}
+          {activeSection === 'trigger' && (
+            <>
+              {/* Nome */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Nome da automação
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ex: Welcome Message"
+                  className="w-full bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+                />
+              </div>
+
+              {/* Tipo de gatilho */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Quando disparar
+                </label>
+                <select
+                  value={triggerType}
+                  onChange={(e) => setTriggerType(e.target.value)}
+                  className="w-full bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+                >
+                  <option value="message_contains">A mensagem contém</option>
+                  <option value="message_is">Mensagem é exatamente</option>
+                  <option value="message_starts_with">Mensagem começa com</option>
+                  <option value="word">Mensagem contém palavra inteira</option>
+                  <option value="reaction">Reação é</option>
+                </select>
+              </div>
+
+              {/* Keywords */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Palavras-chave / Gatilhos
+                </label>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={keywordInput}
+                    onChange={(e) => setKeywordInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddKeyword())}
+                    placeholder="Digite e pressione Enter"
+                    className="flex-1 bg-[#252525] text-white px-4 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+                  />
+                  <button
+                    onClick={handleAddKeyword}
+                    className="px-4 py-2 bg-[#00FF99] text-black rounded-xl font-medium hover:bg-[#00E88C] transition-colors"
+                  >
+                    <Plus size={18} />
+                  </button>
+                </div>
+                {keywords.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {keywords.map((kw, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1 bg-[#00FF99]/10 text-[#00FF99] px-3 py-1 rounded-full text-sm"
+                      >
+                        {kw}
+                        <button onClick={() => handleRemoveKeyword(kw)} className="hover:text-white">
+                          <X size={14} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* SEÇÃO: RESPOSTA */}
+          {activeSection === 'response' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Resposta automática
+              </label>
+              <textarea
+                value={responseContent}
+                onChange={(e) => setResponseContent(e.target.value)}
+                placeholder="Digite a mensagem que será enviada automaticamente..."
+                rows={8}
+                className="w-full bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30 resize-none"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                Você pode usar variáveis como: {'{nome}'}, {'{telefone}'}, {'{mensagem}'}
+              </p>
+            </div>
+          )}
+
+          {/* SEÇÃO: AÇÕES */}
+          {activeSection === 'actions' && (
+            <>
+              {/* Adicionar Tags */}
+              <div className="bg-[#252525] rounded-xl p-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+                    <Tag className="text-blue-400" size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-medium">Adicionar Tags</h3>
+                    <p className="text-xs text-gray-400">Tags serão adicionadas ao contato quando a automação disparar</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
+                    placeholder="Nome da tag (ex: lead-quente)"
+                    className="flex-1 bg-[#1A1A1A] text-white px-4 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  />
+                  <button
+                    onClick={handleAddTag}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors"
+                  >
+                    <Plus size={18} />
+                  </button>
+                </div>
+                {tagsToAdd.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {tagsToAdd.map((tag, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1 bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full text-sm"
+                      >
+                        <Tag size={12} />
+                        {tag}
+                        <button onClick={() => handleRemoveTag(tag)} className="hover:text-white">
+                          <X size={14} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Enviar para Webhook */}
+              <div className="bg-[#252525] rounded-xl p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                      <Link className="text-purple-400" size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-medium">Enviar para Webhook</h3>
+                      <p className="text-xs text-gray-400">Envie os dados do lead para um sistema externo</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setWebhookEnabled(!webhookEnabled)}
+                    className={`p-2 rounded-lg transition-colors ${webhookEnabled ? 'text-purple-400 bg-purple-500/20' : 'text-gray-500 bg-white/5'
+                      }`}
+                  >
+                    {webhookEnabled ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
+                  </button>
+                </div>
+
+                {webhookEnabled && (
+                  <div>
+                    <input
+                      type="url"
+                      value={webhookUrl}
+                      onChange={(e) => setWebhookUrl(e.target.value)}
+                      placeholder="https://seu-sistema.com/webhook"
+                      className="w-full bg-[#1A1A1A] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+                    />
+                    <p className="text-xs text-gray-500 mt-2">
+                      Dados enviados: nome, telefone, mensagem, data/hora, tags
+                    </p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-3 p-6 border-t border-white/10 flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-3 bg-white/5 text-white rounded-xl font-medium hover:bg-white/10 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!name.trim() || loading}
+            className="flex-1 px-4 py-3 bg-[#00FF99] text-black rounded-xl font-medium hover:bg-[#00E88C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {loading && <Loader2 className="animate-spin" size={18} />}
+            Salvar Alterações
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
 // MAIN PAGE COMPONENT
 // ============================================================================
 export default function AutomationsPage() {
@@ -579,6 +900,7 @@ export default function AutomationsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedFolder, setSelectedFolder] = useState(null)
+  const [editingAutomation, setEditingAutomation] = useState(null)
 
   // Load connections on mount
   useEffect(() => {
@@ -710,6 +1032,20 @@ export default function AutomationsPage() {
     if (!confirm('Tem certeza que deseja excluir esta automação?')) return
     await fetch(`/api/automations/${id}`, { method: 'DELETE' })
     await loadAutomations()
+  }
+
+  const handleEditAutomation = async (data) => {
+    const response = await fetch(`/api/automations/${editingAutomation.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    if (response.ok) {
+      await loadAutomations()
+      setEditingAutomation(null)
+    } else {
+      throw new Error('Erro ao atualizar')
+    }
   }
 
   const handleToggleSequence = async (id, isActive) => {
@@ -891,7 +1227,7 @@ export default function AutomationsPage() {
                   key={automation.id}
                   automation={automation}
                   onToggle={handleToggleAutomation}
-                  onEdit={() => { }}
+                  onEdit={(automation) => setEditingAutomation(automation)}
                   onDelete={handleDeleteAutomation}
                 />
               ))
@@ -905,6 +1241,15 @@ export default function AutomationsPage() {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onCreate={handleCreateAutomation}
+        connectionId={selectedConnection}
+      />
+
+      {/* Edit modal */}
+      <EditAutomationModal
+        isOpen={!!editingAutomation}
+        onClose={() => setEditingAutomation(null)}
+        automation={editingAutomation}
+        onSave={handleEditAutomation}
         connectionId={selectedConnection}
       />
     </div>

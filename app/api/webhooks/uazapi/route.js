@@ -24,6 +24,7 @@ import { chatSupabaseAdmin } from '@/lib/supabase/chat-server'; // Chat DB Admin
 import ConversationService from '@/lib/ConversationService';
 import MediaServiceVPS from '@/lib/MediaServiceVPS';
 import N8nWebhookService from '@/lib/N8nWebhookService';
+import AutomationService from '@/lib/AutomationService';
 import { randomUUID } from 'crypto';
 
 // Force dynamic rendering
@@ -918,7 +919,22 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
     // Por padrão (sem registro), agente está ATIVADO
     const shouldSendToAgent = !agentSettings || agentSettings.agent_enabled !== false;
 
-    // 12. ENVIAR PARA N8N (agente de IA)
+    // 12. PROCESSAR AUTOMAÇÕES (RESPOSTA AUTOMÁTICA POR KEYWORDS)
+    // Fire and forget - não bloqueia o webhook
+    // Apenas mensagens inbound são processadas
+    if (!fromMe) {
+      AutomationService.processMessage(savedMessage, connection, contact)
+        .then(result => {
+          if (result.processed && result.matched) {
+            log(requestId, 'info', '🤖', `Automação disparada: ${result.automationName}`);
+          }
+        })
+        .catch(err => {
+          log(requestId, 'error', '❌', `Erro ao processar automação: ${err.message}`);
+        });
+    }
+
+    // 13. ENVIAR PARA N8N (agente de IA)
     // Fire and forget - não bloqueia o webhook
     // Apenas mensagens inbound são enviadas (filtrado internamente)
     if (shouldSendToAgent) {
