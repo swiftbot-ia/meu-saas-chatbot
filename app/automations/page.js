@@ -157,7 +157,7 @@ const ConnectionDropdown = ({ connections, selectedConnection, onSelectConnectio
 // ============================================================================
 const TabNavigation = ({ activeTab, onTabChange }) => {
   const tabs = [
-    { id: 'automations', label: 'Minhas Automações', icon: Zap },
+    { id: 'templates', label: 'Meus Templates', icon: MessageCircle },
     { id: 'keywords', label: 'Palavras-chave', icon: Hash },
     { id: 'sequences', label: 'Sequências', icon: Clock }
   ]
@@ -390,6 +390,89 @@ const SequenceCard = ({ sequence, onToggle, onEdit, onDelete }) => {
               </>
             )}
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// CREATE TEMPLATE MODAL
+// ============================================================================
+const CreateTemplateModal = ({ isOpen, onClose, onSave }) => {
+  const [name, setName] = useState('')
+  const [content, setContent] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!name.trim() || !content.trim()) return
+    setLoading(true)
+    try {
+      await onSave({ name: name.trim(), content: content.trim() })
+      setName('')
+      setContent('')
+    } catch (error) {
+      console.error('Erro ao criar template:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-[#1A1A1A] rounded-2xl w-full max-w-lg">
+        <div className="flex items-center justify-between p-6 border-b border-white/10">
+          <h2 className="text-xl font-semibold text-white">Novo Template</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Nome do Template
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ex: Boas-vindas, Follow-up 1..."
+              className="w-full bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Conteúdo da Mensagem
+            </label>
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Digite o texto da mensagem..."
+              rows={4}
+              className="w-full bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30 resize-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3 p-6 border-t border-white/10">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-3 bg-white/5 text-white rounded-xl font-medium hover:bg-white/10 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!name.trim() || !content.trim() || loading}
+            className="flex-1 px-4 py-3 bg-[#00FF99] text-black rounded-xl font-medium hover:bg-[#00E88C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {loading && <Loader2 className="animate-spin" size={18} />}
+            Criar Template
+          </button>
         </div>
       </div>
     </div>
@@ -1024,12 +1107,15 @@ export default function AutomationsPage() {
   const [selectedConnection, setSelectedConnection] = useState(null)
   const [automations, setAutomations] = useState([])
   const [sequences, setSequences] = useState([])
+  const [templates, setTemplates] = useState([])
   const [folders, setFolders] = useState([])
 
   // UI
-  const [activeTab, setActiveTab] = useState('automations')
+  const [activeTab, setActiveTab] = useState('keywords')
   const [searchTerm, setSearchTerm] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [editingTemplate, setEditingTemplate] = useState(null)
   const [selectedFolder, setSelectedFolder] = useState(null)
   const [editingAutomation, setEditingAutomation] = useState(null)
 
@@ -1043,6 +1129,7 @@ export default function AutomationsPage() {
     if (selectedConnection) {
       loadAutomations()
       loadSequences()
+      loadTemplates()
     }
   }, [selectedConnection])
 
@@ -1130,6 +1217,38 @@ export default function AutomationsPage() {
     } catch (error) {
       console.error('Erro ao carregar sequências:', error)
     }
+  }
+
+  const loadTemplates = async () => {
+    try {
+      const response = await fetch(`/api/automations/templates?connectionId=${selectedConnection}`)
+      const data = await response.json()
+      if (response.ok) {
+        setTemplates(data.templates || [])
+      }
+    } catch (error) {
+      console.error('Erro ao carregar templates:', error)
+    }
+  }
+
+  const handleCreateTemplate = async (templateData) => {
+    const response = await fetch('/api/automations/templates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...templateData, connectionId: selectedConnection })
+    })
+    if (response.ok) {
+      await loadTemplates()
+      setShowTemplateModal(false)
+    } else {
+      throw new Error('Erro ao criar template')
+    }
+  }
+
+  const handleDeleteTemplate = async (id) => {
+    if (!confirm('Excluir este template?')) return
+    await fetch(`/api/automations/templates/${id}`, { method: 'DELETE' })
+    await loadTemplates()
   }
 
   const handleConnectionSelect = (id) => {
@@ -1336,13 +1455,57 @@ export default function AutomationsPage() {
               ))
             )}
           </div>
-        ) : activeTab === 'automations' ? (
-          // Minhas Automações - Para futuros fluxos visuais
-          <div className="text-center py-16">
-            <Bot className="mx-auto text-gray-600 mb-4" size={48} />
-            <h3 className="text-lg font-medium text-white mb-2">Fluxos Visuais (Em breve)</h3>
-            <p className="text-gray-400 mb-4">Aqui você poderá criar automações visuais com drag-and-drop.</p>
-            <p className="text-sm text-gray-500">Use a aba &quot;Palavras-chave&quot; para criar automações baseadas em keywords.</p>
+        ) : activeTab === 'templates' ? (
+          // Templates list - Mensagens modelo
+          <div className="space-y-3">
+            {templates.length === 0 ? (
+              <div className="text-center py-16">
+                <MessageCircle className="mx-auto text-gray-600 mb-4" size={48} />
+                <h3 className="text-lg font-medium text-white mb-2">Nenhum template criado</h3>
+                <p className="text-gray-400 mb-4">Crie mensagens modelo para usar nas suas automações e sequências.</p>
+                <button
+                  onClick={() => setShowTemplateModal(true)}
+                  className="inline-flex items-center gap-2 bg-[#00FF99] text-black px-4 py-2 rounded-xl font-medium hover:bg-[#00E88C] transition-colors"
+                >
+                  <Plus size={18} /> Novo Template
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-end mb-4">
+                  <button
+                    onClick={() => setShowTemplateModal(true)}
+                    className="inline-flex items-center gap-2 bg-[#00FF99] text-black px-4 py-2 rounded-xl font-medium hover:bg-[#00E88C] transition-colors"
+                  >
+                    <Plus size={18} /> Novo Template
+                  </button>
+                </div>
+                {templates.map(template => (
+                  <div
+                    key={template.id}
+                    className="bg-[#1A1A1A] rounded-xl p-4 border border-white/5 hover:border-white/10 transition-colors"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h3 className="text-white font-medium mb-1">{template.name}</h3>
+                        <p className="text-gray-400 text-sm line-clamp-2">{template.content}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full">
+                            {template.type === 'text' ? 'Texto' : template.type}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteTemplate(template.id)}
+                        className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         ) : (
           // Keywords list - Automações por palavra-chave
@@ -1374,12 +1537,19 @@ export default function AutomationsPage() {
         )}
       </div>
 
-      {/* Create modal */}
+      {/* Create automation modal */}
       <CreateAutomationModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onCreate={handleCreateAutomation}
         connectionId={selectedConnection}
+      />
+
+      {/* Create template modal */}
+      <CreateTemplateModal
+        isOpen={showTemplateModal}
+        onClose={() => setShowTemplateModal(false)}
+        onSave={handleCreateTemplate}
       />
 
       {/* Edit modal */}
