@@ -1,6 +1,7 @@
 import React from 'react';
 import { Draggable } from '@hello-pangea/dnd';
 import { Mail, Phone, Calendar, User } from 'lucide-react';
+import Avatar from '@/app/components/Avatar';
 
 const LeadCard = ({ lead, index, onClick, currentStageId, currentDragDestination, allStages }) => {
     // Determina qual gradiente usar baseado em onde o card está sendo arrastado
@@ -53,18 +54,11 @@ const LeadCard = ({ lead, index, onClick, currentStageId, currentDragDestination
                         <div className="flex items-start gap-2 sm:gap-3">
                             {/* Avatar */}
                             <div className="flex-shrink-0">
-                                {lead.profile_pic_url ? (
-                                    <img
-                                        src={lead.profile_pic_url}
-                                        alt={lead.name}
-                                        referrerPolicy="no-referrer"
-                                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-white/10"
-                                    />
-                                ) : (
-                                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#00FF99]/10 flex items-center justify-center text-[#00FF99]">
-                                        <User size={18} className="sm:w-5 sm:h-5" />
-                                    </div>
-                                )}
+                                <Avatar
+                                    src={lead.profile_pic_url}
+                                    name={lead.name}
+                                    size={40}
+                                />
                             </div>
 
                             {/* Content */}

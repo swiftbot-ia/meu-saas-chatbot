@@ -7,6 +7,7 @@
 
 import React, { useState } from 'react';
 import { Search, MessageCircle, Loader2, Phone, ChevronDown } from 'lucide-react';
+import Avatar from '@/app/components/Avatar';
 
 // Custom Dropdown Component for Connections
 const ConnectionDropdown = ({ connections, selectedConnection, onSelectConnection }) => {
@@ -245,20 +246,11 @@ export default function ConversationList({
               >
                 <div className="flex items-start space-x-3">
                   {/* Avatar */}
-                  {conversation.contact?.profile_pic_url ? (
-                    <img
-                      src={conversation.contact.profile_pic_url}
-                      alt={conversation.contact.name || 'Contato'}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold"
-                      style={{ background: 'linear-gradient(135deg, #00FF99 0%, #00E88C 100%)' }}
-                    >
-                      {getInitials(conversation.contact?.name || conversation.contact?.whatsapp_number)}
-                    </div>
-                  )}
+                  <Avatar
+                    src={conversation.contact?.profile_pic_url}
+                    name={conversation.contact?.name || conversation.contact?.whatsapp_number}
+                    size={48}
+                  />
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
