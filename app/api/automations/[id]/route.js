@@ -53,7 +53,18 @@ export async function PUT(request, { params }) {
         }
 
         const body = await request.json()
-        const { name, description, triggerType, isActive, folderId, keywords, responses } = body
+        const {
+            name,
+            description,
+            triggerType,
+            isActive,
+            folderId,
+            keywords,
+            responses,
+            actionWebhookUrl,
+            actionWebhookEnabled,
+            actionAddTags
+        } = body
 
         // Verificar propriedade
         const { data: existing, error: existingError } = await supabase
@@ -74,6 +85,11 @@ export async function PUT(request, { params }) {
         if (triggerType !== undefined) updateData.trigger_type = triggerType
         if (isActive !== undefined) updateData.is_active = isActive
         if (folderId !== undefined) updateData.folder_id = folderId || null
+
+        // Action fields
+        if (actionWebhookUrl !== undefined) updateData.action_webhook_url = actionWebhookUrl || null
+        if (actionWebhookEnabled !== undefined) updateData.action_webhook_enabled = actionWebhookEnabled
+        if (actionAddTags !== undefined) updateData.action_add_tags = actionAddTags || []
 
         const { error: updateError } = await supabase
             .from('automations')
