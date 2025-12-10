@@ -1231,9 +1231,8 @@ export default function AutomationsPage() {
     )
   }
 
-  // Filter automations for keywords tab
+  // Filter keyword-based automations
   const keywordAutomations = automations.filter(a => a.type === 'keyword')
-  const filteredAutomations = activeTab === 'keywords' ? keywordAutomations : automations
 
   return (
     <div className="min-h-screen bg-[#0A0A0A]">
@@ -1311,13 +1310,13 @@ export default function AutomationsPage() {
 
         {/* Content based on active tab */}
         {activeTab === 'sequences' ? (
-          // Sequences list
+          // Sequences list (for follow-ups)
           <div className="space-y-3">
             {sequences.length === 0 ? (
               <div className="text-center py-16">
                 <Clock className="mx-auto text-gray-600 mb-4" size={48} />
                 <h3 className="text-lg font-medium text-white mb-2">Nenhuma sequência criada</h3>
-                <p className="text-gray-400 mb-4">Crie sequências para enviar mensagens programadas automaticamente.</p>
+                <p className="text-gray-400 mb-4">Crie sequências para enviar mensagens de follow-up automaticamente.</p>
                 <button
                   onClick={() => setShowCreateModal(true)}
                   className="inline-flex items-center gap-2 bg-[#00FF99] text-black px-4 py-2 rounded-xl font-medium hover:bg-[#00E88C] transition-colors"
@@ -1337,10 +1336,18 @@ export default function AutomationsPage() {
               ))
             )}
           </div>
+        ) : activeTab === 'automations' ? (
+          // Minhas Automações - Para futuros fluxos visuais
+          <div className="text-center py-16">
+            <Bot className="mx-auto text-gray-600 mb-4" size={48} />
+            <h3 className="text-lg font-medium text-white mb-2">Fluxos Visuais (Em breve)</h3>
+            <p className="text-gray-400 mb-4">Aqui você poderá criar automações visuais com drag-and-drop.</p>
+            <p className="text-sm text-gray-500">Use a aba &quot;Palavras-chave&quot; para criar automações baseadas em keywords.</p>
+          </div>
         ) : (
-          // Automations / Keywords list
+          // Keywords list - Automações por palavra-chave
           <div className="space-y-3">
-            {filteredAutomations.length === 0 ? (
+            {keywordAutomations.length === 0 ? (
               <div className="text-center py-16">
                 <Zap className="mx-auto text-gray-600 mb-4" size={48} />
                 <h3 className="text-lg font-medium text-white mb-2">Nenhuma automação criada</h3>
@@ -1353,7 +1360,7 @@ export default function AutomationsPage() {
                 </button>
               </div>
             ) : (
-              filteredAutomations.map(automation => (
+              keywordAutomations.map(automation => (
                 <AutomationCard
                   key={automation.id}
                   automation={automation}
