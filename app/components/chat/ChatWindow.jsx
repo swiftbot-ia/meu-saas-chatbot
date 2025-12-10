@@ -8,6 +8,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
+import Avatar from '@/app/components/Avatar';
 import { Phone, MoreVertical, Archive, Trash2, X, MessageSquare, Bot } from 'lucide-react';
 import { createChatSupabaseClient } from '@/lib/supabase/chat-client';
 
@@ -523,20 +524,11 @@ export default function ChatWindow({
       <div className="bg-[#111111] px-4 py-3 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           {/* Avatar */}
-          {conversation.contact?.profile_pic_url ? (
-            <img
-              src={conversation.contact.profile_pic_url}
-              alt={conversation.contact.name || 'Contato'}
-              className="w-10 h-10 rounded-full object-cover"
-            />
-          ) : (
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold"
-              style={{ background: 'linear-gradient(135deg, #00FF99 0%, #00E88C 100%)' }}
-            >
-              {(conversation.contact?.name || conversation.contact?.whatsapp_number || '?')[0].toUpperCase()}
-            </div>
-          )}
+          <Avatar
+            src={conversation.contact?.profile_pic_url}
+            name={conversation.contact?.name || conversation.contact?.whatsapp_number}
+            size={40}
+          />
 
           {/* Info */}
           <div>
