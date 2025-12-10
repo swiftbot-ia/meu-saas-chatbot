@@ -63,7 +63,8 @@ export async function PUT(request, { params }) {
             responses,
             actionWebhookUrl,
             actionWebhookEnabled,
-            actionAddTags
+            actionAddTags,
+            actionSetOriginId
         } = body
 
         // Verificar propriedade
@@ -90,6 +91,7 @@ export async function PUT(request, { params }) {
         if (actionWebhookUrl !== undefined) updateData.action_webhook_url = actionWebhookUrl || null
         if (actionWebhookEnabled !== undefined) updateData.action_webhook_enabled = actionWebhookEnabled
         if (actionAddTags !== undefined) updateData.action_add_tags = actionAddTags || []
+        if (actionSetOriginId !== undefined) updateData.action_set_origin_id = actionSetOriginId || null
 
         const { error: updateError } = await supabase
             .from('automations')
