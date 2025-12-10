@@ -480,6 +480,278 @@ const CreateTemplateModal = ({ isOpen, onClose, onSave }) => {
 }
 
 // ============================================================================
+// CREATE SEQUENCE MODAL
+// ============================================================================
+const CreateSequenceModal = ({ isOpen, onClose, onSave, templates = [] }) => {
+  const [name, setName] = useState('')
+  const [steps, setSteps] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  const delayUnits = [
+    { value: 'immediately', label: 'Imediatamente' },
+    { value: 'minutes', label: 'Minutos' },
+    { value: 'hours', label: 'Horas' },
+    { value: 'days', label: 'Dias' }
+  ]
+
+  const daysOfWeek = [
+    { value: 'mon', label: 'Seg' },
+    { value: 'tue', label: 'Ter' },
+    { value: 'wed', label: 'Qua' },
+    { value: 'thu', label: 'Qui' },
+    { value: 'fri', label: 'Sex' },
+    { value: 'sat', label: 'Sáb' },
+    { value: 'sun', label: 'Dom' }
+  ]
+
+  const addStep = () => {
+    setSteps([...steps, {
+      id: Date.now(),
+      templateId: null,
+      customContent: '',
+      delayValue: 1,
+      delayUnit: 'hours',
+      timeWindowStart: null,
+      timeWindowEnd: null,
+      allowedDays: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
+      isActive: true
+    }])
+  }
+
+  const updateStep = (index, updates) => {
+    const newSteps = [...steps]
+    newSteps[index] = { ...newSteps[index], ...updates }
+    setSteps(newSteps)
+  }
+
+  const removeStep = (index) => {
+    setSteps(steps.filter((_, i) => i !== index))
+  }
+
+  const toggleDay = (index, day) => {
+    const step = steps[index]
+    const days = step.allowedDays || []
+    const newDays = days.includes(day)
+      ? days.filter(d => d !== day)
+      : [...days, day]
+    updateStep(index, { allowedDays: newDays })
+  }
+
+  const getDelayLabel = (step) => {
+    if (step.delayUnit === 'immediately') return 'Imediatamente'
+    return `Após ${step.delayValue} ${delayUnits.find(u => u.value === step.delayUnit)?.label || 'horas'}`
+  }
+
+  const handleSubmit = async () => {
+    if (!name.trim() || steps.length === 0) return
+    setLoading(true)
+    try {
+      await onSave({
+        name: name.trim(),
+        steps: steps.map(s => ({
+          templateId: s.templateId,
+          delayValue: s.delayUnit === 'immediately' ? 0 : s.delayValue,
+          delayUnit: s.delayUnit,
+          timeWindowStart: s.timeWindowStart,
+          timeWindowEnd: s.timeWindowEnd,
+          allowedDays: s.allowedDays,
+          isActive: s.isActive
+        }))
+      })
+      setName('')
+      setSteps([])
+    } catch (error) {
+      console.error('Erro ao criar sequência:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-[#1A1A1A] rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between p-6 border-b border-white/10 flex-shrink-0">
+          <h2 className="text-xl font-semibold text-white">Nova Sequência</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-6 overflow-y-auto flex-1 space-y-6">
+          {/* Nome da sequência */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Nome da Sequência
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ex: Follow-up Vendas, Boas-vindas..."
+              className="w-full bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+            />
+          </div>
+
+          {/* Steps */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-white font-medium">Mensagens da Sequência</h3>
+              <button
+                onClick={addStep}
+                className="text-sm text-[#00FF99] hover:underline flex items-center gap-1"
+              >
+                <Plus size={14} /> Adicionar Mensagem
+              </button>
+            </div>
+
+            {steps.length === 0 ? (
+              <div className="text-center py-8 bg-[#252525] rounded-xl">
+                <Clock className="mx-auto text-gray-600 mb-2" size={32} />
+                <p className="text-gray-400 text-sm">Nenhuma mensagem adicionada</p>
+                <button
+                  onClick={addStep}
+                  className="mt-3 text-sm text-[#00FF99] hover:underline"
+                >
+                  + Adicionar primeira mensagem
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {steps.map((step, index) => (
+                  <div key={step.id} className="bg-[#252525] rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-[#00FF99]/20 text-[#00FF99] text-xs px-2 py-1 rounded-full font-medium">
+                          {getDelayLabel(step)}
+                        </span>
+                        <button
+                          onClick={() => updateStep(index, { isActive: !step.isActive })}
+                          className={`p-1 rounded ${step.isActive ? 'text-[#00FF99]' : 'text-gray-500'}`}
+                        >
+                          {step.isActive ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => removeStep(index)}
+                        className="text-gray-400 hover:text-red-400"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+
+                    {/* Delay config */}
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                      <div className="col-span-1">
+                        <label className="text-xs text-gray-400 mb-1 block">Tempo</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={step.delayValue}
+                          onChange={(e) => updateStep(index, { delayValue: parseInt(e.target.value) || 0 })}
+                          className="w-full bg-[#1A1A1A] text-white px-3 py-2 rounded-lg text-sm"
+                          disabled={step.delayUnit === 'immediately'}
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-xs text-gray-400 mb-1 block">Unidade</label>
+                        <select
+                          value={step.delayUnit}
+                          onChange={(e) => updateStep(index, { delayUnit: e.target.value })}
+                          className="w-full bg-[#1A1A1A] text-white px-3 py-2 rounded-lg text-sm"
+                        >
+                          {delayUnits.map(u => (
+                            <option key={u.value} value={u.value}>{u.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Template selection */}
+                    <div className="mb-4">
+                      <label className="text-xs text-gray-400 mb-1 block">Mensagem</label>
+                      <select
+                        value={step.templateId || ''}
+                        onChange={(e) => updateStep(index, { templateId: e.target.value || null })}
+                        className="w-full bg-[#1A1A1A] text-white px-3 py-2 rounded-lg text-sm"
+                      >
+                        <option value="">Selecione um template...</option>
+                        {templates.map(t => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Time window */}
+                    <div className="grid grid-cols-2 gap-3 mb-4">
+                      <div>
+                        <label className="text-xs text-gray-400 mb-1 block">Enviar a partir de</label>
+                        <input
+                          type="time"
+                          value={step.timeWindowStart || ''}
+                          onChange={(e) => updateStep(index, { timeWindowStart: e.target.value || null })}
+                          className="w-full bg-[#1A1A1A] text-white px-3 py-2 rounded-lg text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 mb-1 block">Até</label>
+                        <input
+                          type="time"
+                          value={step.timeWindowEnd || ''}
+                          onChange={(e) => updateStep(index, { timeWindowEnd: e.target.value || null })}
+                          className="w-full bg-[#1A1A1A] text-white px-3 py-2 rounded-lg text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Days of week */}
+                    <div>
+                      <label className="text-xs text-gray-400 mb-2 block">Dias permitidos</label>
+                      <div className="flex gap-2">
+                        {daysOfWeek.map(day => (
+                          <button
+                            key={day.value}
+                            onClick={() => toggleDay(index, day.value)}
+                            className={`px-2 py-1 rounded text-xs font-medium transition-colors ${(step.allowedDays || []).includes(day.value)
+                              ? 'bg-[#00FF99]/20 text-[#00FF99]'
+                              : 'bg-white/5 text-gray-500'
+                              }`}
+                          >
+                            {day.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex gap-3 p-6 border-t border-white/10 flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-3 bg-white/5 text-white rounded-xl font-medium hover:bg-white/10 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!name.trim() || steps.length === 0 || loading}
+            className="flex-1 px-4 py-3 bg-[#00FF99] text-black rounded-xl font-medium hover:bg-[#00E88C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {loading && <Loader2 className="animate-spin" size={18} />}
+            Criar Sequência
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
 // CREATE AUTOMATION MODAL
 // ============================================================================
 const CreateAutomationModal = ({ isOpen, onClose, onCreate, connectionId }) => {
@@ -1115,6 +1387,7 @@ export default function AutomationsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [showSequenceModal, setShowSequenceModal] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState(null)
   const [selectedFolder, setSelectedFolder] = useState(null)
   const [editingAutomation, setEditingAutomation] = useState(null)
@@ -1249,6 +1522,20 @@ export default function AutomationsPage() {
     if (!confirm('Excluir este template?')) return
     await fetch(`/api/automations/templates/${id}`, { method: 'DELETE' })
     await loadTemplates()
+  }
+
+  const handleCreateSequence = async (sequenceData) => {
+    const response = await fetch('/api/automations/sequences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...sequenceData, connectionId: selectedConnection })
+    })
+    if (response.ok) {
+      await loadSequences()
+      setShowSequenceModal(false)
+    } else {
+      throw new Error('Erro ao criar sequência')
+    }
   }
 
   const handleConnectionSelect = (id) => {
@@ -1437,7 +1724,7 @@ export default function AutomationsPage() {
                 <h3 className="text-lg font-medium text-white mb-2">Nenhuma sequência criada</h3>
                 <p className="text-gray-400 mb-4">Crie sequências para enviar mensagens de follow-up automaticamente.</p>
                 <button
-                  onClick={() => setShowCreateModal(true)}
+                  onClick={() => setShowSequenceModal(true)}
                   className="inline-flex items-center gap-2 bg-[#00FF99] text-black px-4 py-2 rounded-xl font-medium hover:bg-[#00E88C] transition-colors"
                 >
                   <Plus size={18} /> Nova Sequência
@@ -1550,6 +1837,14 @@ export default function AutomationsPage() {
         isOpen={showTemplateModal}
         onClose={() => setShowTemplateModal(false)}
         onSave={handleCreateTemplate}
+      />
+
+      {/* Create sequence modal */}
+      <CreateSequenceModal
+        isOpen={showSequenceModal}
+        onClose={() => setShowSequenceModal(false)}
+        onSave={handleCreateSequence}
+        templates={templates}
       />
 
       {/* Edit modal */}
