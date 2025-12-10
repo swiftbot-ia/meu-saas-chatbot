@@ -919,6 +919,157 @@ const CreateSequenceModal = ({ isOpen, onClose, onSave, templates = [], tags = [
 }
 
 // ============================================================================
+// EDIT SEQUENCE MODAL
+// ============================================================================
+const EditSequenceModal = ({ isOpen, onClose, onSave, sequence, templates = [], tags = [], origins = [] }) => {
+  const [name, setName] = useState(sequence?.name || '')
+  const [triggerType, setTriggerType] = useState(sequence?.trigger_type || 'manual')
+  const [triggerTagId, setTriggerTagId] = useState(sequence?.trigger_tag_id || '')
+  const [triggerOriginId, setTriggerOriginId] = useState(sequence?.trigger_origin_id || '')
+  const [triggerKeywords, setTriggerKeywords] = useState((sequence?.trigger_keywords || []).join(', '))
+  const [loading, setLoading] = useState(false)
+
+  const triggerTypes = [
+    { value: 'manual', label: 'Manual (inscrever pelo sistema)', icon: '👤' },
+    { value: 'new_contact', label: 'Novo contato (primeira mensagem)', icon: '🆕' },
+    { value: 'has_tag', label: 'Quando receber tag', icon: '🏷️' },
+    { value: 'has_origin', label: 'Quando tiver origem', icon: '📍' },
+    { value: 'keyword', label: 'Palavra-chave na mensagem', icon: '🔑' }
+  ]
+
+  const handleSubmit = async () => {
+    if (!name.trim()) return
+    setLoading(true)
+    try {
+      await onSave({
+        id: sequence.id,
+        name: name.trim(),
+        triggerType,
+        triggerTagId: triggerType === 'has_tag' ? triggerTagId : null,
+        triggerOriginId: triggerType === 'has_origin' ? triggerOriginId : null,
+        triggerKeywords: triggerType === 'keyword' ? triggerKeywords.split(',').map(k => k.trim()).filter(Boolean) : []
+      })
+    } catch (error) {
+      console.error('Erro ao salvar sequência:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-[#1A1A1A] rounded-2xl w-full max-w-lg overflow-hidden">
+        <div className="flex items-center justify-between p-6 border-b border-white/10">
+          <h2 className="text-xl font-semibold text-white">Editar Sequência</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Nome */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Nome da Sequência
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ex: Follow-up Vendas"
+              className="w-full bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+            />
+          </div>
+
+          {/* Trigger Type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Gatilho de inscrição
+            </label>
+            <div className="grid grid-cols-1 gap-2">
+              {triggerTypes.map(trigger => (
+                <button
+                  key={trigger.value}
+                  onClick={() => setTriggerType(trigger.value)}
+                  className={`p-3 rounded-xl text-left text-sm transition-colors ${triggerType === trigger.value
+                      ? 'bg-[#00FF99]/20 border border-[#00FF99]/50 text-white'
+                      : 'bg-[#252525] border border-white/5 text-gray-400 hover:border-white/20'
+                    }`}
+                >
+                  <span className="mr-2">{trigger.icon}</span>
+                  {trigger.label}
+                </button>
+              ))}
+            </div>
+
+            {triggerType === 'has_tag' && (
+              <div className="mt-3">
+                <select
+                  value={triggerTagId}
+                  onChange={(e) => setTriggerTagId(e.target.value)}
+                  className="w-full bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+                >
+                  <option value="">Selecione uma tag...</option>
+                  {tags.map(tag => (
+                    <option key={tag.id} value={tag.id}>{tag.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {triggerType === 'has_origin' && (
+              <div className="mt-3">
+                <select
+                  value={triggerOriginId}
+                  onChange={(e) => setTriggerOriginId(e.target.value)}
+                  className="w-full bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+                >
+                  <option value="">Selecione uma origem...</option>
+                  {origins.map(origin => (
+                    <option key={origin.id} value={origin.id}>{origin.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {triggerType === 'keyword' && (
+              <div className="mt-3">
+                <input
+                  type="text"
+                  value={triggerKeywords}
+                  onChange={(e) => setTriggerKeywords(e.target.value)}
+                  placeholder="Ex: promoção, desconto, quero saber (separadas por vírgula)"
+                  className="w-full bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex gap-3 p-6 border-t border-white/10">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-3 bg-white/5 text-white rounded-xl font-medium hover:bg-white/10 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!name.trim() || loading}
+            className="flex-1 px-4 py-3 bg-[#00FF99] text-black rounded-xl font-medium hover:bg-[#00E88C] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {loading && <Loader2 className="animate-spin" size={18} />}
+            Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
 // CREATE AUTOMATION MODAL
 // ============================================================================
 const CreateAutomationModal = ({ isOpen, onClose, onCreate, connectionId }) => {
@@ -1558,6 +1709,8 @@ export default function AutomationsPage() {
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [showSequenceModal, setShowSequenceModal] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState(null)
+  const [editingSequence, setEditingSequence] = useState(null)
+  const [deleteSequenceId, setDeleteSequenceId] = useState(null)
   const [selectedFolder, setSelectedFolder] = useState(null)
   const [editingAutomation, setEditingAutomation] = useState(null)
 
@@ -1833,9 +1986,39 @@ export default function AutomationsPage() {
   }
 
   const handleDeleteSequence = async (id) => {
-    if (!confirm('Tem certeza que deseja excluir esta sequência?')) return
-    await fetch(`/api/automations/sequences/${id}`, { method: 'DELETE' })
+    setDeleteSequenceId(id)
+  }
+
+  const confirmDeleteSequence = async () => {
+    if (!deleteSequenceId) return
+    await fetch(`/api/automations/sequences/${deleteSequenceId}`, { method: 'DELETE' })
+    setDeleteSequenceId(null)
     await loadSequences()
+  }
+
+  const handleEditSequence = (sequence) => {
+    setEditingSequence(sequence)
+  }
+
+  const handleSaveSequence = async (data) => {
+    const isEdit = !!data.id
+    const url = isEdit ? `/api/automations/sequences/${data.id}` : '/api/automations/sequences'
+    const method = isEdit ? 'PUT' : 'POST'
+
+    const response = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        connectionId: selectedConnection,
+        ...data
+      })
+    })
+
+    if (response.ok) {
+      setEditingSequence(null)
+      setShowSequenceModal(false)
+      await loadSequences()
+    }
   }
 
   const handleDuplicateSequence = async (sequence) => {
@@ -2001,7 +2184,7 @@ export default function AutomationsPage() {
                     key={seq.id}
                     sequence={seq}
                     onToggle={handleToggleSequence}
-                    onEdit={() => { }}
+                    onEdit={handleEditSequence}
                     onDuplicate={handleDuplicateSequence}
                     onDelete={handleDeleteSequence}
                   />
@@ -2121,6 +2304,50 @@ export default function AutomationsPage() {
         onSave={handleEditAutomation}
         connectionId={selectedConnection}
       />
+
+      {/* Edit sequence modal */}
+      {editingSequence && (
+        <EditSequenceModal
+          isOpen={!!editingSequence}
+          onClose={() => setEditingSequence(null)}
+          onSave={handleSaveSequence}
+          sequence={editingSequence}
+          templates={templates}
+          tags={tags}
+          origins={origins}
+        />
+      )}
+
+      {/* Delete sequence confirmation modal */}
+      {deleteSequenceId && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1A1A1A] rounded-2xl w-full max-w-md p-6">
+            <div className="text-center">
+              <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="text-red-500" size={24} />
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">Excluir Sequência</h3>
+              <p className="text-gray-400 mb-6">
+                Tem certeza que deseja excluir esta sequência? Esta ação não pode ser desfeita.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteSequenceId(null)}
+                className="flex-1 px-4 py-3 bg-white/5 text-white rounded-xl font-medium hover:bg-white/10 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDeleteSequence}
+                className="flex-1 px-4 py-3 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors"
+              >
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

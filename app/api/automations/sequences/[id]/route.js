@@ -68,7 +68,7 @@ export async function PUT(request, { params }) {
         }
 
         const body = await request.json()
-        const { name, description, isActive, steps } = body
+        const { name, description, isActive, steps, triggerType, triggerTagId, triggerOriginId, triggerKeywords } = body
 
         // Verificar propriedade
         const { data: existing } = await supabase
@@ -87,6 +87,10 @@ export async function PUT(request, { params }) {
         if (name !== undefined) updateData.name = name.trim()
         if (description !== undefined) updateData.description = description?.trim() || null
         if (isActive !== undefined) updateData.is_active = isActive
+        if (triggerType !== undefined) updateData.trigger_type = triggerType
+        if (triggerTagId !== undefined) updateData.trigger_tag_id = triggerTagId || null
+        if (triggerOriginId !== undefined) updateData.trigger_origin_id = triggerOriginId || null
+        if (triggerKeywords !== undefined) updateData.trigger_keywords = triggerKeywords || []
 
         await supabase.from('automation_sequences').update(updateData).eq('id', id)
 
