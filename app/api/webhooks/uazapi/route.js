@@ -25,6 +25,7 @@ import ConversationService from '@/lib/ConversationService';
 import MediaServiceVPS from '@/lib/MediaServiceVPS';
 import N8nWebhookService from '@/lib/N8nWebhookService';
 import AutomationService from '@/lib/AutomationService';
+import SequenceService from '@/lib/SequenceService';
 import { randomUUID } from 'crypto';
 
 // Force dynamic rendering
@@ -932,6 +933,26 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
         .catch(err => {
           log(requestId, 'error', '❌', `Erro ao processar automação: ${err.message}`);
         });
+
+      // 12.1 VERIFICAR SEQUÊNCIAS - NOVO CONTATO
+      // Detectar se é primeiro contato (first_message_at ainda não definido)
+      if (!contact.first_message_at) {
+        // Atualizar first_message_at
+        chatSupabaseAdmin
+          .from('whatsapp_contacts')
+          .update({ first_message_at: new Date().toISOString() })
+          .eq('id', contact.id)
+          .then(() => {
+            // Check for new_contact sequences
+            SequenceService.checkAndEnroll(contact.id, connection.id, 'new_contact')
+              .catch(err => log(requestId, 'error', '❌', `Erro ao verificar sequências new_contact: ${err.message}`));
+          });
+      }
+
+      // 12.2 VERIFICAR SEQUÊNCIAS - KEYWORD
+      // Fire and forget
+      SequenceService.checkAndEnroll(contact.id, connection.id, 'keyword', messageContent)
+        .catch(err => log(requestId, 'error', '❌', `Erro ao verificar sequências keyword: ${err.message}`));
     }
 
     // 13. ENVIAR PARA N8N (agente de IA)
