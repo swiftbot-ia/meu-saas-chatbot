@@ -572,10 +572,12 @@ const EditAutomationModal = ({ isOpen, onClose, automation, onSave, connectionId
   const [webhookEnabled, setWebhookEnabled] = useState(false)
   const [tagInput, setTagInput] = useState('')
   const [tagsToAdd, setTagsToAdd] = useState([])
+  const [selectedOriginId, setSelectedOriginId] = useState(null)
+  const [availableOrigins, setAvailableOrigins] = useState([])
   const [loading, setLoading] = useState(false)
   const [activeSection, setActiveSection] = useState('trigger') // 'trigger', 'response', 'actions'
 
-  // Carregar dados da automação quando abrir
+  // Carregar dados da automação e origens quando abrir
   useEffect(() => {
     if (automation && isOpen) {
       setName(automation.name || '')
@@ -584,10 +586,25 @@ const EditAutomationModal = ({ isOpen, onClose, automation, onSave, connectionId
       setResponseContent(automation.automation_responses?.[0]?.content || '')
       setWebhookUrl(automation.action_webhook_url || '')
       setWebhookEnabled(automation.action_webhook_enabled || false)
-      // Tags seriam carregadas aqui se tivéssemos uma tabela de tags
-      setTagsToAdd([])
+      setTagsToAdd(automation.action_add_tags || [])
+      setSelectedOriginId(automation.action_set_origin_id || null)
+
+      // Carregar origens disponíveis
+      loadOrigins()
     }
   }, [automation, isOpen])
+
+  const loadOrigins = async () => {
+    try {
+      const response = await fetch(`/api/contacts?connectionId=${connectionId}`)
+      const data = await response.json()
+      if (response.ok) {
+        setAvailableOrigins(data.origins || [])
+      }
+    } catch (error) {
+      console.error('Erro ao carregar origens:', error)
+    }
+  }
 
   const handleAddKeyword = () => {
     if (keywordInput.trim() && !keywords.includes(keywordInput.trim())) {
@@ -622,7 +639,8 @@ const EditAutomationModal = ({ isOpen, onClose, automation, onSave, connectionId
         responses: responseContent ? [{ type: 'text', content: responseContent }] : [],
         actionWebhookUrl: webhookUrl,
         actionWebhookEnabled: webhookEnabled,
-        actionAddTags: tagsToAdd
+        actionAddTags: tagsToAdd,
+        actionSetOriginId: selectedOriginId
       })
       onClose()
     } catch (error) {
@@ -850,6 +868,29 @@ const EditAutomationModal = ({ isOpen, onClose, automation, onSave, connectionId
                     </p>
                   </div>
                 )}
+              </div>
+
+              {/* Definir Origem */}
+              <div className="bg-[#252525] rounded-xl p-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
+                    <Send className="text-orange-400" size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-medium">Definir Origem</h3>
+                    <p className="text-xs text-gray-400">Atribuir origem ao contato para tracking</p>
+                  </div>
+                </div>
+                <select
+                  value={selectedOriginId || ''}
+                  onChange={(e) => setSelectedOriginId(e.target.value || null)}
+                  className="w-full bg-[#1A1A1A] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+                >
+                  <option value="">Nenhuma origem</option>
+                  {availableOrigins.map(origin => (
+                    <option key={origin.id} value={origin.id}>{origin.name}</option>
+                  ))}
+                </select>
               </div>
             </>
           )}
