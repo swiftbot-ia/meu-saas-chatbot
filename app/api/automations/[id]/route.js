@@ -64,7 +64,8 @@ export async function PUT(request, { params }) {
             actionWebhookUrl,
             actionWebhookEnabled,
             actionAddTags,
-            actionSetOriginId
+            actionSetOriginId,
+            actionCustomFields
         } = body
 
         // Verificar propriedade
@@ -92,6 +93,7 @@ export async function PUT(request, { params }) {
         if (actionWebhookEnabled !== undefined) updateData.action_webhook_enabled = actionWebhookEnabled
         if (actionAddTags !== undefined) updateData.action_add_tags = actionAddTags || []
         if (actionSetOriginId !== undefined) updateData.action_set_origin_id = actionSetOriginId || null
+        if (actionCustomFields !== undefined) updateData.action_custom_fields = actionCustomFields || {}
 
         const { error: updateError } = await supabase
             .from('automations')
