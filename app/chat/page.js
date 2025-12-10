@@ -33,6 +33,10 @@ function ChatContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const conversationIdParam = searchParams.get('conversation');
+  const phoneParam = searchParams.get('phone');
+
+  // Debug: Log URL params on mount
+  console.log('🔗 [Chat] URL params:', { conversationIdParam, phoneParam });
 
   // 1. ESTADOS
   const [conversations, setConversations] = useState([]);
@@ -44,9 +48,11 @@ function ChatContent() {
   const [subscription, setSubscription] = useState(null);
   const [subscriptionChecked, setSubscriptionChecked] = useState(false);
   const [pendingConversationId, setPendingConversationId] = useState(conversationIdParam);
+  const [pendingPhone, setPendingPhone] = useState(phoneParam);
 
   // 2. FUNÇÕES
   const loadConnections = async () => {
+    console.log('📡 [Chat] loadConnections called, pendingConversationId:', pendingConversationId, 'pendingPhone:', pendingPhone);
     try {
       // ✅ Check authentication first
       const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -67,20 +73,60 @@ function ChatContent() {
       if (data.connections && data.connections.length > 0) {
         let selectedConn = null;
 
-        // If there's a pending conversation from URL, find which connection it belongs to
+        // If there's a pending conversation from URL, fetch it directly by ID
         if (pendingConversationId) {
+          console.log('🔍 [Chat] Fetching conversation directly by ID:', pendingConversationId);
+          try {
+            // Fetch conversation directly by ID - this doesn't filter by is_archived
+            const convRes = await fetch(`/api/chat/conversations/${pendingConversationId}`);
+            if (convRes.ok) {
+              const conversationData = await convRes.json();
+              console.log('✅ [Chat] Found conversation:', conversationData.id);
+
+              // Find which connection this conversation belongs to
+              selectedConn = data.connections.find(c => c.instance_name === conversationData.instance_name);
+
+              if (selectedConn) {
+                console.log('✅ [Chat] Matched connection:', selectedConn.profile_name || selectedConn.instance_name);
+              } else {
+                console.warn('⚠️ [Chat] No matching connection for instance:', conversationData.instance_name);
+              }
+            } else {
+              console.warn('⚠️ [Chat] Conversation not found:', pendingConversationId);
+            }
+          } catch (e) {
+            console.error('Error fetching conversation:', e);
+          }
+        }
+
+        // If there's a pending phone from URL, find which connection has a conversation with this phone
+        // or use the first connected instance to create the conversation
+        if (!selectedConn && pendingPhone) {
+          console.log('🔍 [Chat] Searching for connection with phone:', pendingPhone);
+          const normalizedPhone = pendingPhone.replace(/\D/g, '');
+
           for (const conn of data.connections) {
             try {
               const convRes = await fetch(`/api/chat/conversations?connectionId=${conn.id}&limit=100`);
               const convData = await convRes.json();
-              if (convData.conversations?.some(c => c.id === pendingConversationId)) {
+              const matchingConv = convData.conversations?.find(c => {
+                const contactPhone = c.contact?.whatsapp_number?.replace(/\D/g, '') || '';
+                return contactPhone.includes(normalizedPhone) || normalizedPhone.includes(contactPhone);
+              });
+              if (matchingConv) {
                 selectedConn = conn;
-                console.log('✅ [Chat] Found conversation in connection:', conn.profile_name || conn.instance_name);
+                console.log('✅ [Chat] Found phone in connection:', conn.profile_name || conn.instance_name);
                 break;
               }
             } catch (e) {
-              console.error('Error checking connection:', e);
+              console.error('Error checking connection for phone:', e);
             }
+          }
+
+          // If no connection found with this phone, use first connected instance
+          if (!selectedConn) {
+            selectedConn = data.connections.find(c => c.is_connected);
+            console.log('🔄 [Chat] No conversation found for phone, using first connected:', selectedConn?.instance_name);
           }
         }
 
@@ -170,13 +216,70 @@ function ChatContent() {
 
       setConversations(data.conversations || []);
 
-      // Auto-select conversation from URL parameter
+      // Auto-select conversation from URL parameter (by ID)
       if (pendingConversationId) {
-        const targetConversation = data.conversations?.find(c => c.id === pendingConversationId);
+        console.log('🔍 [Chat] Fetching conversation by ID for auto-select:', pendingConversationId);
+        try {
+          // Fetch conversation directly by ID (works even if not in list due to archived/filtered)
+          const convRes = await fetch(`/api/chat/conversations/${pendingConversationId}`);
+          if (convRes.ok) {
+            const targetConversation = await convRes.json();
+
+            // Add to list if not already there
+            if (!data.conversations?.some(c => c.id === targetConversation.id)) {
+              setConversations(prev => [targetConversation, ...prev]);
+            }
+
+            setSelectedConversation(targetConversation);
+            console.log('✅ [Chat] Auto-selected conversation:', targetConversation.id);
+          } else {
+            console.warn('⚠️ [Chat] Could not fetch conversation:', pendingConversationId);
+          }
+        } catch (e) {
+          console.error('Error fetching conversation for auto-select:', e);
+        }
+        setPendingConversationId(null);
+      }
+      // Auto-select conversation from URL parameter (by phone)
+      else if (pendingPhone) {
+        // Normalize phone number for comparison (remove special chars)
+        const normalizedPhone = pendingPhone.replace(/\D/g, '');
+        const targetConversation = data.conversations?.find(c => {
+          const contactPhone = c.contact?.whatsapp_number?.replace(/\D/g, '') || '';
+          return contactPhone.includes(normalizedPhone) || normalizedPhone.includes(contactPhone);
+        });
         if (targetConversation) {
           setSelectedConversation(targetConversation);
-          console.log('✅ [Chat] Auto-selected conversation from URL:', pendingConversationId);
-          setPendingConversationId(null);
+          console.log('✅ [Chat] Auto-selected conversation by phone:', pendingPhone);
+          setPendingPhone(null);
+        } else {
+          // No conversation found - create one!
+          console.log('🔄 [Chat] Creating conversation for phone:', pendingPhone);
+          try {
+            const response = await fetch('/api/chat/conversations/find-or-create', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                phone: pendingPhone,
+                connectionId: selectedConnection
+              })
+            });
+
+            if (response.ok) {
+              const result = await response.json();
+              if (result.conversation) {
+                // Add to conversations list and select it
+                setConversations(prev => [result.conversation, ...prev]);
+                setSelectedConversation(result.conversation);
+                console.log('✅ [Chat] Created/found conversation:', result.conversation.id);
+              }
+            } else {
+              console.error('❌ [Chat] Failed to create conversation');
+            }
+          } catch (err) {
+            console.error('❌ [Chat] Error creating conversation:', err);
+          }
+          setPendingPhone(null);
         }
       }
       // Update selected conversation if it exists

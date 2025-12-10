@@ -1,7 +1,7 @@
 /**
  * Tags API Route
- * GET /api/contacts/tags - Lista todas as tags
- * POST /api/contacts/tags - Cria nova tag
+ * GET /api/contacts/tags - Lista todas as tags (por instância)
+ * POST /api/contacts/tags - Cria nova tag (por instância)
  */
 
 import { NextResponse } from 'next/server';
@@ -13,7 +13,6 @@ import { createChatSupabaseAdminClient } from '@/lib/supabase/chat-server';
 export const dynamic = 'force-dynamic';
 
 // Helper para criar cliente Supabase com cookies (para autenticação)
-// NOTA: No Next.js 16, cookies() retorna uma Promise
 async function createAuthClient() {
     const cookieStore = await cookies();
     return createServerClient(
@@ -35,8 +34,11 @@ async function createAuthClient() {
     );
 }
 
-export async function GET() {
+export async function GET(request) {
     try {
+        const { searchParams } = new URL(request.url);
+        const instanceName = searchParams.get('instance_name');
+
         const supabase = await createAuthClient();
         const { data: { session }, error: authError } = await supabase.auth.getSession();
 
@@ -46,11 +48,21 @@ export async function GET() {
 
         const chatSupabase = createChatSupabaseAdminClient();
 
-        const { data: tags, error } = await chatSupabase
+        // Build query - filter by instance_name if provided, otherwise by user_id (legacy)
+        let query = chatSupabase
             .from('contact_tags')
             .select('*')
-            .eq('user_id', session.user.id)
             .order('name');
+
+        if (instanceName) {
+            // New way: filter by instance_name
+            query = query.eq('instance_name', instanceName);
+        } else {
+            // Legacy fallback: filter by user_id
+            query = query.eq('user_id', session.user.id);
+        }
+
+        const { data: tags, error } = await query;
 
         if (error) {
             console.error('Erro ao buscar tags:', error);
@@ -75,10 +87,14 @@ export async function POST(request) {
         }
 
         const body = await request.json();
-        const { name, color, description } = body;
+        const { name, color, description, instance_name } = body;
 
         if (!name) {
             return NextResponse.json({ error: 'Nome da tag é obrigatório' }, { status: 400 });
+        }
+
+        if (!instance_name) {
+            return NextResponse.json({ error: 'Instance name é obrigatório' }, { status: 400 });
         }
 
         const chatSupabase = createChatSupabaseAdminClient();
@@ -89,7 +105,8 @@ export async function POST(request) {
                 name,
                 color: color || '#00FF99',
                 description: description || null,
-                user_id: session.user.id
+                user_id: session.user.id, // Keep for reference
+                instance_name // New: link to instance
             })
             .select()
             .single();

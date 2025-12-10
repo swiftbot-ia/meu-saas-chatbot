@@ -5,9 +5,13 @@ import { useRouter } from 'next/navigation';
 import { DragDropContext } from '@hello-pangea/dnd';
 import KanbanColumn from './components/KanbanColumn';
 import LeadModal from './components/LeadModal';
+import CRMFilters from './components/CRMFilters';
+import NewOpportunityModal from './components/NewOpportunityModal';
 import axios from 'axios';
 import { supabase } from '@/lib/supabase/client'
 import NoSubscription from '../components/NoSubscription'
+import NotificationBell from '../components/NotificationBell'
+import { Plus } from 'lucide-react'
 
 const SALES_STAGES = {
     novo: {
@@ -54,6 +58,23 @@ const SalesFunnelPage = () => {
         negociacao: 0,
         fechamento: 0
     });
+
+    // Filter states
+    const [filters, setFilters] = useState({
+        date_from: '',
+        date_to: '',
+        won_from: '',
+        won_to: '',
+        lost_from: '',
+        lost_to: '',
+        origin_id: '',
+        tag_id: '',
+        status: 'active',
+        include_manual: false
+    });
+    const [origins, setOrigins] = useState([]);
+    const [tags, setTags] = useState([]);
+    const [showNewOpportunityModal, setShowNewOpportunityModal] = useState(false);
 
     // Read active connection ID and fetch connection details
     useEffect(() => {
@@ -136,12 +157,25 @@ const SalesFunnelPage = () => {
             setSubscriptionChecked(true)
         }
     }
-    // Fetch leads when connection changes
+    // Fetch leads when connection or filters change
     useEffect(() => {
         if (selectedConnection) {
             fetchLeads();
+            fetchOriginsAndTags();
         }
-    }, [selectedConnection]);
+    }, [selectedConnection, filters]);
+
+    const fetchOriginsAndTags = async () => {
+        try {
+            const response = await axios.get('/api/contacts', {
+                params: { connectionId: selectedConnection.id }
+            });
+            setOrigins(response.data.origins || []);
+            setTags(response.data.tags || []);
+        } catch (error) {
+            console.error('Error fetching origins/tags:', error);
+        }
+    };
 
     const fetchLeads = async () => {
         if (!selectedConnection) {
@@ -151,12 +185,24 @@ const SalesFunnelPage = () => {
         }
 
         try {
-            const response = await axios.get('/api/funnels/vendas', {
-                params: {
-                    instance_name: selectedConnection.instance_name,
-                    limit: 20
-                }
-            });
+            const params = {
+                instance_name: selectedConnection.instance_name,
+                limit: 20,
+                include_manual: filters.include_manual ? 'true' : 'false'
+            };
+
+            // Add filter params
+            if (filters.date_from) params.date_from = filters.date_from;
+            if (filters.date_to) params.date_to = filters.date_to;
+            if (filters.won_from) params.won_from = filters.won_from;
+            if (filters.won_to) params.won_to = filters.won_to;
+            if (filters.lost_from) params.lost_from = filters.lost_from;
+            if (filters.lost_to) params.lost_to = filters.lost_to;
+            if (filters.origin_id) params.origin_id = filters.origin_id;
+            if (filters.tag_id) params.tag_id = filters.tag_id;
+            if (filters.status && filters.status !== 'all') params.status = filters.status;
+
+            const response = await axios.get('/api/funnels/vendas', { params });
 
             // New API returns { stage: { leads: [...], hasMore: bool, nextCursor: string } }
             const stagesData = response.data;
@@ -325,8 +371,37 @@ const SalesFunnelPage = () => {
                         </p>
                     </div>
 
-                    <div className="bg-[#00FF99]/10 text-[#00FF99] px-6 py-3 rounded-2xl text-sm font-bold whitespace-nowrap mt-2 sm:mt-0">
-                        Total: {Object.values(stageCounts).reduce((a, b) => a + b, 0)} Leads
+                    <div className="flex items-center gap-3 mt-2 sm:mt-0">
+                        <button
+                            onClick={() => setShowNewOpportunityModal(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold rounded-xl hover:shadow-[0_0_20px_rgba(0,255,153,0.3)] transition-all"
+                        >
+                            <Plus size={18} />
+                            <span className="hidden sm:inline">Nova Oportunidade</span>
+                        </button>
+                        <CRMFilters
+                            instanceName={selectedConnection?.instance_name}
+                            filters={filters}
+                            onFiltersChange={setFilters}
+                            onClearFilters={() => setFilters({
+                                date_from: '',
+                                date_to: '',
+                                won_from: '',
+                                won_to: '',
+                                lost_from: '',
+                                lost_to: '',
+                                origin_id: '',
+                                tag_id: '',
+                                status: 'active',
+                                include_manual: false
+                            })}
+                            origins={origins}
+                            tags={tags}
+                        />
+                        <NotificationBell instanceName={selectedConnection?.instance_name} />
+                        <div className="bg-[#00FF99]/10 text-[#00FF99] px-6 py-3 rounded-2xl text-sm font-bold whitespace-nowrap">
+                            Total: {Object.values(stageCounts).reduce((a, b) => a + b, 0)} Leads
+                        </div>
                     </div>
                 </div>
 
@@ -364,9 +439,19 @@ const SalesFunnelPage = () => {
                     lead={selectedLead}
                     onClose={() => setSelectedLead(null)}
                     onConvert={handleConvert}
+                    onUpdate={fetchLeads}
                     allStages={SALES_STAGES}
+                    instanceName={selectedConnection?.instance_name}
                 />
             )}
+
+            <NewOpportunityModal
+                isOpen={showNewOpportunityModal}
+                onClose={() => setShowNewOpportunityModal(false)}
+                onSuccess={fetchLeads}
+                instanceName={selectedConnection?.instance_name}
+                origins={origins}
+            />
         </div>
     );
 };

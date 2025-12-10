@@ -13,50 +13,43 @@ export async function POST(request, { params }) {
         const { data: conversation, error: fetchError } = await supabase
             .from('whatsapp_conversations')
             .select(`
-    *,
-    contact: whatsapp_contacts(*)
-        `)
+                *,
+                contact: whatsapp_contacts(*)
+            `)
             .eq('id', id)
             .single();
 
         if (fetchError) throw fetchError;
 
-        // 2. Create client
-        const { data: client, error: createError } = await supabase
-            .from('clients')
-            .insert({
-                name: conversation.contact?.name || conversation.contact?.whatsapp_number || 'Cliente',
-                email: conversation.contact?.email,
-                phone: conversation.contact?.whatsapp_number,
-                conversation_id: conversation.id,
-                funnel_stage: 'onboarding',
-                status: 'active'
+        // 2. Update conversation - set won_at and update stage to fechamento
+        const { data: updatedConversation, error: updateError } = await supabase
+            .from('whatsapp_conversations')
+            .update({
+                funnel_stage: 'fechamento',
+                won_at: new Date().toISOString(),
+                lost_at: null, // Clear any lost status
+                lost_reason: null,
+                updated_at: new Date().toISOString()
             })
+            .eq('id', id)
             .select()
             .single();
 
-        if (createError) throw createError;
-
-        // 3. Update conversation stage
-        const { error: updateError } = await supabase
-            .from('whatsapp_conversations')
-            .update({
-                funnel_stage: 'fechamento'
-            })
-            .eq('id', id);
-
         if (updateError) throw updateError;
 
-        // 4. Record history
+        // 3. Record history
         await supabase.from('funnel_stage_history').insert({
             entity_type: 'conversation',
             entity_id: id,
             from_stage: conversation.funnel_stage,
-            to_stage: 'converted',
-            notes: 'Converted to client'
+            to_stage: 'fechamento',
+            notes: 'Convertido em cliente - marcado como ganho'
         });
 
-        return NextResponse.json({ success: true, client });
+        return NextResponse.json({
+            success: true,
+            conversation: updatedConversation
+        });
     } catch (error) {
         console.error('Error converting conversation:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
