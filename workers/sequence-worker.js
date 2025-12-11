@@ -12,8 +12,10 @@
  *   node workers/sequence-worker.js
  * 
  * Environment variables required:
- *   - NEXT_PUBLIC_SUPABASE_URL
- *   - SUPABASE_SERVICE_ROLE_KEY
+ *   - NEXT_PUBLIC_SUPABASE_URL (Main DB)
+ *   - SUPABASE_SERVICE_ROLE_KEY (Main DB)
+ *   - NEXT_PUBLIC_CHAT_SUPABASE_URL (Chat DB)
+ *   - CHAT_SUPABASE_SERVICE_ROLE_KEY (Chat DB)
  *   - UAZAPI_BASE_URL
  *   - UAZAPI_ADMIN_TOKEN
  */
@@ -24,21 +26,41 @@ import { createClient } from '@supabase/supabase-js'
 const INTERVAL_MS = 60000 // 60 seconds
 const BATCH_SIZE = 50
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+// Main DB - sequences, steps, connections, templates
+const mainDbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const mainDbKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+// Chat DB - contacts, conversations, subscriptions
+const chatDbUrl = process.env.NEXT_PUBLIC_CHAT_SUPABASE_URL
+const chatDbKey = process.env.CHAT_SUPABASE_SERVICE_ROLE_KEY
+
 const uazapiBaseUrl = process.env.UAZAPI_BASE_URL || 'https://swiftbot.uazapi.com'
 
-if (!supabaseUrl || !supabaseServiceKey) {
-    console.error('❌ Missing required environment variables')
+if (!mainDbUrl || !mainDbKey) {
+    console.error('❌ Missing Main DB environment variables')
     process.exit(1)
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+if (!chatDbUrl || !chatDbKey) {
+    console.error('❌ Missing Chat DB environment variables')
+    process.exit(1)
+}
+
+// Main DB client - for sequences, steps, connections, templates
+const mainDb = createClient(mainDbUrl, mainDbKey, {
+    auth: { persistSession: false }
+})
+
+// Chat DB client - for contacts, conversations, subscriptions
+const chatDb = createClient(chatDbUrl, chatDbKey, {
     auth: { persistSession: false }
 })
 
 console.log('🚀 Sequence Worker starting...')
 console.log(`📊 Interval: ${INTERVAL_MS / 1000}s, Batch size: ${BATCH_SIZE}`)
+console.log(`📦 Main DB: ${mainDbUrl}`)
+console.log(`📦 Chat DB: ${chatDbUrl}`)
+
 
 /**
  * Calculate next step time based on delay configuration
@@ -151,8 +173,8 @@ async function processSubscription(subscription) {
     const currentStep = steps[currentStepIndex]
 
     if (!currentStep) {
-        // No more steps, mark as completed
-        await supabase
+        // No more steps, mark as completed (Chat DB)
+        await chatDb
             .from('automation_sequence_subscriptions')
             .update({ status: 'completed', completed_at: new Date().toISOString(), next_step_at: null })
             .eq('id', subscription.id)
@@ -165,9 +187,9 @@ async function processSubscription(subscription) {
         return advanceToNextStep(subscription.id, steps, currentStepIndex)
     }
 
-    // Check if agent is paused
+    // Check if agent is paused (Chat DB)
     if (subscription.conversation_id) {
-        const { data: conversation } = await supabase
+        const { data: conversation } = await chatDb
             .from('whatsapp_conversations')
             .select('agent_paused')
             .eq('id', subscription.conversation_id)
@@ -177,7 +199,7 @@ async function processSubscription(subscription) {
             console.log(`⏸️ Agent paused for subscription ${subscription.id}, rescheduling`)
             const rescheduleTime = new Date()
             rescheduleTime.setHours(rescheduleTime.getHours() + 1)
-            await supabase
+            await chatDb
                 .from('automation_sequence_subscriptions')
                 .update({ next_step_at: rescheduleTime.toISOString() })
                 .eq('id', subscription.id)
@@ -185,14 +207,15 @@ async function processSubscription(subscription) {
         }
     }
 
-    // Get contact and connection details
-    const { data: contact } = await supabase
+    // Get contact details (Chat DB)
+    const { data: contact } = await chatDb
         .from('whatsapp_contacts')
         .select('whatsapp_number, name')
         .eq('id', subscription.contact_id)
         .single()
 
-    const { data: connection } = await supabase
+    // Get connection details (Main DB)
+    const { data: connection } = await mainDb
         .from('whatsapp_connections')
         .select('instance_token')
         .eq('id', sequence.connection_id)
@@ -203,11 +226,11 @@ async function processSubscription(subscription) {
         return
     }
 
-    // Get message content
+    // Get message content (Main DB)
     let messageContent = null
 
     if (currentStep.template_id) {
-        const { data: template } = await supabase
+        const { data: template } = await mainDb
             .from('message_templates')
             .select('content, type, media_url')
             .eq('id', currentStep.template_id)
@@ -219,7 +242,7 @@ async function processSubscription(subscription) {
     }
 
     if (!messageContent && currentStep.automation_id) {
-        const { data: automation } = await supabase
+        const { data: automation } = await mainDb
             .from('automations')
             .select('response_type, response_content, response_media_url')
             .eq('id', currentStep.automation_id)
@@ -241,8 +264,8 @@ async function processSubscription(subscription) {
         await sendMessage(connection.instance_token, contact.whatsapp_number, messageContent)
         console.log(`✅ Message sent to ${contact.whatsapp_number}`)
 
-        // Update sent count
-        await supabase
+        // Update sent count (Main DB)
+        await mainDb
             .from('automation_sequence_steps')
             .update({ sent_count: (currentStep.sent_count || 0) + 1 })
             .eq('id', currentStep.id)
@@ -257,14 +280,14 @@ async function processSubscription(subscription) {
 }
 
 /**
- * Advance subscription to next step
+ * Advance subscription to next step (Chat DB)
  */
 async function advanceToNextStep(subscriptionId, steps, currentStepIndex) {
     const nextStepIndex = currentStepIndex + 1
     const nextStep = steps[nextStepIndex]
 
     if (!nextStep) {
-        await supabase
+        await chatDb
             .from('automation_sequence_subscriptions')
             .update({ status: 'completed', completed_at: new Date().toISOString(), next_step_at: null, current_step: nextStepIndex })
             .eq('id', subscriptionId)
@@ -273,7 +296,7 @@ async function advanceToNextStep(subscriptionId, steps, currentStepIndex) {
     }
 
     const nextStepAt = calculateNextStepTime(nextStep)
-    await supabase
+    await chatDb
         .from('automation_sequence_subscriptions')
         .update({ current_step: nextStepIndex, next_step_at: nextStepAt })
         .eq('id', subscriptionId)
@@ -282,21 +305,18 @@ async function advanceToNextStep(subscriptionId, steps, currentStepIndex) {
 
 /**
  * Main processing loop
+ * IMPORTANT: Subscriptions are in Chat DB, but sequences/steps are in Main DB
+ * We cannot use JOINs across databases, so we fetch separately
  */
 async function processPendingSubscriptions() {
     const now = new Date().toISOString()
     console.log(`\n🔄 [${new Date().toLocaleTimeString()}] Checking for pending subscriptions...`)
 
     try {
-        const { data: subscriptions, error } = await supabase
+        // Step 1: Get pending subscriptions from Chat DB
+        const { data: subscriptions, error } = await chatDb
             .from('automation_sequence_subscriptions')
-            .select(`
-        *,
-        automation_sequences!inner (
-          id, name, connection_id, is_active,
-          automation_sequence_steps (*)
-        )
-      `)
+            .select('*')
             .eq('status', 'active')
             .lte('next_step_at', now)
             .limit(BATCH_SIZE)
@@ -313,8 +333,32 @@ async function processPendingSubscriptions() {
 
         console.log(`📋 Found ${subscriptions.length} pending subscriptions`)
 
+        // Step 2: For each subscription, fetch sequence and steps from Main DB
         for (const subscription of subscriptions) {
             try {
+                // Fetch sequence with steps from Main DB
+                const { data: sequence, error: seqError } = await mainDb
+                    .from('automation_sequences')
+                    .select(`
+                        id, name, connection_id, is_active,
+                        automation_sequence_steps (*)
+                    `)
+                    .eq('id', subscription.sequence_id)
+                    .single()
+
+                if (seqError || !sequence) {
+                    console.error(`❌ Sequence not found: ${subscription.sequence_id}`)
+                    continue
+                }
+
+                if (!sequence.is_active) {
+                    console.log(`⏸️ Sequence ${sequence.name} is paused, skipping`)
+                    continue
+                }
+
+                // Attach sequence to subscription for processSubscription
+                subscription.automation_sequences = sequence
+
                 await processSubscription(subscription)
             } catch (err) {
                 console.error(`❌ Error processing subscription ${subscription.id}:`, err)
@@ -325,6 +369,7 @@ async function processPendingSubscriptions() {
         console.error('❌ Unexpected error:', err)
     }
 }
+
 
 // Start the worker loop
 setInterval(processPendingSubscriptions, INTERVAL_MS)
