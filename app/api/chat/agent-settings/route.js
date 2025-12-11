@@ -10,6 +10,7 @@ import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { createChatSupabaseClient } from '@/lib/supabase/chat-client';
+import { getOwnerUserIdFromMember } from '@/lib/account-service';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -89,12 +90,23 @@ export async function GET(request) {
             );
         }
 
-        // 2. Check if user owns this connection
+        // 2. Get owner's user ID for team data sharing
+        let ownerUserId = session.user.id;
+        try {
+            const ownerFromService = await getOwnerUserIdFromMember(session.user.id);
+            if (ownerFromService) {
+                ownerUserId = ownerFromService;
+            }
+        } catch (accountError) {
+            console.log('⚠️ [AgentSettings GET] Account check failed:', accountError.message);
+        }
+
+        // 3. Check if owner owns this connection
         const { data: connection, error: connError } = await supabaseAdmin
             .from('whatsapp_connections')
             .select('id, user_id')
             .eq('id', connectionId)
-            .eq('user_id', session.user.id)
+            .eq('user_id', ownerUserId)
             .single();
 
         if (connError || !connection) {
@@ -184,12 +196,23 @@ export async function PATCH(request) {
             );
         }
 
-        // 2. Check if user owns this connection
+        // 2. Get owner's user ID for team data sharing
+        let ownerUserId = session.user.id;
+        try {
+            const ownerFromService = await getOwnerUserIdFromMember(session.user.id);
+            if (ownerFromService) {
+                ownerUserId = ownerFromService;
+            }
+        } catch (accountError) {
+            console.log('⚠️ [AgentSettings PATCH] Account check failed:', accountError.message);
+        }
+
+        // 3. Check if owner owns this connection
         const { data: connection, error: connError } = await supabaseAdmin
             .from('whatsapp_connections')
             .select('id, user_id')
             .eq('id', connectionId)
-            .eq('user_id', session.user.id)
+            .eq('user_id', ownerUserId)
             .single();
 
         if (connError || !connection) {

@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
+import { getOwnerUserIdFromMember } from '@/lib/account-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,13 +35,27 @@ export async function GET(request) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
 
+        // Get owner's user ID for team data sharing
+        let ownerUserId = user.id;
+        try {
+            const ownerFromService = await getOwnerUserIdFromMember(user.id);
+            if (ownerFromService) {
+                ownerUserId = ownerFromService;
+                if (ownerUserId !== user.id) {
+                    console.log('👥 [Templates API] Team member, using owner data:', ownerUserId);
+                }
+            }
+        } catch (accountError) {
+            console.log('⚠️ [Templates API] Account check failed:', accountError.message);
+        }
+
         const { searchParams } = new URL(request.url);
         const connectionId = searchParams.get('connectionId');
 
         let query = supabase
             .from('message_templates')
             .select('*')
-            .eq('user_id', user.id)
+            .eq('user_id', ownerUserId)
             .order('created_at', { ascending: false });
 
         if (connectionId) {

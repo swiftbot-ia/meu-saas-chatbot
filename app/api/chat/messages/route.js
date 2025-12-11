@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import MessageService from '@/lib/MessageService';
+import { getOwnerUserIdFromMember } from '@/lib/account-service';
 
 // Helper para criar cliente Supabase com cookies (para autenticação)
 async function createAuthClient() {
@@ -49,6 +50,20 @@ export async function GET(request) {
 
     const userId = session.user.id;
 
+    // Get owner's user ID for team data sharing
+    let ownerUserId = userId;
+    try {
+      const ownerFromService = await getOwnerUserIdFromMember(userId);
+      if (ownerFromService) {
+        ownerUserId = ownerFromService;
+        if (ownerUserId !== userId) {
+          console.log('👥 [Messages] Team member, using owner data:', ownerUserId);
+        }
+      }
+    } catch (accountError) {
+      console.log('⚠️ [Messages] Account check failed:', accountError.message);
+    }
+
     // Get query params
     const { searchParams } = new URL(request.url);
     const conversationId = searchParams.get('conversationId');
@@ -62,15 +77,16 @@ export async function GET(request) {
       );
     }
 
-    // List messages
+    // List messages using owner's user ID
     console.log(`🔍 [API/messages] Requesting messages for:`, {
       conversationId,
       userId,
+      ownerUserId,
       limit,
       before
     });
 
-    const messages = await MessageService.listMessages(conversationId, userId, {
+    const messages = await MessageService.listMessages(conversationId, ownerUserId, {
       limit,
       before
     });
@@ -95,3 +111,4 @@ export async function GET(request) {
     );
   }
 }
+

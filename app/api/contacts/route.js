@@ -8,6 +8,7 @@ import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { createChatSupabaseAdminClient } from '@/lib/supabase/chat-server';
+import { getOwnerUserIdFromMember } from '@/lib/account-service';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -52,11 +53,25 @@ export async function GET(request) {
 
         const userId = session.user.id;
 
-        // Get user's connections to filter by instance_name
+        // Get owner's user ID for team data sharing
+        let ownerUserId = userId;
+        try {
+            const ownerFromService = await getOwnerUserIdFromMember(userId);
+            if (ownerFromService) {
+                ownerUserId = ownerFromService;
+                if (ownerUserId !== userId) {
+                    console.log('👥 [Contacts] Team member, using owner data:', ownerUserId);
+                }
+            }
+        } catch (accountError) {
+            console.log('⚠️ [Contacts] Account check failed:', accountError.message);
+        }
+
+        // Get owner's connections to filter by instance_name
         const { data: connections, error: connError } = await supabaseAdmin
             .from('whatsapp_connections')
             .select('id, instance_name')
-            .eq('user_id', userId);
+            .eq('user_id', ownerUserId);
 
         if (connError) {
             console.error('Erro ao buscar conexões:', connError);
@@ -116,11 +131,11 @@ export async function GET(request) {
             return NextResponse.json({ error: 'Erro ao buscar contatos' }, { status: 500 });
         }
 
-        // Get all origins for this user
+        // Get all origins for this user (using owner's user ID)
         const { data: allOrigins, error: originsError } = await chatSupabase
             .from('contact_origins')
             .select('*')
-            .eq('user_id', userId)
+            .eq('user_id', ownerUserId)
             .order('name');
 
         if (originsError) {

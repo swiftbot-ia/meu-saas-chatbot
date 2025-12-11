@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import ConversationService from '@/lib/ConversationService';
+import { getOwnerUserIdFromMember } from '@/lib/account-service';
 
 // Helper para criar cliente Supabase com cookies (para autenticação)
 async function createAuthClient() {
@@ -49,6 +50,20 @@ export async function GET(request) {
 
     const userId = session.user.id;
 
+    // Get owner's user ID for team data sharing
+    let ownerUserId = userId;
+    try {
+      const ownerFromService = await getOwnerUserIdFromMember(userId);
+      if (ownerFromService) {
+        ownerUserId = ownerFromService;
+        if (ownerUserId !== userId) {
+          console.log('👥 [Conversations] Team member, using owner data:', ownerUserId);
+        }
+      }
+    } catch (accountError) {
+      console.log('⚠️ [Conversations] Account check failed:', accountError.message);
+    }
+
     // Get query params
     const { searchParams } = new URL(request.url);
     const connectionId = searchParams.get('connectionId');
@@ -56,15 +71,15 @@ export async function GET(request) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    // List conversations
-    const result = await ConversationService.listConversations(userId, {
+    // List conversations using owner's user ID
+    const result = await ConversationService.listConversations(ownerUserId, {
       connectionId,
       search,
       limit,
       offset
     });
 
-    console.log(`📋 [Conversations] userId=${userId}, connectionId=${connectionId}, total=${result.total}`);
+    console.log(`📋 [Conversations] userId=${userId}, ownerUserId=${ownerUserId}, connectionId=${connectionId}, total=${result.total}`);
 
     return NextResponse.json(result);
 
@@ -76,3 +91,4 @@ export async function GET(request) {
     );
   }
 }
+

@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import MessageService from '@/lib/MessageService';
+import { getOwnerUserIdFromMember } from '@/lib/account-service';
 
 // Helper para criar cliente Supabase com cookies (para autenticação)
 async function createAuthClient() {
@@ -74,11 +75,25 @@ export async function POST(request) {
       );
     }
 
-    // Send message
+    // Get owner's user ID for team data sharing
+    let ownerUserId = userId;
+    try {
+      const ownerFromService = await getOwnerUserIdFromMember(userId);
+      if (ownerFromService) {
+        ownerUserId = ownerFromService;
+        if (ownerUserId !== userId) {
+          console.log('👥 [ChatSend] Team member, using owner data:', ownerUserId);
+        }
+      }
+    } catch (accountError) {
+      console.log('⚠️ [ChatSend] Account check failed:', accountError.message);
+    }
+
+    // Send message using owner's user ID
     const result = await MessageService.sendTextMessage(
       conversationId,
       message,
-      userId
+      ownerUserId
     );
 
     // Return success - webhook will save the message shortly
@@ -100,3 +115,4 @@ export async function POST(request) {
     );
   }
 }
+

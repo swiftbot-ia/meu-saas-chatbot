@@ -152,10 +152,27 @@ function ChatContent() {
       }
 
 
-      // Load subscription
+      // Load subscription - check team membership for owner's subscription
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        await loadSubscription(user.id);
+        // Get owner user ID for team members
+        let ownerUserId = user.id;
+        try {
+          const accountResponse = await fetch('/api/account/team');
+          const accountData = await accountResponse.json();
+
+          if (accountData.success && accountData.account) {
+            const owner = accountData.members?.find(m => m.role === 'owner');
+            if (owner) {
+              ownerUserId = owner.userId;
+              console.log('👥 [Chat] Team member, using owner subscription:', ownerUserId);
+            }
+          }
+        } catch (accountError) {
+          console.log('⚠️ [Chat] Account check failed:', accountError.message);
+        }
+
+        await loadSubscription(ownerUserId);
       }
 
     } catch (err) {

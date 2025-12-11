@@ -42,11 +42,31 @@ export default function AccountSubscription() {
 
     if (!user) {
       router.push('/login')
-    } else {
-      setUser(user)
-      await loadUserProfile(user.id)
-      await loadSubscriptionData(user.id)
+      return
     }
+
+    // Verificar se é owner da conta
+    try {
+      const { data: member, error } = await supabase
+        .from('account_members')
+        .select('role')
+        .eq('user_id', user.id)
+        .single()
+
+      // Se não tem registro ou não é owner, redirecionar
+      if (error || !member || member.role !== 'owner') {
+        console.log('❌ Usuário não é owner, redirecionando...')
+        router.push('/dashboard')
+        return
+      }
+    } catch (err) {
+      // Se a tabela não existe ainda (antes da migração), permitir acesso normal
+      console.log('⚠️ Verificação de role ignorada (tabela pode não existir)')
+    }
+
+    setUser(user)
+    await loadUserProfile(user.id)
+    await loadSubscriptionData(user.id)
     setLoading(false)
   }
 

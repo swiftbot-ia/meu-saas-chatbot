@@ -215,10 +215,27 @@ function AgentConfigContent() {
   }
   const loadSubscription = async (userId) => {
     try {
+      // Get owner user ID for team members
+      let ownerUserId = userId;
+      try {
+        const accountResponse = await fetch('/api/account/team');
+        const accountData = await accountResponse.json();
+
+        if (accountData.success && accountData.account) {
+          const owner = accountData.members?.find(m => m.role === 'owner');
+          if (owner) {
+            ownerUserId = owner.userId;
+            console.log('👥 [AgentConfig] Team member, using owner subscription:', ownerUserId);
+          }
+        }
+      } catch (accountError) {
+        console.log('⚠️ [AgentConfig] Account check failed:', accountError.message);
+      }
+
       const { data, error } = await supabase
         .from('user_subscriptions')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', ownerUserId)
         .order('created_at', { ascending: false })
         .limit(1)
         .single()
@@ -236,7 +253,24 @@ function AgentConfigContent() {
   }
   const loadExistingConfig = async (userId) => {
     try {
-      let query = supabase.from('ai_agents').select('*').eq('user_id', userId)
+      // Get owner user ID for team members
+      let ownerUserId = userId;
+      try {
+        const accountResponse = await fetch('/api/account/team');
+        const accountData = await accountResponse.json();
+
+        if (accountData.success && accountData.account) {
+          const owner = accountData.members?.find(m => m.role === 'owner');
+          if (owner) {
+            ownerUserId = owner.userId;
+            console.log('👥 [AgentConfig] Team member, loading owner config:', ownerUserId);
+          }
+        }
+      } catch (accountError) {
+        console.log('⚠️ [AgentConfig] Account check failed:', accountError.message);
+      }
+
+      let query = supabase.from('ai_agents').select('*').eq('user_id', ownerUserId)
 
       if (connectionId) {
         query = query.eq('connection_id', connectionId)
@@ -424,6 +458,23 @@ function AgentConfigContent() {
     setSaving(true)
 
     try {
+      // Get owner user ID for team members
+      let ownerUserId = user.id;
+      try {
+        const accountResponse = await fetch('/api/account/team');
+        const accountData = await accountResponse.json();
+
+        if (accountData.success && accountData.account) {
+          const owner = accountData.members?.find(m => m.role === 'owner');
+          if (owner) {
+            ownerUserId = owner.userId;
+            console.log('👥 [AgentConfig] Team member, saving as owner:', ownerUserId);
+          }
+        }
+      } catch (accountError) {
+        console.log('⚠️ [AgentConfig] Account check failed:', accountError.message);
+      }
+
       let finalProductUrl = formData.productUrl.trim()
       if (finalProductUrl && !/^https?:\/\//i.test(finalProductUrl)) {
         finalProductUrl = `https://${finalProductUrl}`
@@ -436,7 +487,7 @@ function AgentConfigContent() {
       })
 
       const agentData = {
-        user_id: user.id,
+        user_id: ownerUserId,
         connection_id: connectionId,
         company_name: formData.companyName,
         business_sector: formData.businessSector,

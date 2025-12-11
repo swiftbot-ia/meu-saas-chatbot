@@ -5,6 +5,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { getOwnerUserIdFromMember } from '@/lib/account-service'
 
 // GET - Lista sequências do usuário
 export async function GET(request) {
@@ -14,6 +15,20 @@ export async function GET(request) {
         const { data: { user }, error: authError } = await supabase.auth.getUser()
         if (authError || !user) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+        }
+
+        // Get owner's user ID for team data sharing
+        let ownerUserId = user.id;
+        try {
+            const ownerFromService = await getOwnerUserIdFromMember(user.id);
+            if (ownerFromService) {
+                ownerUserId = ownerFromService;
+                if (ownerUserId !== user.id) {
+                    console.log('👥 [Sequences API] Team member, using owner data:', ownerUserId);
+                }
+            }
+        } catch (accountError) {
+            console.log('⚠️ [Sequences API] Account check failed:', accountError.message);
         }
 
         const { searchParams } = new URL(request.url)
@@ -41,7 +56,7 @@ export async function GET(request) {
           automations (id, name)
         )
       `)
-            .eq('user_id', user.id)
+            .eq('user_id', ownerUserId)
             .order('updated_at', { ascending: false })
 
         if (connectionId) {
