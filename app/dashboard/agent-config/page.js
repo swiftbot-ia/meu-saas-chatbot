@@ -455,30 +455,23 @@ function AgentConfigContent() {
         is_active: true
       }
 
-      let targetId = agentId
-
-      if (!targetId) {
-        let checkQuery = supabase.from('ai_agents').select('id').eq('user_id', user.id)
-        if (connectionId) {
-          checkQuery = checkQuery.eq('connection_id', connectionId)
-        }
-        const { data: existingData } = await checkQuery.maybeSingle()
-        if (existingData) {
-          targetId = existingData.id
-        }
-      }
-
-      let error = null
-
-      if (targetId) {
-        const { error: updateError } = await supabase.from('ai_agents').update(agentData).eq('id', targetId)
-        error = updateError
-      } else {
-        const { error: insertError } = await supabase.from('ai_agents').insert(agentData)
-        error = insertError
-      }
+      // Usar UPSERT com constraint composta (user_id, connection_id)
+      // Isso permite um agente por conexão para cada usuário
+      const { data: upsertedAgent, error } = await supabase
+        .from('ai_agents')
+        .upsert(agentData, {
+          onConflict: 'user_id,connection_id',
+          ignoreDuplicates: false
+        })
+        .select('id')
+        .single()
 
       if (error) throw error
+
+      // Atualizar o agentId local para futuras operações
+      if (upsertedAgent?.id) {
+        setAgentId(upsertedAgent.id)
+      }
 
       try {
         await fetch('/api/n8n/update-agent', {
