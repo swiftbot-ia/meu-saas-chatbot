@@ -355,10 +355,13 @@ const SequenceCard = ({ sequence, onToggle, onEdit, onDuplicate, onDelete }) => 
             onClick={() => onToggle(sequence.id, !sequence.is_active)}
             className={`
               p-2 rounded-lg transition-colors
-              ${sequence.is_active ? 'text-[#00FF99] hover:bg-[#00FF99]/10' : 'text-gray-500 hover:bg-white/5'}
+              ${sequence.is_active
+                ? 'text-red-400 hover:bg-red-500/10'
+                : 'text-[#00FF99] hover:bg-[#00FF99]/10'}
             `}
+            title={sequence.is_active ? 'Pausar sequência' : 'Ativar sequência'}
           >
-            {sequence.is_active ? <Play size={20} /> : <Pause size={20} />}
+            {sequence.is_active ? <Pause size={20} /> : <Play size={20} />}
           </button>
 
           <div className="relative">
@@ -994,8 +997,8 @@ const EditSequenceModal = ({ isOpen, onClose, onSave, sequence, templates = [], 
                   key={trigger.value}
                   onClick={() => setTriggerType(trigger.value)}
                   className={`p-3 rounded-xl text-left text-sm transition-colors ${triggerType === trigger.value
-                      ? 'bg-[#00FF99]/20 border border-[#00FF99]/50 text-white'
-                      : 'bg-[#252525] border border-white/5 text-gray-400 hover:border-white/20'
+                    ? 'bg-[#00FF99]/20 border border-[#00FF99]/50 text-white'
+                    : 'bg-[#252525] border border-white/5 text-gray-400 hover:border-white/20'
                     }`}
                 >
                   <span className="mr-2">{trigger.icon}</span>
