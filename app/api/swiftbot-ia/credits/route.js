@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import creditsService from '../../../../lib/swiftbot-ia/credits-service'
+import { getOwnerUserIdFromMember } from '../../../../lib/account-service'
 
 async function getUser() {
     const cookieStore = await cookies()
@@ -36,7 +37,21 @@ export async function GET() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { balance, exists } = await creditsService.getBalance(user.id)
+        // Get owner's user ID for team data sharing
+        let ownerUserId = user.id;
+        try {
+            const ownerFromService = await getOwnerUserIdFromMember(user.id);
+            if (ownerFromService) {
+                ownerUserId = ownerFromService;
+                if (ownerUserId !== user.id) {
+                    console.log('👥 [Credits] Team member, using owner credits:', ownerUserId);
+                }
+            }
+        } catch (accountError) {
+            console.log('⚠️ [Credits] Account check failed:', accountError.message);
+        }
+
+        const { balance, exists } = await creditsService.getBalance(ownerUserId)
 
         return NextResponse.json({
             balance,
@@ -57,7 +72,21 @@ export async function POST() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const result = await creditsService.initializeCredits(user.id)
+        // Get owner's user ID for team data sharing
+        let ownerUserId = user.id;
+        try {
+            const ownerFromService = await getOwnerUserIdFromMember(user.id);
+            if (ownerFromService) {
+                ownerUserId = ownerFromService;
+                if (ownerUserId !== user.id) {
+                    console.log('👥 [Credits] Team member, initializing owner credits:', ownerUserId);
+                }
+            }
+        } catch (accountError) {
+            console.log('⚠️ [Credits] Account check failed:', accountError.message);
+        }
+
+        const result = await creditsService.initializeCredits(ownerUserId)
 
         return NextResponse.json({
             balance: result.balance,
@@ -70,3 +99,4 @@ export async function POST() {
         return NextResponse.json({ error: error.message }, { status: 500 })
     }
 }
+

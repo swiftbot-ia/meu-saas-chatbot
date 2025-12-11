@@ -994,8 +994,8 @@ const EditSequenceModal = ({ isOpen, onClose, onSave, sequence, templates = [], 
                   key={trigger.value}
                   onClick={() => setTriggerType(trigger.value)}
                   className={`p-3 rounded-xl text-left text-sm transition-colors ${triggerType === trigger.value
-                      ? 'bg-[#00FF99]/20 border border-[#00FF99]/50 text-white'
-                      : 'bg-[#252525] border border-white/5 text-gray-400 hover:border-white/20'
+                    ? 'bg-[#00FF99]/20 border border-[#00FF99]/50 text-white'
+                    : 'bg-[#252525] border border-white/5 text-gray-400 hover:border-white/20'
                     }`}
                 >
                   <span className="mr-2">{trigger.icon}</span>
@@ -1762,10 +1762,27 @@ export default function AutomationsPage() {
 
   const loadSubscription = async (userId) => {
     try {
+      // Get owner user ID for team members
+      let ownerUserId = userId;
+      try {
+        const accountResponse = await fetch('/api/account/team');
+        const accountData = await accountResponse.json();
+
+        if (accountData.success && accountData.account) {
+          const owner = accountData.members?.find(m => m.role === 'owner');
+          if (owner) {
+            ownerUserId = owner.userId;
+            console.log('👥 [Automations] Team member, using owner subscription:', ownerUserId);
+          }
+        }
+      } catch (accountError) {
+        console.log('⚠️ [Automations] Account check failed:', accountError.message);
+      }
+
       const { data, error } = await supabase
         .from('user_subscriptions')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', ownerUserId)
         .order('created_at', { ascending: false })
         .limit(1)
         .single()

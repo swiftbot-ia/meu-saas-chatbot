@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import ConversationService from '@/lib/ConversationService';
+import { getOwnerUserIdFromMember } from '@/lib/account-service';
 
 // Helper para criar cliente Supabase com cookies (para autenticação)
 async function createAuthClient() {
@@ -50,8 +51,22 @@ export async function GET(request, { params }) {
     const userId = session.user.id;
     const { id: conversationId } = await params;
 
-    // Get conversation
-    const conversation = await ConversationService.getConversation(conversationId, userId);
+    // Get owner's user ID for team data sharing
+    let ownerUserId = userId;
+    try {
+      const ownerFromService = await getOwnerUserIdFromMember(userId);
+      if (ownerFromService) {
+        ownerUserId = ownerFromService;
+        if (ownerUserId !== userId) {
+          console.log('👥 [Conversation] Team member, using owner data:', ownerUserId);
+        }
+      }
+    } catch (accountError) {
+      console.log('⚠️ [Conversation] Account check failed:', accountError.message);
+    }
+
+    // Get conversation using owner's user ID
+    const conversation = await ConversationService.getConversation(conversationId, ownerUserId);
 
     if (!conversation) {
       return NextResponse.json(

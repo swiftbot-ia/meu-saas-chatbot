@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import { supabaseAdmin } from '../../../../lib/supabase/server.js'
+import { getOwnerUserIdFromMember } from '../../../../lib/account-service.js'
 
 // Helper para criar cliente Supabase com cookies (para autenticação)
 // NOTA: No Next.js 16, cookies() retorna uma Promise
@@ -34,7 +35,7 @@ async function createAuthClient() {
 
 
 // ============================================================================
-// GET: Listar conexões do usuário autenticado
+// GET: Listar conexões do usuário autenticado (ou do owner se for membro)
 // ============================================================================
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
@@ -59,11 +60,26 @@ export async function GET(request) {
     const userId = session.user.id
     console.log('👤 [GetConnections] userId:', userId)
 
-    // Buscar conexões do usuário usando supabaseAdmin para bypass RLS
+    // Get owner's user ID for team data sharing
+    // If user is a team member, use owner's ID to fetch shared connections
+    let ownerUserId = userId
+    try {
+      const ownerFromService = await getOwnerUserIdFromMember(userId)
+      if (ownerFromService) {
+        ownerUserId = ownerFromService
+        if (ownerUserId !== userId) {
+          console.log('👥 [GetConnections] Team member, using owner connections:', ownerUserId)
+        }
+      }
+    } catch (accountError) {
+      console.log('⚠️ [GetConnections] Account check failed, using user ID:', accountError.message)
+    }
+
+    // Buscar conexões do owner usando supabaseAdmin para bypass RLS
     const { data: connections, error: fetchError } = await supabaseAdmin
       .from('whatsapp_connections')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', ownerUserId)
       .order('created_at', { ascending: false })
 
     if (fetchError) {

@@ -187,11 +187,46 @@ export default function Dashboard() {
         return
       }
 
+      // Check if user needs to reset password (new team member)
+      try {
+        const resetResponse = await fetch('/api/account/check-reset-password')
+        const resetData = await resetResponse.json()
+
+        if (resetData.success && resetData.mustResetPassword) {
+          console.log('🔐 Usuário precisa redefinir senha, redirecionando...')
+          router.push('/account/reset-password')
+          return
+        }
+      } catch (resetError) {
+        // If check fails, continue normally (table might not exist yet)
+        console.log('⚠️ Verificação de reset ignorada:', resetError.message)
+      }
+
       setUser(user)
+
+      // Get owner user ID for team data sharing
+      // If user is a team member, use owner's ID for shared data
+      let ownerUserId = user.id
+      try {
+        const accountResponse = await fetch('/api/account/team')
+        const accountData = await accountResponse.json()
+
+        if (accountData.success && accountData.account) {
+          // Find the owner's user ID from account members
+          const owner = accountData.members?.find(m => m.role === 'owner')
+          if (owner) {
+            ownerUserId = owner.userId
+            console.log('👥 Team member detected, using owner data:', ownerUserId)
+          }
+        }
+      } catch (accountError) {
+        console.log('⚠️ Account check failed, using user ID:', accountError.message)
+      }
+
       await Promise.all([
-        loadUserProfile(user.id),
-        loadSubscription(user.id),
-        loadConnections(user.id)
+        loadUserProfile(user.id), // Profile is always individual
+        loadSubscription(ownerUserId), // Subscription is shared (owner's)
+        loadConnections(ownerUserId) // Connections are shared (owner's)
       ])
     } catch (error) {
       console.error('Erro ao verificar usuário:', error)

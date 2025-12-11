@@ -19,7 +19,8 @@ import {
   HelpCircle,
   LogOut,
   Zap,
-  Trello
+  Trello,
+  UsersRound  // For team management
 } from 'lucide-react'
 
 /**
@@ -91,6 +92,12 @@ export default function Sidebar() {
       icon: UserCog,
       label: 'Configurar Conta',
       href: '/account/profile',
+      badge: null
+    },
+    {
+      icon: UsersRound,
+      label: 'Gerenciar Equipe',
+      href: '/account/team',
       badge: null
     },
     {

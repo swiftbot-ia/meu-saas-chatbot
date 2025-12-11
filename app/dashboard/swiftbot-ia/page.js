@@ -308,10 +308,27 @@ export default function SwiftbotProPage() {
 
   const loadSubscription = async (userId) => {
     try {
+      // Get owner user ID for team members
+      let ownerUserId = userId;
+      try {
+        const accountResponse = await fetch('/api/account/team');
+        const accountData = await accountResponse.json();
+
+        if (accountData.success && accountData.account) {
+          const owner = accountData.members?.find(m => m.role === 'owner');
+          if (owner) {
+            ownerUserId = owner.userId;
+            console.log('👥 [SwiftBot IA] Team member, using owner subscription:', ownerUserId);
+          }
+        }
+      } catch (accountError) {
+        console.log('⚠️ [SwiftBot IA] Account check failed:', accountError.message);
+      }
+
       const { data, error } = await supabase
         .from('user_subscriptions')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', ownerUserId)
         .order('created_at', { ascending: false })
         .limit(1)
         .single()

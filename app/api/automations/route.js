@@ -5,6 +5,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { getOwnerUserIdFromMember } from '@/lib/account-service'
 
 // GET - Lista automações do usuário
 export async function GET(request) {
@@ -15,6 +16,20 @@ export async function GET(request) {
         const { data: { user }, error: authError } = await supabase.auth.getUser()
         if (authError || !user) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+        }
+
+        // Get owner's user ID for team data sharing
+        let ownerUserId = user.id;
+        try {
+            const ownerFromService = await getOwnerUserIdFromMember(user.id);
+            if (ownerFromService) {
+                ownerUserId = ownerFromService;
+                if (ownerUserId !== user.id) {
+                    console.log('👥 [Automations API] Team member, using owner data:', ownerUserId);
+                }
+            }
+        } catch (accountError) {
+            console.log('⚠️ [Automations API] Account check failed:', accountError.message);
         }
 
         // Parâmetros de query
@@ -34,7 +49,7 @@ export async function GET(request) {
         automation_responses (id, response_type, content, order_index),
         automation_folders!automations_folder_id_fkey (id, name)
       `)
-            .eq('user_id', user.id)
+            .eq('user_id', ownerUserId)
             .order('updated_at', { ascending: false })
 
         // Filtros opcionais
@@ -65,7 +80,7 @@ export async function GET(request) {
         let foldersQuery = supabase
             .from('automation_folders')
             .select('id, name')
-            .eq('user_id', user.id)
+            .eq('user_id', ownerUserId)
             .order('name')
 
         if (connectionId) {
