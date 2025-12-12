@@ -129,7 +129,7 @@ export async function GET(request) {
             .eq('user_id', ownerUserId)
             .in('instance_name', instanceNames)
             .order('last_message_at', { ascending: false })
-            .limit(5000); // Supabase default is 1000
+            .limit(10000); // High limit to allow search across all contacts
 
         const { data: conversations, error: convError } = await query;
 
