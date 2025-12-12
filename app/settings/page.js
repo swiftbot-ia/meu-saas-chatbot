@@ -265,6 +265,15 @@ const ApiDocumentation = () => {
   -H 'X-API-KEY: sua-api-key'`
     },
     {
+      method: 'PATCH',
+      path: '/api/v1/contact/phone/{phone}',
+      description: 'Atualizar contato por telefone (nome e campos)',
+      example: `curl -X PATCH 'https://app.swiftbot.com.br/api/v1/contact/phone/5511999999999' \\
+  -H 'X-API-KEY: sua-api-key' \\
+  -H 'Content-Type: application/json' \\
+  -d '{"name": "João Silva", "metadata": {"idCRM": "12345", "source": "landing"}}'`
+    },
+    {
       method: 'POST',
       path: '/api/v1/contact',
       description: 'Criar novo contato',
@@ -272,6 +281,31 @@ const ApiDocumentation = () => {
   -H 'X-API-KEY: sua-api-key' \\
   -H 'Content-Type: application/json' \\
   -d '{"phone": "5511999999999", "name": "João Silva"}'`
+    },
+    {
+      method: 'GET',
+      path: '/api/v1/contact/{contactId}/metadata',
+      description: 'Buscar campos personalizados do contato',
+      example: `curl -X GET 'https://app.swiftbot.com.br/api/v1/contact/{contactId}/metadata' \\
+  -H 'X-API-KEY: sua-api-key'`
+    },
+    {
+      method: 'PATCH',
+      path: '/api/v1/contact/{contactId}/metadata',
+      description: 'Atualizar campos personalizados (merge)',
+      example: `curl -X PATCH 'https://app.swiftbot.com.br/api/v1/contact/{contactId}/metadata' \\
+  -H 'X-API-KEY: sua-api-key' \\
+  -H 'Content-Type: application/json' \\
+  -d '{"idCRM": "12345", "source": "landing_page", "segment": "premium"}'`
+    },
+    {
+      method: 'PUT',
+      path: '/api/v1/contact/{contactId}/metadata',
+      description: 'Substituir todos campos personalizados',
+      example: `curl -X PUT 'https://app.swiftbot.com.br/api/v1/contact/{contactId}/metadata' \\
+  -H 'X-API-KEY: sua-api-key' \\
+  -H 'Content-Type: application/json' \\
+  -d '{"idCRM": "12345"}'`
     },
     {
       method: 'POST',
@@ -316,6 +350,8 @@ const ApiDocumentation = () => {
     switch (method) {
       case 'GET': return 'bg-blue-500/20 text-blue-400'
       case 'POST': return 'bg-green-500/20 text-green-400'
+      case 'PATCH': return 'bg-yellow-500/20 text-yellow-400'
+      case 'PUT': return 'bg-orange-500/20 text-orange-400'
       case 'DELETE': return 'bg-red-500/20 text-red-400'
       default: return 'bg-gray-500/20 text-gray-400'
     }
