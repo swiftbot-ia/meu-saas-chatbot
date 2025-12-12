@@ -440,23 +440,35 @@ export default function ContactsPage() {
     }
   }, [hasMore, loadingMore, offset, selectedConnection, selectedOrigin, selectedTag, searchTerm]);
 
-  // Debounced search - now sends to backend
+  // Debounced search - only triggers when search term actually changes (not on mount)
+  const previousSearchRef = useRef('');
   useEffect(() => {
+    // Skip initial mount and if search hasn't changed
+    if (previousSearchRef.current === searchTerm) {
+      return;
+    }
+
+    // Clear previous timeout
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
-    searchTimeoutRef.current = setTimeout(() => {
-      if (selectedConnection) {
-        loadContacts(true);
-      }
-    }, 300);
+
+    // Only search after 3+ characters or when clearing
+    if (searchTerm.length >= 3 || (previousSearchRef.current.length >= 3 && searchTerm.length < 3)) {
+      searchTimeoutRef.current = setTimeout(() => {
+        if (selectedConnection) {
+          previousSearchRef.current = searchTerm;
+          loadContacts(true);
+        }
+      }, 400);
+    }
 
     return () => {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [searchTerm]);
+  }, [searchTerm, selectedConnection]);
 
   // No longer need client-side filtering - backend handles it
   const filteredContacts = contacts;
