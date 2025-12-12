@@ -288,9 +288,12 @@ export async function GET(request) {
 
         // Filter by tag
         if (tagId) {
+            console.log(`🏷️ [Contacts] Filtering by tagId: ${tagId}`);
+            console.log(`🏷️ [Contacts] Sample contact tags:`, contacts.slice(0, 3).map(c => ({ name: c.name, tags: c.tags?.map(t => ({ id: t?.id, name: t?.name })) })));
             contacts = contacts.filter(c =>
-                c.tags?.some(t => t.id === tagId)
+                c.tags?.some(t => t?.id === tagId)
             );
+            console.log(`🏷️ [Contacts] After filter: ${contacts.length} contacts`);
         }
 
         // Filter by search (name or phone)
