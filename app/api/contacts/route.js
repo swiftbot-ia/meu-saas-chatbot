@@ -96,39 +96,50 @@ export async function GET(request) {
         // Use chat supabase for whatsapp tables
         const chatSupabase = createChatSupabaseAdminClient();
 
-        // Build query for contacts with conversations and origin
-        let query = chatSupabase
-            .from('whatsapp_conversations')
+        // Build query for contacts DIRECTLY from whatsapp_contacts (not via conversations)
+        // This ensures all contacts appear, even those without conversations
+        let contactsQuery = chatSupabase
+            .from('whatsapp_contacts')
             .select(`
                 id,
-                instance_name,
-                funnel_stage,
-                funnel_position,
+                whatsapp_number,
+                name,
+                profile_pic_url,
+                created_at,
                 last_message_at,
-                last_message_preview,
-                contact:whatsapp_contacts!contact_id (
+                metadata,
+                instance_name,
+                origin_id,
+                origin:contact_origins!origin_id (
                     id,
-                    whatsapp_number,
-                    name,
-                    profile_pic_url,
-                    created_at,
-                    last_message_at,
-                    metadata,
-                    origin_id,
-                    origin:contact_origins!origin_id (
-                        id,
-                        name
-                    )
+                    name
                 )
             `)
             .in('instance_name', instanceNames)
-            .order('last_message_at', { ascending: false });
+            .order('last_message_at', { ascending: false, nullsFirst: false });
 
-        const { data: conversations, error: convError } = await query;
+        const { data: contactsData, error: contactsError } = await contactsQuery;
 
-        if (convError) {
-            console.error('Erro ao buscar contatos:', convError);
+        if (contactsError) {
+            console.error('Erro ao buscar contatos:', contactsError);
             return NextResponse.json({ error: 'Erro ao buscar contatos' }, { status: 500 });
+        }
+
+        // Get conversations for these contacts to get funnel info
+        const contactIds = contactsData?.map(c => c.id).filter(Boolean) || [];
+
+        let conversationsMap = {};
+        if (contactIds.length > 0) {
+            const { data: convData } = await chatSupabase
+                .from('whatsapp_conversations')
+                .select('id, contact_id, funnel_stage, funnel_position, last_message_preview')
+                .in('contact_id', contactIds);
+
+            if (convData) {
+                convData.forEach(conv => {
+                    conversationsMap[conv.contact_id] = conv;
+                });
+            }
         }
 
         // Get all origins for these instances (per instance, like tags)
@@ -154,8 +165,6 @@ export async function GET(request) {
         }
 
         // Get tag assignments for all contacts
-        const contactIds = conversations?.map(c => c.contact?.id).filter(Boolean) || [];
-
         let tagAssignments = [];
         if (contactIds.length > 0) {
             const { data: assignments, error: assignError } = await chatSupabase
@@ -175,26 +184,28 @@ export async function GET(request) {
             }
         }
 
-        // Build contacts array with tags and origin
-        let contacts = conversations?.map(conv => {
+        // Build contacts array with tags, origin and conversation data
+        let contacts = contactsData?.map(contact => {
             const contactTags = tagAssignments
-                .filter(a => a.contact_id === conv.contact?.id)
+                .filter(a => a.contact_id === contact.id)
                 .map(a => a.tag);
 
+            const conv = conversationsMap[contact.id];
+
             return {
-                id: conv.contact?.id,
-                conversation_id: conv.id,
-                whatsapp_number: conv.contact?.whatsapp_number,
-                name: conv.contact?.name,
-                profile_pic_url: conv.contact?.profile_pic_url,
-                created_at: conv.contact?.created_at,
-                last_message_at: conv.last_message_at || conv.contact?.last_message_at,
-                last_message_preview: conv.last_message_preview,
-                instance_name: conv.instance_name,
-                funnel_stage: conv.funnel_stage,
-                funnel_position: conv.funnel_position,
-                metadata: conv.contact?.metadata,
-                origin: conv.contact?.origin || null,
+                id: contact.id,
+                conversation_id: conv?.id || null,
+                whatsapp_number: contact.whatsapp_number,
+                name: contact.name,
+                profile_pic_url: contact.profile_pic_url,
+                created_at: contact.created_at,
+                last_message_at: contact.last_message_at,
+                last_message_preview: conv?.last_message_preview || null,
+                instance_name: contact.instance_name,
+                funnel_stage: conv?.funnel_stage || null,
+                funnel_position: conv?.funnel_position || null,
+                metadata: contact.metadata,
+                origin: contact.origin || null,
                 tags: contactTags
             };
         }) || [];

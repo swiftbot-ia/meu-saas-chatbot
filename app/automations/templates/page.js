@@ -186,6 +186,7 @@ export default function TemplatesPage() {
     // Modal states
     const [showModal, setShowModal] = useState(false)
     const [editingTemplate, setEditingTemplate] = useState(null)
+    const [deleteConfirm, setDeleteConfirm] = useState(null)
 
     useEffect(() => {
         if (!selectedConnection) {
@@ -249,10 +250,9 @@ export default function TemplatesPage() {
     }
 
     const handleDelete = async (templateId) => {
-        if (!confirm('Excluir este template?')) return
-
         await supabase.from('message_templates').delete().eq('id', templateId)
         setTemplates(prev => prev.filter(t => t.id !== templateId))
+        setDeleteConfirm(null)
     }
 
     const handleDuplicate = async (template) => {
@@ -337,7 +337,7 @@ export default function TemplatesPage() {
                             template={template}
                             onEdit={handleEdit}
                             onDuplicate={handleDuplicate}
-                            onDelete={handleDelete}
+                            onDelete={() => setDeleteConfirm(template)}
                         />
                     ))}
                 </div>
@@ -350,6 +350,43 @@ export default function TemplatesPage() {
                 onSave={handleSaveTemplate}
                 template={editingTemplate}
             />
+
+            {/* Delete Confirmation Modal */}
+            {deleteConfirm && (
+                <>
+                    <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setDeleteConfirm(null)} />
+                    <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-[#111111] rounded-2xl p-6 z-50 w-96">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                                <Trash2 size={20} className="text-red-400" />
+                                Excluir Template
+                            </h3>
+                            <button onClick={() => setDeleteConfirm(null)} className="text-gray-400 hover:text-white">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <p className="text-gray-300 mb-2">
+                            Tem certeza que deseja excluir <span className="text-white font-semibold">"{deleteConfirm.name}"</span>?
+                        </p>
+                        <p className="text-sm text-gray-500 mb-6">Esta ação não pode ser desfeita.</p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setDeleteConfirm(null)}
+                                className="flex-1 bg-[#1E1E1E] text-white py-3 rounded-xl hover:bg-[#2A2A2A] transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => handleDelete(deleteConfirm.id)}
+                                className="flex-1 bg-red-500 text-white py-3 rounded-xl hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Trash2 size={16} />
+                                Excluir
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     )
 }
