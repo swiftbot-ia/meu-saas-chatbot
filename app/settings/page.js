@@ -497,8 +497,8 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
         {/* Result Message */}
         {result && (
           <div className={`mt-4 p-3 rounded-lg flex items-center gap-2 ${result.type === 'success'
-              ? 'bg-[#00FF99]/10 text-[#00FF99] border border-[#00FF99]/20'
-              : 'bg-red-500/10 text-red-400 border border-red-500/20'
+            ? 'bg-[#00FF99]/10 text-[#00FF99] border border-[#00FF99]/20'
+            : 'bg-red-500/10 text-red-400 border border-red-500/20'
             }`}>
             {result.type === 'success' ? <Check size={18} /> : <AlertCircle size={18} />}
             {result.message}
@@ -522,23 +522,6 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
             </>
           )}
         </button>
-      </div>
-
-      {/* Info about API */}
-      <div className="bg-[#1A1A1A] rounded-xl p-5 border border-white/5">
-        <h3 className="text-white font-medium mb-3">Via API</h3>
-        <p className="text-gray-400 text-sm mb-3">
-          Você também pode atualizar campos personalizados via API:
-        </p>
-        <pre className="bg-[#252525] p-4 rounded-lg overflow-x-auto text-xs text-gray-300">
-          {`# Por telefone:
-PATCH /api/v1/contact/phone/{phone}
-Body: { "metadata": { "${fieldName || 'idCRM'}": "valor" } }
-
-# Por contactId:
-PATCH /api/v1/contact/{contactId}/metadata
-Body: { "${fieldName || 'idCRM'}": "valor" }`}
-        </pre>
       </div>
     </div>
   )
@@ -564,7 +547,14 @@ export default function SettingsPage() {
       if (data.success) {
         setConnections(data.connections || [])
         if (!selectedConnection && data.connections?.length > 0) {
-          setSelectedConnection(data.connections[0].connectionId)
+          // Use localStorage to sync with other pages
+          const saved = localStorage.getItem('activeConnectionId')
+          const foundSaved = data.connections.find(c => c.connectionId === saved)
+          if (foundSaved) {
+            setSelectedConnection(saved)
+          } else {
+            setSelectedConnection(data.connections[0].connectionId)
+          }
         }
       }
     } catch (error) {
@@ -766,7 +756,10 @@ export default function SettingsPage() {
             <CustomFieldsTab
               connections={connections}
               selectedConnection={selectedConnection}
-              onSelectConnection={setSelectedConnection}
+              onSelectConnection={(connId) => {
+                setSelectedConnection(connId)
+                localStorage.setItem('activeConnectionId', connId)
+              }}
             />
           )}
         </div>

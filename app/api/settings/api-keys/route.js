@@ -84,6 +84,7 @@ export async function GET(request) {
                 return {
                     connectionId: conn.id,
                     connectionName: conn.profile_name || conn.instance_name,
+                    instanceName: conn.instance_name, // For global field API
                     isConnected: conn.is_connected,
                     hasApiKey: keyInfo.exists,
                     apiKey: keyInfo.key || null
