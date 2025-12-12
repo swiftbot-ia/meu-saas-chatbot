@@ -19,7 +19,8 @@ import {
     Zap,
     Send,
     Tag,
-    Link
+    Link,
+    Settings
 } from 'lucide-react'
 
 // ============================================================================
@@ -120,38 +121,15 @@ const AutomationCard = ({ automation, onToggle, onEdit, onDuplicate, onDelete })
 }
 
 // ============================================================================
-// AUTOMATION MODAL (Create/Edit combined - from original)
+// CREATE AUTOMATION MODAL (from original)
 // ============================================================================
-const AutomationModal = ({ isOpen, onClose, onSave, automation = null, connectionId }) => {
+const CreateAutomationModal = ({ isOpen, onClose, onCreate, connectionId }) => {
     const [name, setName] = useState('')
     const [triggerType, setTriggerType] = useState('message_contains')
     const [keywords, setKeywords] = useState([])
     const [keywordInput, setKeywordInput] = useState('')
     const [responseContent, setResponseContent] = useState('')
-    const [webhookUrl, setWebhookUrl] = useState('')
-    const [webhookEnabled, setWebhookEnabled] = useState(false)
     const [loading, setLoading] = useState(false)
-    const [activeSection, setActiveSection] = useState('trigger')
-
-    const isEditing = !!automation
-
-    useEffect(() => {
-        if (automation && isOpen) {
-            setName(automation.name || '')
-            setTriggerType(automation.trigger_type || 'message_contains')
-            setKeywords(automation.automation_keywords?.map(k => k.keyword) || [])
-            setResponseContent(automation.automation_responses?.[0]?.content || '')
-            setWebhookUrl(automation.action_webhook_url || '')
-            setWebhookEnabled(automation.action_webhook_enabled || false)
-        } else if (!automation && isOpen) {
-            setName('')
-            setTriggerType('message_contains')
-            setKeywords([])
-            setResponseContent('')
-            setWebhookUrl('')
-            setWebhookEnabled(false)
-        }
-    }, [automation, isOpen])
 
     const handleAddKeyword = () => {
         if (keywordInput.trim() && !keywords.includes(keywordInput.trim())) {
@@ -168,18 +146,20 @@ const AutomationModal = ({ isOpen, onClose, onSave, automation = null, connectio
         if (!name.trim()) return
         setLoading(true)
         try {
-            await onSave({
-                id: automation?.id,
+            await onCreate({
+                connectionId,
                 name: name.trim(),
+                type: 'keyword',
                 triggerType,
-                keywords: keywords.map(k => ({ keyword: k, matchType: triggerType.replace('message_', '') })),
-                responses: responseContent ? [{ type: 'text', content: responseContent }] : [],
-                actionWebhookUrl: webhookUrl,
-                actionWebhookEnabled: webhookEnabled
+                keywords,
+                responses: responseContent ? [{ type: 'text', content: responseContent }] : []
             })
             onClose()
+            setName('')
+            setKeywords([])
+            setResponseContent('')
         } catch (error) {
-            console.error('Erro ao salvar automação:', error)
+            console.error('Erro ao criar automação:', error)
         } finally {
             setLoading(false)
         }
@@ -189,34 +169,269 @@ const AutomationModal = ({ isOpen, onClose, onSave, automation = null, connectio
 
     return (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-            <div className="bg-[#1A1A1A] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-                {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-white/10 flex-shrink-0">
-                    <h2 className="text-xl font-semibold text-white">
-                        {isEditing ? 'Editar Automação' : 'Nova Automação'}
-                    </h2>
+            <div className="bg-[#1A1A1A] rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between p-6 border-b border-white/10">
+                    <h2 className="text-xl font-semibold text-white">Nova Automação</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-white">
                         <X size={20} />
                     </button>
                 </div>
 
-                {/* Tabs */}
+                <div className="p-6 space-y-6">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                            Nome da automação
+                        </label>
+                        <input
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="Ex: Welcome Message"
+                            className="w-full bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                            Quando disparar
+                        </label>
+                        <select
+                            value={triggerType}
+                            onChange={(e) => setTriggerType(e.target.value)}
+                            className="w-full bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+                        >
+                            <option value="message_contains">A mensagem contém</option>
+                            <option value="message_is">Mensagem é exatamente</option>
+                            <option value="message_starts_with">Mensagem começa com</option>
+                            <option value="word">Mensagem contém palavra inteira</option>
+                            <option value="reaction">Reação é</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                            Palavras-chave / Gatilhos
+                        </label>
+                        <div className="flex gap-2 mb-2">
+                            <input
+                                type="text"
+                                value={keywordInput}
+                                onChange={(e) => setKeywordInput(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddKeyword())}
+                                placeholder="Digite e pressione Enter"
+                                className="flex-1 bg-[#252525] text-white px-4 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+                            />
+                            <button
+                                onClick={handleAddKeyword}
+                                className="px-4 py-2 bg-[#00FF99] text-black rounded-xl font-medium hover:bg-[#00E88C] transition-colors"
+                            >
+                                <Plus size={18} />
+                            </button>
+                        </div>
+                        {keywords.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                                {keywords.map((kw, i) => (
+                                    <span
+                                        key={i}
+                                        className="inline-flex items-center gap-1 bg-[#00FF99]/10 text-[#00FF99] px-3 py-1 rounded-full text-sm"
+                                    >
+                                        {kw}
+                                        <button onClick={() => handleRemoveKeyword(kw)} className="hover:text-white">
+                                            <X size={14} />
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                            Resposta automática
+                        </label>
+                        <textarea
+                            value={responseContent}
+                            onChange={(e) => setResponseContent(e.target.value)}
+                            placeholder="Digite a mensagem que será enviada..."
+                            rows={4}
+                            className="w-full bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30 resize-none"
+                        />
+                    </div>
+                </div>
+
+                <div className="flex gap-3 p-6 border-t border-white/10">
+                    <button
+                        onClick={onClose}
+                        className="flex-1 px-4 py-3 bg-white/5 text-white rounded-xl font-medium hover:bg-white/10 transition-colors"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={!name.trim() || loading}
+                        className="flex-1 px-4 py-3 bg-[#00FF99] text-black rounded-xl font-medium hover:bg-[#00E88C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                        {loading && <Loader2 className="animate-spin" size={18} />}
+                        Criar Automação
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ============================================================================
+// EDIT AUTOMATION MODAL - Com configurações de ações (tags, webhook) - FROM ORIGINAL
+// ============================================================================
+const EditAutomationModal = ({ isOpen, onClose, automation, onSave, connectionId }) => {
+    const [name, setName] = useState('')
+    const [triggerType, setTriggerType] = useState('message_contains')
+    const [keywords, setKeywords] = useState([])
+    const [keywordInput, setKeywordInput] = useState('')
+    const [responseContent, setResponseContent] = useState('')
+    const [webhookUrl, setWebhookUrl] = useState('')
+    const [webhookEnabled, setWebhookEnabled] = useState(false)
+    const [tagInput, setTagInput] = useState('')
+    const [tagsToAdd, setTagsToAdd] = useState([])
+    const [selectedOriginId, setSelectedOriginId] = useState(null)
+    const [availableOrigins, setAvailableOrigins] = useState([])
+    const [loading, setLoading] = useState(false)
+    const [activeSection, setActiveSection] = useState('trigger')
+
+    // Estado para campos personalizados
+    const [customFields, setCustomFields] = useState([])
+    const [newFieldName, setNewFieldName] = useState('')
+    const [newFieldValue, setNewFieldValue] = useState('')
+
+    // Carregar dados da automação e origens quando abrir
+    useEffect(() => {
+        if (automation && isOpen) {
+            setName(automation.name || '')
+            setTriggerType(automation.trigger_type || 'message_contains')
+            setKeywords(automation.automation_keywords?.map(k => k.keyword) || [])
+            setResponseContent(automation.automation_responses?.[0]?.content || '')
+            setWebhookUrl(automation.action_webhook_url || '')
+            setWebhookEnabled(automation.action_webhook_enabled || false)
+            setTagsToAdd(automation.action_add_tags || [])
+            setSelectedOriginId(automation.action_set_origin_id || null)
+
+            // Carregar campos personalizados
+            const savedFields = automation.action_custom_fields || {}
+            setCustomFields(Object.entries(savedFields).map(([name, value]) => ({ name, value })))
+
+            // Carregar origens disponíveis
+            loadOrigins()
+        }
+    }, [automation, isOpen])
+
+    const loadOrigins = async () => {
+        try {
+            const response = await fetch(`/api/contacts?connectionId=${connectionId}`)
+            const data = await response.json()
+            if (response.ok) {
+                setAvailableOrigins(data.origins || [])
+            }
+        } catch (error) {
+            console.error('Erro ao carregar origens:', error)
+        }
+    }
+
+    const handleAddCustomField = () => {
+        if (newFieldName.trim() && newFieldValue.trim()) {
+            setCustomFields([...customFields, { name: newFieldName.trim(), value: newFieldValue.trim() }])
+            setNewFieldName('')
+            setNewFieldValue('')
+        }
+    }
+
+    const handleRemoveCustomField = (index) => {
+        setCustomFields(customFields.filter((_, i) => i !== index))
+    }
+
+    const handleAddKeyword = () => {
+        if (keywordInput.trim() && !keywords.includes(keywordInput.trim())) {
+            setKeywords([...keywords, keywordInput.trim()])
+            setKeywordInput('')
+        }
+    }
+
+    const handleRemoveKeyword = (kw) => {
+        setKeywords(keywords.filter(k => k !== kw))
+    }
+
+    const handleAddTag = () => {
+        if (tagInput.trim() && !tagsToAdd.includes(tagInput.trim())) {
+            setTagsToAdd([...tagsToAdd, tagInput.trim()])
+            setTagInput('')
+        }
+    }
+
+    const handleRemoveTag = (tag) => {
+        setTagsToAdd(tagsToAdd.filter(t => t !== tag))
+    }
+
+    const handleSubmit = async () => {
+        if (!name.trim()) return
+        setLoading(true)
+        try {
+            // Converter array de campos para objeto
+            const customFieldsObj = customFields.reduce((acc, field) => {
+                acc[field.name] = field.value
+                return acc
+            }, {})
+
+            await onSave({
+                name: name.trim(),
+                triggerType,
+                keywords: keywords.map(k => ({ keyword: k, matchType: triggerType.replace('message_', '') })),
+                responses: responseContent ? [{ type: 'text', content: responseContent }] : [],
+                actionWebhookUrl: webhookUrl,
+                actionWebhookEnabled: webhookEnabled,
+                actionAddTags: tagsToAdd,
+                actionSetOriginId: selectedOriginId,
+                actionCustomFields: customFieldsObj
+            })
+            onClose()
+        } catch (error) {
+            console.error('Erro ao salvar automação:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    if (!isOpen || !automation) return null
+
+    return (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-[#1A1A1A] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+                {/* Header */}
+                <div className="flex items-center justify-between p-6 border-b border-white/10 flex-shrink-0">
+                    <h2 className="text-xl font-semibold text-white">Editar Automação</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                {/* Tabs de navegação */}
                 <div className="flex border-b border-white/10 flex-shrink-0">
                     <button
                         onClick={() => setActiveSection('trigger')}
-                        className={`flex-1 px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 border-b-2 ${activeSection === 'trigger' ? 'text-[#00FF99] border-[#00FF99]' : 'text-gray-400 border-transparent hover:text-white'}`}
+                        className={`flex-1 px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 border-b-2 ${activeSection === 'trigger' ? 'text-[#00FF99] border-[#00FF99]' : 'text-gray-400 border-transparent hover:text-white'
+                            }`}
                     >
                         <Zap size={16} /> Gatilho
                     </button>
                     <button
                         onClick={() => setActiveSection('response')}
-                        className={`flex-1 px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 border-b-2 ${activeSection === 'response' ? 'text-[#00FF99] border-[#00FF99]' : 'text-gray-400 border-transparent hover:text-white'}`}
+                        className={`flex-1 px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 border-b-2 ${activeSection === 'response' ? 'text-[#00FF99] border-[#00FF99]' : 'text-gray-400 border-transparent hover:text-white'
+                            }`}
                     >
                         <Send size={16} /> Resposta
                     </button>
                     <button
                         onClick={() => setActiveSection('actions')}
-                        className={`flex-1 px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 border-b-2 ${activeSection === 'actions' ? 'text-[#00FF99] border-[#00FF99]' : 'text-gray-400 border-transparent hover:text-white'}`}
+                        className={`flex-1 px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 border-b-2 ${activeSection === 'actions' ? 'text-[#00FF99] border-[#00FF99]' : 'text-gray-400 border-transparent hover:text-white'
+                            }`}
                     >
                         <Tag size={16} /> Ações
                     </button>
@@ -224,6 +439,7 @@ const AutomationModal = ({ isOpen, onClose, onSave, automation = null, connectio
 
                 {/* Content */}
                 <div className="p-6 space-y-6 overflow-y-auto flex-1">
+                    {/* SEÇÃO: GATILHO */}
                     {activeSection === 'trigger' && (
                         <>
                             <div>
@@ -252,12 +468,13 @@ const AutomationModal = ({ isOpen, onClose, onSave, automation = null, connectio
                                     <option value="message_is">Mensagem é exatamente</option>
                                     <option value="message_starts_with">Mensagem começa com</option>
                                     <option value="word">Mensagem contém palavra inteira</option>
+                                    <option value="reaction">Reação é</option>
                                 </select>
                             </div>
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                                    Palavras-chave
+                                    Palavras-chave / Gatilhos
                                 </label>
                                 <div className="flex gap-2 mb-2">
                                     <input
@@ -294,6 +511,7 @@ const AutomationModal = ({ isOpen, onClose, onSave, automation = null, connectio
                         </>
                     )}
 
+                    {/* SEÇÃO: RESPOSTA */}
                     {activeSection === 'response' && (
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -302,39 +520,184 @@ const AutomationModal = ({ isOpen, onClose, onSave, automation = null, connectio
                             <textarea
                                 value={responseContent}
                                 onChange={(e) => setResponseContent(e.target.value)}
-                                placeholder="Digite a mensagem que será enviada..."
-                                rows={6}
+                                placeholder="Digite a mensagem que será enviada automaticamente..."
+                                rows={8}
                                 className="w-full bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30 resize-none"
                             />
+                            <p className="text-xs text-gray-500 mt-2">
+                                Você pode usar variáveis como: {'{nome}'}, {'{telefone}'}, {'{mensagem}'}
+                            </p>
                         </div>
                     )}
 
+                    {/* SEÇÃO: AÇÕES */}
                     {activeSection === 'actions' && (
-                        <div className="space-y-6">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">
-                                    Webhook URL (opcional)
-                                </label>
-                                <div className="flex items-center gap-3">
+                        <>
+                            {/* Adicionar Tags */}
+                            <div className="bg-[#252525] rounded-xl p-4">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+                                        <Tag className="text-blue-400" size={20} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-white font-medium">Adicionar Tags</h3>
+                                        <p className="text-xs text-gray-400">Tags serão adicionadas ao contato quando a automação disparar</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-2 mb-2">
                                     <input
                                         type="text"
-                                        value={webhookUrl}
-                                        onChange={(e) => setWebhookUrl(e.target.value)}
-                                        placeholder="https://..."
-                                        className="flex-1 bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+                                        value={tagInput}
+                                        onChange={(e) => setTagInput(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
+                                        placeholder="Nome da tag (ex: lead-quente)"
+                                        className="flex-1 bg-[#1A1A1A] text-white px-4 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                                     />
                                     <button
+                                        onClick={handleAddTag}
+                                        className="px-4 py-2 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors"
+                                    >
+                                        <Plus size={18} />
+                                    </button>
+                                </div>
+                                {tagsToAdd.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                        {tagsToAdd.map((tag, i) => (
+                                            <span
+                                                key={i}
+                                                className="inline-flex items-center gap-1 bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full text-sm"
+                                            >
+                                                <Tag size={12} />
+                                                {tag}
+                                                <button onClick={() => handleRemoveTag(tag)} className="hover:text-white">
+                                                    <X size={14} />
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Enviar para Webhook */}
+                            <div className="bg-[#252525] rounded-xl p-4">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                                            <Link className="text-purple-400" size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-white font-medium">Enviar para Webhook</h3>
+                                            <p className="text-xs text-gray-400">Envie os dados do lead para um sistema externo</p>
+                                        </div>
+                                    </div>
+                                    <button
                                         onClick={() => setWebhookEnabled(!webhookEnabled)}
-                                        className={`p-2 rounded-lg ${webhookEnabled ? 'text-[#00FF99]' : 'text-gray-500'}`}
+                                        className={`p-2 rounded-lg transition-colors ${webhookEnabled ? 'text-purple-400 bg-purple-500/20' : 'text-gray-500 bg-white/5'
+                                            }`}
                                     >
                                         {webhookEnabled ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
                                     </button>
                                 </div>
-                                <p className="text-xs text-gray-500 mt-2">
-                                    Dispara um webhook quando a automação é executada
-                                </p>
+
+                                {webhookEnabled && (
+                                    <div>
+                                        <input
+                                            type="url"
+                                            value={webhookUrl}
+                                            onChange={(e) => setWebhookUrl(e.target.value)}
+                                            placeholder="https://seu-sistema.com/webhook"
+                                            className="w-full bg-[#1A1A1A] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-2">
+                                            Dados enviados: nome, telefone, mensagem, data/hora, tags
+                                        </p>
+                                    </div>
+                                )}
                             </div>
-                        </div>
+
+                            {/* Definir Origem */}
+                            <div className="bg-[#252525] rounded-xl p-4">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
+                                        <Send className="text-orange-400" size={20} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-white font-medium">Definir Origem</h3>
+                                        <p className="text-xs text-gray-400">Atribuir origem ao contato para tracking</p>
+                                    </div>
+                                </div>
+                                <select
+                                    value={selectedOriginId || ''}
+                                    onChange={(e) => setSelectedOriginId(e.target.value || null)}
+                                    className="w-full bg-[#1A1A1A] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+                                >
+                                    <option value="">Nenhuma origem</option>
+                                    {availableOrigins.map(origin => (
+                                        <option key={origin.id} value={origin.id}>{origin.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Campos Personalizados */}
+                            <div className="bg-[#252525] rounded-xl p-4">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                                        <Settings className="text-cyan-400" size={20} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-white font-medium">Campos Personalizados</h3>
+                                        <p className="text-xs text-gray-400">Enviar dados extras no webhook</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-2 mb-3">
+                                    <input
+                                        type="text"
+                                        value={newFieldName}
+                                        onChange={(e) => setNewFieldName(e.target.value)}
+                                        placeholder="Nome do campo"
+                                        className="flex-1 bg-[#1A1A1A] text-white px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={newFieldValue}
+                                        onChange={(e) => setNewFieldValue(e.target.value)}
+                                        placeholder="Valor"
+                                        className="flex-1 bg-[#1A1A1A] text-white px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+                                    />
+                                    <button
+                                        onClick={handleAddCustomField}
+                                        disabled={!newFieldName.trim() || !newFieldValue.trim()}
+                                        className="px-3 py-2 bg-cyan-500 text-white rounded-xl font-medium hover:bg-cyan-600 transition-colors disabled:opacity-50"
+                                    >
+                                        <Plus size={16} />
+                                    </button>
+                                </div>
+
+                                {customFields.length > 0 && (
+                                    <div className="space-y-2">
+                                        {customFields.map((field, i) => (
+                                            <div
+                                                key={i}
+                                                className="flex items-center justify-between bg-[#1A1A1A] px-3 py-2 rounded-lg"
+                                            >
+                                                <div className="flex items-center gap-2 text-sm">
+                                                    <span className="text-cyan-400 font-medium">{field.name}:</span>
+                                                    <span className="text-gray-300">{field.value}</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleRemoveCustomField(i)}
+                                                    className="text-gray-500 hover:text-red-400 transition-colors"
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </>
                     )}
                 </div>
 
@@ -352,7 +715,7 @@ const AutomationModal = ({ isOpen, onClose, onSave, automation = null, connectio
                         className="flex-1 px-4 py-3 bg-[#00FF99] text-black rounded-xl font-medium hover:bg-[#00E88C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                         {loading && <Loader2 className="animate-spin" size={18} />}
-                        {isEditing ? 'Salvar' : 'Criar Automação'}
+                        Salvar Alterações
                     </button>
                 </div>
             </div>
@@ -372,7 +735,8 @@ export default function KeywordsPage() {
     const [searchTerm, setSearchTerm] = useState('')
 
     // Modal states
-    const [showModal, setShowModal] = useState(false)
+    const [showCreateModal, setShowCreateModal] = useState(false)
+    const [showEditModal, setShowEditModal] = useState(false)
     const [editingAutomation, setEditingAutomation] = useState(null)
 
     useEffect(() => {
@@ -402,93 +766,96 @@ export default function KeywordsPage() {
         }
     }
 
-    const handleSaveAutomation = async (data) => {
+    const handleCreateAutomation = async (data) => {
         const { data: { user } } = await supabase.auth.getUser()
 
-        if (data.id) {
-            // Update automation
-            const { error: autoError } = await supabase
-                .from('automations')
-                .update({
-                    name: data.name,
-                    trigger_type: data.triggerType,
-                    action_webhook_url: data.actionWebhookUrl || null,
-                    action_webhook_enabled: data.actionWebhookEnabled || false,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', data.id)
+        const { data: newAutomation, error: autoError } = await supabase
+            .from('automations')
+            .insert({
+                user_id: user.id,
+                connection_id: selectedConnection,
+                name: data.name,
+                type: 'keyword',
+                trigger_type: data.triggerType,
+                is_active: true
+            })
+            .select()
+            .single()
 
-            if (autoError) throw autoError
+        if (autoError) throw autoError
 
-            // Delete old keywords
-            await supabase.from('automation_keywords').delete().eq('automation_id', data.id)
+        // Insert keywords
+        if (data.keywords?.length) {
+            const keywordsToInsert = data.keywords.map(k => ({
+                automation_id: newAutomation.id,
+                keyword: k,
+                match_type: data.triggerType.replace('message_', '') || 'contains'
+            }))
+            await supabase.from('automation_keywords').insert(keywordsToInsert)
+        }
 
-            // Insert new keywords
-            if (data.keywords?.length) {
-                const keywordsToInsert = data.keywords.map(k => ({
-                    automation_id: data.id,
-                    keyword: k.keyword,
-                    match_type: k.matchType || 'contains'
-                }))
-                await supabase.from('automation_keywords').insert(keywordsToInsert)
-            }
-
-            // Delete old responses
-            await supabase.from('automation_responses').delete().eq('automation_id', data.id)
-
-            // Insert new responses
-            if (data.responses?.length) {
-                const responsesToInsert = data.responses.map((r, i) => ({
-                    automation_id: data.id,
-                    response_type: r.type,
-                    content: r.content,
-                    order_index: i
-                }))
-                await supabase.from('automation_responses').insert(responsesToInsert)
-            }
-        } else {
-            // Create automation
-            const { data: newAutomation, error: autoError } = await supabase
-                .from('automations')
-                .insert({
-                    user_id: user.id,
-                    connection_id: selectedConnection,
-                    name: data.name,
-                    type: 'keyword',
-                    trigger_type: data.triggerType,
-                    action_webhook_url: data.actionWebhookUrl || null,
-                    action_webhook_enabled: data.actionWebhookEnabled || false,
-                    is_active: true
-                })
-                .select()
-                .single()
-
-            if (autoError) throw autoError
-
-            // Insert keywords
-            if (data.keywords?.length) {
-                const keywordsToInsert = data.keywords.map(k => ({
-                    automation_id: newAutomation.id,
-                    keyword: k.keyword,
-                    match_type: k.matchType || 'contains'
-                }))
-                await supabase.from('automation_keywords').insert(keywordsToInsert)
-            }
-
-            // Insert responses
-            if (data.responses?.length) {
-                const responsesToInsert = data.responses.map((r, i) => ({
-                    automation_id: newAutomation.id,
-                    response_type: r.type,
-                    content: r.content,
-                    order_index: i
-                }))
-                await supabase.from('automation_responses').insert(responsesToInsert)
-            }
+        // Insert responses
+        if (data.responses?.length) {
+            const responsesToInsert = data.responses.map((r, i) => ({
+                automation_id: newAutomation.id,
+                response_type: r.type,
+                content: r.content,
+                order_index: i
+            }))
+            await supabase.from('automation_responses').insert(responsesToInsert)
         }
 
         loadAutomations()
-        setShowModal(false)
+    }
+
+    const handleSaveAutomation = async (data) => {
+        if (!editingAutomation) return
+
+        // Update automation
+        const { error: autoError } = await supabase
+            .from('automations')
+            .update({
+                name: data.name,
+                trigger_type: data.triggerType,
+                action_webhook_url: data.actionWebhookUrl || null,
+                action_webhook_enabled: data.actionWebhookEnabled || false,
+                action_add_tags: data.actionAddTags || [],
+                action_set_origin_id: data.actionSetOriginId || null,
+                action_custom_fields: data.actionCustomFields || {},
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', editingAutomation.id)
+
+        if (autoError) throw autoError
+
+        // Delete old keywords
+        await supabase.from('automation_keywords').delete().eq('automation_id', editingAutomation.id)
+
+        // Insert new keywords
+        if (data.keywords?.length) {
+            const keywordsToInsert = data.keywords.map(k => ({
+                automation_id: editingAutomation.id,
+                keyword: k.keyword,
+                match_type: k.matchType || 'contains'
+            }))
+            await supabase.from('automation_keywords').insert(keywordsToInsert)
+        }
+
+        // Delete old responses
+        await supabase.from('automation_responses').delete().eq('automation_id', editingAutomation.id)
+
+        // Insert new responses
+        if (data.responses?.length) {
+            const responsesToInsert = data.responses.map((r, i) => ({
+                automation_id: editingAutomation.id,
+                response_type: r.type,
+                content: r.content,
+                order_index: i
+            }))
+            await supabase.from('automation_responses').insert(responsesToInsert)
+        }
+
+        loadAutomations()
         setEditingAutomation(null)
     }
 
@@ -540,12 +907,7 @@ export default function KeywordsPage() {
 
     const handleEdit = (automation) => {
         setEditingAutomation(automation)
-        setShowModal(true)
-    }
-
-    const handleCreate = () => {
-        setEditingAutomation(null)
-        setShowModal(true)
+        setShowEditModal(true)
     }
 
     const filteredAutomations = automations.filter(a =>
@@ -576,7 +938,7 @@ export default function KeywordsPage() {
                     />
                 </div>
                 <button
-                    onClick={handleCreate}
+                    onClick={() => setShowCreateModal(true)}
                     className="flex items-center gap-2 bg-[#00FF99] text-black font-medium px-4 py-3 rounded-xl hover:bg-[#00E88C] transition-colors"
                 >
                     <Plus size={18} />
@@ -591,7 +953,7 @@ export default function KeywordsPage() {
                     <h3 className="text-white font-medium mb-2">Nenhuma automação</h3>
                     <p className="text-gray-500 text-sm mb-4">Crie automações baseadas em palavras-chave.</p>
                     <button
-                        onClick={handleCreate}
+                        onClick={() => setShowCreateModal(true)}
                         className="inline-flex items-center gap-2 bg-[#00FF99] text-black font-medium px-4 py-2 rounded-xl hover:bg-[#00E88C] transition-colors"
                     >
                         <Plus size={18} />
@@ -613,12 +975,20 @@ export default function KeywordsPage() {
                 </div>
             )}
 
-            {/* Modal */}
-            <AutomationModal
-                isOpen={showModal}
-                onClose={() => { setShowModal(false); setEditingAutomation(null) }}
-                onSave={handleSaveAutomation}
+            {/* Create Modal */}
+            <CreateAutomationModal
+                isOpen={showCreateModal}
+                onClose={() => setShowCreateModal(false)}
+                onCreate={handleCreateAutomation}
+                connectionId={selectedConnection}
+            />
+
+            {/* Edit Modal */}
+            <EditAutomationModal
+                isOpen={showEditModal}
+                onClose={() => { setShowEditModal(false); setEditingAutomation(null) }}
                 automation={editingAutomation}
+                onSave={handleSaveAutomation}
                 connectionId={selectedConnection}
             />
         </div>
