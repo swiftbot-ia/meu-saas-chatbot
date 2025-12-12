@@ -227,6 +227,7 @@ export default function ContactsPage() {
   // Pagination state
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false); // For subtle loading during search
   const [totalContacts, setTotalContacts] = useState(0);
   const [offset, setOffset] = useState(0);
   const CONTACTS_PER_PAGE = 50;
@@ -362,10 +363,15 @@ export default function ContactsPage() {
     }
   };
 
-  const loadContacts = async (reset = true) => {
+  const loadContacts = async (reset = true, isSearch = false) => {
     try {
       if (reset) {
-        setLoading(true);
+        // Use searchLoading for search operations to avoid hiding list
+        if (isSearch) {
+          setSearchLoading(true);
+        } else {
+          setLoading(true);
+        }
         setOffset(0);
       }
       const params = new URLSearchParams();
@@ -396,6 +402,7 @@ export default function ContactsPage() {
       setError('Erro ao carregar contatos');
     } finally {
       setLoading(false);
+      setSearchLoading(false);
     }
   };
 
@@ -458,7 +465,7 @@ export default function ContactsPage() {
       searchTimeoutRef.current = setTimeout(() => {
         if (selectedConnection) {
           previousSearchRef.current = searchTerm;
-          loadContacts(true);
+          loadContacts(true, true); // isSearch = true
         }
       }, 400);
     }
@@ -1134,10 +1141,14 @@ export default function ContactsPage() {
         {/* Search Bar */}
         <div className="p-4">
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" size={18} />
+            {searchLoading ? (
+              <Loader2 className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#00FF99] animate-spin" size={18} />
+            ) : (
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" size={18} />
+            )}
             <input
               type="text"
-              placeholder="Buscar contato..."
+              placeholder="Buscar contato (3+ letras)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-[#1E1E1E] text-white placeholder-gray-500 pl-12 pr-4 py-3 rounded-3xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/20 transition-all"
