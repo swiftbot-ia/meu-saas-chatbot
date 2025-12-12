@@ -131,11 +131,11 @@ export async function GET(request) {
             return NextResponse.json({ error: 'Erro ao buscar contatos' }, { status: 500 });
         }
 
-        // Get all origins for this user (using owner's user ID)
+        // Get all origins for these instances (per instance, like tags)
         const { data: allOrigins, error: originsError } = await chatSupabase
             .from('contact_origins')
             .select('*')
-            .eq('user_id', ownerUserId)
+            .in('instance_name', instanceNames)
             .order('name');
 
         if (originsError) {
