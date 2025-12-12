@@ -125,7 +125,8 @@ export async function GET(request) {
             `)
             .eq('user_id', ownerUserId)
             .in('instance_name', instanceNames)
-            .order('last_message_at', { ascending: false });
+            .order('last_message_at', { ascending: false })
+            .limit(5000); // Supabase default is 1000
 
         const { data: conversations, error: convError } = await query;
 
