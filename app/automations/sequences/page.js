@@ -254,7 +254,7 @@ const SequenceModal = ({ isOpen, onClose, onSave, sequence = null, templates = [
     return (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
             <div className="bg-[#1A1A1A] rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-                <div className="flex items-center justify-between p-6 border-b border-white/10 flex-shrink-0">
+                <div className="flex ok items-center justify-between p-6 border-b border-white/10 flex-shrink-0">
                     <h2 className="text-xl font-semibold text-white">
                         {isEditing ? 'Editar Sequência' : 'Nova Sequência'}
                     </h2>
