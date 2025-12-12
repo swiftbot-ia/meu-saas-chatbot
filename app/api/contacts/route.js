@@ -235,28 +235,40 @@ export async function GET(request) {
             console.error('Erro ao buscar tags:', tagsError);
         }
 
-        // Get tag assignments for all contacts (batch to avoid Supabase IN limit)
+        // Get tag assignments for all contacts
+        // Using simpler two-step approach to avoid complex join issues
         let tagAssignments = [];
+        const tagsMap = {}; // Map tag_id -> tag object
+
+        // First, get all tags for quick lookup
+        if (allTags) {
+            allTags.forEach(tag => {
+                tagsMap[tag.id] = tag;
+            });
+        }
+
         if (contactIds.length > 0) {
-            const TAG_BATCH_SIZE = 500; // Supabase IN clause limit
+            // Query assignments in smaller batches (100 at a time)
+            const TAG_BATCH_SIZE = 100;
             for (let i = 0; i < contactIds.length; i += TAG_BATCH_SIZE) {
                 const batchIds = contactIds.slice(i, i + TAG_BATCH_SIZE);
+
+                // Simple query without nested join
                 const { data: assignments, error: assignError } = await chatSupabase
                     .from('contact_tag_assignments')
-                    .select(`
-                        contact_id,
-                        tag:contact_tags (
-                            id,
-                            name,
-                            color
-                        )
-                    `)
+                    .select('contact_id, tag_id')
                     .in('contact_id', batchIds);
 
                 if (assignError) {
-                    console.error('🏷️ [Contacts] Error loading tag assignments batch:', assignError);
+                    console.error('🏷️ [Contacts] Error loading tag assignments batch:', assignError.message);
                 } else if (assignments) {
-                    tagAssignments = tagAssignments.concat(assignments);
+                    // Map tag data from our lookup
+                    const mappedAssignments = assignments.map(a => ({
+                        contact_id: a.contact_id,
+                        tag: tagsMap[a.tag_id] || null
+                    })).filter(a => a.tag);
+
+                    tagAssignments = tagAssignments.concat(mappedAssignments);
                 }
             }
             console.log(`🏷️ [Contacts] Loaded ${tagAssignments.length} tag assignments for ${contactIds.length} contacts`);
