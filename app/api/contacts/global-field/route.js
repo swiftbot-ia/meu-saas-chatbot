@@ -1,8 +1,10 @@
 /**
  * Global Custom Field API
- * POST /api/contacts/global-field
  * 
- * Adds a custom field to all contacts for a specific connection
+ * GET /api/contacts/global-field - List existing custom fields
+ * POST /api/contacts/global-field - Add custom field to all contacts
+ * 
+ * Uses PostgreSQL RPC for instant bulk updates
  */
 
 import { NextResponse } from 'next/server'
@@ -28,28 +30,114 @@ async function createAuthClient() {
     )
 }
 
+async function getAuthAndOwner() {
+    const supabase = await createAuthClient()
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
+
+    if (authError || !session) {
+        return { error: 'Não autorizado', status: 401 }
+    }
+
+    const userId = session.user.id
+    let ownerUserId = userId
+
+    try {
+        const ownerFromService = await getOwnerUserIdFromMember(userId)
+        if (ownerFromService) ownerUserId = ownerFromService
+    } catch (err) {
+        console.log('⚠️ Account check failed:', err.message)
+    }
+
+    return { userId, ownerUserId }
+}
+
+/**
+ * GET /api/contacts/global-field
+ * List existing custom fields for a connection
+ */
+export async function GET(request) {
+    try {
+        const auth = await getAuthAndOwner()
+        if (auth.error) {
+            return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+        }
+
+        const { searchParams } = new URL(request.url)
+        const instanceName = searchParams.get('instanceName')
+
+        if (!instanceName) {
+            return NextResponse.json({
+                success: false,
+                error: 'instanceName é obrigatório'
+            }, { status: 400 })
+        }
+
+        const chatSupabase = createChatSupabaseAdminClient()
+
+        // Try RPC first
+        const { data: fields, error: rpcError } = await chatSupabase.rpc('get_metadata_fields', {
+            p_instance_name: instanceName,
+            p_user_id: auth.ownerUserId
+        })
+
+        if (!rpcError && fields) {
+            return NextResponse.json({
+                success: true,
+                fields: fields.map(f => ({
+                    name: f.field_name,
+                    sampleValue: f.sample_value,
+                    contactCount: f.contact_count
+                }))
+            })
+        }
+
+        // Fallback: sample a few contacts to get field names
+        console.log('⚠️ [Global Field] RPC not available, using fallback to get fields')
+
+        const { data: sampleContacts } = await chatSupabase
+            .from('whatsapp_conversations')
+            .select('contact:whatsapp_contacts(metadata)')
+            .eq('instance_name', instanceName)
+            .eq('user_id', auth.ownerUserId)
+            .not('contact_id', 'is', null)
+            .limit(100)
+
+        const fieldSet = new Set()
+        for (const conv of sampleContacts || []) {
+            if (conv.contact?.metadata) {
+                Object.keys(conv.contact.metadata).forEach(k => fieldSet.add(k))
+            }
+        }
+
+        return NextResponse.json({
+            success: true,
+            fields: Array.from(fieldSet).map(name => ({
+                name,
+                sampleValue: '',
+                contactCount: null // Unknown without RPC
+            }))
+        })
+
+    } catch (error) {
+        console.error('Error in global-field GET:', error)
+        return NextResponse.json({
+            success: false,
+            error: 'Erro interno do servidor'
+        }, { status: 500 })
+    }
+}
+
+/**
+ * POST /api/contacts/global-field
+ * Add custom field to all contacts (uses RPC for instant bulk update)
+ */
 export async function POST(request) {
     try {
-        // Auth check
-        const supabase = await createAuthClient()
-        const { data: { session }, error: authError } = await supabase.auth.getSession()
-
-        if (authError || !session) {
-            return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 })
+        const auth = await getAuthAndOwner()
+        if (auth.error) {
+            return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
         }
 
-        const userId = session.user.id
-
-        // Get owner user ID
-        let ownerUserId = userId
-        try {
-            const ownerFromService = await getOwnerUserIdFromMember(userId)
-            if (ownerFromService) ownerUserId = ownerFromService
-        } catch (err) {
-            console.log('⚠️ Account check failed:', err.message)
-        }
-
-        // Parse body
         const { connectionId, instanceName, fieldName, defaultValue } = await request.json()
 
         if (!connectionId || !instanceName || !fieldName) {
@@ -59,122 +147,118 @@ export async function POST(request) {
             }, { status: 400 })
         }
 
-        // Validate field name (no spaces, alphanumeric + underscore)
+        // Validate field name
         if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(fieldName)) {
             return NextResponse.json({
                 success: false,
-                error: 'Nome do campo inválido. Use apenas letras, números e underscore, começando com letra.'
+                error: 'Nome do campo inválido. Use apenas letras, números e underscore.'
             }, { status: 400 })
         }
 
         const chatSupabase = createChatSupabaseAdminClient()
 
-        // Batch fetch ALL contact IDs to bypass Supabase 1000 row limit
-        let allContactIds = []
-        const BATCH_SIZE = 1000
-        let offset = 0
-        let hasMore = true
+        console.log(`📝 [Global Field] Adding "${fieldName}" via RPC for ${instanceName}...`)
 
-        console.log(`📝 [Global Field] Fetching all contact IDs for ${instanceName}...`)
+        // Try RPC first (instant, single SQL query)
+        const { data: rpcResult, error: rpcError } = await chatSupabase.rpc('add_global_metadata_field', {
+            p_instance_name: instanceName,
+            p_user_id: auth.ownerUserId,
+            p_field_name: fieldName,
+            p_field_value: defaultValue || ''
+        })
 
-        while (hasMore) {
-            const { data: batch, error: batchError } = await chatSupabase
-                .from('whatsapp_conversations')
-                .select('contact_id')
-                .eq('instance_name', instanceName)
-                .eq('user_id', ownerUserId)
-                .not('contact_id', 'is', null)
-                .range(offset, offset + BATCH_SIZE - 1)
+        if (!rpcError && rpcResult && rpcResult.length > 0) {
+            const result = rpcResult[0]
+            console.log(`✅ [Global Field] RPC Success: Updated ${result.updated_count} of ${result.total_count} contacts`)
 
-            if (batchError) {
-                console.error('Error fetching batch:', batchError)
-                break
-            }
-
-            if (batch && batch.length > 0) {
-                allContactIds = allContactIds.concat(batch.map(c => c.contact_id))
-                offset += BATCH_SIZE
-                hasMore = batch.length === BATCH_SIZE
-            } else {
-                hasMore = false
-            }
-
-            // Safety limit
-            if (offset > 50000) {
-                console.warn('⚠️ [Global Field] Safety limit reached')
-                break
-            }
+            return NextResponse.json({
+                success: true,
+                message: `Campo "${fieldName}" adicionado a ${result.updated_count} contatos`,
+                updatedCount: result.updated_count,
+                totalContacts: result.total_count
+            })
         }
 
-        // Deduplicate contact IDs
-        const contactIds = [...new Set(allContactIds)]
+        // Fallback if RPC not available
+        console.log(`⚠️ [Global Field] RPC failed or not available, using SQL fallback...`)
+
+        if (rpcError) {
+            console.error('RPC Error:', rpcError.message)
+        }
+
+        // Direct SQL via admin client update
+        // Count contacts first
+        const { count: totalCount } = await chatSupabase
+            .from('whatsapp_conversations')
+            .select('contact_id', { count: 'exact', head: true })
+            .eq('instance_name', instanceName)
+            .eq('user_id', auth.ownerUserId)
+            .not('contact_id', 'is', null)
+
+        // Get distinct contact IDs and update them
+        // Using a single batch update with .in()
+        const { data: convs } = await chatSupabase
+            .from('whatsapp_conversations')
+            .select('contact_id')
+            .eq('instance_name', instanceName)
+            .eq('user_id', auth.ownerUserId)
+            .not('contact_id', 'is', null)
+            .limit(5000) // Higher limit for fallback
+
+        const contactIds = [...new Set(convs?.map(c => c.contact_id) || [])]
 
         if (contactIds.length === 0) {
             return NextResponse.json({
                 success: false,
-                error: 'Nenhum contato encontrado para esta conexão'
+                error: 'Nenhum contato encontrado'
             }, { status: 404 })
         }
 
-        console.log(`📝 [Global Field] Adding "${fieldName}" to ${contactIds.length} contacts`)
-
-        // Update all contacts using bulk update with JSONB merge
-        // Use a more efficient approach: update in larger batches without fetching first
+        // In fallback mode, just add the field to all contacts with COALESCE
+        // We can't use jsonb_set directly, so we'll use a batch approach
         let updatedCount = 0
-        const UPDATE_BATCH_SIZE = 500
+        const BATCH = 200
 
-        for (let i = 0; i < contactIds.length; i += UPDATE_BATCH_SIZE) {
-            const batchIds = contactIds.slice(i, i + UPDATE_BATCH_SIZE)
+        for (let i = 0; i < contactIds.length; i += BATCH) {
+            const batch = contactIds.slice(i, i + BATCH)
 
-            // Use PostgreSQL's jsonb_set to efficiently add the field
-            // This updates metadata by merging the new field
-            const { data: updated, error: updateError } = await chatSupabase.rpc('add_metadata_field', {
-                contact_ids: batchIds,
-                field_name: fieldName,
-                field_value: defaultValue || ''
-            })
+            // Fetch and update
+            const { data: contacts } = await chatSupabase
+                .from('whatsapp_contacts')
+                .select('id, metadata')
+                .in('id', batch)
 
-            if (updateError) {
-                // Fallback to individual updates if RPC doesn't exist
-                console.log(`⚠️ [Global Field] RPC not available, using fallback...`)
+            const updates = contacts?.filter(c => {
+                const meta = c.metadata || {}
+                return !(fieldName in meta)
+            }).map(c => ({
+                id: c.id,
+                metadata: { ...(c.metadata || {}), [fieldName]: defaultValue || '' }
+            })) || []
 
-                // Simple fallback: just update metadata with raw SQL approach
-                for (const contactId of batchIds) {
-                    const { data: contact } = await chatSupabase
-                        .from('whatsapp_contacts')
-                        .select('metadata')
-                        .eq('id', contactId)
-                        .single()
-
-                    const existingMetadata = contact?.metadata || {}
-                    if (!(fieldName in existingMetadata)) {
-                        await chatSupabase
-                            .from('whatsapp_contacts')
-                            .update({ metadata: { ...existingMetadata, [fieldName]: defaultValue || '' } })
-                            .eq('id', contactId)
-                        updatedCount++
-                    }
-                }
-            } else {
-                updatedCount += batchIds.length
+            for (const upd of updates) {
+                await chatSupabase
+                    .from('whatsapp_contacts')
+                    .update({ metadata: upd.metadata })
+                    .eq('id', upd.id)
+                updatedCount++
             }
         }
 
-        console.log(`✅ [Global Field] Updated ${updatedCount} of ${contactIds.length} contacts`)
+        console.log(`✅ [Global Field] Fallback updated ${updatedCount} of ${contactIds.length} contacts`)
 
         return NextResponse.json({
             success: true,
-            message: `Campo "${fieldName}" adicionado a ${updatedCount} contatos`,
+            message: `Campo "${fieldName}" adicionado a ${updatedCount} contatos (modo fallback)`,
             updatedCount,
             totalContacts: contactIds.length
         })
 
     } catch (error) {
-        console.error('Error in global-field API:', error)
+        console.error('Error in global-field POST:', error)
         return NextResponse.json({
             success: false,
             error: 'Erro interno do servidor'
         }, { status: 500 })
     }
 }
-

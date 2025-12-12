@@ -377,6 +377,32 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
   const [defaultValue, setDefaultValue] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
+  const [existingFields, setExistingFields] = useState([])
+  const [loadingFields, setLoadingFields] = useState(false)
+
+  const selectedConn = connections.find(c => c.connectionId === selectedConnection)
+
+  // Load existing fields when connection changes
+  useEffect(() => {
+    const loadFields = async () => {
+      if (!selectedConn?.instanceName) return
+
+      setLoadingFields(true)
+      try {
+        const response = await fetch(`/api/contacts/global-field?instanceName=${selectedConn.instanceName}`)
+        const data = await response.json()
+        if (data.success) {
+          setExistingFields(data.fields || [])
+        }
+      } catch (error) {
+        console.error('Error loading fields:', error)
+      } finally {
+        setLoadingFields(false)
+      }
+    }
+
+    loadFields()
+  }, [selectedConn?.instanceName])
 
   const handleCreateField = async () => {
     if (!fieldName.trim()) {
@@ -393,13 +419,11 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
     setResult(null)
 
     try {
-      // Get connection info
       const conn = connections.find(c => c.connectionId === selectedConnection)
       if (!conn?.instanceName) {
         throw new Error('Conexão não encontrada')
       }
 
-      // Call API to add field to all contacts
       const response = await fetch('/api/contacts/global-field', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -420,6 +444,11 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
         })
         setFieldName('')
         setDefaultValue('')
+        // Reload existing fields
+        setExistingFields(prev => [
+          ...prev.filter(f => f.name !== fieldName),
+          { name: fieldName, sampleValue: defaultValue || '', contactCount: data.updatedCount }
+        ])
       } else {
         setResult({ type: 'error', message: data.error || 'Erro ao criar campo' })
       }
@@ -430,8 +459,6 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
       setLoading(false)
     }
   }
-
-  const selectedConn = connections.find(c => c.connectionId === selectedConnection)
 
   return (
     <div className="space-y-6">
@@ -460,6 +487,34 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
           />
         </div>
       )}
+
+      {/* Existing Fields List */}
+      <div className="bg-[#1A1A1A] rounded-xl p-6 border border-white/5">
+        <h3 className="text-white font-medium mb-4 flex items-center gap-2">
+          <FileText size={18} className="text-purple-400" />
+          Campos Existentes
+          {loadingFields && <Loader2 size={14} className="animate-spin text-gray-500 ml-2" />}
+        </h3>
+
+        {existingFields.length === 0 ? (
+          <p className="text-gray-500 text-sm">
+            {loadingFields ? 'Carregando campos...' : 'Nenhum campo personalizado criado ainda.'}
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {existingFields.map((field, idx) => (
+              <div key={idx} className="bg-[#252525] rounded-lg px-4 py-3 border border-white/5">
+                <div className="font-mono text-[#00FF99] text-sm">{field.name}</div>
+                {field.contactCount && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    {field.contactCount} contatos
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Create Field Form */}
       <div className="bg-[#1A1A1A] rounded-xl p-6 border border-white/5">
@@ -518,7 +573,7 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
           ) : (
             <>
               <Plus size={18} />
-              Criar Campo em Todos os Contatos
+              Criar Campo
             </>
           )}
         </button>
