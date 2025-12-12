@@ -106,9 +106,9 @@ const SequenceCard = ({ sequence, onToggle, onEdit, onDuplicate, onDelete }) => 
 }
 
 // ============================================================================
-// CREATE SEQUENCE MODAL (from original - with template selection)
+// SEQUENCE MODAL (Create/Edit combined with full step editing)
 // ============================================================================
-const CreateSequenceModal = ({ isOpen, onClose, onSave, templates = [], tags = [], origins = [] }) => {
+const SequenceModal = ({ isOpen, onClose, onSave, sequence = null, templates = [], tags = [], origins = [] }) => {
     const [name, setName] = useState('')
     const [triggerType, setTriggerType] = useState('manual')
     const [triggerTagId, setTriggerTagId] = useState('')
@@ -116,6 +116,8 @@ const CreateSequenceModal = ({ isOpen, onClose, onSave, templates = [], tags = [
     const [triggerKeywords, setTriggerKeywords] = useState('')
     const [steps, setSteps] = useState([])
     const [loading, setLoading] = useState(false)
+
+    const isEditing = !!sequence
 
     const triggerTypes = [
         { value: 'manual', label: 'Manual (inscrever pelo sistema)', icon: '👤' },
@@ -142,11 +144,44 @@ const CreateSequenceModal = ({ isOpen, onClose, onSave, templates = [], tags = [
         { value: 'sun', label: 'Dom' }
     ]
 
+    // Load sequence data when editing
+    useEffect(() => {
+        if (sequence && isOpen) {
+            setName(sequence.name || '')
+            setTriggerType(sequence.trigger_type || 'manual')
+            setTriggerTagId(sequence.trigger_tag_id || '')
+            setTriggerOriginId(sequence.trigger_origin_id || '')
+            setTriggerKeywords((sequence.trigger_keywords || []).join(', '))
+
+            // Load existing steps
+            const existingSteps = (sequence.automation_sequence_steps || [])
+                .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+                .map(s => ({
+                    id: s.id || Date.now(),
+                    templateId: s.template_id,
+                    delayValue: s.delay_value || 1,
+                    delayUnit: s.delay_unit || 'hours',
+                    timeWindowStart: s.time_window_start || null,
+                    timeWindowEnd: s.time_window_end || null,
+                    allowedDays: s.allowed_days || ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
+                    isActive: s.is_active !== false
+                }))
+            setSteps(existingSteps)
+        } else if (!sequence && isOpen) {
+            // Reset for new sequence
+            setName('')
+            setTriggerType('manual')
+            setTriggerTagId('')
+            setTriggerOriginId('')
+            setTriggerKeywords('')
+            setSteps([])
+        }
+    }, [sequence, isOpen])
+
     const addStep = () => {
         setSteps([...steps, {
             id: Date.now(),
             templateId: null,
-            customContent: '',
             delayValue: 1,
             delayUnit: 'hours',
             timeWindowStart: null,
@@ -180,11 +215,17 @@ const CreateSequenceModal = ({ isOpen, onClose, onSave, templates = [], tags = [
         return `Após ${step.delayValue} ${delayUnits.find(u => u.value === step.delayUnit)?.label || 'horas'}`
     }
 
+    const getTemplateName = (templateId) => {
+        const template = templates.find(t => t.id === templateId)
+        return template?.name || 'Template não encontrado'
+    }
+
     const handleSubmit = async () => {
         if (!name.trim() || steps.length === 0) return
         setLoading(true)
         try {
             await onSave({
+                id: sequence?.id,
                 name: name.trim(),
                 triggerType,
                 triggerTagId: triggerType === 'has_tag' ? triggerTagId : null,
@@ -200,14 +241,9 @@ const CreateSequenceModal = ({ isOpen, onClose, onSave, templates = [], tags = [
                     isActive: s.isActive
                 }))
             })
-            setName('')
-            setTriggerType('manual')
-            setTriggerTagId('')
-            setTriggerOriginId('')
-            setTriggerKeywords('')
-            setSteps([])
+            onClose()
         } catch (error) {
-            console.error('Erro ao criar sequência:', error)
+            console.error('Erro ao salvar sequência:', error)
         } finally {
             setLoading(false)
         }
@@ -219,7 +255,9 @@ const CreateSequenceModal = ({ isOpen, onClose, onSave, templates = [], tags = [
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
             <div className="bg-[#1A1A1A] rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
                 <div className="flex items-center justify-between p-6 border-b border-white/10 flex-shrink-0">
-                    <h2 className="text-xl font-semibold text-white">Nova Sequência</h2>
+                    <h2 className="text-xl font-semibold text-white">
+                        {isEditing ? 'Editar Sequência' : 'Nova Sequência'}
+                    </h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-white">
                         <X size={20} />
                     </button>
@@ -335,6 +373,9 @@ const CreateSequenceModal = ({ isOpen, onClose, onSave, templates = [], tags = [
                                         <div className="flex items-center justify-between mb-4">
                                             <div className="flex items-center gap-2">
                                                 <span className="bg-[#00FF99]/20 text-[#00FF99] text-xs px-2 py-1 rounded-full font-medium">
+                                                    Mensagem {index + 1}
+                                                </span>
+                                                <span className="text-xs text-gray-400">
                                                     {getDelayLabel(step)}
                                                 </span>
                                                 <button
@@ -350,6 +391,26 @@ const CreateSequenceModal = ({ isOpen, onClose, onSave, templates = [], tags = [
                                             >
                                                 <Trash2 size={16} />
                                             </button>
+                                        </div>
+
+                                        {/* Template selection */}
+                                        <div className="mb-4">
+                                            <label className="text-xs text-gray-400 mb-1 block">Mensagem (Template)</label>
+                                            <select
+                                                value={step.templateId || ''}
+                                                onChange={(e) => updateStep(index, { templateId: e.target.value || null })}
+                                                className="w-full bg-[#1A1A1A] text-white px-3 py-2 rounded-lg text-sm"
+                                            >
+                                                <option value="">Selecione um template...</option>
+                                                {templates.map(t => (
+                                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                                ))}
+                                            </select>
+                                            {step.templateId && (
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    {templates.find(t => t.id === step.templateId)?.content?.substring(0, 100)}...
+                                                </p>
+                                            )}
                                         </div>
 
                                         {/* Delay config */}
@@ -377,21 +438,6 @@ const CreateSequenceModal = ({ isOpen, onClose, onSave, templates = [], tags = [
                                                     ))}
                                                 </select>
                                             </div>
-                                        </div>
-
-                                        {/* Template selection */}
-                                        <div className="mb-4">
-                                            <label className="text-xs text-gray-400 mb-1 block">Mensagem (Template)</label>
-                                            <select
-                                                value={step.templateId || ''}
-                                                onChange={(e) => updateStep(index, { templateId: e.target.value || null })}
-                                                className="w-full bg-[#1A1A1A] text-white px-3 py-2 rounded-lg text-sm"
-                                            >
-                                                <option value="">Selecione um template...</option>
-                                                {templates.map(t => (
-                                                    <option key={t.id} value={t.id}>{t.name}</option>
-                                                ))}
-                                            </select>
                                         </div>
 
                                         {/* Time window */}
@@ -454,7 +500,7 @@ const CreateSequenceModal = ({ isOpen, onClose, onSave, templates = [], tags = [
                         className="flex-1 px-4 py-3 bg-[#00FF99] text-black rounded-xl font-medium hover:bg-[#00E88C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                         {loading && <Loader2 className="animate-spin" size={18} />}
-                        Criar Sequência
+                        {isEditing ? 'Salvar Alterações' : 'Criar Sequência'}
                     </button>
                 </div>
             </div>
@@ -477,7 +523,8 @@ export default function SequencesPage() {
     const [searchTerm, setSearchTerm] = useState('')
 
     // Modal states
-    const [showCreateModal, setShowCreateModal] = useState(false)
+    const [showModal, setShowModal] = useState(false)
+    const [editingSequence, setEditingSequence] = useState(null)
 
     useEffect(() => {
         if (!selectedConnection) {
@@ -490,7 +537,7 @@ export default function SequencesPage() {
     const loadData = async () => {
         setLoading(true)
         try {
-            // Load sequences
+            // Load sequences with steps
             const { data: seqData } = await supabase
                 .from('automation_sequences')
                 .select('*, automation_sequence_steps(*)')
@@ -528,42 +575,82 @@ export default function SequencesPage() {
     const handleSaveSequence = async (data) => {
         const { data: { user } } = await supabase.auth.getUser()
 
-        // Create sequence
-        const { data: newSequence, error: seqError } = await supabase
-            .from('automation_sequences')
-            .insert({
-                user_id: user.id,
-                connection_id: selectedConnection,
-                name: data.name,
-                trigger_type: data.triggerType,
-                trigger_tag_id: data.triggerTagId,
-                trigger_origin_id: data.triggerOriginId,
-                trigger_keywords: data.triggerKeywords,
-                is_active: true
-            })
-            .select()
-            .single()
+        if (data.id) {
+            // Update existing sequence
+            const { error: seqError } = await supabase
+                .from('automation_sequences')
+                .update({
+                    name: data.name,
+                    trigger_type: data.triggerType,
+                    trigger_tag_id: data.triggerTagId,
+                    trigger_origin_id: data.triggerOriginId,
+                    trigger_keywords: data.triggerKeywords,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', data.id)
 
-        if (seqError) throw seqError
+            if (seqError) throw seqError
 
-        // Create steps
-        if (data.steps?.length) {
-            const stepsToInsert = data.steps.map((s, i) => ({
-                sequence_id: newSequence.id,
-                template_id: s.templateId,
-                delay_value: s.delayValue,
-                delay_unit: s.delayUnit,
-                time_window_start: s.timeWindowStart,
-                time_window_end: s.timeWindowEnd,
-                allowed_days: s.allowedDays,
-                is_active: s.isActive,
-                order_index: i
-            }))
-            await supabase.from('automation_sequence_steps').insert(stepsToInsert)
+            // Delete old steps
+            await supabase
+                .from('automation_sequence_steps')
+                .delete()
+                .eq('sequence_id', data.id)
+
+            // Insert new steps
+            if (data.steps?.length) {
+                const stepsToInsert = data.steps.map((s, i) => ({
+                    sequence_id: data.id,
+                    template_id: s.templateId,
+                    delay_value: s.delayValue,
+                    delay_unit: s.delayUnit,
+                    time_window_start: s.timeWindowStart,
+                    time_window_end: s.timeWindowEnd,
+                    allowed_days: s.allowedDays,
+                    is_active: s.isActive,
+                    order_index: i
+                }))
+                await supabase.from('automation_sequence_steps').insert(stepsToInsert)
+            }
+        } else {
+            // Create new sequence
+            const { data: newSequence, error: seqError } = await supabase
+                .from('automation_sequences')
+                .insert({
+                    user_id: user.id,
+                    connection_id: selectedConnection,
+                    name: data.name,
+                    trigger_type: data.triggerType,
+                    trigger_tag_id: data.triggerTagId,
+                    trigger_origin_id: data.triggerOriginId,
+                    trigger_keywords: data.triggerKeywords,
+                    is_active: true
+                })
+                .select()
+                .single()
+
+            if (seqError) throw seqError
+
+            // Create steps
+            if (data.steps?.length) {
+                const stepsToInsert = data.steps.map((s, i) => ({
+                    sequence_id: newSequence.id,
+                    template_id: s.templateId,
+                    delay_value: s.delayValue,
+                    delay_unit: s.delayUnit,
+                    time_window_start: s.timeWindowStart,
+                    time_window_end: s.timeWindowEnd,
+                    allowed_days: s.allowedDays,
+                    is_active: s.isActive,
+                    order_index: i
+                }))
+                await supabase.from('automation_sequence_steps').insert(stepsToInsert)
+            }
         }
 
         loadData()
-        setShowCreateModal(false)
+        setShowModal(false)
+        setEditingSequence(null)
     }
 
     const handleToggle = async (sequenceId, newStatus) => {
@@ -618,8 +705,13 @@ export default function SequencesPage() {
     }
 
     const handleEdit = (sequence) => {
-        // TODO: Implementar modal de edição
-        alert('Editar: ' + sequence.name + ' - Modal de edição em desenvolvimento')
+        setEditingSequence(sequence)
+        setShowModal(true)
+    }
+
+    const handleCreate = () => {
+        setEditingSequence(null)
+        setShowModal(true)
     }
 
     const filteredSequences = sequences.filter(s =>
@@ -649,7 +741,7 @@ export default function SequencesPage() {
                     />
                 </div>
                 <button
-                    onClick={() => setShowCreateModal(true)}
+                    onClick={handleCreate}
                     className="flex items-center gap-2 bg-[#00FF99] text-black font-medium px-4 py-3 rounded-xl hover:bg-[#00E88C] transition-colors"
                 >
                     <Plus size={18} />
@@ -664,7 +756,7 @@ export default function SequencesPage() {
                     <h3 className="text-white font-medium mb-2">Nenhuma sequência</h3>
                     <p className="text-gray-500 text-sm mb-4">Crie sua primeira sequência de mensagens automáticas.</p>
                     <button
-                        onClick={() => setShowCreateModal(true)}
+                        onClick={handleCreate}
                         className="inline-flex items-center gap-2 bg-[#00FF99] text-black font-medium px-4 py-2 rounded-xl hover:bg-[#00E88C] transition-colors"
                     >
                         <Plus size={18} />
@@ -686,11 +778,12 @@ export default function SequencesPage() {
                 </div>
             )}
 
-            {/* Create Modal */}
-            <CreateSequenceModal
-                isOpen={showCreateModal}
-                onClose={() => setShowCreateModal(false)}
+            {/* Modal (Create/Edit) */}
+            <SequenceModal
+                isOpen={showModal}
+                onClose={() => { setShowModal(false); setEditingSequence(null) }}
                 onSave={handleSaveSequence}
+                sequence={editingSequence}
                 templates={templates}
                 tags={tags}
                 origins={origins}
