@@ -235,33 +235,31 @@ export async function GET(request) {
             console.error('Erro ao buscar tags:', tagsError);
         }
 
-        // Get tag assignments for all contacts
+        // Get tag assignments for all contacts (batch to avoid Supabase IN limit)
         let tagAssignments = [];
         if (contactIds.length > 0) {
-            const { data: assignments, error: assignError } = await chatSupabase
-                .from('contact_tag_assignments')
-                .select(`
-                    contact_id,
-                    tag:contact_tags (
-                        id,
-                        name,
-                        color
-                    )
-                `)
-                .in('contact_id', contactIds);
+            const TAG_BATCH_SIZE = 500; // Supabase IN clause limit
+            for (let i = 0; i < contactIds.length; i += TAG_BATCH_SIZE) {
+                const batchIds = contactIds.slice(i, i + TAG_BATCH_SIZE);
+                const { data: assignments, error: assignError } = await chatSupabase
+                    .from('contact_tag_assignments')
+                    .select(`
+                        contact_id,
+                        tag:contact_tags (
+                            id,
+                            name,
+                            color
+                        )
+                    `)
+                    .in('contact_id', batchIds);
 
-            if (assignError) {
-                console.error('🏷️ [Contacts] Error loading tag assignments:', assignError);
-            } else {
-                tagAssignments = assignments || [];
-                console.log(`🏷️ [Contacts] Loaded ${tagAssignments.length} tag assignments for ${contactIds.length} contacts`);
-                if (tagAssignments.length > 0) {
-                    console.log(`🏷️ [Contacts] Sample assignments:`, tagAssignments.slice(0, 3).map(a => ({
-                        contact_id: a.contact_id,
-                        tag: a.tag
-                    })));
+                if (assignError) {
+                    console.error('🏷️ [Contacts] Error loading tag assignments batch:', assignError);
+                } else if (assignments) {
+                    tagAssignments = tagAssignments.concat(assignments);
                 }
             }
+            console.log(`🏷️ [Contacts] Loaded ${tagAssignments.length} tag assignments for ${contactIds.length} contacts`);
         }
 
         // Build contacts array with tags and origin (filter out conversations without contacts)
