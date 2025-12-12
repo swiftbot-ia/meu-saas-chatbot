@@ -918,7 +918,44 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
 
     // Se não existe registro OU agent_enabled = true, enviar para n8n
     // Por padrão (sem registro), agente está ATIVADO
-    const shouldSendToAgent = !agentSettings || agentSettings.agent_enabled !== false;
+    let shouldSendToAgent = !agentSettings || agentSettings.agent_enabled !== false;
+
+    // 11.1 VERIFICAR PALAVRAS IGNORADAS (se agente ainda está ativo)
+    // Apenas para mensagens recebidas (inbound)
+    if (shouldSendToAgent && !fromMe && messageContent) {
+      // Buscar palavras ignoradas da configuração do agente
+      const { data: agentConfig } = await supabaseAdmin
+        .from('ai_agents')
+        .select('ignored_keywords')
+        .eq('connection_id', connection.id)
+        .maybeSingle();
+
+      const ignoredKeywords = agentConfig?.ignored_keywords || [];
+
+      if (ignoredKeywords.length > 0) {
+        const messageContentLower = messageContent.toLowerCase();
+        const matchedKeyword = ignoredKeywords.find(keyword =>
+          messageContentLower.includes(keyword.toLowerCase())
+        );
+
+        if (matchedKeyword) {
+          log(requestId, 'info', '🚫', `Palavra ignorada detectada: "${matchedKeyword}". Desativando agente para: ${whatsappNumber}`);
+
+          // Desativar agente para este contato
+          await supabaseAdmin
+            .from('contact_agent_settings')
+            .upsert({
+              connection_id: connection.id,
+              whatsapp_number: whatsappNumber,
+              agent_enabled: false,
+              disabled_at: new Date().toISOString(),
+              disabled_reason: `Mensagem contém palavra ignorada: "${matchedKeyword}"`
+            }, { onConflict: 'connection_id,whatsapp_number' });
+
+          shouldSendToAgent = false;
+        }
+      }
+    }
 
     // 12. PROCESSAR AUTOMAÇÕES (RESPOSTA AUTOMÁTICA POR KEYWORDS)
     // Fire and forget - não bloqueia o webhook

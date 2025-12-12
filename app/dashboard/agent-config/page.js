@@ -196,6 +196,7 @@ function AgentConfigContent() {
     objectiveQuestions: [],
     salesCTA: '',
     notifyLeads: false,
+    ignoredKeywords: [],
   })
 
   useEffect(() => {
@@ -306,7 +307,8 @@ function AgentConfigContent() {
           objectionsQA: data.objections_qa?.length > 0 ? data.objections_qa : [{ question: '', answer: '' }],
           objectiveQuestions: data.objective_questions || [],
           salesCTA: data.sales_cta || '',
-          notifyLeads: data.notify_leads || false
+          notifyLeads: data.notify_leads || false,
+          ignoredKeywords: data.ignored_keywords || []
         })
       }
     } catch (error) {
@@ -503,6 +505,7 @@ function AgentConfigContent() {
         objective_questions: cleanObjectiveQuestions,
         sales_cta: formData.salesCTA,
         notify_leads: formData.notifyLeads,
+        ignored_keywords: formData.ignoredKeywords.filter(k => k.trim()),
         is_active: true
       }
 
@@ -849,6 +852,95 @@ function AgentConfigContent() {
                   <button type="button" onClick={() => addArrayItem('objectionsQA', { question: '', answer: '' })} disabled={formData.objectionsQA.length >= MAX_ITEMS} className="w-full py-4 border border-dashed border-gray-700 rounded-3xl text-gray-400 hover:border-white hover:text-white transition-all">
                     + Adicionar Objeção
                   </button>
+                </div>
+              </div>
+
+              {/* SEÇÃO: PALAVRAS IGNORADAS */}
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-2xl font-bold text-white flex items-center gap-2">
+                    <svg className="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                    Palavras Ignoradas
+                  </h3>
+                  <span className="text-xs text-gray-600 bg-white/5 px-3 py-1 rounded-full">
+                    {formData.ignoredKeywords.length} palavras
+                  </span>
+                </div>
+                <p className="text-gray-500 text-sm -mt-2">
+                  Mensagens que contiverem essas palavras serão ignoradas e o agente será <strong>desativado automaticamente</strong> para o contato.
+                  <br />Útil para formulários de campanha que enviam dados sensíveis.
+                </p>
+
+                <div className="bg-[#1E1E1E] rounded-3xl p-6">
+                  <div className="flex gap-3 mb-4">
+                    <input
+                      type="text"
+                      id="newIgnoredKeyword"
+                      placeholder="Ex: Preenchi seu formulário, email:, Telefone/WhatsApp:"
+                      className={`${getInputClass('newKeyword')} flex-1`}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          const value = e.target.value.trim()
+                          if (value && !formData.ignoredKeywords.includes(value)) {
+                            setFormData(prev => ({
+                              ...prev,
+                              ignoredKeywords: [...prev.ignoredKeywords, value]
+                            }))
+                            e.target.value = ''
+                          }
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const input = document.getElementById('newIgnoredKeyword')
+                        const value = input.value.trim()
+                        if (value && !formData.ignoredKeywords.includes(value)) {
+                          setFormData(prev => ({
+                            ...prev,
+                            ignoredKeywords: [...prev.ignoredKeywords, value]
+                          }))
+                          input.value = ''
+                        }
+                      }}
+                      className="px-6 py-4 bg-orange-500/10 text-orange-400 rounded-3xl hover:bg-orange-500/20 transition-all font-medium"
+                    >
+                      Adicionar
+                    </button>
+                  </div>
+
+                  {formData.ignoredKeywords.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {formData.ignoredKeywords.map((keyword, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500/10 text-orange-300 rounded-full text-sm group"
+                        >
+                          {keyword}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                ignoredKeywords: prev.ignoredKeywords.filter((_, i) => i !== index)
+                              }))
+                            }}
+                            className="text-orange-400/50 hover:text-red-400 transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-600 text-sm text-center py-4">
+                      Nenhuma palavra ignorada configurada. Pressione Enter ou clique em Adicionar.
+                    </p>
+                  )}
                 </div>
               </div>
 
