@@ -192,6 +192,8 @@ export default function ContactsPage() {
   const [tagLoading, setTagLoading] = useState(false);
   const [showDeleteTagConfirm, setShowDeleteTagConfirm] = useState(false);
   const [tagToDelete, setTagToDelete] = useState(null);
+  const [showDeleteOriginConfirm, setShowDeleteOriginConfirm] = useState(false);
+  const [originToDelete, setOriginToDelete] = useState(null);
 
   // New tag/origin form
   const [newTagName, setNewTagName] = useState('');
@@ -457,16 +459,47 @@ export default function ContactsPage() {
       });
 
       if (response.ok) {
+        const data = await response.json();
+        // Atualizar lista de origens imediatamente
+        setOrigins(prev => [...prev, data.origin]);
         setNewOriginName('');
         setShowCreateOriginModal(false);
-        setSelectedContact({
-          ...selectedContact,
-          tags: selectedContact.tags?.filter(t => t.id !== tagId) || []
-        });
-        await loadContacts();
       }
     } catch (err) {
-      console.error('Erro ao remover tag:', err);
+      console.error('Erro ao criar origem:', err);
+    } finally {
+      setTagLoading(false);
+    }
+  };
+
+  // Delete origin permanently from system
+  const handleDeleteOrigin = async () => {
+    if (!originToDelete) return;
+
+    setTagLoading(true);
+    try {
+      const response = await fetch(`/api/contacts/origins/${originToDelete.id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        // Atualizar lista de origens imediatamente
+        setOrigins(prev => prev.filter(o => o.id !== originToDelete.id));
+        // Limpar filtro se era a origem selecionada
+        if (selectedOrigin === originToDelete.id) {
+          setSelectedOrigin('');
+        }
+        setShowDeleteOriginConfirm(false);
+        setOriginToDelete(null);
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Erro ao excluir origem');
+      }
+    } catch (err) {
+      console.error('Erro ao excluir origem:', err);
+      alert('Erro ao excluir origem');
+    } finally {
+      setTagLoading(false);
     }
   };
 
@@ -695,16 +728,31 @@ export default function ContactsPage() {
                   Todas as origens
                 </button>
                 {origins.map((origin) => (
-                  <button
+                  <div
                     key={origin.id}
-                    onClick={() => setSelectedOrigin(origin.id)}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all truncate ${selectedOrigin === origin.id
+                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all flex items-center justify-between group ${selectedOrigin === origin.id
                       ? 'bg-[#00FF99]/10 text-[#00FF99]'
                       : 'text-gray-400 hover:bg-[#1E1E1E] hover:text-white'
                       }`}
                   >
-                    {origin.name}
-                  </button>
+                    <span
+                      className="truncate flex-1 cursor-pointer"
+                      onClick={() => setSelectedOrigin(origin.id)}
+                    >
+                      {origin.name}
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOriginToDelete(origin);
+                        setShowDeleteOriginConfirm(true);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-all p-1"
+                      title="Excluir origem"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 ))}
                 {origins.length === 0 && (
                   <p className="text-xs text-gray-500 px-3 py-2">
@@ -1312,6 +1360,72 @@ export default function ContactsPage() {
               </button>
               <button
                 onClick={handleDeleteTag}
+                className="flex-1 bg-red-500 text-white py-3 rounded-xl hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+                disabled={tagLoading}
+              >
+                {tagLoading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Excluindo...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={16} />
+                    Excluir
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Delete Origin Confirmation Modal */}
+      {showDeleteOriginConfirm && originToDelete && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => {
+            setShowDeleteOriginConfirm(false);
+            setOriginToDelete(null);
+          }} />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-[#111111] rounded-2xl p-6 z-50 w-96">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Trash2 size={20} className="text-red-400" />
+                Excluir Origem
+              </h3>
+              <button
+                onClick={() => {
+                  setShowDeleteOriginConfirm(false);
+                  setOriginToDelete(null);
+                }}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-gray-300 mb-2">
+                Tem certeza que deseja excluir a origem <span className="text-white font-semibold">"{originToDelete.name}"</span>?
+              </p>
+              <p className="text-sm text-gray-500">
+                Esta ação irá remover a origem de todos os contatos e não pode ser desfeita.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteOriginConfirm(false);
+                  setOriginToDelete(null);
+                }}
+                className="flex-1 bg-[#1E1E1E] text-white py-3 rounded-xl hover:bg-[#2A2A2A] transition-colors"
+                disabled={tagLoading}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteOrigin}
                 className="flex-1 bg-red-500 text-white py-3 rounded-xl hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
                 disabled={tagLoading}
               >
