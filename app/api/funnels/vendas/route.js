@@ -102,10 +102,7 @@ export async function GET(request) {
             // Apply filters
             query = applyFilters(query, filters);
 
-            // Origin filter (on contact)
-            if (filters.origin_id) {
-                query = query.eq('contact.origin_id', filters.origin_id);
-            }
+            // Note: origin_id and tag_id filters are applied post-query
 
             // If cursor provided, paginate
             if (cursor) {
@@ -126,6 +123,15 @@ export async function GET(request) {
 
             // Filter by tag if needed (post-query because of join complexity)
             let filteredConversations = conversations || [];
+
+            // Filter by origin (post-query because Supabase doesn't support nested field filters)
+            if (filters.origin_id) {
+                filteredConversations = filteredConversations.filter(conv =>
+                    conv.contact?.origin_id === filters.origin_id
+                );
+            }
+
+            // Filter by tag
             if (filters.tag_id) {
                 // Get contacts with this tag
                 const { data: tagAssignments } = await supabase
@@ -204,10 +210,7 @@ export async function GET(request) {
             // Apply filters
             query = applyFilters(query, filters);
 
-            // Origin filter
-            if (filters.origin_id) {
-                query = query.eq('contact.origin_id', filters.origin_id);
-            }
+            // Note: origin_id and tag_id filters are applied post-query
 
             query = query
                 .order('funnel_position', { ascending: true })
@@ -221,8 +224,15 @@ export async function GET(request) {
                 continue;
             }
 
-            // Filter by tag if needed
+            // Filter by origin (post-query filtering)
             let filteredConversations = conversations || [];
+            if (filters.origin_id) {
+                filteredConversations = filteredConversations.filter(conv =>
+                    conv.contact?.origin_id === filters.origin_id
+                );
+            }
+
+            // Filter by tag if needed
             if (contactIdsWithTag) {
                 filteredConversations = filteredConversations.filter(conv =>
                     contactIdsWithTag.has(conv.contact?.id)
