@@ -78,7 +78,7 @@ export default function TemplatesPage() {
             setLoading(true)
             try {
                 const { data, error } = await supabase
-                    .from('automation_templates')
+                    .from('message_templates')
                     .select('*')
                     .eq('connection_id', selectedConnection)
                     .order('created_at', { ascending: false })
@@ -98,7 +98,7 @@ export default function TemplatesPage() {
     const handleDelete = async (template) => {
         if (!confirm(`Excluir template "${template.name}"?`)) return
 
-        await supabase.from('automation_templates').delete().eq('id', template.id)
+        await supabase.from('message_templates').delete().eq('id', template.id)
         setTemplates(prev => prev.filter(t => t.id !== template.id))
     }
 
