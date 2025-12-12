@@ -24,69 +24,124 @@ export function useAutomations() {
 }
 
 // ============================================================================
-// CONNECTION DROPDOWN - Padrão do Chat
+// CONNECTION DROPDOWN - Padrão do Chat (ConversationList.jsx)
 // ============================================================================
 const ConnectionDropdown = ({ connections, selectedConnection, onSelectConnection }) => {
     const [isOpen, setIsOpen] = useState(false)
+
+    if (!connections || connections.length <= 1) return null
+
     const selected = connections.find(c => c.id === selectedConnection)
+    const displayValue = selected
+        ? (selected.contact_name || selected.profile_name || selected.instance_name)
+        : 'Selecione uma instância'
 
     return (
-        <div className="relative">
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between gap-3 bg-[#1E1E1E] px-4 py-3 rounded-2xl hover:bg-[#252525] transition-all"
-            >
-                <div className="flex items-center gap-3">
-                    {selected?.profile_pic_url ? (
-                        <img src={selected.profile_pic_url} alt="" className="w-12 h-12 rounded-full object-cover" />
-                    ) : (
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#00FF99] to-[#00E88C] flex items-center justify-center">
-                            <span className="text-black text-lg font-bold">{selected?.contact_name?.[0] || 'W'}</span>
-                        </div>
-                    )}
-                    <div className="text-left">
-                        <p className="text-white font-semibold">{selected?.contact_name || 'Selecionar'}</p>
-                        <p className={`text-sm ${selected?.is_connected ? 'text-[#00FF99]' : 'text-gray-500'}`}>
-                            ● {selected?.is_connected ? 'Conectado' : 'Desconectado'}
-                        </p>
-                    </div>
-                </div>
-                <ChevronDown size={20} className={`text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {isOpen && (
-                <>
-                    <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-[#1E1E1E] rounded-2xl shadow-2xl z-50 max-h-80 overflow-y-auto border border-white/10">
-                        {connections.map(conn => (
-                            <button
-                                key={conn.id}
-                                onClick={() => { onSelectConnection(conn.id); setIsOpen(false) }}
-                                className={`w-full flex items-center gap-3 px-4 py-3 transition-colors first:rounded-t-2xl last:rounded-b-2xl
-                                    ${selectedConnection === conn.id
-                                        ? 'bg-[#00FF99]/10'
-                                        : 'hover:bg-white/5'}`}
-                            >
-                                {conn.profile_pic_url ? (
-                                    <img src={conn.profile_pic_url} alt="" className="w-12 h-12 rounded-full object-cover" />
+        <div className="relative mb-3">
+            <div className="bg-[#1E1E1E] rounded-2xl overflow-hidden">
+                <button
+                    type="button"
+                    onClick={() => setIsOpen(!isOpen)}
+                    className="w-full px-4 py-3 flex items-center justify-between text-left outline-none"
+                >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {/* Avatar */}
+                        {selected && (
+                            <div className="flex-shrink-0">
+                                {selected.profile_pic_url ? (
+                                    <img
+                                        src={selected.profile_pic_url}
+                                        alt={displayValue}
+                                        className="w-10 h-10 rounded-full object-cover bg-[#333333]"
+                                    />
                                 ) : (
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#00FF99] to-[#00E88C] flex items-center justify-center">
-                                        <span className="text-black text-lg font-bold">{conn.contact_name?.[0] || 'W'}</span>
+                                    <div className="w-10 h-10 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold">
+                                        {displayValue.charAt(0).toUpperCase()}
                                     </div>
                                 )}
-                                <div className="text-left flex-1">
-                                    <p className={`font-semibold ${selectedConnection === conn.id ? 'text-[#00FF99]' : 'text-white'}`}>
-                                        {conn.contact_name || conn.instance_name}
-                                    </p>
-                                    <p className={`text-sm ${conn.is_connected ? 'text-[#00FF99]' : 'text-gray-500'}`}>
-                                        ● {conn.is_connected ? 'Conectado' : 'Desconectado'}
-                                    </p>
+                            </div>
+                        )}
+
+                        {/* Text info */}
+                        <div className="flex-1 min-w-0">
+                            <div className="text-white text-sm font-medium truncate">
+                                {displayValue}
+                            </div>
+                            {selected && (
+                                <div className="text-xs text-gray-500 flex items-center gap-1.5">
+                                    <span className={selected.is_connected ? 'text-[#00FF99]' : 'text-red-400'}>
+                                        {selected.is_connected ? '●' : '○'}
+                                    </span>
+                                    <span className={selected.is_connected ? 'text-[#00FF99]' : 'text-gray-500'}>
+                                        {selected.is_connected ? 'Conectado' : 'Desconectado'}
+                                    </span>
                                 </div>
-                            </button>
-                        ))}
+                            )}
+                        </div>
                     </div>
-                </>
-            )}
+
+                    <ChevronDown
+                        className={`w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ml-2 ${isOpen ? 'rotate-180' : 'rotate-0'}`}
+                    />
+                </button>
+
+                {/* Dropdown options */}
+                {isOpen && (
+                    <div className="absolute top-full left-0 right-0 mt-1 backdrop-blur-md bg-[#1E1E1E]/95 rounded-2xl shadow-2xl z-50 max-h-[300px] overflow-y-auto">
+                        {connections.map((connection, index) => {
+                            const connName = connection.contact_name || connection.profile_name || connection.instance_name
+                            return (
+                                <button
+                                    key={connection.id}
+                                    type="button"
+                                    onClick={() => {
+                                        onSelectConnection(connection.id)
+                                        setIsOpen(false)
+                                    }}
+                                    className={`
+                                        w-full p-3 text-sm text-left transition-all duration-150 border-b border-white/5 last:border-0
+                                        ${selectedConnection === connection.id
+                                            ? 'bg-[#00FF99]/10 text-[#00FF99]'
+                                            : 'text-gray-300 hover:bg-white/5 hover:text-white'}
+                                    `}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        {/* Avatar */}
+                                        <div className="flex-shrink-0">
+                                            {connection.profile_pic_url ? (
+                                                <img
+                                                    src={connection.profile_pic_url}
+                                                    alt={connName}
+                                                    className="w-10 h-10 rounded-full object-cover bg-[#333333]"
+                                                />
+                                            ) : (
+                                                <div className="w-10 h-10 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold">
+                                                    {connName ? connName.charAt(0).toUpperCase() : (index + 1)}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Text info */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-medium truncate">
+                                                {connName}
+                                            </div>
+                                            <div className="text-xs flex items-center gap-1.5 mt-0.5">
+                                                <span className={connection.is_connected ? 'text-[#00FF99]' : 'text-red-400'}>
+                                                    {connection.is_connected ? '● Conectado' : '○ Desconectado'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </button>
+                            )
+                        })}
+                    </div>
+                )}
+            </div>
+
+            {/* Overlay */}
+            {isOpen && <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />}
         </div>
     )
 }
