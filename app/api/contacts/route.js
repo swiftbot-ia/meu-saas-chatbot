@@ -147,6 +147,18 @@ export async function GET(request) {
             conversationsWithoutContacts: conversations?.filter(c => !c.contact?.id).length || 0
         });
 
+        // Debug: find specific contact
+        const targetContact = conversations?.find(c =>
+            c.contact?.whatsapp_number?.includes('447447021530') ||
+            c.contact_id === '3541920d-b508-4765-8631-119a3571fda2'
+        );
+        console.log('🔍 [Debug] Looking for 447447021530:', targetContact ? {
+            conv_id: targetContact.id,
+            contact_id: targetContact.contact_id,
+            has_contact_data: !!targetContact.contact,
+            contact_phone: targetContact.contact?.whatsapp_number
+        } : 'NOT FOUND in conversations');
+
         // Get contact IDs from conversations
         const contactIds = conversations?.map(c => c.contact?.id).filter(Boolean) || [];
 
