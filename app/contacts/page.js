@@ -23,7 +23,11 @@ import {
   Clock,
   MapPin,
   Trash2,
-  UserPlus
+  UserPlus,
+  List,
+  Edit3,
+  Save,
+  FileText
 } from 'lucide-react';
 import NoSubscription from '../components/NoSubscription'
 import NewOpportunityModal from '../crm/components/NewOpportunityModal'
@@ -206,6 +210,19 @@ export default function ContactsPage() {
 
   // New contact modal
   const [showNewContactModal, setShowNewContactModal] = useState(false);
+
+  // Sequences state
+  const [sequences, setSequences] = useState([]);
+  const [contactSequences, setContactSequences] = useState([]);
+  const [showSequenceModal, setShowSequenceModal] = useState(false);
+  const [sequenceLoading, setSequenceLoading] = useState(false);
+
+  // Custom fields state
+  const [customFields, setCustomFields] = useState({});
+  const [showCustomFieldModal, setShowCustomFieldModal] = useState(false);
+  const [newFieldKey, setNewFieldKey] = useState('');
+  const [newFieldValue, setNewFieldValue] = useState('');
+  const [editingField, setEditingField] = useState(null);
 
   // Load connections on mount
   useEffect(() => {
@@ -538,6 +555,153 @@ export default function ContactsPage() {
       alert('Erro ao excluir tag');
     } finally {
       setTagLoading(false);
+    }
+  };
+
+  // Load sequences when contact is selected
+  useEffect(() => {
+    if (selectedContact && selectedConnection) {
+      loadSequences();
+      loadContactSequences();
+      // Load custom fields from contact metadata
+      setCustomFields(selectedContact.metadata?.custom_fields || {});
+    }
+  }, [selectedContact?.id]);
+
+  // Load available sequences for this connection
+  const loadSequences = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('automation_sequences')
+        .select('id, name, is_active')
+        .eq('connection_id', selectedConnection)
+        .eq('is_active', true)
+        .order('name');
+
+      if (!error) {
+        setSequences(data || []);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar sequências:', err);
+    }
+  };
+
+  // Load sequences the contact is enrolled in
+  const loadContactSequences = async () => {
+    if (!selectedContact?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('automation_sequence_subscriptions')
+        .select(`
+          id,
+          sequence_id,
+          status,
+          sequence:automation_sequences(id, name)
+        `)
+        .eq('contact_id', selectedContact.id)
+        .in('status', ['active', 'pending']);
+
+      if (!error && data) {
+        setContactSequences(data);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar inscrições:', err);
+    }
+  };
+
+  // Enroll contact in a sequence
+  const handleEnrollSequence = async (sequenceId) => {
+    if (!selectedContact?.id) return;
+
+    setSequenceLoading(true);
+    try {
+      const response = await fetch('/api/sequences/enroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactId: selectedContact.id,
+          sequenceId
+        })
+      });
+
+      if (response.ok) {
+        await loadContactSequences();
+        setShowSequenceModal(false);
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Erro ao inscrever na sequência');
+      }
+    } catch (err) {
+      console.error('Erro ao inscrever na sequência:', err);
+    } finally {
+      setSequenceLoading(false);
+    }
+  };
+
+  // Unenroll contact from a sequence
+  const handleUnenrollSequence = async (subscriptionId) => {
+    setSequenceLoading(true);
+    try {
+      const response = await fetch('/api/sequences/unenroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscriptionId })
+      });
+
+      if (response.ok) {
+        await loadContactSequences();
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Erro ao remover da sequência');
+      }
+    } catch (err) {
+      console.error('Erro ao remover da sequência:', err);
+    } finally {
+      setSequenceLoading(false);
+    }
+  };
+
+  // Add/Update custom field
+  const handleSaveCustomField = async () => {
+    if (!newFieldKey.trim() || !selectedContact?.id) return;
+
+    const updatedFields = { ...customFields, [newFieldKey.trim()]: newFieldValue };
+    setCustomFields(updatedFields);
+
+    try {
+      // Update contact metadata with custom fields
+      const response = await fetch(`/api/contacts/${selectedContact.id}/metadata`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ custom_fields: updatedFields })
+      });
+
+      if (response.ok) {
+        setNewFieldKey('');
+        setNewFieldValue('');
+        setShowCustomFieldModal(false);
+        setEditingField(null);
+      }
+    } catch (err) {
+      console.error('Erro ao salvar campo:', err);
+    }
+  };
+
+  // Delete custom field
+  const handleDeleteCustomField = async (key) => {
+    const updatedFields = { ...customFields };
+    delete updatedFields[key];
+    setCustomFields(updatedFields);
+
+    try {
+      await fetch(`/api/contacts/${selectedContact.id}/metadata`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ custom_fields: updatedFields })
+      });
+    } catch (err) {
+      console.error('Erro ao deletar campo:', err);
     }
   };
 
@@ -1140,6 +1304,108 @@ export default function ContactsPage() {
                 )}
               </div>
 
+              {/* Sequences */}
+              <div className="bg-[#111111] rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <List size={20} />
+                    Sequências
+                  </h3>
+                  <button
+                    onClick={() => setShowSequenceModal(true)}
+                    className="flex items-center gap-1 text-sm text-[#00FF99] hover:text-white transition-colors"
+                  >
+                    <Plus size={16} />
+                    Inscrever
+                  </button>
+                </div>
+
+                {contactSequences.length > 0 ? (
+                  <div className="space-y-2">
+                    {contactSequences.map((sub) => (
+                      <div
+                        key={sub.id}
+                        className="flex items-center justify-between bg-[#1E1E1E] rounded-xl px-4 py-3"
+                      >
+                        <div>
+                          <p className="text-white text-sm font-medium">{sub.sequence?.name}</p>
+                          <p className="text-xs text-gray-500 capitalize">{sub.status}</p>
+                        </div>
+                        <button
+                          onClick={() => handleUnenrollSequence(sub.id)}
+                          disabled={sequenceLoading}
+                          className="text-red-400 hover:text-red-300 text-xs flex items-center gap-1"
+                        >
+                          <X size={14} />
+                          Remover
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-sm">Não inscrito em nenhuma sequência</p>
+                )}
+              </div>
+
+              {/* Custom Fields */}
+              <div className="bg-[#111111] rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <FileText size={20} />
+                    Campos Personalizados
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setNewFieldKey('');
+                      setNewFieldValue('');
+                      setEditingField(null);
+                      setShowCustomFieldModal(true);
+                    }}
+                    className="flex items-center gap-1 text-sm text-[#00FF99] hover:text-white transition-colors"
+                  >
+                    <Plus size={16} />
+                    Adicionar
+                  </button>
+                </div>
+
+                {Object.keys(customFields).length > 0 ? (
+                  <div className="space-y-2">
+                    {Object.entries(customFields).map(([key, value]) => (
+                      <div
+                        key={key}
+                        className="flex items-center justify-between bg-[#1E1E1E] rounded-xl px-4 py-3 group"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-gray-400">{key}</p>
+                          <p className="text-white text-sm font-medium truncate">{value}</p>
+                        </div>
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => {
+                              setNewFieldKey(key);
+                              setNewFieldValue(value);
+                              setEditingField(key);
+                              setShowCustomFieldModal(true);
+                            }}
+                            className="text-gray-400 hover:text-white p-1"
+                          >
+                            <Edit3 size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCustomField(key)}
+                            className="text-red-400 hover:text-red-300 p-1"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-sm">Nenhum campo personalizado</p>
+                )}
+              </div>
+
             </div>
           </>
         ) : (
@@ -1227,6 +1493,104 @@ export default function ContactsPage() {
               {origins.length === 0 && (
                 <p className="text-gray-500 text-sm text-center py-4">Nenhuma origem criada ainda</p>
               )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ========================================== */}
+      {/* MODAL: INSCREVER EM SEQUÊNCIA */}
+      {/* ========================================== */}
+      {showSequenceModal && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setShowSequenceModal(false)} />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-[#111111] rounded-2xl p-6 z-50 w-80 max-h-96 overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">Inscrever em Sequência</h3>
+              <button onClick={() => setShowSequenceModal(false)} className="text-gray-400 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2">
+              {sequences.filter(seq => !contactSequences.some(cs => cs.sequence_id === seq.id)).map((seq) => (
+                <button
+                  key={seq.id}
+                  onClick={() => handleEnrollSequence(seq.id)}
+                  disabled={sequenceLoading}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-[#1E1E1E] transition-all text-left disabled:opacity-50"
+                >
+                  <List size={16} className="text-[#00FF99] flex-shrink-0" />
+                  <span className="text-white flex-1">{seq.name}</span>
+                  {sequenceLoading ? <Loader2 className="animate-spin text-gray-400" size={16} /> : <Plus size={16} className="text-gray-400" />}
+                </button>
+              ))}
+
+              {sequences.filter(seq => !contactSequences.some(cs => cs.sequence_id === seq.id)).length === 0 && (
+                <p className="text-gray-500 text-sm text-center py-4">
+                  {sequences.length === 0 ? 'Nenhuma sequência ativa' : 'Já inscrito em todas as sequências'}
+                </p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ========================================== */}
+      {/* MODAL: CAMPO PERSONALIZADO */}
+      {/* ========================================== */}
+      {showCustomFieldModal && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setShowCustomFieldModal(false)} />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-[#111111] rounded-2xl p-6 z-50 w-96">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">
+                {editingField ? 'Editar Campo' : 'Novo Campo Personalizado'}
+              </h3>
+              <button onClick={() => setShowCustomFieldModal(false)} className="text-gray-400 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Nome do Campo</label>
+                <input
+                  type="text"
+                  value={newFieldKey}
+                  onChange={(e) => setNewFieldKey(e.target.value)}
+                  placeholder="Ex: id_CRM, cpf, empresa..."
+                  disabled={!!editingField}
+                  className="w-full bg-[#1E1E1E] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30 disabled:opacity-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Valor</label>
+                <input
+                  type="text"
+                  value={newFieldValue}
+                  onChange={(e) => setNewFieldValue(e.target.value)}
+                  placeholder="Ex: 12345"
+                  className="w-full bg-[#1E1E1E] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowCustomFieldModal(false)}
+                className="flex-1 bg-[#1E1E1E] text-white py-3 rounded-xl hover:bg-[#2A2A2A] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveCustomField}
+                disabled={!newFieldKey.trim()}
+                className="flex-1 bg-[#00FF99] text-black py-3 rounded-xl font-medium hover:bg-[#00E88C] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                <Save size={16} />
+                Salvar
+              </button>
             </div>
           </div>
         </>
