@@ -450,12 +450,22 @@ export default function ContactsPage() {
   const handleCreateOrigin = async () => {
     if (!newOriginName.trim()) return;
 
+    // Get instance_name from selected connection
+    const selectedConn = connections.find(c => c.id === selectedConnection);
+    if (!selectedConn?.instance_name) {
+      console.error('No connection selected');
+      return;
+    }
+
     setTagLoading(true);
     try {
       const response = await fetch('/api/contacts/origins', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newOriginName.trim() })
+        body: JSON.stringify({
+          name: newOriginName.trim(),
+          instance_name: selectedConn.instance_name
+        })
       });
 
       if (response.ok) {
