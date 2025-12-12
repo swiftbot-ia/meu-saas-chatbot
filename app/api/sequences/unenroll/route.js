@@ -56,7 +56,7 @@ export async function POST(request) {
             .from('automation_sequence_subscriptions')
             .update({
                 status: 'cancelled',
-                cancelled_at: new Date().toISOString()
+                completed_at: new Date().toISOString()
             })
             .eq('id', subscriptionId);
 

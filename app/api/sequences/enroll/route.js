@@ -84,32 +84,46 @@ export async function POST(request) {
         }
 
         // Get first step of the sequence
-        const { data: firstStep } = await supabaseAdmin
+        const { data: steps, error: stepError } = await supabaseAdmin
             .from('automation_sequence_steps')
-            .select('id')
+            .select('id, order_index')
             .eq('sequence_id', sequenceId)
-            .eq('is_active', true)
-            .order('order_index', { ascending: true })
-            .limit(1)
-            .single();
+            .order('order_index', { ascending: true });
 
-        // Create subscription
+        console.log('📋 [Enroll] Data:', {
+            contactId,
+            sequenceId,
+            connectionId: sequence.connection_id,
+            stepsCount: steps?.length || 0,
+            stepError: stepError?.message
+        });
+
+        // Get conversation_id for this contact
+        const { data: conversation } = await chatSupabase
+            .from('whatsapp_conversations')
+            .select('id')
+            .eq('contact_id', contactId)
+            .maybeSingle();
+
+        // Create subscription - current_step is INTEGER (index), not UUID
         const { data: subscription, error: subError } = await chatSupabase
             .from('automation_sequence_subscriptions')
             .insert({
                 sequence_id: sequenceId,
                 contact_id: contactId,
-                instance_name: connection?.instance_name,
-                current_step_id: firstStep?.id || null,
+                connection_id: sequence.connection_id,
+                conversation_id: conversation?.id || null,
+                current_step: 0, // Start at first step (index 0)
                 status: 'active',
-                enrolled_at: new Date().toISOString()
+                started_at: new Date().toISOString(),
+                next_step_at: new Date().toISOString() // Process immediately
             })
             .select()
             .single();
 
         if (subError) {
             console.error('Erro ao inscrever na sequência:', subError);
-            return NextResponse.json({ error: 'Erro ao inscrever na sequência' }, { status: 500 });
+            return NextResponse.json({ error: 'Erro ao inscrever na sequência: ' + subError.message }, { status: 500 });
         }
 
         return NextResponse.json({ success: true, subscription });

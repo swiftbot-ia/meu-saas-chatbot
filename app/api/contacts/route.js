@@ -103,6 +103,7 @@ export async function GET(request) {
             .select(`
                 id,
                 instance_name,
+                contact_id,
                 funnel_stage,
                 funnel_position,
                 last_message_at,
@@ -122,8 +123,8 @@ export async function GET(request) {
                     )
                 )
             `)
+            .eq('user_id', ownerUserId)
             .in('instance_name', instanceNames)
-            .not('contact_id', 'is', null)
             .order('last_message_at', { ascending: false });
 
         const { data: conversations, error: convError } = await query;
@@ -132,6 +133,15 @@ export async function GET(request) {
             console.error('Erro ao buscar contatos:', convError);
             return NextResponse.json({ error: 'Erro ao buscar contatos' }, { status: 500 });
         }
+
+        // Debug log
+        console.log('📋 [Contacts API] Query results:', {
+            ownerUserId,
+            instanceNames,
+            totalConversations: conversations?.length || 0,
+            conversationsWithContacts: conversations?.filter(c => c.contact?.id).length || 0,
+            conversationsWithoutContacts: conversations?.filter(c => !c.contact?.id).length || 0
+        });
 
         // Get contact IDs from conversations
         const contactIds = conversations?.map(c => c.contact?.id).filter(Boolean) || [];
@@ -178,29 +188,31 @@ export async function GET(request) {
             }
         }
 
-        // Build contacts array with tags and origin
-        let contacts = conversations?.map(conv => {
-            const contactTags = tagAssignments
-                .filter(a => a.contact_id === conv.contact?.id)
-                .map(a => a.tag);
+        // Build contacts array with tags and origin (filter out conversations without contacts)
+        let contacts = conversations
+            ?.filter(conv => conv.contact?.id) // Only include conversations with linked contacts
+            ?.map(conv => {
+                const contactTags = tagAssignments
+                    .filter(a => a.contact_id === conv.contact?.id)
+                    .map(a => a.tag);
 
-            return {
-                id: conv.contact?.id,
-                conversation_id: conv.id,
-                whatsapp_number: conv.contact?.whatsapp_number,
-                name: conv.contact?.name,
-                profile_pic_url: conv.contact?.profile_pic_url,
-                created_at: conv.contact?.created_at,
-                last_message_at: conv.last_message_at || conv.contact?.last_message_at,
-                last_message_preview: conv.last_message_preview,
-                instance_name: conv.instance_name,
-                funnel_stage: conv.funnel_stage,
-                funnel_position: conv.funnel_position,
-                metadata: conv.contact?.metadata,
-                origin: conv.contact?.origin || null,
-                tags: contactTags
-            };
-        }) || [];
+                return {
+                    id: conv.contact?.id,
+                    conversation_id: conv.id,
+                    whatsapp_number: conv.contact?.whatsapp_number,
+                    name: conv.contact?.name,
+                    profile_pic_url: conv.contact?.profile_pic_url,
+                    created_at: conv.contact?.created_at,
+                    last_message_at: conv.last_message_at || conv.contact?.last_message_at,
+                    last_message_preview: conv.last_message_preview,
+                    instance_name: conv.instance_name,
+                    funnel_stage: conv.funnel_stage,
+                    funnel_position: conv.funnel_position,
+                    metadata: conv.contact?.metadata,
+                    origin: conv.contact?.origin || null,
+                    tags: contactTags
+                };
+            }) || [];
 
         // Filter by origin
         if (originId) {
