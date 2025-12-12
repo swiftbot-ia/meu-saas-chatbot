@@ -27,12 +27,8 @@ const SequenceCard = ({ sequence, onToggle, onEdit, onDuplicate, onDelete }) => 
     const [showMenu, setShowMenu] = useState(false)
 
     const stepsCount = sequence.automation_sequence_steps?.length || 0
-    const subscribersCount = sequence.automation_sequence_subscriptions?.length || 0
-
-    // Calculate stats
-    const totalSent = sequence.automation_sequence_subscriptions?.reduce((acc, sub) => {
-        return acc + (sub.messages_sent || 0)
-    }, 0) || 0
+    // Use subscribers_count from sequence record (subscriptions are in chat DB)
+    const subscribersCount = sequence.subscribers_count || 0
 
     return (
         <div className="bg-[#1E1E1E] rounded-xl p-4 hover:bg-[#252525] transition-all border border-transparent hover:border-white/5">
@@ -47,8 +43,8 @@ const SequenceCard = ({ sequence, onToggle, onEdit, onDuplicate, onDelete }) => 
                     <button
                         onClick={() => onToggle(sequence)}
                         className={`p-2 rounded-lg transition-colors ${sequence.is_active
-                                ? 'bg-[#00FF99]/10 text-[#00FF99]'
-                                : 'bg-gray-700/50 text-gray-400'
+                            ? 'bg-[#00FF99]/10 text-[#00FF99]'
+                            : 'bg-gray-700/50 text-gray-400'
                             }`}
                         title={sequence.is_active ? 'Pausar' : 'Ativar'}
                     >
@@ -101,10 +97,10 @@ const SequenceCard = ({ sequence, onToggle, onEdit, onDuplicate, onDelete }) => 
             {/* Trigger badge */}
             <div className="mt-3 flex items-center gap-2">
                 <span className={`text-xs px-2 py-1 rounded-full ${sequence.trigger_type === 'manual' ? 'bg-blue-500/10 text-blue-400' :
-                        sequence.trigger_type === 'new_contact' ? 'bg-green-500/10 text-green-400' :
-                            sequence.trigger_type === 'tag' ? 'bg-purple-500/10 text-purple-400' :
-                                sequence.trigger_type === 'origin' ? 'bg-orange-500/10 text-orange-400' :
-                                    'bg-gray-500/10 text-gray-400'
+                    sequence.trigger_type === 'new_contact' ? 'bg-green-500/10 text-green-400' :
+                        sequence.trigger_type === 'tag' ? 'bg-purple-500/10 text-purple-400' :
+                            sequence.trigger_type === 'origin' ? 'bg-orange-500/10 text-orange-400' :
+                                'bg-gray-500/10 text-gray-400'
                     }`}>
                     {sequence.trigger_type === 'manual' && 'Manual'}
                     {sequence.trigger_type === 'new_contact' && 'Novo Contato'}
@@ -130,25 +126,36 @@ export default function SequencesPage() {
 
     // Load sequences
     useEffect(() => {
-        if (!selectedConnection) return
+        if (!selectedConnection) {
+            console.log('[Sequences] No connection selected')
+            setLoading(false)
+            return
+        }
 
         const loadSequences = async () => {
             setLoading(true)
+            console.log('[Sequences] Loading for connection:', selectedConnection)
             try {
+                // Query only from main DB - automation_sequences and automation_sequence_steps
+                // Note: automation_sequence_subscriptions is in CHAT DB, not main DB
                 const { data, error } = await supabase
                     .from('automation_sequences')
                     .select(`
-            *,
-            automation_sequence_steps(*),
-            automation_sequence_subscriptions(id, messages_sent)
-          `)
+                        *,
+                        automation_sequence_steps(*)
+                    `)
                     .eq('connection_id', selectedConnection)
                     .order('created_at', { ascending: false })
 
-                if (error) throw error
+                console.log('[Sequences] Query result:', { data, error, count: data?.length })
+
+                if (error) {
+                    console.error('[Sequences] Query error:', error)
+                    throw error
+                }
                 setSequences(data || [])
             } catch (error) {
-                console.error('Error loading sequences:', error)
+                console.error('[Sequences] Error loading sequences:', error)
             } finally {
                 setLoading(false)
             }
