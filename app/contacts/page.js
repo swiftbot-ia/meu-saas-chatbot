@@ -1154,6 +1154,14 @@ export default function ContactsPage() {
               className="w-full bg-[#1E1E1E] text-white placeholder-gray-500 pl-12 pr-4 py-3 rounded-3xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/20 transition-all"
             />
           </div>
+          {/* Contact counter */}
+          {!loading && totalContacts > 0 && (
+            <div className="mt-2 text-center">
+              <span className="text-sm text-gray-400">
+                Mostrando <span className="text-[#00FF99] font-semibold">{filteredContacts.length}</span> de <span className="text-white font-semibold">{totalContacts}</span> contatos
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Contacts List */}

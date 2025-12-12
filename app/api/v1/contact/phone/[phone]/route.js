@@ -169,3 +169,103 @@ export async function GET(request, { params }) {
         )
     }
 }
+
+/**
+ * PATCH /api/v1/contact/phone/{phone}
+ * Update contact by phone number (name and/or metadata)
+ * 
+ * Body: { name?: string, metadata?: object }
+ */
+export async function PATCH(request, { params }) {
+    try {
+        const auth = await validateApiKey(request)
+        if (!auth.valid) {
+            return NextResponse.json(
+                { success: false, error: auth.error },
+                { status: 401 }
+            )
+        }
+
+        const { phone } = await params
+        const body = await request.json()
+
+        if (!phone) {
+            return NextResponse.json(
+                { success: false, error: 'phone is required' },
+                { status: 400 }
+            )
+        }
+
+        const { name, metadata } = body
+
+        if (!name && !metadata) {
+            return NextResponse.json(
+                { success: false, error: 'At least one of name or metadata is required' },
+                { status: 400 }
+            )
+        }
+
+        const normalizedPhone = phone.replace(/\D/g, '')
+        const chatDb = getChatDb()
+
+        // Find contact
+        const { data: contact, error: contactError } = await chatDb
+            .from('whatsapp_contacts')
+            .select('id, whatsapp_number, name, metadata')
+            .eq('whatsapp_number', normalizedPhone)
+            .single()
+
+        if (contactError || !contact) {
+            return NextResponse.json(
+                { success: false, error: 'Contact not found' },
+                { status: 404 }
+            )
+        }
+
+        // Build update object
+        const updateData = { updated_at: new Date().toISOString() }
+
+        if (name) {
+            updateData.name = name
+        }
+
+        if (metadata && typeof metadata === 'object') {
+            // Merge with existing metadata
+            updateData.metadata = { ...(contact.metadata || {}), ...metadata }
+        }
+
+        // Update contact
+        const { error: updateError } = await chatDb
+            .from('whatsapp_contacts')
+            .update(updateData)
+            .eq('id', contact.id)
+
+        if (updateError) {
+            console.error('[API v1] Error updating contact by phone:', updateError)
+            return NextResponse.json(
+                { success: false, error: 'Failed to update contact' },
+                { status: 500 }
+            )
+        }
+
+        console.log(`📝 [API v1] Contact ${normalizedPhone} updated:`, Object.keys(updateData))
+
+        return NextResponse.json({
+            success: true,
+            message: 'Contact updated successfully',
+            contact: {
+                id: contact.id,
+                phone: contact.whatsapp_number,
+                name: name || contact.name,
+                metadata: updateData.metadata || contact.metadata
+            }
+        })
+
+    } catch (error) {
+        console.error('[API v1] Update contact by phone error:', error)
+        return NextResponse.json(
+            { success: false, error: 'Internal server error' },
+            { status: 500 }
+        )
+    }
+}

@@ -19,7 +19,10 @@ import {
   Loader2,
   ExternalLink,
   Code,
-  ArrowLeft
+  ArrowLeft,
+  FileText,
+  Plus,
+  AlertCircle
 } from 'lucide-react'
 
 // ============================================================================
@@ -108,6 +111,7 @@ const ConnectionDropdown = ({ connections, selectedConnection, onSelectConnectio
 const TabNavigation = ({ activeTab, onTabChange }) => {
   const tabs = [
     { id: 'webhook', label: 'Webhook', icon: Webhook, soon: false },
+    { id: 'custom-fields', label: 'Campos Personalizados', icon: FileText, soon: false },
     { id: 'cadencia', label: 'Cadência', icon: Clock, soon: true },
     { id: 'gatilhos', label: 'Gatilhos Automáticos', icon: Zap, soon: true }
   ]
@@ -170,8 +174,8 @@ const ApiKeyCard = ({ connection, onGenerate, onRevoke, onCopy, loading }) => {
             <Key className="text-[#00FF99]" size={18} />
             <h3 className="text-white font-medium">{connection.connectionName}</h3>
             <span className={`text-xs px-2 py-0.5 rounded-full ${connection.isConnected
-                ? 'bg-[#00FF99]/20 text-[#00FF99]'
-                : 'bg-red-500/20 text-red-400'
+              ? 'bg-[#00FF99]/20 text-[#00FF99]'
+              : 'bg-red-500/20 text-red-400'
               }`}>
               {connection.isConnected ? 'Conectado' : 'Desconectado'}
             </span>
@@ -360,6 +364,181 @@ const ApiDocumentation = () => {
             )}
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// CUSTOM FIELDS TAB - Global Custom Fields Management
+// ============================================================================
+const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }) => {
+  const [fieldName, setFieldName] = useState('')
+  const [defaultValue, setDefaultValue] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState(null)
+
+  const handleCreateField = async () => {
+    if (!fieldName.trim()) {
+      setResult({ type: 'error', message: 'Nome do campo é obrigatório' })
+      return
+    }
+
+    if (!selectedConnection) {
+      setResult({ type: 'error', message: 'Selecione uma conexão' })
+      return
+    }
+
+    setLoading(true)
+    setResult(null)
+
+    try {
+      // Get connection info
+      const conn = connections.find(c => c.connectionId === selectedConnection)
+      if (!conn?.instanceName) {
+        throw new Error('Conexão não encontrada')
+      }
+
+      // Call API to add field to all contacts
+      const response = await fetch('/api/contacts/global-field', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          connectionId: selectedConnection,
+          instanceName: conn.instanceName,
+          fieldName: fieldName.trim(),
+          defaultValue: defaultValue.trim() || ''
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setResult({
+          type: 'success',
+          message: `Campo "${fieldName}" criado em ${data.updatedCount} contatos!`
+        })
+        setFieldName('')
+        setDefaultValue('')
+      } else {
+        setResult({ type: 'error', message: data.error || 'Erro ao criar campo' })
+      }
+    } catch (error) {
+      console.error('Error creating global field:', error)
+      setResult({ type: 'error', message: 'Erro ao criar campo global' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const selectedConn = connections.find(c => c.connectionId === selectedConnection)
+
+  return (
+    <div className="space-y-6">
+      {/* Info Banner */}
+      <div className="bg-gradient-to-r from-purple-500/10 to-transparent rounded-xl p-5 border border-purple-500/20">
+        <div className="flex items-start gap-4">
+          <FileText className="text-purple-400 flex-shrink-0 mt-1" size={24} />
+          <div>
+            <h2 className="text-white font-semibold mb-1">Campos Personalizados Globais</h2>
+            <p className="text-gray-400 text-sm">
+              Crie campos personalizados que serão adicionados a todos os contatos da sua conexão.
+              Ideal para campos como ID do CRM, origem, segmento, etc.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Connection Selector */}
+      {connections.length > 1 && (
+        <div>
+          <label className="block text-sm text-gray-400 mb-2">Conexão</label>
+          <ConnectionDropdown
+            connections={connections}
+            selectedConnection={selectedConnection}
+            onSelectConnection={onSelectConnection}
+          />
+        </div>
+      )}
+
+      {/* Create Field Form */}
+      <div className="bg-[#1A1A1A] rounded-xl p-6 border border-white/5">
+        <h3 className="text-white font-medium mb-4 flex items-center gap-2">
+          <Plus size={18} className="text-[#00FF99]" />
+          Criar Novo Campo Global
+        </h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Nome do Campo *</label>
+            <input
+              type="text"
+              value={fieldName}
+              onChange={(e) => setFieldName(e.target.value)}
+              placeholder="Ex: idCRM, source, segment"
+              className="w-full bg-[#252525] border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+            />
+            <p className="text-xs text-gray-500 mt-1">Sem espaços, use camelCase</p>
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Valor Padrão</label>
+            <input
+              type="text"
+              value={defaultValue}
+              onChange={(e) => setDefaultValue(e.target.value)}
+              placeholder="Ex: vazio ou valor inicial"
+              className="w-full bg-[#252525] border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+            />
+            <p className="text-xs text-gray-500 mt-1">Deixe vazio para adicionar sem valor</p>
+          </div>
+        </div>
+
+        {/* Result Message */}
+        {result && (
+          <div className={`mt-4 p-3 rounded-lg flex items-center gap-2 ${result.type === 'success'
+              ? 'bg-[#00FF99]/10 text-[#00FF99] border border-[#00FF99]/20'
+              : 'bg-red-500/10 text-red-400 border border-red-500/20'
+            }`}>
+            {result.type === 'success' ? <Check size={18} /> : <AlertCircle size={18} />}
+            {result.message}
+          </div>
+        )}
+
+        <button
+          onClick={handleCreateField}
+          disabled={loading || !fieldName.trim()}
+          className="mt-4 w-full md:w-auto px-6 py-3 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold rounded-xl hover:shadow-[0_0_20px_rgba(0,255,153,0.3)] disabled:opacity-50 disabled:hover:shadow-none transition-all flex items-center justify-center gap-2"
+        >
+          {loading ? (
+            <>
+              <Loader2 size={18} className="animate-spin" />
+              Criando...
+            </>
+          ) : (
+            <>
+              <Plus size={18} />
+              Criar Campo em Todos os Contatos
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Info about API */}
+      <div className="bg-[#1A1A1A] rounded-xl p-5 border border-white/5">
+        <h3 className="text-white font-medium mb-3">Via API</h3>
+        <p className="text-gray-400 text-sm mb-3">
+          Você também pode atualizar campos personalizados via API:
+        </p>
+        <pre className="bg-[#252525] p-4 rounded-lg overflow-x-auto text-xs text-gray-300">
+          {`# Por telefone:
+PATCH /api/v1/contact/phone/{phone}
+Body: { "metadata": { "${fieldName || 'idCRM'}": "valor" } }
+
+# Por contactId:
+PATCH /api/v1/contact/{contactId}/metadata
+Body: { "${fieldName || 'idCRM'}": "valor" }`}
+        </pre>
       </div>
     </div>
   )
@@ -581,6 +760,14 @@ export default function SettingsPage() {
                 Em Desenvolvimento
               </span>
             </div>
+          )}
+
+          {activeTab === 'custom-fields' && (
+            <CustomFieldsTab
+              connections={connections}
+              selectedConnection={selectedConnection}
+              onSelectConnection={setSelectedConnection}
+            />
           )}
         </div>
       </div>
