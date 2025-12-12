@@ -42,6 +42,9 @@ export async function GET(request) {
         const connectionId = searchParams.get('connectionId') || '';
         const originId = searchParams.get('originId') || '';
         const tagId = searchParams.get('tagId') || '';
+        const search = searchParams.get('search') || '';
+        const limit = parseInt(searchParams.get('limit') || '50');
+        const offset = parseInt(searchParams.get('offset') || '0');
 
         // Get authenticated user
         const supabase = await createAuthClient();
@@ -90,7 +93,7 @@ export async function GET(request) {
         }
 
         if (instanceNames.length === 0) {
-            return NextResponse.json({ contacts: [], origins: [], tags: [] });
+            return NextResponse.json({ contacts: [], origins: [], tags: [], total: 0, hasMore: false });
         }
 
         // Use chat supabase for whatsapp tables
@@ -227,10 +230,30 @@ export async function GET(request) {
             );
         }
 
+        // Filter by search (name or phone)
+        if (search) {
+            const searchLower = search.toLowerCase();
+            contacts = contacts.filter(c =>
+                (c.name?.toLowerCase().includes(searchLower)) ||
+                (c.whatsapp_number?.includes(search))
+            );
+        }
+
+        // Calculate total before pagination
+        const total = contacts.length;
+
+        // Apply pagination
+        const paginatedContacts = contacts.slice(offset, offset + limit);
+        const hasMore = offset + limit < total;
+
+        console.log('📋 [Contacts API] Pagination:', { total, offset, limit, returned: paginatedContacts.length, hasMore });
+
         return NextResponse.json({
-            contacts,
+            contacts: paginatedContacts,
             origins: allOrigins || [],
-            tags: allTags || []
+            tags: allTags || [],
+            total,
+            hasMore
         });
 
     } catch (error) {

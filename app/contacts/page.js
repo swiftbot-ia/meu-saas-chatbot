@@ -6,7 +6,7 @@
 'use client';
 
 import { supabase } from '@/lib/supabase/client'
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Search,
@@ -224,6 +224,15 @@ export default function ContactsPage() {
   const [newFieldValue, setNewFieldValue] = useState('');
   const [editingField, setEditingField] = useState(null);
 
+  // Pagination state
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [totalContacts, setTotalContacts] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const CONTACTS_PER_PAGE = 50;
+  const contactsListRef = useRef(null);
+  const searchTimeoutRef = useRef(null);
+
   // Load connections on mount
   useEffect(() => {
     loadConnections();
@@ -353,13 +362,19 @@ export default function ContactsPage() {
     }
   };
 
-  const loadContacts = async () => {
+  const loadContacts = async (reset = true) => {
     try {
-      setLoading(true);
+      if (reset) {
+        setLoading(true);
+        setOffset(0);
+      }
       const params = new URLSearchParams();
       if (selectedConnection) params.set('connectionId', selectedConnection);
       if (selectedOrigin) params.set('originId', selectedOrigin);
       if (selectedTag) params.set('tagId', selectedTag);
+      if (searchTerm) params.set('search', searchTerm);
+      params.set('limit', CONTACTS_PER_PAGE.toString());
+      params.set('offset', reset ? '0' : offset.toString());
 
       const response = await fetch(`/api/contacts?${params}`);
       const data = await response.json();
@@ -371,6 +386,9 @@ export default function ContactsPage() {
       setContacts(data.contacts || []);
       setOrigins(data.origins || []);
       setTags(data.tags || []);
+      setTotalContacts(data.total || 0);
+      setHasMore(data.hasMore || false);
+      setOffset(CONTACTS_PER_PAGE);
       setError(null);
 
     } catch (err) {
@@ -381,15 +399,67 @@ export default function ContactsPage() {
     }
   };
 
-  // Filter contacts by search
-  const filteredContacts = contacts.filter(contact => {
-    if (!searchTerm) return true;
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      contact.name?.toLowerCase().includes(searchLower) ||
-      contact.whatsapp_number?.toLowerCase().includes(searchLower)
-    );
-  });
+  // Load more contacts on scroll
+  const loadMoreContacts = async () => {
+    if (loadingMore || !hasMore) return;
+
+    try {
+      setLoadingMore(true);
+      const params = new URLSearchParams();
+      if (selectedConnection) params.set('connectionId', selectedConnection);
+      if (selectedOrigin) params.set('originId', selectedOrigin);
+      if (selectedTag) params.set('tagId', selectedTag);
+      if (searchTerm) params.set('search', searchTerm);
+      params.set('limit', CONTACTS_PER_PAGE.toString());
+      params.set('offset', offset.toString());
+
+      const response = await fetch(`/api/contacts?${params}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao carregar mais contatos');
+      }
+
+      setContacts(prev => [...prev, ...(data.contacts || [])]);
+      setHasMore(data.hasMore || false);
+      setOffset(prev => prev + CONTACTS_PER_PAGE);
+
+    } catch (err) {
+      console.error('Erro ao carregar mais contatos:', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Handle scroll for infinite loading
+  const handleScroll = useCallback((e) => {
+    const target = e.target;
+    const bottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 200;
+    if (bottom && hasMore && !loadingMore) {
+      loadMoreContacts();
+    }
+  }, [hasMore, loadingMore, offset, selectedConnection, selectedOrigin, selectedTag, searchTerm]);
+
+  // Debounced search - now sends to backend
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      if (selectedConnection) {
+        loadContacts(true);
+      }
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchTerm]);
+
+  // No longer need client-side filtering - backend handles it
+  const filteredContacts = contacts;
 
   // Format date helper
   const formatDate = (timestamp) => {
@@ -1064,7 +1134,11 @@ export default function ContactsPage() {
         </div>
 
         {/* Contacts List */}
-        <div className="flex-1 overflow-y-auto">
+        <div
+          ref={contactsListRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto"
+        >
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="animate-spin text-[#00FF99]" size={32} />
@@ -1107,24 +1181,18 @@ export default function ContactsPage() {
                       </div>
                     )}
 
-                    {/* Content */}
+                    {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-semibold text-white truncate">
-                          {contact.name || contact.whatsapp_number}
-                        </h3>
-                        <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
-                          {formatRelativeTime(contact.last_message_at)}
-                        </span>
-                      </div>
-
-                      <p className="text-sm text-gray-400 truncate">
+                      <h3 className="font-semibold text-white truncate">
+                        {contact.name || contact.whatsapp_number || 'Sem nome'}
+                      </h3>
+                      <p className="text-sm text-[#B0B0B0] truncate">
                         {contact.whatsapp_number}
                       </p>
 
-                      {/* Tags */}
+                      {/* Tags preview */}
                       {contact.tags && contact.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
+                        <div className="flex flex-wrap gap-1 mt-1">
                           {contact.tags.slice(0, 2).map((tag) => (
                             <span
                               key={tag.id}
@@ -1148,6 +1216,21 @@ export default function ContactsPage() {
                   </div>
                 </div>
               ))}
+
+              {/* Loading more indicator */}
+              {loadingMore && (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="animate-spin text-[#00FF99]" size={20} />
+                  <span className="ml-2 text-sm text-gray-400">Carregando mais...</span>
+                </div>
+              )}
+
+              {/* End of list indicator */}
+              {!hasMore && filteredContacts.length > 0 && (
+                <div className="text-center py-4 text-sm text-gray-500">
+                  {totalContacts} contatos carregados
+                </div>
+              )}
             </div>
           )}
         </div>
