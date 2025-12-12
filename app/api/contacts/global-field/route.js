@@ -69,23 +69,45 @@ export async function POST(request) {
 
         const chatSupabase = createChatSupabaseAdminClient()
 
-        // Get all contact IDs for this instance via conversations
-        const { data: conversations, error: convError } = await chatSupabase
-            .from('whatsapp_conversations')
-            .select('contact_id')
-            .eq('instance_name', instanceName)
-            .eq('user_id', ownerUserId)
-            .not('contact_id', 'is', null)
+        // Batch fetch ALL contact IDs to bypass Supabase 1000 row limit
+        let allContactIds = []
+        const BATCH_SIZE = 1000
+        let offset = 0
+        let hasMore = true
 
-        if (convError) {
-            console.error('Error fetching conversations:', convError)
-            return NextResponse.json({
-                success: false,
-                error: 'Erro ao buscar contatos'
-            }, { status: 500 })
+        console.log(`📝 [Global Field] Fetching all contact IDs for ${instanceName}...`)
+
+        while (hasMore) {
+            const { data: batch, error: batchError } = await chatSupabase
+                .from('whatsapp_conversations')
+                .select('contact_id')
+                .eq('instance_name', instanceName)
+                .eq('user_id', ownerUserId)
+                .not('contact_id', 'is', null)
+                .range(offset, offset + BATCH_SIZE - 1)
+
+            if (batchError) {
+                console.error('Error fetching batch:', batchError)
+                break
+            }
+
+            if (batch && batch.length > 0) {
+                allContactIds = allContactIds.concat(batch.map(c => c.contact_id))
+                offset += BATCH_SIZE
+                hasMore = batch.length === BATCH_SIZE
+            } else {
+                hasMore = false
+            }
+
+            // Safety limit
+            if (offset > 50000) {
+                console.warn('⚠️ [Global Field] Safety limit reached')
+                break
+            }
         }
 
-        const contactIds = [...new Set(conversations?.map(c => c.contact_id).filter(Boolean) || [])]
+        // Deduplicate contact IDs
+        const contactIds = [...new Set(allContactIds)]
 
         if (contactIds.length === 0) {
             return NextResponse.json({
@@ -96,44 +118,45 @@ export async function POST(request) {
 
         console.log(`📝 [Global Field] Adding "${fieldName}" to ${contactIds.length} contacts`)
 
-        // Update contacts in batches
+        // Update all contacts using bulk update with JSONB merge
+        // Use a more efficient approach: update in larger batches without fetching first
         let updatedCount = 0
-        const BATCH_SIZE = 100
+        const UPDATE_BATCH_SIZE = 500
 
-        for (let i = 0; i < contactIds.length; i += BATCH_SIZE) {
-            const batch = contactIds.slice(i, i + BATCH_SIZE)
+        for (let i = 0; i < contactIds.length; i += UPDATE_BATCH_SIZE) {
+            const batchIds = contactIds.slice(i, i + UPDATE_BATCH_SIZE)
 
-            // Use RPC or raw SQL via function to update JSONB
-            // Since Supabase doesn't support jsonb_set in update, we'll fetch and update each
-            const { data: contacts, error: fetchError } = await chatSupabase
-                .from('whatsapp_contacts')
-                .select('id, metadata')
-                .in('id', batch)
+            // Use PostgreSQL's jsonb_set to efficiently add the field
+            // This updates metadata by merging the new field
+            const { data: updated, error: updateError } = await chatSupabase.rpc('add_metadata_field', {
+                contact_ids: batchIds,
+                field_name: fieldName,
+                field_value: defaultValue || ''
+            })
 
-            if (fetchError) {
-                console.error('Error fetching batch:', fetchError)
-                continue
-            }
+            if (updateError) {
+                // Fallback to individual updates if RPC doesn't exist
+                console.log(`⚠️ [Global Field] RPC not available, using fallback...`)
 
-            for (const contact of contacts || []) {
-                const existingMetadata = contact.metadata || {}
-
-                // Only add if field doesn't exist
-                if (!(fieldName in existingMetadata)) {
-                    const updatedMetadata = {
-                        ...existingMetadata,
-                        [fieldName]: defaultValue || ''
-                    }
-
-                    const { error: updateError } = await chatSupabase
+                // Simple fallback: just update metadata with raw SQL approach
+                for (const contactId of batchIds) {
+                    const { data: contact } = await chatSupabase
                         .from('whatsapp_contacts')
-                        .update({ metadata: updatedMetadata })
-                        .eq('id', contact.id)
+                        .select('metadata')
+                        .eq('id', contactId)
+                        .single()
 
-                    if (!updateError) {
+                    const existingMetadata = contact?.metadata || {}
+                    if (!(fieldName in existingMetadata)) {
+                        await chatSupabase
+                            .from('whatsapp_contacts')
+                            .update({ metadata: { ...existingMetadata, [fieldName]: defaultValue || '' } })
+                            .eq('id', contactId)
                         updatedCount++
                     }
                 }
+            } else {
+                updatedCount += batchIds.length
             }
         }
 
@@ -154,3 +177,4 @@ export async function POST(request) {
         }, { status: 500 })
     }
 }
+
