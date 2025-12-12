@@ -233,7 +233,8 @@ export default function AutomationsLayout({ children }) {
 
                 if (conns && conns.length > 0) {
                     setConnections(conns)
-                    const saved = localStorage.getItem('automations-connection')
+                    // Use same localStorage key as other pages (contacts, chat)
+                    const saved = localStorage.getItem('activeConnectionId')
                     if (saved && conns.find(c => c.id === saved)) {
                         setSelectedConnection(saved)
                     } else {
@@ -251,7 +252,8 @@ export default function AutomationsLayout({ children }) {
 
     const handleConnectionSelect = (connId) => {
         setSelectedConnection(connId)
-        localStorage.setItem('automations-connection', connId)
+        // Sync with other pages
+        localStorage.setItem('activeConnectionId', connId)
     }
 
     // Redirect to templates if on base path
