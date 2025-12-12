@@ -14,7 +14,7 @@ export default function AutomationsPage() {
   const router = useRouter()
 
   useEffect(() => {
-    router.replace('/automations/sequences')
+    router.replace('/automations/templates')
   }, [router])
 
   return (

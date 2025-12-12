@@ -24,7 +24,7 @@ export function useAutomations() {
 }
 
 // ============================================================================
-// CONNECTION DROPDOWN
+// CONNECTION DROPDOWN - Padrão do Chat
 // ============================================================================
 const ConnectionDropdown = ({ connections, selectedConnection, onSelectConnection }) => {
     const [isOpen, setIsOpen] = useState(false)
@@ -34,44 +34,53 @@ const ConnectionDropdown = ({ connections, selectedConnection, onSelectConnectio
         <div className="relative">
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between gap-3 bg-[#1E1E1E] px-4 py-3 rounded-xl hover:bg-[#252525] transition-all"
+                className="w-full flex items-center justify-between gap-3 bg-[#1E1E1E] px-4 py-3 rounded-2xl hover:bg-[#252525] transition-all"
             >
                 <div className="flex items-center gap-3">
                     {selected?.profile_pic_url ? (
-                        <img src={selected.profile_pic_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                        <img src={selected.profile_pic_url} alt="" className="w-12 h-12 rounded-full object-cover" />
                     ) : (
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#00FF99] to-[#00E88C] flex items-center justify-center">
-                            <span className="text-black text-sm font-bold">{selected?.contact_name?.[0] || 'W'}</span>
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#00FF99] to-[#00E88C] flex items-center justify-center">
+                            <span className="text-black text-lg font-bold">{selected?.contact_name?.[0] || 'W'}</span>
                         </div>
                     )}
                     <div className="text-left">
-                        <p className="text-white text-sm font-medium truncate max-w-[150px]">{selected?.contact_name || 'Selecionar'}</p>
-                        <p className="text-xs text-gray-500">{selected?.is_connected ? '● Conectado' : '○ Desconectado'}</p>
+                        <p className="text-white font-semibold">{selected?.contact_name || 'Selecionar'}</p>
+                        <p className={`text-sm ${selected?.is_connected ? 'text-[#00FF99]' : 'text-gray-500'}`}>
+                            ● {selected?.is_connected ? 'Conectado' : 'Desconectado'}
+                        </p>
                     </div>
                 </div>
-                <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown size={20} className={`text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isOpen && (
                 <>
                     <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-[#1E1E1E] rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto border border-white/10">
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-[#1E1E1E] rounded-2xl shadow-2xl z-50 max-h-80 overflow-y-auto border border-white/10">
                         {connections.map(conn => (
                             <button
                                 key={conn.id}
                                 onClick={() => { onSelectConnection(conn.id); setIsOpen(false) }}
-                                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors ${selectedConnection === conn.id ? 'bg-[#00FF99]/10' : ''}`}
+                                className={`w-full flex items-center gap-3 px-4 py-3 transition-colors first:rounded-t-2xl last:rounded-b-2xl
+                                    ${selectedConnection === conn.id
+                                        ? 'bg-[#00FF99]/10'
+                                        : 'hover:bg-white/5'}`}
                             >
                                 {conn.profile_pic_url ? (
-                                    <img src={conn.profile_pic_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                                    <img src={conn.profile_pic_url} alt="" className="w-12 h-12 rounded-full object-cover" />
                                 ) : (
-                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#00FF99] to-[#00E88C] flex items-center justify-center">
-                                        <span className="text-black text-sm font-bold">{conn.contact_name?.[0] || 'W'}</span>
+                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#00FF99] to-[#00E88C] flex items-center justify-center">
+                                        <span className="text-black text-lg font-bold">{conn.contact_name?.[0] || 'W'}</span>
                                     </div>
                                 )}
                                 <div className="text-left flex-1">
-                                    <p className="text-white text-sm font-medium">{conn.contact_name || conn.instance_name}</p>
-                                    <p className="text-xs text-gray-500">{conn.is_connected ? '● Conectado' : '○ Desconectado'}</p>
+                                    <p className={`font-semibold ${selectedConnection === conn.id ? 'text-[#00FF99]' : 'text-white'}`}>
+                                        {conn.contact_name || conn.instance_name}
+                                    </p>
+                                    <p className={`text-sm ${conn.is_connected ? 'text-[#00FF99]' : 'text-gray-500'}`}>
+                                        ● {conn.is_connected ? 'Conectado' : 'Desconectado'}
+                                    </p>
                                 </div>
                             </button>
                         ))}
@@ -190,10 +199,10 @@ export default function AutomationsLayout({ children }) {
         localStorage.setItem('automations-connection', connId)
     }
 
-    // Redirect to sequences if on base path
+    // Redirect to templates if on base path
     useEffect(() => {
         if (pathname === '/automations' && !loading) {
-            router.replace('/automations/sequences')
+            router.replace('/automations/templates')
         }
     }, [pathname, loading, router])
 
