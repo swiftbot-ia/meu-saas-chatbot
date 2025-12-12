@@ -652,8 +652,8 @@ export default function ContactsPage() {
     if (selectedContact && selectedConnection) {
       loadSequences();
       loadContactSequences();
-      // Load custom fields from contact metadata
-      setCustomFields(selectedContact.metadata?.custom_fields || {});
+      // Load custom fields from contact metadata (fields are stored directly in metadata)
+      setCustomFields(selectedContact.metadata || {});
     }
   }, [selectedContact?.id]);
 
@@ -759,11 +759,11 @@ export default function ContactsPage() {
     setCustomFields(updatedFields);
 
     try {
-      // Update contact metadata with custom fields
+      // Update contact metadata - send fields directly (API does merge)
       const response = await fetch(`/api/contacts/${selectedContact.id}/metadata`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ custom_fields: updatedFields })
+        body: JSON.stringify({ [newFieldKey.trim()]: newFieldValue })
       });
 
       if (response.ok) {
@@ -784,10 +784,12 @@ export default function ContactsPage() {
     setCustomFields(updatedFields);
 
     try {
+      // To delete a field, we need to send the complete updated metadata
+      // Use PUT to replace all metadata (without the deleted field)
       await fetch(`/api/contacts/${selectedContact.id}/metadata`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ custom_fields: updatedFields })
+        body: JSON.stringify(updatedFields)
       });
     } catch (err) {
       console.error('Erro ao deletar campo:', err);
