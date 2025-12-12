@@ -258,6 +258,23 @@ const ApiDocumentation = () => {
 
   const endpoints = [
     {
+      method: 'POST',
+      path: '/api/v1/contact/update',
+      description: 'Atualizar contato completo (nome, origem, etapa, tags, etc)',
+      example: `curl -X POST 'https://app.swiftbot.com.br/api/v1/contact/update' \\
+  -H 'X-API-KEY: sua-api-key' \\
+  -H 'Content-Type: application/json' \\
+  -d '{
+    "phone": "5511999999999",
+    "name": "João Silva",
+    "funnelStage": "negociacao",
+    "originId": "uuid-da-origem",
+    "metadata": {"idCRM": "12345"},
+    "addTags": ["tag-uuid-1"],
+    "agentEnabled": true
+  }'`
+    },
+    {
       method: 'GET',
       path: '/api/v1/contact/phone/{phone}',
       description: 'Buscar contato por telefone',
