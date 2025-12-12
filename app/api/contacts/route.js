@@ -128,15 +128,66 @@ export async function GET(request) {
             `)
             .eq('user_id', ownerUserId)
             .in('instance_name', instanceNames)
-            .order('last_message_at', { ascending: false })
-            .limit(10000); // High limit to allow search across all contacts
+            .order('last_message_at', { ascending: false });
 
-        const { data: conversations, error: convError } = await query;
+        // Fetch all conversations in batches to bypass Supabase 1000 row limit
+        let allConversations = [];
+        const BATCH_SIZE = 1000;
+        let batchOffset = 0;
+        let batchHasMore = true;
 
-        if (convError) {
-            console.error('Erro ao buscar contatos:', convError);
-            return NextResponse.json({ error: 'Erro ao buscar contatos' }, { status: 500 });
+        while (batchHasMore) {
+            const { data: batch, error: batchError } = await chatSupabase
+                .from('whatsapp_conversations')
+                .select(`
+                    id,
+                    instance_name,
+                    contact_id,
+                    funnel_stage,
+                    funnel_position,
+                    last_message_at,
+                    last_message_preview,
+                    contact:whatsapp_contacts!contact_id (
+                        id,
+                        whatsapp_number,
+                        name,
+                        profile_pic_url,
+                        created_at,
+                        last_message_at,
+                        metadata,
+                        origin_id,
+                        origin:contact_origins!origin_id (
+                            id,
+                            name
+                        )
+                    )
+                `)
+                .eq('user_id', ownerUserId)
+                .in('instance_name', instanceNames)
+                .order('last_message_at', { ascending: false })
+                .range(batchOffset, batchOffset + BATCH_SIZE - 1);
+
+            if (batchError) {
+                console.error('Erro ao buscar lote de contatos:', batchError);
+                break;
+            }
+
+            if (batch && batch.length > 0) {
+                allConversations = allConversations.concat(batch);
+                batchOffset += BATCH_SIZE;
+                batchHasMore = batch.length === BATCH_SIZE;
+            } else {
+                batchHasMore = false;
+            }
+
+            // Safety limit to prevent infinite loops
+            if (batchOffset > 20000) {
+                console.warn('⚠️ [Contacts API] Safety limit reached at 20000 conversations');
+                break;
+            }
         }
+
+        const conversations = allConversations;
 
         // Debug log
         console.log('📋 [Contacts API] Query results:', {
