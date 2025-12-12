@@ -250,8 +250,17 @@ export async function GET(request) {
                 `)
                 .in('contact_id', contactIds);
 
-            if (!assignError) {
+            if (assignError) {
+                console.error('🏷️ [Contacts] Error loading tag assignments:', assignError);
+            } else {
                 tagAssignments = assignments || [];
+                console.log(`🏷️ [Contacts] Loaded ${tagAssignments.length} tag assignments for ${contactIds.length} contacts`);
+                if (tagAssignments.length > 0) {
+                    console.log(`🏷️ [Contacts] Sample assignments:`, tagAssignments.slice(0, 3).map(a => ({
+                        contact_id: a.contact_id,
+                        tag: a.tag
+                    })));
+                }
             }
         }
 
