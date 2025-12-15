@@ -33,7 +33,7 @@ export default function LazyVideo({ src, poster, className, ...props }) {
                     onLoadedData={() => setHasLoaded(true)}
                     {...props}
                 >
-                    <source src={src} type="video/mp4" />
+                    <source src={src} type="video/webm" />
                 </video>
             ) : (
                 poster && (
