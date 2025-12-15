@@ -3,7 +3,9 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import Header from './components/Header'
+import LazyVideo from './components/LazyVideo'
 
 export default function Home() {
   const router = useRouter()
@@ -108,12 +110,13 @@ export default function Home() {
         {/* SEÇÃO 1: HERO COM VÍDEO DE FUNDO */}
         <section className="relative min-h-screen md:min-h-screen flex items-center justify-center overflow-visible bg-transparent pb-12 md:pb-20">
           <div className="absolute inset-0 bg-black rounded-b-[40px] md:rounded-b-[80px] overflow-hidden">
-            {/* Video Background */}
+            {/* Video Background - Optimized with preload metadata */}
             <video
               autoPlay
               loop
               muted
               playsInline
+              preload="metadata"
               className="absolute inset-0 w-full h-full object-cover opacity-40"
             >
               <source src="/particles-background.mp4" type="video/mp4" />
@@ -439,18 +442,13 @@ export default function Home() {
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
               <div className="grid md:grid-cols-2 gap-16 items-center">
-                {/* Vídeo */}
+                {/* Vídeo - Lazy loaded */}
                 <div className="relative">
                   <div className="bg-gradient-to-br from-purple-500 via-pink-500 to-indigo-600 rounded-[40px] p-8">
-                    <video
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full h-auto rounded-3xl"
-                    >
-                      <source src="/swiftbot-ia-demo.mp4" type="video/mp4" />
-                    </video>
+                    <LazyVideo
+                      src="/swiftbot-ia-demo.mp4"
+                      className="w-full h-auto rounded-3xl overflow-hidden"
+                    />
                   </div>
                 </div>
 
@@ -523,13 +521,16 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Imagem */}
+                {/* Imagem - Optimized with next/image */}
                 <div className="relative">
                   <div className="bg-gradient-to-br from-green-500 via-emerald-500 to-teal-500 rounded-[40px] p-8">
-                    <img
+                    <Image
                       src="/chat-live-demo.png"
                       alt="Chat ao Vivo SwiftBot"
+                      width={800}
+                      height={600}
                       className="w-full h-auto rounded-3xl"
+                      loading="lazy"
                     />
                   </div>
                 </div>
@@ -543,13 +544,16 @@ export default function Home() {
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
               <div className="grid md:grid-cols-2 gap-16 items-center">
-                {/* Imagem */}
+                {/* Imagem - Optimized with next/image */}
                 <div className="relative">
                   <div className="bg-gradient-to-br from-blue-500 via-cyan-500 to-teal-400 rounded-[40px] p-8">
-                    <img
+                    <Image
                       src="/contacts-demo.png"
                       alt="Gestão de Contatos"
+                      width={800}
+                      height={600}
                       className="w-full h-auto rounded-3xl"
+                      loading="lazy"
                     />
                   </div>
                 </div>
@@ -624,18 +628,13 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Vídeo */}
+                {/* Vídeo - Lazy loaded */}
                 <div className="relative">
                   <div className="bg-gradient-to-br from-orange-500 via-pink-500 to-purple-500 rounded-[40px] p-8">
-                    <video
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full h-auto rounded-3xl"
-                    >
-                      <source src="/crm-kanban-demo.mp4" type="video/mp4" />
-                    </video>
+                    <LazyVideo
+                      src="/crm-kanban-demo.mp4"
+                      className="w-full h-auto rounded-3xl overflow-hidden"
+                    />
                   </div>
                 </div>
               </div>
@@ -648,13 +647,16 @@ export default function Home() {
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
               <div className="grid md:grid-cols-2 gap-16 items-center">
-                {/* Imagem */}
+                {/* Imagem - Optimized with next/image */}
                 <div className="relative">
                   <div className="bg-gradient-to-br from-yellow-400 via-orange-500 to-pink-500 rounded-[40px] p-8">
-                    <img
+                    <Image
                       src="/agent-config-demo.png"
                       alt="Configuração do Agente"
+                      width={800}
+                      height={600}
                       className="w-full h-auto rounded-3xl"
+                      loading="lazy"
                     />
                   </div>
                 </div>
@@ -1059,16 +1061,11 @@ export default function Home() {
 
         {/* SEÇÃO 8: CTA FINAL COM VÍDEO DE FUNDO */}
         <section className="py-32 bg-black rounded-t-[40px] md:rounded-t-[80px] relative overflow-hidden -mt-1">
-          {/* Video Background */}
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover opacity-30"
-          >
-            <source src="/cta-background.mp4" type="video/mp4" />
-          </video>
+          {/* Video Background - Lazy loaded */}
+          <LazyVideo
+            src="/cta-background.mp4"
+            className="absolute inset-0 w-full h-full opacity-30"
+          />
 
           {/* Overlay com gradiente sutil */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/90" />
