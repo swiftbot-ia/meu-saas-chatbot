@@ -525,7 +525,7 @@ export default function Home() {
                 <div className="relative">
                   <div className="bg-gradient-to-br from-green-500 via-emerald-500 to-teal-500 rounded-[40px] p-8">
                     <Image
-                      src="/chat-live-demo.png"
+                      src="/chat-live-demo.webp"
                       alt="Chat ao Vivo SwiftBot"
                       width={800}
                       height={600}
@@ -548,7 +548,7 @@ export default function Home() {
                 <div className="relative">
                   <div className="bg-gradient-to-br from-blue-500 via-cyan-500 to-teal-400 rounded-[40px] p-8">
                     <Image
-                      src="/contacts-demo.png"
+                      src="/contacts-demo.webp"
                       alt="Gestão de Contatos"
                       width={800}
                       height={600}
@@ -651,7 +651,7 @@ export default function Home() {
                 <div className="relative">
                   <div className="bg-gradient-to-br from-yellow-400 via-orange-500 to-pink-500 rounded-[40px] p-8">
                     <Image
-                      src="/agent-config-demo.png"
+                      src="/agent-config-demo.webp"
                       alt="Configuração do Agente"
                       width={800}
                       height={600}
