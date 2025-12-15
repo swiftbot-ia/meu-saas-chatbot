@@ -6,7 +6,7 @@
 'use client';
 
 import { supabase } from '@/lib/supabase/client'
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Search,
@@ -23,7 +23,11 @@ import {
   Clock,
   MapPin,
   Trash2,
-  UserPlus
+  UserPlus,
+  List,
+  Edit3,
+  Save,
+  FileText
 } from 'lucide-react';
 import NoSubscription from '../components/NoSubscription'
 import NewOpportunityModal from '../crm/components/NewOpportunityModal'
@@ -192,6 +196,8 @@ export default function ContactsPage() {
   const [tagLoading, setTagLoading] = useState(false);
   const [showDeleteTagConfirm, setShowDeleteTagConfirm] = useState(false);
   const [tagToDelete, setTagToDelete] = useState(null);
+  const [showDeleteOriginConfirm, setShowDeleteOriginConfirm] = useState(false);
+  const [originToDelete, setOriginToDelete] = useState(null);
 
   // New tag/origin form
   const [newTagName, setNewTagName] = useState('');
@@ -204,6 +210,29 @@ export default function ContactsPage() {
 
   // New contact modal
   const [showNewContactModal, setShowNewContactModal] = useState(false);
+
+  // Sequences state
+  const [sequences, setSequences] = useState([]);
+  const [contactSequences, setContactSequences] = useState([]);
+  const [showSequenceModal, setShowSequenceModal] = useState(false);
+  const [sequenceLoading, setSequenceLoading] = useState(false);
+
+  // Custom fields state
+  const [customFields, setCustomFields] = useState({});
+  const [showCustomFieldModal, setShowCustomFieldModal] = useState(false);
+  const [newFieldKey, setNewFieldKey] = useState('');
+  const [newFieldValue, setNewFieldValue] = useState('');
+  const [editingField, setEditingField] = useState(null);
+
+  // Pagination state
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false); // For subtle loading during search
+  const [totalContacts, setTotalContacts] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const CONTACTS_PER_PAGE = 50;
+  const contactsListRef = useRef(null);
+  const searchTimeoutRef = useRef(null);
 
   // Load connections on mount
   useEffect(() => {
@@ -334,13 +363,24 @@ export default function ContactsPage() {
     }
   };
 
-  const loadContacts = async () => {
+  const loadContacts = async (reset = true, isSearch = false) => {
     try {
-      setLoading(true);
+      if (reset) {
+        // Use searchLoading for search operations to avoid hiding list
+        if (isSearch) {
+          setSearchLoading(true);
+        } else {
+          setLoading(true);
+        }
+        setOffset(0);
+      }
       const params = new URLSearchParams();
       if (selectedConnection) params.set('connectionId', selectedConnection);
       if (selectedOrigin) params.set('originId', selectedOrigin);
       if (selectedTag) params.set('tagId', selectedTag);
+      if (searchTerm) params.set('search', searchTerm);
+      params.set('limit', CONTACTS_PER_PAGE.toString());
+      params.set('offset', reset ? '0' : offset.toString());
 
       const response = await fetch(`/api/contacts?${params}`);
       const data = await response.json();
@@ -352,6 +392,9 @@ export default function ContactsPage() {
       setContacts(data.contacts || []);
       setOrigins(data.origins || []);
       setTags(data.tags || []);
+      setTotalContacts(data.total || 0);
+      setHasMore(data.hasMore || false);
+      setOffset(CONTACTS_PER_PAGE);
       setError(null);
 
     } catch (err) {
@@ -359,18 +402,83 @@ export default function ContactsPage() {
       setError('Erro ao carregar contatos');
     } finally {
       setLoading(false);
+      setSearchLoading(false);
     }
   };
 
-  // Filter contacts by search
-  const filteredContacts = contacts.filter(contact => {
-    if (!searchTerm) return true;
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      contact.name?.toLowerCase().includes(searchLower) ||
-      contact.whatsapp_number?.toLowerCase().includes(searchLower)
-    );
-  });
+  // Load more contacts on scroll
+  const loadMoreContacts = async () => {
+    if (loadingMore || !hasMore) return;
+
+    try {
+      setLoadingMore(true);
+      const params = new URLSearchParams();
+      if (selectedConnection) params.set('connectionId', selectedConnection);
+      if (selectedOrigin) params.set('originId', selectedOrigin);
+      if (selectedTag) params.set('tagId', selectedTag);
+      if (searchTerm) params.set('search', searchTerm);
+      params.set('limit', CONTACTS_PER_PAGE.toString());
+      params.set('offset', offset.toString());
+
+      const response = await fetch(`/api/contacts?${params}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao carregar mais contatos');
+      }
+
+      setContacts(prev => [...prev, ...(data.contacts || [])]);
+      setHasMore(data.hasMore || false);
+      setOffset(prev => prev + CONTACTS_PER_PAGE);
+
+    } catch (err) {
+      console.error('Erro ao carregar mais contatos:', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Handle scroll for infinite loading
+  const handleScroll = useCallback((e) => {
+    const target = e.target;
+    const bottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 200;
+    if (bottom && hasMore && !loadingMore) {
+      loadMoreContacts();
+    }
+  }, [hasMore, loadingMore, offset, selectedConnection, selectedOrigin, selectedTag, searchTerm]);
+
+  // Debounced search - only triggers when search term actually changes (not on mount)
+  const previousSearchRef = useRef('');
+  useEffect(() => {
+    // Skip initial mount and if search hasn't changed
+    if (previousSearchRef.current === searchTerm) {
+      return;
+    }
+
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Only search after 3+ characters or when clearing
+    if (searchTerm.length >= 3 || (previousSearchRef.current.length >= 3 && searchTerm.length < 3)) {
+      searchTimeoutRef.current = setTimeout(() => {
+        if (selectedConnection) {
+          previousSearchRef.current = searchTerm;
+          loadContacts(true, true); // isSearch = true
+        }
+      }, 400);
+    }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchTerm, selectedConnection]);
+
+  // No longer need client-side filtering - backend handles it
+  const filteredContacts = contacts;
 
   // Format date helper
   const formatDate = (timestamp) => {
@@ -448,25 +556,66 @@ export default function ContactsPage() {
   const handleCreateOrigin = async () => {
     if (!newOriginName.trim()) return;
 
+    // Get instance_name from selected connection
+    const selectedConn = connections.find(c => c.id === selectedConnection);
+    if (!selectedConn?.instance_name) {
+      console.error('No connection selected');
+      return;
+    }
+
     setTagLoading(true);
     try {
       const response = await fetch('/api/contacts/origins', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newOriginName.trim() })
+        body: JSON.stringify({
+          name: newOriginName.trim(),
+          instance_name: selectedConn.instance_name
+        })
       });
 
       if (response.ok) {
+        const data = await response.json();
+        // Atualizar lista de origens imediatamente
+        setOrigins(prev => [...prev, data.origin]);
         setNewOriginName('');
         setShowCreateOriginModal(false);
-        setSelectedContact({
-          ...selectedContact,
-          tags: selectedContact.tags?.filter(t => t.id !== tagId) || []
-        });
-        await loadContacts();
       }
     } catch (err) {
-      console.error('Erro ao remover tag:', err);
+      console.error('Erro ao criar origem:', err);
+    } finally {
+      setTagLoading(false);
+    }
+  };
+
+  // Delete origin permanently from system
+  const handleDeleteOrigin = async () => {
+    if (!originToDelete) return;
+
+    setTagLoading(true);
+    try {
+      const response = await fetch(`/api/contacts/origins/${originToDelete.id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        // Atualizar lista de origens imediatamente
+        setOrigins(prev => prev.filter(o => o.id !== originToDelete.id));
+        // Limpar filtro se era a origem selecionada
+        if (selectedOrigin === originToDelete.id) {
+          setSelectedOrigin('');
+        }
+        setShowDeleteOriginConfirm(false);
+        setOriginToDelete(null);
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Erro ao excluir origem');
+      }
+    } catch (err) {
+      console.error('Erro ao excluir origem:', err);
+      alert('Erro ao excluir origem');
+    } finally {
+      setTagLoading(false);
     }
   };
 
@@ -495,6 +644,155 @@ export default function ContactsPage() {
       alert('Erro ao excluir tag');
     } finally {
       setTagLoading(false);
+    }
+  };
+
+  // Load sequences when contact is selected
+  useEffect(() => {
+    if (selectedContact && selectedConnection) {
+      loadSequences();
+      loadContactSequences();
+      // Load custom fields from contact metadata (fields are stored directly in metadata)
+      setCustomFields(selectedContact.metadata || {});
+    }
+  }, [selectedContact?.id]);
+
+  // Load available sequences for this connection
+  const loadSequences = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('automation_sequences')
+        .select('id, name, is_active')
+        .eq('connection_id', selectedConnection)
+        .eq('is_active', true)
+        .order('name');
+
+      if (!error) {
+        setSequences(data || []);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar sequências:', err);
+    }
+  };
+
+  // Load sequences the contact is enrolled in
+  const loadContactSequences = async () => {
+    if (!selectedContact?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('automation_sequence_subscriptions')
+        .select(`
+          id,
+          sequence_id,
+          status,
+          sequence:automation_sequences(id, name)
+        `)
+        .eq('contact_id', selectedContact.id)
+        .in('status', ['active', 'pending']);
+
+      if (!error && data) {
+        setContactSequences(data);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar inscrições:', err);
+    }
+  };
+
+  // Enroll contact in a sequence
+  const handleEnrollSequence = async (sequenceId) => {
+    if (!selectedContact?.id) return;
+
+    setSequenceLoading(true);
+    try {
+      const response = await fetch('/api/sequences/enroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactId: selectedContact.id,
+          sequenceId
+        })
+      });
+
+      if (response.ok) {
+        await loadContactSequences();
+        setShowSequenceModal(false);
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Erro ao inscrever na sequência');
+      }
+    } catch (err) {
+      console.error('Erro ao inscrever na sequência:', err);
+    } finally {
+      setSequenceLoading(false);
+    }
+  };
+
+  // Unenroll contact from a sequence
+  const handleUnenrollSequence = async (subscriptionId) => {
+    setSequenceLoading(true);
+    try {
+      const response = await fetch('/api/sequences/unenroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscriptionId })
+      });
+
+      if (response.ok) {
+        await loadContactSequences();
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Erro ao remover da sequência');
+      }
+    } catch (err) {
+      console.error('Erro ao remover da sequência:', err);
+    } finally {
+      setSequenceLoading(false);
+    }
+  };
+
+  // Add/Update custom field
+  const handleSaveCustomField = async () => {
+    if (!newFieldKey.trim() || !selectedContact?.id) return;
+
+    const updatedFields = { ...customFields, [newFieldKey.trim()]: newFieldValue };
+    setCustomFields(updatedFields);
+
+    try {
+      // Update contact metadata - send fields directly (API does merge)
+      const response = await fetch(`/api/contacts/${selectedContact.id}/metadata`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [newFieldKey.trim()]: newFieldValue })
+      });
+
+      if (response.ok) {
+        setNewFieldKey('');
+        setNewFieldValue('');
+        setShowCustomFieldModal(false);
+        setEditingField(null);
+      }
+    } catch (err) {
+      console.error('Erro ao salvar campo:', err);
+    }
+  };
+
+  // Delete custom field
+  const handleDeleteCustomField = async (key) => {
+    const updatedFields = { ...customFields };
+    delete updatedFields[key];
+    setCustomFields(updatedFields);
+
+    try {
+      // To delete a field, we need to send the complete updated metadata
+      // Use PUT to replace all metadata (without the deleted field)
+      await fetch(`/api/contacts/${selectedContact.id}/metadata`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedFields)
+      });
+    } catch (err) {
+      console.error('Erro ao deletar campo:', err);
     }
   };
 
@@ -695,16 +993,31 @@ export default function ContactsPage() {
                   Todas as origens
                 </button>
                 {origins.map((origin) => (
-                  <button
+                  <div
                     key={origin.id}
-                    onClick={() => setSelectedOrigin(origin.id)}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all truncate ${selectedOrigin === origin.id
+                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all flex items-center justify-between group ${selectedOrigin === origin.id
                       ? 'bg-[#00FF99]/10 text-[#00FF99]'
                       : 'text-gray-400 hover:bg-[#1E1E1E] hover:text-white'
                       }`}
                   >
-                    {origin.name}
-                  </button>
+                    <span
+                      className="truncate flex-1 cursor-pointer"
+                      onClick={() => setSelectedOrigin(origin.id)}
+                    >
+                      {origin.name}
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOriginToDelete(origin);
+                        setShowDeleteOriginConfirm(true);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-all p-1"
+                      title="Excluir origem"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 ))}
                 {origins.length === 0 && (
                   <p className="text-xs text-gray-500 px-3 py-2">
@@ -830,19 +1143,35 @@ export default function ContactsPage() {
         {/* Search Bar */}
         <div className="p-4">
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" size={18} />
+            {searchLoading ? (
+              <Loader2 className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#00FF99] animate-spin" size={18} />
+            ) : (
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" size={18} />
+            )}
             <input
               type="text"
-              placeholder="Buscar contato..."
+              placeholder="Buscar contato (3+ letras)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-[#1E1E1E] text-white placeholder-gray-500 pl-12 pr-4 py-3 rounded-3xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/20 transition-all"
             />
           </div>
+          {/* Contact counter */}
+          {!loading && totalContacts > 0 && (
+            <div className="mt-2 text-center">
+              <span className="text-sm text-gray-400">
+                Mostrando <span className="text-[#00FF99] font-semibold">{filteredContacts.length}</span> de <span className="text-white font-semibold">{totalContacts}</span> contatos
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Contacts List */}
-        <div className="flex-1 overflow-y-auto">
+        <div
+          ref={contactsListRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto"
+        >
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="animate-spin text-[#00FF99]" size={32} />
@@ -885,24 +1214,18 @@ export default function ContactsPage() {
                       </div>
                     )}
 
-                    {/* Content */}
+                    {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-semibold text-white truncate">
-                          {contact.name || contact.whatsapp_number}
-                        </h3>
-                        <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
-                          {formatRelativeTime(contact.last_message_at)}
-                        </span>
-                      </div>
-
-                      <p className="text-sm text-gray-400 truncate">
+                      <h3 className="font-semibold text-white truncate">
+                        {contact.name || contact.whatsapp_number || 'Sem nome'}
+                      </h3>
+                      <p className="text-sm text-[#B0B0B0] truncate">
                         {contact.whatsapp_number}
                       </p>
 
-                      {/* Tags */}
+                      {/* Tags preview */}
                       {contact.tags && contact.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
+                        <div className="flex flex-wrap gap-1 mt-1">
                           {contact.tags.slice(0, 2).map((tag) => (
                             <span
                               key={tag.id}
@@ -926,6 +1249,21 @@ export default function ContactsPage() {
                   </div>
                 </div>
               ))}
+
+              {/* Loading more indicator */}
+              {loadingMore && (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="animate-spin text-[#00FF99]" size={20} />
+                  <span className="ml-2 text-sm text-gray-400">Carregando mais...</span>
+                </div>
+              )}
+
+              {/* End of list indicator */}
+              {!hasMore && filteredContacts.length > 0 && (
+                <div className="text-center py-4 text-sm text-gray-500">
+                  {totalContacts} contatos carregados
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1041,7 +1379,7 @@ export default function ContactsPage() {
               </div>
 
               {/* Tags */}
-              <div className="bg-[#111111] rounded-2xl p-6">
+              <div className="bg-[#111111] rounded-2xl p-6 mb-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                     <Tag size={20} />
@@ -1079,6 +1417,108 @@ export default function ContactsPage() {
                   </div>
                 ) : (
                   <p className="text-gray-500 text-sm">Nenhuma etiqueta atribuída</p>
+                )}
+              </div>
+
+              {/* Sequences */}
+              <div className="bg-[#111111] rounded-2xl p-6 mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <List size={20} />
+                    Sequências
+                  </h3>
+                  <button
+                    onClick={() => setShowSequenceModal(true)}
+                    className="flex items-center gap-1 text-sm text-[#00FF99] hover:text-white transition-colors"
+                  >
+                    <Plus size={16} />
+                    Inscrever
+                  </button>
+                </div>
+
+                {contactSequences.length > 0 ? (
+                  <div className="space-y-2">
+                    {contactSequences.map((sub) => (
+                      <div
+                        key={sub.id}
+                        className="flex items-center justify-between bg-[#1E1E1E] rounded-xl px-4 py-3"
+                      >
+                        <div>
+                          <p className="text-white text-sm font-medium">{sub.sequence?.name}</p>
+                          <p className="text-xs text-gray-500 capitalize">{sub.status}</p>
+                        </div>
+                        <button
+                          onClick={() => handleUnenrollSequence(sub.id)}
+                          disabled={sequenceLoading}
+                          className="text-red-400 hover:text-red-300 text-xs flex items-center gap-1"
+                        >
+                          <X size={14} />
+                          Remover
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-sm">Não inscrito em nenhuma sequência</p>
+                )}
+              </div>
+
+              {/* Custom Fields */}
+              <div className="bg-[#111111] rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <FileText size={20} />
+                    Campos Personalizados
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setNewFieldKey('');
+                      setNewFieldValue('');
+                      setEditingField(null);
+                      setShowCustomFieldModal(true);
+                    }}
+                    className="flex items-center gap-1 text-sm text-[#00FF99] hover:text-white transition-colors"
+                  >
+                    <Plus size={16} />
+                    Adicionar
+                  </button>
+                </div>
+
+                {Object.keys(customFields).length > 0 ? (
+                  <div className="space-y-2">
+                    {Object.entries(customFields).map(([key, value]) => (
+                      <div
+                        key={key}
+                        className="flex items-center justify-between bg-[#1E1E1E] rounded-xl px-4 py-3 group"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-gray-400">{key}</p>
+                          <p className="text-white text-sm font-medium truncate">{value}</p>
+                        </div>
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => {
+                              setNewFieldKey(key);
+                              setNewFieldValue(value);
+                              setEditingField(key);
+                              setShowCustomFieldModal(true);
+                            }}
+                            className="text-gray-400 hover:text-white p-1"
+                          >
+                            <Edit3 size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCustomField(key)}
+                            className="text-red-400 hover:text-red-300 p-1"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-sm">Nenhum campo personalizado</p>
                 )}
               </div>
 
@@ -1169,6 +1609,104 @@ export default function ContactsPage() {
               {origins.length === 0 && (
                 <p className="text-gray-500 text-sm text-center py-4">Nenhuma origem criada ainda</p>
               )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ========================================== */}
+      {/* MODAL: INSCREVER EM SEQUÊNCIA */}
+      {/* ========================================== */}
+      {showSequenceModal && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setShowSequenceModal(false)} />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-[#111111] rounded-2xl p-6 z-50 w-80 max-h-96 overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">Inscrever em Sequência</h3>
+              <button onClick={() => setShowSequenceModal(false)} className="text-gray-400 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2">
+              {sequences.filter(seq => !contactSequences.some(cs => cs.sequence_id === seq.id)).map((seq) => (
+                <button
+                  key={seq.id}
+                  onClick={() => handleEnrollSequence(seq.id)}
+                  disabled={sequenceLoading}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-[#1E1E1E] transition-all text-left disabled:opacity-50"
+                >
+                  <List size={16} className="text-[#00FF99] flex-shrink-0" />
+                  <span className="text-white flex-1">{seq.name}</span>
+                  {sequenceLoading ? <Loader2 className="animate-spin text-gray-400" size={16} /> : <Plus size={16} className="text-gray-400" />}
+                </button>
+              ))}
+
+              {sequences.filter(seq => !contactSequences.some(cs => cs.sequence_id === seq.id)).length === 0 && (
+                <p className="text-gray-500 text-sm text-center py-4">
+                  {sequences.length === 0 ? 'Nenhuma sequência ativa' : 'Já inscrito em todas as sequências'}
+                </p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ========================================== */}
+      {/* MODAL: CAMPO PERSONALIZADO */}
+      {/* ========================================== */}
+      {showCustomFieldModal && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setShowCustomFieldModal(false)} />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-[#111111] rounded-2xl p-6 z-50 w-96">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">
+                {editingField ? 'Editar Campo' : 'Novo Campo Personalizado'}
+              </h3>
+              <button onClick={() => setShowCustomFieldModal(false)} className="text-gray-400 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Nome do Campo</label>
+                <input
+                  type="text"
+                  value={newFieldKey}
+                  onChange={(e) => setNewFieldKey(e.target.value)}
+                  placeholder="Ex: id_CRM, cpf, empresa..."
+                  disabled={!!editingField}
+                  className="w-full bg-[#1E1E1E] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30 disabled:opacity-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Valor</label>
+                <input
+                  type="text"
+                  value={newFieldValue}
+                  onChange={(e) => setNewFieldValue(e.target.value)}
+                  placeholder="Ex: 12345"
+                  className="w-full bg-[#1E1E1E] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowCustomFieldModal(false)}
+                className="flex-1 bg-[#1E1E1E] text-white py-3 rounded-xl hover:bg-[#2A2A2A] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveCustomField}
+                disabled={!newFieldKey.trim()}
+                className="flex-1 bg-[#00FF99] text-black py-3 rounded-xl font-medium hover:bg-[#00E88C] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                <Save size={16} />
+                Salvar
+              </button>
             </div>
           </div>
         </>
@@ -1312,6 +1850,72 @@ export default function ContactsPage() {
               </button>
               <button
                 onClick={handleDeleteTag}
+                className="flex-1 bg-red-500 text-white py-3 rounded-xl hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+                disabled={tagLoading}
+              >
+                {tagLoading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Excluindo...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={16} />
+                    Excluir
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Delete Origin Confirmation Modal */}
+      {showDeleteOriginConfirm && originToDelete && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => {
+            setShowDeleteOriginConfirm(false);
+            setOriginToDelete(null);
+          }} />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-[#111111] rounded-2xl p-6 z-50 w-96">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Trash2 size={20} className="text-red-400" />
+                Excluir Origem
+              </h3>
+              <button
+                onClick={() => {
+                  setShowDeleteOriginConfirm(false);
+                  setOriginToDelete(null);
+                }}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-gray-300 mb-2">
+                Tem certeza que deseja excluir a origem <span className="text-white font-semibold">"{originToDelete.name}"</span>?
+              </p>
+              <p className="text-sm text-gray-500">
+                Esta ação irá remover a origem de todos os contatos e não pode ser desfeita.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteOriginConfirm(false);
+                  setOriginToDelete(null);
+                }}
+                className="flex-1 bg-[#1E1E1E] text-white py-3 rounded-xl hover:bg-[#2A2A2A] transition-colors"
+                disabled={tagLoading}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteOrigin}
                 className="flex-1 bg-red-500 text-white py-3 rounded-xl hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
                 disabled={tagLoading}
               >

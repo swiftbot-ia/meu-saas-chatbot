@@ -74,13 +74,13 @@ export default function Sidebar() {
       icon: Bot,
       label: 'Automações',
       href: '/automations',
-      badge: '🚧'
+      badge: null
     },
     {
       icon: Settings,
       label: 'Configurações',
       href: '/settings',
-      badge: '🚧'
+      badge: null
     }
   ]
 

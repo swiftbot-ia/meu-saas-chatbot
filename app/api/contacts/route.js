@@ -42,6 +42,9 @@ export async function GET(request) {
         const connectionId = searchParams.get('connectionId') || '';
         const originId = searchParams.get('originId') || '';
         const tagId = searchParams.get('tagId') || '';
+        const search = searchParams.get('search') || '';
+        const limit = parseInt(searchParams.get('limit') || '50');
+        const offset = parseInt(searchParams.get('offset') || '0');
 
         // Get authenticated user
         const supabase = await createAuthClient();
@@ -90,18 +93,20 @@ export async function GET(request) {
         }
 
         if (instanceNames.length === 0) {
-            return NextResponse.json({ contacts: [], origins: [], tags: [] });
+            return NextResponse.json({ contacts: [], origins: [], tags: [], total: 0, hasMore: false });
         }
 
         // Use chat supabase for whatsapp tables
         const chatSupabase = createChatSupabaseAdminClient();
 
-        // Build query for contacts with conversations and origin
+        // Query conversations with contacts - contacts are linked to instances via conversations
+        // Note: whatsapp_contacts doesn't have instance_name, so we must query via conversations
         let query = chatSupabase
             .from('whatsapp_conversations')
             .select(`
                 id,
                 instance_name,
+                contact_id,
                 funnel_stage,
                 funnel_position,
                 last_message_at,
@@ -121,21 +126,98 @@ export async function GET(request) {
                     )
                 )
             `)
+            .eq('user_id', ownerUserId)
             .in('instance_name', instanceNames)
             .order('last_message_at', { ascending: false });
 
-        const { data: conversations, error: convError } = await query;
+        // Fetch all conversations in batches to bypass Supabase 1000 row limit
+        let allConversations = [];
+        const BATCH_SIZE = 1000;
+        let batchOffset = 0;
+        let batchHasMore = true;
 
-        if (convError) {
-            console.error('Erro ao buscar contatos:', convError);
-            return NextResponse.json({ error: 'Erro ao buscar contatos' }, { status: 500 });
+        while (batchHasMore) {
+            const { data: batch, error: batchError } = await chatSupabase
+                .from('whatsapp_conversations')
+                .select(`
+                    id,
+                    instance_name,
+                    contact_id,
+                    funnel_stage,
+                    funnel_position,
+                    last_message_at,
+                    last_message_preview,
+                    contact:whatsapp_contacts!contact_id (
+                        id,
+                        whatsapp_number,
+                        name,
+                        profile_pic_url,
+                        created_at,
+                        last_message_at,
+                        metadata,
+                        origin_id,
+                        origin:contact_origins!origin_id (
+                            id,
+                            name
+                        )
+                    )
+                `)
+                .eq('user_id', ownerUserId)
+                .in('instance_name', instanceNames)
+                .order('last_message_at', { ascending: false })
+                .range(batchOffset, batchOffset + BATCH_SIZE - 1);
+
+            if (batchError) {
+                console.error('Erro ao buscar lote de contatos:', batchError);
+                break;
+            }
+
+            if (batch && batch.length > 0) {
+                allConversations = allConversations.concat(batch);
+                batchOffset += BATCH_SIZE;
+                batchHasMore = batch.length === BATCH_SIZE;
+            } else {
+                batchHasMore = false;
+            }
+
+            // Safety limit to prevent infinite loops
+            if (batchOffset > 20000) {
+                console.warn('⚠️ [Contacts API] Safety limit reached at 20000 conversations');
+                break;
+            }
         }
 
-        // Get all origins for this user (using owner's user ID)
+        const conversations = allConversations;
+
+        // Debug log
+        console.log('📋 [Contacts API] Query results:', {
+            ownerUserId,
+            instanceNames,
+            totalConversations: conversations?.length || 0,
+            conversationsWithContacts: conversations?.filter(c => c.contact?.id).length || 0,
+            conversationsWithoutContacts: conversations?.filter(c => !c.contact?.id).length || 0
+        });
+
+        // Debug: find specific contact
+        const targetContact = conversations?.find(c =>
+            c.contact?.whatsapp_number?.includes('447447021530') ||
+            c.contact_id === '3541920d-b508-4765-8631-119a3571fda2'
+        );
+        console.log('🔍 [Debug] Looking for 447447021530:', targetContact ? {
+            conv_id: targetContact.id,
+            contact_id: targetContact.contact_id,
+            has_contact_data: !!targetContact.contact,
+            contact_phone: targetContact.contact?.whatsapp_number
+        } : 'NOT FOUND in conversations');
+
+        // Get contact IDs from conversations
+        const contactIds = conversations?.map(c => c.contact?.id).filter(Boolean) || [];
+
+        // Get all origins for these instances (per instance, like tags)
         const { data: allOrigins, error: originsError } = await chatSupabase
             .from('contact_origins')
             .select('*')
-            .eq('user_id', ownerUserId)
+            .in('instance_name', instanceNames)
             .order('name');
 
         if (originsError) {
@@ -154,50 +236,69 @@ export async function GET(request) {
         }
 
         // Get tag assignments for all contacts
-        const contactIds = conversations?.map(c => c.contact?.id).filter(Boolean) || [];
-
+        // Using simpler two-step approach to avoid complex join issues
         let tagAssignments = [];
-        if (contactIds.length > 0) {
-            const { data: assignments, error: assignError } = await chatSupabase
-                .from('contact_tag_assignments')
-                .select(`
-                    contact_id,
-                    tag:contact_tags (
-                        id,
-                        name,
-                        color
-                    )
-                `)
-                .in('contact_id', contactIds);
+        const tagsMap = {}; // Map tag_id -> tag object
 
-            if (!assignError) {
-                tagAssignments = assignments || [];
-            }
+        // First, get all tags for quick lookup
+        if (allTags) {
+            allTags.forEach(tag => {
+                tagsMap[tag.id] = tag;
+            });
         }
 
-        // Build contacts array with tags and origin
-        let contacts = conversations?.map(conv => {
-            const contactTags = tagAssignments
-                .filter(a => a.contact_id === conv.contact?.id)
-                .map(a => a.tag);
+        if (contactIds.length > 0) {
+            // Query assignments in smaller batches (100 at a time)
+            const TAG_BATCH_SIZE = 100;
+            for (let i = 0; i < contactIds.length; i += TAG_BATCH_SIZE) {
+                const batchIds = contactIds.slice(i, i + TAG_BATCH_SIZE);
 
-            return {
-                id: conv.contact?.id,
-                conversation_id: conv.id,
-                whatsapp_number: conv.contact?.whatsapp_number,
-                name: conv.contact?.name,
-                profile_pic_url: conv.contact?.profile_pic_url,
-                created_at: conv.contact?.created_at,
-                last_message_at: conv.last_message_at || conv.contact?.last_message_at,
-                last_message_preview: conv.last_message_preview,
-                instance_name: conv.instance_name,
-                funnel_stage: conv.funnel_stage,
-                funnel_position: conv.funnel_position,
-                metadata: conv.contact?.metadata,
-                origin: conv.contact?.origin || null,
-                tags: contactTags
-            };
-        }) || [];
+                // Simple query without nested join
+                const { data: assignments, error: assignError } = await chatSupabase
+                    .from('contact_tag_assignments')
+                    .select('contact_id, tag_id')
+                    .in('contact_id', batchIds);
+
+                if (assignError) {
+                    console.error('🏷️ [Contacts] Error loading tag assignments batch:', assignError.message);
+                } else if (assignments) {
+                    // Map tag data from our lookup
+                    const mappedAssignments = assignments.map(a => ({
+                        contact_id: a.contact_id,
+                        tag: tagsMap[a.tag_id] || null
+                    })).filter(a => a.tag);
+
+                    tagAssignments = tagAssignments.concat(mappedAssignments);
+                }
+            }
+            console.log(`🏷️ [Contacts] Loaded ${tagAssignments.length} tag assignments for ${contactIds.length} contacts`);
+        }
+
+        // Build contacts array with tags and origin (filter out conversations without contacts)
+        let contacts = conversations
+            ?.filter(conv => conv.contact?.id) // Only include conversations with linked contacts
+            ?.map(conv => {
+                const contactTags = tagAssignments
+                    .filter(a => a.contact_id === conv.contact?.id)
+                    .map(a => a.tag);
+
+                return {
+                    id: conv.contact?.id,
+                    conversation_id: conv.id,
+                    whatsapp_number: conv.contact?.whatsapp_number,
+                    name: conv.contact?.name,
+                    profile_pic_url: conv.contact?.profile_pic_url,
+                    created_at: conv.contact?.created_at,
+                    last_message_at: conv.last_message_at || conv.contact?.last_message_at,
+                    last_message_preview: conv.last_message_preview,
+                    instance_name: conv.instance_name,
+                    funnel_stage: conv.funnel_stage,
+                    funnel_position: conv.funnel_position,
+                    metadata: conv.contact?.metadata,
+                    origin: conv.contact?.origin || null,
+                    tags: contactTags
+                };
+            }) || [];
 
         // Filter by origin
         if (originId) {
@@ -206,15 +307,38 @@ export async function GET(request) {
 
         // Filter by tag
         if (tagId) {
+            console.log(`🏷️ [Contacts] Filtering by tagId: ${tagId}`);
+            console.log(`🏷️ [Contacts] Sample contact tags:`, contacts.slice(0, 3).map(c => ({ name: c.name, tags: c.tags?.map(t => ({ id: t?.id, name: t?.name })) })));
             contacts = contacts.filter(c =>
-                c.tags?.some(t => t.id === tagId)
+                c.tags?.some(t => t?.id === tagId)
+            );
+            console.log(`🏷️ [Contacts] After filter: ${contacts.length} contacts`);
+        }
+
+        // Filter by search (name or phone)
+        if (search) {
+            const searchLower = search.toLowerCase();
+            contacts = contacts.filter(c =>
+                (c.name?.toLowerCase().includes(searchLower)) ||
+                (c.whatsapp_number?.includes(search))
             );
         }
 
+        // Calculate total before pagination
+        const total = contacts.length;
+
+        // Apply pagination
+        const paginatedContacts = contacts.slice(offset, offset + limit);
+        const hasMore = offset + limit < total;
+
+        console.log('📋 [Contacts API] Pagination:', { total, offset, limit, returned: paginatedContacts.length, hasMore });
+
         return NextResponse.json({
-            contacts,
+            contacts: paginatedContacts,
             origins: allOrigins || [],
-            tags: allTags || []
+            tags: allTags || [],
+            total,
+            hasMore
         });
 
     } catch (error) {

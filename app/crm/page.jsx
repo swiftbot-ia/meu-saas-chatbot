@@ -11,7 +11,127 @@ import axios from 'axios';
 import { supabase } from '@/lib/supabase/client'
 import NoSubscription from '../components/NoSubscription'
 import NotificationBell from '../components/NotificationBell'
-import { Plus } from 'lucide-react'
+import { Plus, ChevronDown } from 'lucide-react'
+
+// ============================================================================
+// CONNECTION DROPDOWN
+// ============================================================================
+const ConnectionDropdown = ({ connections, selectedConnection, onSelectConnection }) => {
+    const [isOpen, setIsOpen] = useState(false);
+
+    const selected = connections.find(c => c.id === selectedConnection?.id);
+    const displayValue = selected
+        ? (selected.profile_name || selected.instance_name)
+        : 'Selecione uma instância';
+
+    return (
+        <div className="relative">
+            <div className="bg-[#1E1E1E] rounded-2xl overflow-hidden">
+                <button
+                    type="button"
+                    onClick={() => setIsOpen(!isOpen)}
+                    className="w-full px-4 py-3 flex items-center justify-between text-left outline-none min-w-[220px]"
+                >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {selected && (
+                            <div className="flex-shrink-0">
+                                {selected.profile_pic_url ? (
+                                    <img
+                                        src={selected.profile_pic_url}
+                                        alt={selected.profile_name || 'Conexão'}
+                                        className="w-10 h-10 rounded-full object-cover bg-[#333333]"
+                                        onError={(e) => {
+                                            e.target.style.display = 'none';
+                                            e.target.nextSibling.style.display = 'flex';
+                                        }}
+                                    />
+                                ) : null}
+                                <div
+                                    className={`w-10 h-10 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold ${selected.profile_pic_url ? 'hidden' : 'flex'}`}
+                                    style={{ display: selected.profile_pic_url ? 'none' : 'flex' }}
+                                >
+                                    {selected.profile_name ? selected.profile_name.charAt(0).toUpperCase() : '?'}
+                                </div>
+                            </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                            <div className="text-white text-sm font-medium truncate">
+                                {displayValue}
+                            </div>
+                            {selected && (
+                                <div className="text-xs text-gray-500 flex items-center gap-1.5">
+                                    <span className={selected.is_connected ? 'text-[#00FF99]' : 'text-red-400'}>
+                                        {selected.is_connected ? '●' : '○'}
+                                    </span>
+                                    <span className="truncate">
+                                        {selected.is_connected ? 'Conectado' : 'Desconectado'}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    <ChevronDown
+                        className={`w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ml-2 ${isOpen ? 'rotate-180' : 'rotate-0'}`}
+                    />
+                </button>
+
+                {isOpen && (
+                    <div className="absolute top-full left-0 right-0 mt-1 backdrop-blur-md bg-[#1E1E1E]/95 rounded-2xl shadow-2xl z-50 max-h-[300px] overflow-y-auto">
+                        {connections.map((connection, index) => (
+                            <button
+                                key={connection.id}
+                                type="button"
+                                onClick={() => {
+                                    onSelectConnection(connection);
+                                    setIsOpen(false);
+                                }}
+                                className={`
+                                    w-full p-3 text-sm text-left transition-all duration-150 border-b border-white/5 last:border-0
+                                    ${selectedConnection?.id === connection.id
+                                        ? 'bg-[#00FF99]/10 text-[#00FF99]'
+                                        : 'text-gray-300 hover:bg-white/5 hover:text-white'}
+                                `}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="flex-shrink-0">
+                                        {connection.profile_pic_url ? (
+                                            <img
+                                                src={connection.profile_pic_url}
+                                                alt={connection.profile_name || `Conexão ${index + 1}`}
+                                                className="w-10 h-10 rounded-full object-cover bg-[#333333]"
+                                                onError={(e) => {
+                                                    e.target.style.display = 'none';
+                                                    e.target.nextSibling.style.display = 'flex';
+                                                }}
+                                            />
+                                        ) : null}
+                                        <div
+                                            className={`w-10 h-10 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold ${connection.profile_pic_url ? 'hidden' : 'flex'}`}
+                                            style={{ display: connection.profile_pic_url ? 'none' : 'flex' }}
+                                        >
+                                            {connection.profile_name ? connection.profile_name.charAt(0).toUpperCase() : (index + 1)}
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="font-medium truncate">
+                                            {connection.profile_name || connection.instance_name}
+                                        </div>
+                                        <div className="text-xs flex items-center gap-1.5 mt-0.5">
+                                            <span className={connection.is_connected ? 'text-[#00FF99]' : 'text-red-400'}>
+                                                {connection.is_connected ? '● Conectado' : '○ Desconectado'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+            {isOpen && <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />}
+        </div>
+    );
+};
 
 const SALES_STAGES = {
     novo: {
@@ -46,6 +166,7 @@ const SalesFunnelPage = () => {
     const [subscriptionChecked, setSubscriptionChecked] = useState(false)
     const [currentDragDestination, setCurrentDragDestination] = useState(null);
     const [selectedConnection, setSelectedConnection] = useState(null);
+    const [connections, setConnections] = useState([]);
     const [pagination, setPagination] = useState({
         novo: { cursor: null, hasMore: true, loading: false },
         apresentacao: { cursor: null, hasMore: true, loading: false },
@@ -91,9 +212,10 @@ const SalesFunnelPage = () => {
             try {
                 // Fetch all connections
                 const response = await axios.get('/api/whatsapp/connections');
-                const connections = response.data.connections || response.data;
+                const connectionsData = response.data.connections || response.data;
+                setConnections(connectionsData);
 
-                if (!connections || connections.length === 0) {
+                if (!connectionsData || connectionsData.length === 0) {
                     console.warn('No connections available for this user');
                     setLoading(false);
                     return;
@@ -103,18 +225,18 @@ const SalesFunnelPage = () => {
 
                 if (activeId) {
                     // Try to find the stored connection
-                    connection = connections.find(conn => conn.id === activeId);
+                    connection = connectionsData.find(conn => conn.id === activeId);
 
                     if (connection) {
                         console.log('✅ Active connection loaded:', connection.instance_name);
                     } else {
                         console.warn('Stored connection not found, using first available');
-                        connection = connections[0];
+                        connection = connectionsData[0];
                     }
                 } else {
                     // No stored connection, use first one
                     console.log('No stored connection, using first available');
-                    connection = connections[0];
+                    connection = connectionsData[0];
 
                     // Save it to localStorage for next time
                     localStorage.setItem('activeConnectionId', connection.id);
@@ -379,13 +501,25 @@ const SalesFunnelPage = () => {
 
                 {/* Header centralizado com max-width */}
                 <div className="max-w-7xl mx-auto mb-12 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                        <h1 className="text-4xl sm:text-5xl font-bold text-white">
-                            Funil de Vendas
-                        </h1>
-                        <p className="text-[#B0B0B0] text-base sm:text-lg mt-3">
-                            Gerencie seus leads e oportunidades
-                        </p>
+                    <div className="flex items-center gap-6">
+                        <div>
+                            <h1 className="text-4xl sm:text-5xl font-bold text-white">
+                                Funil de Vendas
+                            </h1>
+                            <p className="text-[#B0B0B0] text-base sm:text-lg mt-3">
+                                Gerencie seus leads e oportunidades
+                            </p>
+                        </div>
+                        {connections.length > 1 && (
+                            <ConnectionDropdown
+                                connections={connections}
+                                selectedConnection={selectedConnection}
+                                onSelectConnection={(conn) => {
+                                    setSelectedConnection(conn);
+                                    localStorage.setItem('activeConnectionId', conn.id);
+                                }}
+                            />
+                        )}
                     </div>
 
                     <div className="flex items-center gap-3 mt-2 sm:mt-0">
