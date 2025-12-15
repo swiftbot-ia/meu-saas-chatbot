@@ -43,56 +43,56 @@ export default function Home() {
       text: "Dobramos nossas vendas online em 3 meses. A SwiftBot captura leads qualificados 24/7, algo que nossa equipe humana simplesmente não conseguia fazer. A implementação com o QR Code foi ridiculamente fácil.",
       name: "Juliana Martins",
       role: "CEO, Bella Moda E-commerce",
-      image: "/testimonials/juliana.jpg",
+      image: "/testimonials/juliana.webp",
       gradient: "from-purple-700/50 via-black to-black"
     },
     {
       text: "Eu era o gargalo do meu próprio negócio, respondendo mensagens até de madrugada. Com a SwiftBot, eu clonei meu atendimento. Ganhamos 15 horas por semana e a qualidade do serviço nunca esteve tão alta.",
       name: "Ricardo Alves",
       role: "Fundador, Clínica FisioHealth",
-      image: "/testimonials/ricardo.jpg",
+      image: "/testimonials/ricardo.webp",
       gradient: "from-blue-700/50 via-black to-black"
     },
     {
       text: "A consistência é tudo. Antes, cada vendedor respondia de um jeito. Agora, nosso 'clone' garante que todo cliente receba o mesmo nível de excelência. Nosso índice de satisfação subiu de 8.2 para 9.8.",
       name: "Beatriz Costa",
       role: "Diretora de Operações, Vestra Seguros",
-      image: "/testimonials/beatriz.jpg",
+      image: "/testimonials/beatriz.webp",
       gradient: "from-cyan-700/50 via-black to-black"
     },
     {
       text: "Estávamos prestes a contratar mais duas pessoas para o suporte. Em vez disso, ativamos a SwiftBot. O custo foi 70% menor e a capacidade de atendimento se tornou infinita. Foi a decisão financeira mais inteligente que fizemos.",
       name: "Fernando Lima",
       role: "Sócio, Agência Criativa Digital",
-      image: "/testimonials/fernando.jpg",
+      image: "/testimonials/fernando.webp",
       gradient: "from-green-700/50 via-black to-black"
     },
     {
       text: "O que mais me impressionou foi a IA aprendendo nosso tom de voz. Nossos clientes não percebem que estão falando com um robô. Eles sentem que estão falando comigo. Isso não tem preço.",
       name: "Camila Oliveira",
       role: "Proprietária, Doce Sabor Confeitaria",
-      image: "/testimonials/camila.jpg",
+      image: "/testimonials/camila.webp",
       gradient: "from-pink-700/50 via-black to-black"
     },
     {
       text: "Agendamentos, confirmações, reagendamentos... tudo automatizado. A taxa de não comparecimento caiu 40%. A SwiftBot não é só um chatbot, é um sistema de gestão de clientes.",
       name: "Dr. Marcos Ferreira",
       role: "Dentista, Sorriso Perfeito Odontologia",
-      image: "/testimonials/marcos.jpg",
+      image: "/testimonials/marcos.webp",
       gradient: "from-indigo-700/50 via-black to-black"
     },
     {
       text: "Recuperamos 25% dos carrinhos abandonados no primeiro mês. A IA aborda o cliente na hora certa, com a mensagem certa. É como ter o melhor vendedor do mundo trabalhando sem parar.",
       name: "Lucas Gomes",
       role: "Gerente de E-commerce, Tech Gadgets Brasil",
-      image: "/testimonials/lucas.jpg",
+      image: "/testimonials/lucas.webp",
       gradient: "from-violet-700/50 via-black to-black"
     },
     {
       text: "Como agência, implementamos a SwiftBot para vários clientes. O tempo de ativação é imbatível e o ROI é visível em semanas. Virou nossa recomendação padrão para automação de WhatsApp.",
       name: "Sofia Ribeiro",
       role: "Especialista em Crescimento, ScaleUp Solutions",
-      image: "/testimonials/sofia.jpg",
+      image: "/testimonials/sofia.webp",
       gradient: "from-teal-700/50 via-black to-black"
     }
   ]
@@ -119,7 +119,7 @@ export default function Home() {
               preload="metadata"
               className="absolute inset-0 w-full h-full object-cover opacity-40"
             >
-              <source src="/particles-background.mp4" type="video/mp4" />
+              <source src="/particles-background.webm" type="video/webm" />
             </video>
 
             {/* Overlay escuro */}
@@ -446,7 +446,7 @@ export default function Home() {
                 <div className="relative">
                   <div className="bg-gradient-to-br from-purple-500 via-pink-500 to-indigo-600 rounded-[40px] p-8">
                     <LazyVideo
-                      src="/swiftbot-ia-demo.mp4"
+                      src="/swiftbot-ia-demo.webm"
                       className="w-full h-auto rounded-3xl overflow-hidden"
                     />
                   </div>
@@ -632,7 +632,7 @@ export default function Home() {
                 <div className="relative">
                   <div className="bg-gradient-to-br from-orange-500 via-pink-500 to-purple-500 rounded-[40px] p-8">
                     <LazyVideo
-                      src="/crm-kanban-demo.mp4"
+                      src="/crm-kanban-demo.webm"
                       className="w-full h-auto rounded-3xl overflow-hidden"
                     />
                   </div>
@@ -1063,7 +1063,7 @@ export default function Home() {
         <section className="py-32 bg-black rounded-t-[40px] md:rounded-t-[80px] relative overflow-hidden -mt-1">
           {/* Video Background - Lazy loaded */}
           <LazyVideo
-            src="/cta-background.mp4"
+            src="/cta-background.webm"
             className="absolute inset-0 w-full h-full opacity-30"
           />
 
