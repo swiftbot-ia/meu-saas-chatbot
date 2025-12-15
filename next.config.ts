@@ -13,6 +13,20 @@ const nextConfig: NextConfig = {
   },
   // Turbopack config (Next.js 16 usa Turbopack por padrão)
   turbopack: {},
+  // Cache headers for static assets
+  async headers() {
+    return [
+      {
+        source: '/:all*(svg|jpg|jpeg|png|webp|webm|gif|ico|woff|woff2)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
