@@ -24,8 +24,8 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Build da aplicação Next.js
-RUN npm run build
+# Build da aplicação Next.js (sem Turbopack - necessário para produção)
+RUN npx next build
 
 # Stage 3: Runner (imagem final)
 FROM node:20-alpine AS runner
