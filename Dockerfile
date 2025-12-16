@@ -24,8 +24,20 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Build da aplicação Next.js (sem Turbopack - necessário para produção)
-RUN npx next build
+# Variáveis dummy para o build (serão substituídas em runtime)
+ENV NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder
+ENV SUPABASE_SERVICE_ROLE_KEY=placeholder
+ENV NEXT_PUBLIC_SUPABASE_CHAT_URL=https://placeholder.supabase.co
+ENV NEXT_PUBLIC_SUPABASE_CHAT_ANON_KEY=placeholder
+ENV SUPABASE_CHAT_SERVICE_ROLE_KEY=placeholder
+ENV STRIPE_SECRET_KEY=sk_placeholder
+ENV STRIPE_WEBHOOK_SECRET=whsec_placeholder
+ENV OPENAI_API_KEY=sk-placeholder
+ENV NEXT_PUBLIC_SITE_URL=https://swiftbot.com.br
+
+# Build da aplicação Next.js (forçar webpack, sem Turbopack)
+RUN NEXT_DISABLE_TURBOPACK=1 npx next build
 
 # Stage 3: Runner (imagem final)
 FROM node:20-alpine AS runner
