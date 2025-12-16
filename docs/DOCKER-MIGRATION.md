@@ -1,215 +1,242 @@
-# 🐳 Guia de Migração: PM2 → Docker
+# 🐳 Guia de Deploy: Docker + Traefik (Produção)
 
-Guia completo para instalar Docker na VPS e migrar do PM2.
-
----
-
-## 📋 Pré-requisitos
-
-- Acesso SSH à VPS (Ubuntu/Debian)
-- Git configurado
-- PM2 rodando atualmente
+Guia completo para deploy do SwiftBot com Docker e Traefik para SSL automático.
 
 ---
 
-## 1️⃣ Instalar Docker na VPS
+## 📋 O que está incluído
+
+- ✅ **Traefik v3.2** - Proxy reverso moderno
+- ✅ **SSL Automático** - Let's Encrypt
+- ✅ **Redirect HTTP → HTTPS** - Automático
+- ✅ **Health Checks** - Monitoramento
+- ✅ **Headers de Segurança** - HSTS
+
+---
+
+## 1️⃣ Pré-requisitos na VPS
 
 ```bash
 # Conectar na VPS
 ssh root@seu-ip
 
-# Atualizar sistema
-sudo apt update && sudo apt upgrade -y
-
-# Instalar dependências
-sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release
-
-# Adicionar chave GPG do Docker
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-
-# Adicionar repositório Docker
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-# Instalar Docker
-sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-
-# Verificar instalação
+# Docker já instalado? Verificar:
 docker --version
 docker compose version
 
-# Iniciar Docker no boot
-sudo systemctl enable docker
-sudo systemctl start docker
+# Se não tiver, instalar:
+curl -fsSL https://get.docker.com | sh
 ```
 
 ---
 
-## 2️⃣ Preparar na Máquina Local
+## 2️⃣ Parar PM2 (se ainda estiver rodando)
 
 ```bash
-# Adicionar arquivos ao Git
-git add Dockerfile docker-compose.yml .dockerignore .env.example next.config.ts app/api/health/
-
-# Commitar
-git commit -m "feat: Docker configuration for production"
-
-# Push para o repositório
-git push origin main
-```
-
----
-
-## 3️⃣ Configurar na VPS
-
-```bash
-# Navegar até o projeto
-cd /caminho/do/seu/projeto
-
-# Pull do repositório
-git pull origin main
-
-# Criar arquivo .env a partir do exemplo
-cp .env.example .env
-
-# Editar .env com suas credenciais reais
-nano .env
-```
-
-### Preencher o .env:
-Copie as variáveis do seu `.env.local` atual (local ou PM2) para o novo `.env`.
-
----
-
-## 4️⃣ Criar Rede Docker (para Traefik)
-
-```bash
-# Criar rede externa para comunicação com Traefik
-docker network create swiftbot_rede
-```
-
-> ⚠️ **Se você já tem Traefik rodando**, verifique o nome da rede e ajuste no `docker-compose.yml`.
-
----
-
-## 5️⃣ Migrar do PM2
-
-```bash
-# Ver processos PM2 atuais
+# Ver processos PM2
 pm2 list
 
-# Parar todos os processos PM2
+# Parar tudo
 pm2 stop all
-
-# OPCIONAL: Salvar estado antes de deletar (backup)
-pm2 save
-
-# Deletar processos PM2
 pm2 delete all
 
-# Remover PM2 do startup (opcional)
+# Remover do startup
 pm2 unstartup
 ```
 
 ---
 
-## 6️⃣ Iniciar com Docker
+## 3️⃣ Liberar Portas 80 e 443
+
+O Traefik precisa das portas 80 e 443. Verifique se algo está usando:
 
 ```bash
-# Build e iniciar container
+# Verificar portas em uso
+sudo lsof -i :80
+sudo lsof -i :443
+
+# Se Nginx estiver rodando, parar:
+sudo systemctl stop nginx
+sudo systemctl disable nginx
+```
+
+---
+
+## 4️⃣ Configurar Variáveis de Ambiente
+
+```bash
+cd /var/www/swiftbot
+
+# Criar .env a partir do exemplo
+cp .env.example .env
+
+# Editar com suas credenciais reais
+nano .env
+```
+
+### Variáveis obrigatórias no .env:
+
+```env
+# Supabase Principal
+NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+
+# Supabase Chat
+NEXT_PUBLIC_CHAT_SUPABASE_URL=https://xxx.supabase.co
+NEXT_PUBLIC_CHAT_SUPABASE_ANON_KEY=eyJ...
+CHAT_SUPABASE_SERVICE_ROLE_KEY=eyJ...
+
+# Stripe
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# OpenAI
+OPENAI_API_KEY=sk-...
+
+# Site
+NEXT_PUBLIC_SITE_URL=https://swiftbot.com.br
+NODE_ENV=production
+```
+
+---
+
+## 5️⃣ Deploy Completo
+
+```bash
+cd /var/www/swiftbot
+
+# Atualizar código
+git pull origin main
+
+# Remover containers e redes antigos
+docker compose down
+docker network rm swiftbot_rede 2>/dev/null || true
+
+# Build e iniciar tudo
 docker compose up -d --build
 
-# Verificar se está rodando
+# Acompanhar logs
+docker compose logs -f
+```
+
+---
+
+## 6️⃣ Verificar se Funcionou
+
+```bash
+# Ver containers rodando
 docker ps
 
-# Ver logs em tempo real
-docker logs -f swiftbot-app
+# Deve mostrar 2 containers:
+# - traefik
+# - swiftbot-app
 
-# Verificar saúde da aplicação
-curl http://localhost:3000/api/health
+# Testar health check
+docker exec swiftbot-app wget -qO- http://localhost:3000/api/health
+
+# Testar via HTTPS (pode demorar ~1min para SSL)
+curl -I https://swiftbot.com.br
 ```
 
 ---
 
-## 7️⃣ Comandos Úteis
+## 🔧 Comandos Úteis
 
 ```bash
-# Parar container
+# Ver logs do SwiftBot
+docker logs -f swiftbot-app
+
+# Ver logs do Traefik
+docker logs -f traefik
+
+# Reiniciar SwiftBot
+docker compose restart swiftbot
+
+# Rebuild após mudanças no código
+docker compose up -d --build swiftbot
+
+# Parar tudo
 docker compose down
 
-# Reiniciar
-docker compose restart
-
-# Rebuild após mudanças
-docker compose up -d --build
-
-# Ver logs
-docker logs swiftbot-app
-
-# Logs em tempo real
-docker logs -f swiftbot-app
-
-# Entrar no container
-docker exec -it swiftbot-app sh
-
 # Limpar imagens antigas
-docker image prune -a
+docker image prune -af
 ```
 
 ---
 
-## 🔧 Troubleshooting
+## 🔐 Dashboard do Traefik (Opcional)
 
-### Container não inicia
+O dashboard está disponível em: `https://traefik.swiftbot.com.br`
+
+**Credenciais padrão:**
+- Usuário: `admin`
+- Senha: `swiftbot2024`
+
+⚠️ **IMPORTANTE:** Mude a senha em produção!
+
+Para gerar nova senha:
 ```bash
-# Ver logs detalhados
-docker logs swiftbot-app
+# Instalar htpasswd
+sudo apt install apache2-utils
 
-# Verificar build
-docker compose build --no-cache
+# Gerar hash
+htpasswd -nb admin SuaNovaSenha
+
+# Copiar resultado para docker-compose.yml na linha traefik-auth
 ```
 
-### Erro de porta em uso
-```bash
-# Verificar o que está usando a porta 3000
-sudo lsof -i :3000
+---
 
-# Matar processo se necessário
+## 🌐 DNS Cloudflare
+
+Certifique-se que o DNS está configurado:
+
+| Tipo | Nome | Conteúdo | Proxy |
+|------|------|----------|-------|
+| A | swiftbot.com.br | IP-da-VPS | ✅ (ou DNS only) |
+| A | www | IP-da-VPS | ✅ (ou DNS only) |
+| A | traefik | IP-da-VPS | ❌ DNS only |
+
+> 💡 Se usar proxy do Cloudflare + SSL do Traefik, configure Cloudflare como "Full (Strict)"
+
+---
+
+## 🚨 Troubleshooting
+
+### Erro: "port is already allocated"
+```bash
+sudo lsof -i :80
 sudo kill -9 <PID>
 ```
 
-### Variáveis de ambiente não funcionam
+### Erro: SSL não funciona
 ```bash
-# Verificar se o .env existe
-ls -la .env
+# Verificar logs do Traefik
+docker logs traefik | grep -i acme
 
-# Verificar conteúdo (sem expor secrets)
-cat .env | head -20
+# Verificar se o volume está correto
+docker volume ls | grep traefik
 ```
 
----
-
-## 🚀 Próximos Passos (Opcional)
-
-### Configurar Traefik (se ainda não tem)
-Se você ainda não tem Traefik configurado para SSL, vou precisar criar a configuração. Me avise!
-
-### GitHub Actions para Deploy Automático
-Posso configurar CI/CD para deploy automático quando fizer push no main.
+### Container reiniciando
+```bash
+# Ver o motivo
+docker logs swiftbot-app --tail 50
+```
 
 ---
 
 ## ✅ Checklist Final
 
-- [ ] Docker instalado na VPS
-- [ ] Arquivos commitados e push feito
-- [ ] Pull na VPS concluído
-- [ ] .env criado e configurado
-- [ ] Rede Docker criada
-- [ ] PM2 parado e removido
-- [ ] Container Docker rodando
-- [ ] Health check funcionando
-- [ ] Site acessível
+- [ ] PM2 parado e desabilitado
+- [ ] Portas 80 e 443 livres
+- [ ] .env configurado com credenciais reais
+- [ ] DNS apontando para a VPS
+- [ ] `docker compose up -d --build` executado
+- [ ] Health check retornando `{"status":"healthy"}`
+- [ ] Site acessível via HTTPS
+- [ ] SSL funcionando (cadeado verde)
 
 ---
 
