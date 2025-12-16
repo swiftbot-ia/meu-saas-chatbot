@@ -1,11 +1,15 @@
-version: '3.8'
-
 services:
   swiftbot:
     image: swiftbot:latest
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: swiftbot-app
+    restart: unless-stopped
     networks:
       - swiftbot_rede
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -16,11 +20,21 @@ services:
           - node.role == manager
       labels:
         - "traefik.enable=true"
+        # HTTP → HTTPS redirect
+        - "traefik.http.routers.swiftbot-http.rule=Host(`swiftbot.com.br`) || Host(`www.swiftbot.com.br`)"
+        - "traefik.http.routers.swiftbot-http.entrypoints=web"
+        - "traefik.http.routers.swiftbot-http.middlewares=redirect-to-https"
+        - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+        - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
+        # HTTPS
         - "traefik.http.routers.swiftbot-secure.rule=Host(`swiftbot.com.br`) || Host(`www.swiftbot.com.br`)"
         - "traefik.http.routers.swiftbot-secure.entrypoints=websecure"
         - "traefik.http.routers.swiftbot-secure.tls=true"
         - "traefik.http.routers.swiftbot-secure.tls.certresolver=letsencryptresolver"
         - "traefik.http.services.swiftbot.loadbalancer.server.port=3000"
+        # Health check
+        - "traefik.http.services.swiftbot.loadbalancer.healthcheck.path=/api/health"
+        - "traefik.http.services.swiftbot.loadbalancer.healthcheck.interval=30s"
 
 networks:
   swiftbot_rede:
