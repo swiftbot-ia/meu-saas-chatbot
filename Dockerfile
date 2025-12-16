@@ -24,20 +24,29 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Variáveis dummy para o build (serão substituídas em runtime)
-ENV NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co
-ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder
-ENV SUPABASE_SERVICE_ROLE_KEY=placeholder
-ENV NEXT_PUBLIC_CHAT_SUPABASE_URL=https://placeholder.supabase.co
-ENV NEXT_PUBLIC_CHAT_SUPABASE_ANON_KEY=placeholder
-ENV CHAT_SUPABASE_SERVICE_ROLE_KEY=placeholder
+# ⚠️ IMPORTANTE: Variáveis NEXT_PUBLIC_* são passadas via build args
+# Isso permite que sejam substituídas durante o build na VPS
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ARG NEXT_PUBLIC_CHAT_SUPABASE_URL
+ARG NEXT_PUBLIC_CHAT_SUPABASE_ANON_KEY
+ARG NEXT_PUBLIC_SITE_URL
+
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_CHAT_SUPABASE_URL=$NEXT_PUBLIC_CHAT_SUPABASE_URL
+ENV NEXT_PUBLIC_CHAT_SUPABASE_ANON_KEY=$NEXT_PUBLIC_CHAT_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
+
+# Variáveis server-side (não precisam estar no build, mas evita erros)
+ENV SUPABASE_SERVICE_ROLE_KEY=placeholder_will_be_replaced_at_runtime
+ENV CHAT_SUPABASE_SERVICE_ROLE_KEY=placeholder_will_be_replaced_at_runtime
 ENV STRIPE_SECRET_KEY=sk_placeholder
 ENV STRIPE_WEBHOOK_SECRET=whsec_placeholder
 ENV OPENAI_API_KEY=sk-placeholder
-ENV NEXT_PUBLIC_SITE_URL=https://swiftbot.com.br
 
-# Build da aplicação Next.js (forçar webpack, sem Turbopack)
-RUN NEXT_DISABLE_TURBOPACK=1 npx next build
+# Build da aplicação Next.js
+RUN npm run build
 
 # Stage 3: Runner (imagem final)
 FROM node:20-alpine AS runner
