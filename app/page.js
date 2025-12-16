@@ -213,14 +213,13 @@ export default function Home() {
                   <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img
+                        <Image
                           src={testimonials[0].image}
                           alt={testimonials[0].name}
+                          width={48}
+                          height={48}
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.style.display = 'none'
-                            e.target.parentElement.innerHTML = `<span class="text-lg font-semibold text-black">${testimonials[0].name.charAt(0)}</span>`
-                          }}
+                          loading="lazy"
                         />
                       </div>
                       <div>
@@ -236,14 +235,13 @@ export default function Home() {
                   <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img
+                        <Image
                           src={testimonials[1].image}
                           alt={testimonials[1].name}
+                          width={48}
+                          height={48}
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.style.display = 'none'
-                            e.target.parentElement.innerHTML = `<span class="text-lg font-semibold text-black">${testimonials[1].name.charAt(0)}</span>`
-                          }}
+                          loading="lazy"
                         />
                       </div>
                       <div>
@@ -259,14 +257,13 @@ export default function Home() {
                   <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img
+                        <Image
                           src={testimonials[2].image}
                           alt={testimonials[2].name}
+                          width={48}
+                          height={48}
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.style.display = 'none'
-                            e.target.parentElement.innerHTML = `<span class="text-lg font-semibold text-black">${testimonials[2].name.charAt(0)}</span>`
-                          }}
+                          loading="lazy"
                         />
                       </div>
                       <div>
@@ -285,14 +282,13 @@ export default function Home() {
                   <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img
+                        <Image
                           src={testimonials[3].image}
                           alt={testimonials[3].name}
+                          width={48}
+                          height={48}
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.style.display = 'none'
-                            e.target.parentElement.innerHTML = `<span class="text-lg font-semibold text-black">${testimonials[3].name.charAt(0)}</span>`
-                          }}
+                          loading="lazy"
                         />
                       </div>
                       <div>
@@ -308,14 +304,13 @@ export default function Home() {
                   <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img
+                        <Image
                           src={testimonials[4].image}
                           alt={testimonials[4].name}
+                          width={48}
+                          height={48}
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.style.display = 'none'
-                            e.target.parentElement.innerHTML = `<span class="text-lg font-semibold text-black">${testimonials[4].name.charAt(0)}</span>`
-                          }}
+                          loading="lazy"
                         />
                       </div>
                       <div>
@@ -331,14 +326,13 @@ export default function Home() {
                   <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img
+                        <Image
                           src={testimonials[5].image}
                           alt={testimonials[5].name}
+                          width={48}
+                          height={48}
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.style.display = 'none'
-                            e.target.parentElement.innerHTML = `<span class="text-lg font-semibold text-black">${testimonials[5].name.charAt(0)}</span>`
-                          }}
+                          loading="lazy"
                         />
                       </div>
                       <div>
@@ -357,14 +351,13 @@ export default function Home() {
                   <div className="bg-gradient-to-b from-white/70 to-white/30 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img
+                        <Image
                           src={testimonials[6].image}
                           alt={testimonials[6].name}
+                          width={48}
+                          height={48}
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.style.display = 'none'
-                            e.target.parentElement.innerHTML = `<span class="text-lg font-semibold text-black">${testimonials[6].name.charAt(0)}</span>`
-                          }}
+                          loading="lazy"
                         />
                       </div>
                       <div>
@@ -380,14 +373,13 @@ export default function Home() {
                   <div className="bg-gradient-to-b from-white/70 to-white/30 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img
+                        <Image
                           src={testimonials[7].image}
                           alt={testimonials[7].name}
+                          width={48}
+                          height={48}
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.style.display = 'none'
-                            e.target.parentElement.innerHTML = `<span class="text-lg font-semibold text-black">${testimonials[7].name.charAt(0)}</span>`
-                          }}
+                          loading="lazy"
                         />
                       </div>
                       <div>
@@ -411,14 +403,13 @@ export default function Home() {
                 >
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                      <img
+                      <Image
                         src={testimonial.image}
                         alt={testimonial.name}
+                        width={48}
+                        height={48}
                         className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.style.display = 'none'
-                          e.target.parentElement.innerHTML = `<span class="text-lg font-semibold text-black">${testimonial.name.charAt(0)}</span>`
-                        }}
+                        loading="lazy"
                       />
                     </div>
                     <div>
