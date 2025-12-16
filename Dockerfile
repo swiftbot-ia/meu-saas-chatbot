@@ -1,16 +1,16 @@
 # =============================================================================
-# SwiftBot - Dockerfile Otimizado para Produção
+# SwiftBot - Dockerfile para Produção (Next.js 16)
 # =============================================================================
 
 # Stage 1: Dependencies
 FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Instalar dependências de sistema necessárias para ffmpeg
+# Instalar dependências de sistema
 RUN apk add --no-cache libc6-compat
 
 COPY package*.json ./
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci && npm cache clean --force
 
 # Stage 2: Builder
 FROM node:20-alpine AS builder
@@ -27,7 +27,7 @@ ENV NODE_ENV=production
 # Build da aplicação Next.js
 RUN npm run build
 
-# Stage 3: Runner (imagem final otimizada)
+# Stage 3: Runner (imagem final)
 FROM node:20-alpine AS runner
 WORKDIR /app
 
@@ -41,13 +41,15 @@ RUN apk add --no-cache ffmpeg
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Copiar apenas arquivos necessários para produção
+# Copiar arquivos necessários para produção
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/next.config.ts ./next.config.ts
 
-# Copiar o standalone build do Next.js (mais eficiente)
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Mudar ownership para usuário não-root
+RUN chown -R nextjs:nodejs /app
 
 # Mudar para usuário não-root
 USER nextjs
@@ -60,8 +62,8 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # Healthcheck para monitoramento
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))" || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
 # Comando de inicialização
-CMD ["node", "server.js"]
+CMD ["npm", "start"]
