@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import ConversationList from '../components/chat/ConversationList';
 import ChatWindow from '../components/chat/ChatWindow';
@@ -13,8 +13,6 @@ import { Loader2, AlertCircle } from 'lucide-react';
 import { createChatSupabaseClient } from '@/lib/supabase/chat-client';
 import { supabase } from '@/lib/supabase/client';
 import NoSubscription from '../components/NoSubscription'
-
-const chatSupabase = createChatSupabaseClient();
 
 // Loading fallback for Suspense
 function ChatLoadingFallback() {
@@ -35,6 +33,9 @@ function ChatContent() {
   const conversationIdParam = searchParams.get('conversation');
   const phoneParam = searchParams.get('phone');
 
+  // Chat Supabase client ref
+  const chatSupabaseRef = useRef(null);
+
   // Debug: Log URL params on mount
   console.log('🔗 [Chat] URL params:', { conversationIdParam, phoneParam });
 
@@ -49,6 +50,13 @@ function ChatContent() {
   const [subscriptionChecked, setSubscriptionChecked] = useState(false);
   const [pendingConversationId, setPendingConversationId] = useState(conversationIdParam);
   const [pendingPhone, setPendingPhone] = useState(phoneParam);
+
+  // Initialize chat supabase client on mount
+  useEffect(() => {
+    if (!chatSupabaseRef.current) {
+      chatSupabaseRef.current = createChatSupabaseClient();
+    }
+  }, []);
 
   // 2. FUNÇÕES
   const loadConnections = async () => {
@@ -362,8 +370,9 @@ function ChatContent() {
       const connection = connections.find(c => c.id === selectedConnection);
       let conversationsChannel = null;
       let messagesChannel = null;
+      const chatSupabase = chatSupabaseRef.current;
 
-      if (connection) {
+      if (connection && chatSupabase) {
         // Subscribe to conversations updates
         conversationsChannel = chatSupabase
           .channel(`conversations:${connection.instance_name}`)
@@ -407,8 +416,8 @@ function ChatContent() {
 
       return () => {
         clearInterval(interval);
-        if (conversationsChannel) chatSupabase.removeChannel(conversationsChannel);
-        if (messagesChannel) chatSupabase.removeChannel(messagesChannel);
+        if (conversationsChannel && chatSupabase) chatSupabase.removeChannel(conversationsChannel);
+        if (messagesChannel && chatSupabase) chatSupabase.removeChannel(messagesChannel);
       };
     }
   }, [selectedConnection, connections]);
