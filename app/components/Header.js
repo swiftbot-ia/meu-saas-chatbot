@@ -8,17 +8,14 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useEffect(() => {
-    const handleScroll = () => {
-      const firstSection = document.querySelector('section') || document.querySelector('main > div')
+    // Fixed threshold instead of reading offsetHeight (causes forced reflow)
+    const SCROLL_THRESHOLD = 600
 
-      if (firstSection) {
-        const firstSectionBottom = firstSection.offsetTop + firstSection.offsetHeight
-        const scrollPosition = window.scrollY
-        setShowCTA(scrollPosition > firstSectionBottom - 100)
-      }
+    const handleScroll = () => {
+      setShowCTA(window.scrollY > SCROLL_THRESHOLD)
     }
 
-    window.addEventListener('scroll', handleScroll)
+    window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
