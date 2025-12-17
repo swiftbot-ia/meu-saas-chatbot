@@ -69,6 +69,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/next.config.ts ./next.config.ts
 
+# Criar diretórios de mídia com permissões de escrita
+RUN mkdir -p /app/public/media/audio /app/public/media/image /app/public/media/video /app/public/media/document
+
 # Mudar ownership para usuário não-root
 RUN chown -R nextjs:nodejs /app
 
