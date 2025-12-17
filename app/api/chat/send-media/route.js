@@ -142,13 +142,13 @@ export async function POST(request) {
         await unlink(filepath);
 
         // ENVIAR MP3 para WhatsApp (melhor compatibilidade)
-        // IMPORTANTE: Usar URL pública acessível pela UAZAPI
+        // IMPORTANTE: Usar URL de API que funciona em runtime
         const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://swiftbot.com.br';
-        mediaUrl = `${baseUrl}/media/audio/${mp3Filename}`;
+        mediaUrl = `${baseUrl}/api/media/audio/${mp3Filename}`;
       } else {
-        // USAR URL ESTÁTICO em vez de rota API
+        // USAR ROTA API que funciona em runtime
         const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://swiftbot.com.br';
-        mediaUrl = `${baseUrl}/media/audio/${filename}`;
+        mediaUrl = `${baseUrl}/api/media/audio/${filename}`;
       }
     }
 
