@@ -65,6 +65,9 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+    # Volume para persistir e compartilhar arquivos de mídia
+    volumes:
+      - ./public/media:/app/public/media
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.swiftbot.rule=Host(`swiftbot.com.br`) || Host(`www.swiftbot.com.br`)"
