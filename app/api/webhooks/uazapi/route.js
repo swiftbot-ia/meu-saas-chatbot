@@ -68,6 +68,15 @@ export async function POST(request) {
         `${process.env.WEBHOOK_AUTH_USER}:${process.env.WEBHOOK_AUTH_PASS}`
       ).toString('base64');
 
+      // DEBUG: Log para diagnóstico
+      log(requestId, 'debug', '🔐', 'Auth Debug', {
+        hasAuthHeader: !!authHeader,
+        authHeaderPrefix: authHeader ? authHeader.substring(0, 20) + '...' : 'null',
+        envUserConfigured: !!process.env.WEBHOOK_AUTH_USER,
+        envPassConfigured: !!process.env.WEBHOOK_AUTH_PASS,
+        expectedPrefix: `Basic ${expectedAuth.substring(0, 10)}...`
+      });
+
       if (authHeader !== `Basic ${expectedAuth}`) {
         log(requestId, 'warn', '⚠️', 'Autenticação falhou');
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
