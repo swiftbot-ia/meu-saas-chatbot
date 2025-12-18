@@ -211,7 +211,10 @@ export default function SwiftbotProPage() {
     const lines = content.split('\n')
 
     return lines.map((line, lineIndex) => {
-      // Headings
+      // Headings - verificar do mais específico (####) para o mais genérico (#)
+      if (line.startsWith('#### ')) {
+        return <h4 key={lineIndex} className="text-base font-bold text-[#00FF99] mt-4 mb-2">{formatInline(line.slice(5))}</h4>
+      }
       if (line.startsWith('### ')) {
         return <h3 key={lineIndex} className="text-lg font-bold text-white mt-4 mb-2">{formatInline(line.slice(4))}</h3>
       }
