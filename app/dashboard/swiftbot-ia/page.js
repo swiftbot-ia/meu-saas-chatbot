@@ -7,6 +7,127 @@ import Link from 'next/link'
 import { Menu, X, Plus, MessageCircle, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
 import NoSubscription from '../../components/NoSubscription'
 import SwiftBotTrial from '../../components/SwiftBotTrial'
+
+// ==================================================================================
+// CONNECTION DROPDOWN COMPONENT (igual ao CRM/Chat)
+// ==================================================================================
+const ConnectionDropdown = ({ connections, selectedConnection, onSelectConnection }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const selected = connections.find(c => c.id === selectedConnection?.id);
+  const displayValue = selected
+    ? (selected.profile_name || selected.instance_name)
+    : 'Selecione uma instância';
+
+  return (
+    <div className="relative w-full">
+      <div className="bg-[#272727] rounded-xl overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full px-3 py-2.5 flex items-center justify-between text-left outline-none"
+        >
+          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+            {selected && (
+              <div className="flex-shrink-0">
+                {selected.profile_pic_url ? (
+                  <img
+                    src={selected.profile_pic_url}
+                    alt={selected.profile_name || 'Conexão'}
+                    className="w-8 h-8 rounded-full object-cover bg-[#333333]"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div
+                  className={`w-8 h-8 rounded-full bg-[#00A884] flex items-center justify-center text-white text-xs font-semibold ${selected.profile_pic_url ? 'hidden' : 'flex'}`}
+                  style={{ display: selected.profile_pic_url ? 'none' : 'flex' }}
+                >
+                  {selected.profile_name ? selected.profile_name.charAt(0).toUpperCase() : '?'}
+                </div>
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="text-white text-sm font-medium truncate">
+                {displayValue}
+              </div>
+              {selected && (
+                <div className="text-xs text-gray-500 flex items-center gap-1">
+                  <span className={selected.is_connected ? 'text-[#00FF99]' : 'text-red-400'}>
+                    {selected.is_connected ? '●' : '○'}
+                  </span>
+                  <span className="truncate">
+                    {selected.is_connected ? 'Conectado' : 'Desconectado'}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+          <ChevronDown
+            className={`w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ml-2 ${isOpen ? 'rotate-180' : 'rotate-0'}`}
+          />
+        </button>
+
+        {isOpen && (
+          <div className="absolute top-full left-0 right-0 mt-1 backdrop-blur-md bg-[#272727]/95 rounded-xl shadow-2xl z-50 max-h-[200px] overflow-y-auto">
+            {connections.map((connection, index) => (
+              <button
+                key={connection.id}
+                type="button"
+                onClick={() => {
+                  onSelectConnection(connection);
+                  setIsOpen(false);
+                }}
+                className={`
+                                    w-full p-2.5 text-sm text-left transition-all duration-150 border-b border-white/5 last:border-0
+                                    ${selectedConnection?.id === connection.id
+                    ? 'bg-[#00FF99]/10 text-[#00FF99]'
+                    : 'text-gray-300 hover:bg-white/5 hover:text-white'}
+                                `}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="flex-shrink-0">
+                    {connection.profile_pic_url ? (
+                      <img
+                        src={connection.profile_pic_url}
+                        alt={connection.profile_name || `Conexão ${index + 1}`}
+                        className="w-8 h-8 rounded-full object-cover bg-[#333333]"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={`w-8 h-8 rounded-full bg-[#00A884] flex items-center justify-center text-white text-xs font-semibold ${connection.profile_pic_url ? 'hidden' : 'flex'}`}
+                      style={{ display: connection.profile_pic_url ? 'none' : 'flex' }}
+                    >
+                      {connection.profile_name ? connection.profile_name.charAt(0).toUpperCase() : (index + 1)}
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate text-sm">
+                      {connection.profile_name || connection.instance_name}
+                    </div>
+                    <div className="text-xs flex items-center gap-1 mt-0.5">
+                      <span className={connection.is_connected ? 'text-[#00FF99]' : 'text-red-400'}>
+                        {connection.is_connected ? '● Conectado' : '○ Desconectado'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {isOpen && <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />}
+    </div>
+  );
+};
+
 // ==================================================================================
 // SWIFTBOT IA
 // ==================================================================================
@@ -37,6 +158,10 @@ export default function SwiftbotProPage() {
   const [credits, setCredits] = useState({ balance: 0, formatted: '0' })
   const [connectionId, setConnectionId] = useState(null)
   const [creditsError, setCreditsError] = useState(false)
+
+  // Estados para conexões (sincronizado com CRM/Chat via localStorage)
+  const [connections, setConnections] = useState([])
+  const [selectedConnection, setSelectedConnection] = useState(null)
 
   // Sugestões de prompts
   const suggestions = [
@@ -253,31 +378,58 @@ export default function SwiftbotProPage() {
   }
 
   // Carregar conexão ativa do localStorage ou buscar do banco
+  // NOTA: Usa 'activeConnectionId' para sincronizar com CRM/Chat/Contacts
   const loadActiveConnection = async () => {
-    // Primeiro tenta localStorage
-    const savedConnectionId = localStorage.getItem('selectedWhatsappConnectionId')
-    if (savedConnectionId) {
-      console.log('[SwiftBot IA] Connection from localStorage:', savedConnectionId)
-      setConnectionId(savedConnectionId)
-      return
-    }
-
-    // Fallback: buscar primeira conexão do usuário
     try {
       const res = await fetch('/api/whatsapp/connections')
       const data = await res.json()
-      if (data.connections?.length > 0) {
-        const firstConnection = data.connections[0]
-        console.log('[SwiftBot IA] Connection from database:', firstConnection.id)
-        setConnectionId(firstConnection.id)
-        // Salvar para próximas vezes
-        localStorage.setItem('selectedWhatsappConnectionId', firstConnection.id)
-      } else {
+      const connectionsData = data.connections || []
+      setConnections(connectionsData)
+
+      if (connectionsData.length === 0) {
         console.log('[SwiftBot IA] No connections found')
+        return
       }
+
+      // Primeiro tenta localStorage (sincronizado com outras páginas)
+      const savedConnectionId = localStorage.getItem('activeConnectionId')
+      let connection = null
+
+      if (savedConnectionId) {
+        connection = connectionsData.find(c => c.id === savedConnectionId)
+        if (connection) {
+          console.log('[SwiftBot IA] Connection from localStorage:', connection.profile_name || connection.instance_name)
+        } else {
+          console.log('[SwiftBot IA] Stored connection not found, using first')
+        }
+      }
+
+      // Fallback: usar primeira conexão
+      if (!connection) {
+        connection = connectionsData[0]
+        localStorage.setItem('activeConnectionId', connection.id)
+        console.log('[SwiftBot IA] Using first connection:', connection.profile_name || connection.instance_name)
+      }
+
+      setSelectedConnection(connection)
+      setConnectionId(connection.id)
+
     } catch (error) {
-      console.error('Erro ao carregar conexão:', error)
+      console.error('[SwiftBot IA] Erro ao carregar conexões:', error)
     }
+  }
+
+  // Handler para mudança de conexão
+  const handleConnectionChange = (connection) => {
+    console.log('[SwiftBot IA] Changing connection to:', connection.profile_name || connection.instance_name)
+    setSelectedConnection(connection)
+    setConnectionId(connection.id)
+    localStorage.setItem('activeConnectionId', connection.id)
+
+    // Limpar chat atual e criar novo para nova conexão
+    setChatStarted(false)
+    setMessages([])
+    setActiveChatId(null)
   }
 
   const checkUser = async () => {
@@ -548,6 +700,18 @@ export default function SwiftbotProPage() {
         {/* Navegação */}
         <nav className="flex-1 overflow-y-auto py-6">
           <div className="px-3 mb-4">
+            {/* Dropdown de Conexão */}
+            {chatSidebarOpen && connections.length > 1 && (
+              <div className="mb-4">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-3">Instância</h3>
+                <ConnectionDropdown
+                  connections={connections}
+                  selectedConnection={selectedConnection}
+                  onSelectConnection={handleConnectionChange}
+                />
+              </div>
+            )}
+
             {chatSidebarOpen && (
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-3">Conversas</h3>
             )}
