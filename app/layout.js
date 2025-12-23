@@ -1,6 +1,7 @@
 // import { Inter } from "next/font/google";
 import "./globals.css";
 import CookieConsent from '../components/CookieConsent'
+import UTMTracker from './components/UTMTracker'
 
 // Temporariamente desabilitado para evitar erros de fetch do Google Fonts
 // Usando fonte do sistema como fallback
@@ -201,6 +202,7 @@ export default function RootLayout({ children }) {
         <div className="min-h-screen">
           {children}
           <CookieConsent />
+          <UTMTracker />
         </div>
       </body>
     </html>
