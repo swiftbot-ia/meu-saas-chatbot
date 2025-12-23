@@ -61,18 +61,8 @@ export async function POST(request) {
   try {
     log(requestId, 'info', '📨', 'Webhook recebido');
 
-    // 1. VALIDAÇÃO DE AUTENTICAÇÃO (opcional)
-    if (process.env.WEBHOOK_AUTH_USER && process.env.WEBHOOK_AUTH_PASS) {
-      const authHeader = request.headers.get('authorization');
-      const expectedAuth = Buffer.from(
-        `${process.env.WEBHOOK_AUTH_USER}:${process.env.WEBHOOK_AUTH_PASS}`
-      ).toString('base64');
 
-      if (authHeader !== `Basic ${expectedAuth}`) {
-        log(requestId, 'warn', '⚠️', 'Autenticação falhou');
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-    }
+    // NOTA: Autenticação de webhook desativada - UAZAPI não envia headers de auth
 
     // 2. PARSE DO PAYLOAD
     let payload;

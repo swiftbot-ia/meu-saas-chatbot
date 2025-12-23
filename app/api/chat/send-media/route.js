@@ -142,10 +142,13 @@ export async function POST(request) {
         await unlink(filepath);
 
         // ENVIAR MP3 para WhatsApp (melhor compatibilidade)
-        mediaUrl = `${process.env.NEXT_PUBLIC_APP_URL}/media/audio/${mp3Filename}`;
+        // IMPORTANTE: Usar URL de API que funciona em runtime
+        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://swiftbot.com.br';
+        mediaUrl = `${baseUrl}/api/media/audio/${mp3Filename}`;
       } else {
-        // USAR URL ESTÁTICO em vez de rota API
-        mediaUrl = `${process.env.NEXT_PUBLIC_APP_URL}/media/audio/${filename}`;
+        // USAR ROTA API que funciona em runtime
+        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://swiftbot.com.br';
+        mediaUrl = `${baseUrl}/api/media/audio/${filename}`;
       }
     }
 

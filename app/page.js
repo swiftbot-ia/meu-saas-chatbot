@@ -3,7 +3,9 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import Header from './components/Header'
+import LazyVideo from './components/LazyVideo'
 
 export default function Home() {
   const router = useRouter()
@@ -41,56 +43,56 @@ export default function Home() {
       text: "Dobramos nossas vendas online em 3 meses. A SwiftBot captura leads qualificados 24/7, algo que nossa equipe humana simplesmente não conseguia fazer. A implementação com o QR Code foi ridiculamente fácil.",
       name: "Juliana Martins",
       role: "CEO, Bella Moda E-commerce",
-      image: "/testimonials/juliana.jpg",
+      image: "/testimonials/juliana.webp",
       gradient: "from-purple-700/50 via-black to-black"
     },
     {
       text: "Eu era o gargalo do meu próprio negócio, respondendo mensagens até de madrugada. Com a SwiftBot, eu clonei meu atendimento. Ganhamos 15 horas por semana e a qualidade do serviço nunca esteve tão alta.",
       name: "Ricardo Alves",
       role: "Fundador, Clínica FisioHealth",
-      image: "/testimonials/ricardo.jpg",
+      image: "/testimonials/ricardo.webp",
       gradient: "from-blue-700/50 via-black to-black"
     },
     {
       text: "A consistência é tudo. Antes, cada vendedor respondia de um jeito. Agora, nosso 'clone' garante que todo cliente receba o mesmo nível de excelência. Nosso índice de satisfação subiu de 8.2 para 9.8.",
       name: "Beatriz Costa",
       role: "Diretora de Operações, Vestra Seguros",
-      image: "/testimonials/beatriz.jpg",
+      image: "/testimonials/beatriz.webp",
       gradient: "from-cyan-700/50 via-black to-black"
     },
     {
       text: "Estávamos prestes a contratar mais duas pessoas para o suporte. Em vez disso, ativamos a SwiftBot. O custo foi 70% menor e a capacidade de atendimento se tornou infinita. Foi a decisão financeira mais inteligente que fizemos.",
       name: "Fernando Lima",
       role: "Sócio, Agência Criativa Digital",
-      image: "/testimonials/fernando.jpg",
+      image: "/testimonials/fernando.webp",
       gradient: "from-green-700/50 via-black to-black"
     },
     {
       text: "O que mais me impressionou foi a IA aprendendo nosso tom de voz. Nossos clientes não percebem que estão falando com um robô. Eles sentem que estão falando comigo. Isso não tem preço.",
       name: "Camila Oliveira",
       role: "Proprietária, Doce Sabor Confeitaria",
-      image: "/testimonials/camila.jpg",
+      image: "/testimonials/camila.webp",
       gradient: "from-pink-700/50 via-black to-black"
     },
     {
       text: "Agendamentos, confirmações, reagendamentos... tudo automatizado. A taxa de não comparecimento caiu 40%. A SwiftBot não é só um chatbot, é um sistema de gestão de clientes.",
       name: "Dr. Marcos Ferreira",
       role: "Dentista, Sorriso Perfeito Odontologia",
-      image: "/testimonials/marcos.jpg",
+      image: "/testimonials/marcos.webp",
       gradient: "from-indigo-700/50 via-black to-black"
     },
     {
       text: "Recuperamos 25% dos carrinhos abandonados no primeiro mês. A IA aborda o cliente na hora certa, com a mensagem certa. É como ter o melhor vendedor do mundo trabalhando sem parar.",
       name: "Lucas Gomes",
       role: "Gerente de E-commerce, Tech Gadgets Brasil",
-      image: "/testimonials/lucas.jpg",
+      image: "/testimonials/lucas.webp",
       gradient: "from-violet-700/50 via-black to-black"
     },
     {
       text: "Como agência, implementamos a SwiftBot para vários clientes. O tempo de ativação é imbatível e o ROI é visível em semanas. Virou nossa recomendação padrão para automação de WhatsApp.",
       name: "Sofia Ribeiro",
       role: "Especialista em Crescimento, ScaleUp Solutions",
-      image: "/testimonials/sofia.jpg",
+      image: "/testimonials/sofia.webp",
       gradient: "from-teal-700/50 via-black to-black"
     }
   ]
@@ -108,15 +110,16 @@ export default function Home() {
         {/* SEÇÃO 1: HERO COM VÍDEO DE FUNDO */}
         <section className="relative min-h-screen md:min-h-screen flex items-center justify-center overflow-visible bg-transparent pb-12 md:pb-20">
           <div className="absolute inset-0 bg-black rounded-b-[40px] md:rounded-b-[80px] overflow-hidden">
-            {/* Video Background */}
+            {/* Video Background - Optimized with preload metadata */}
             <video
               autoPlay
               loop
               muted
               playsInline
+              preload="metadata"
               className="absolute inset-0 w-full h-full object-cover opacity-40"
             >
-              <source src="/particles-background.mp4" type="video/mp4" />
+              <source src="/particles-background.webm" type="video/webm" />
             </video>
 
             {/* Overlay escuro */}
@@ -210,14 +213,13 @@ export default function Home() {
                   <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img
+                        <Image
                           src={testimonials[0].image}
                           alt={testimonials[0].name}
+                          width={48}
+                          height={48}
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.style.display = 'none'
-                            e.target.parentElement.innerHTML = `<span class="text-lg font-semibold text-black">${testimonials[0].name.charAt(0)}</span>`
-                          }}
+                          loading="lazy"
                         />
                       </div>
                       <div>
@@ -233,14 +235,13 @@ export default function Home() {
                   <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img
+                        <Image
                           src={testimonials[1].image}
                           alt={testimonials[1].name}
+                          width={48}
+                          height={48}
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.style.display = 'none'
-                            e.target.parentElement.innerHTML = `<span class="text-lg font-semibold text-black">${testimonials[1].name.charAt(0)}</span>`
-                          }}
+                          loading="lazy"
                         />
                       </div>
                       <div>
@@ -256,14 +257,13 @@ export default function Home() {
                   <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img
+                        <Image
                           src={testimonials[2].image}
                           alt={testimonials[2].name}
+                          width={48}
+                          height={48}
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.style.display = 'none'
-                            e.target.parentElement.innerHTML = `<span class="text-lg font-semibold text-black">${testimonials[2].name.charAt(0)}</span>`
-                          }}
+                          loading="lazy"
                         />
                       </div>
                       <div>
@@ -282,14 +282,13 @@ export default function Home() {
                   <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img
+                        <Image
                           src={testimonials[3].image}
                           alt={testimonials[3].name}
+                          width={48}
+                          height={48}
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.style.display = 'none'
-                            e.target.parentElement.innerHTML = `<span class="text-lg font-semibold text-black">${testimonials[3].name.charAt(0)}</span>`
-                          }}
+                          loading="lazy"
                         />
                       </div>
                       <div>
@@ -305,14 +304,13 @@ export default function Home() {
                   <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img
+                        <Image
                           src={testimonials[4].image}
                           alt={testimonials[4].name}
+                          width={48}
+                          height={48}
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.style.display = 'none'
-                            e.target.parentElement.innerHTML = `<span class="text-lg font-semibold text-black">${testimonials[4].name.charAt(0)}</span>`
-                          }}
+                          loading="lazy"
                         />
                       </div>
                       <div>
@@ -328,14 +326,13 @@ export default function Home() {
                   <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 hover:bg-white/80 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img
+                        <Image
                           src={testimonials[5].image}
                           alt={testimonials[5].name}
+                          width={48}
+                          height={48}
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.style.display = 'none'
-                            e.target.parentElement.innerHTML = `<span class="text-lg font-semibold text-black">${testimonials[5].name.charAt(0)}</span>`
-                          }}
+                          loading="lazy"
                         />
                       </div>
                       <div>
@@ -354,14 +351,13 @@ export default function Home() {
                   <div className="bg-gradient-to-b from-white/70 to-white/30 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img
+                        <Image
                           src={testimonials[6].image}
                           alt={testimonials[6].name}
+                          width={48}
+                          height={48}
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.style.display = 'none'
-                            e.target.parentElement.innerHTML = `<span class="text-lg font-semibold text-black">${testimonials[6].name.charAt(0)}</span>`
-                          }}
+                          loading="lazy"
                         />
                       </div>
                       <div>
@@ -377,14 +373,13 @@ export default function Home() {
                   <div className="bg-gradient-to-b from-white/70 to-white/30 backdrop-blur-sm rounded-3xl p-6 border border-black/5 hover:border-black/10 transition-all duration-500">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                        <img
+                        <Image
                           src={testimonials[7].image}
                           alt={testimonials[7].name}
+                          width={48}
+                          height={48}
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.style.display = 'none'
-                            e.target.parentElement.innerHTML = `<span class="text-lg font-semibold text-black">${testimonials[7].name.charAt(0)}</span>`
-                          }}
+                          loading="lazy"
                         />
                       </div>
                       <div>
@@ -408,14 +403,13 @@ export default function Home() {
                 >
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                      <img
+                      <Image
                         src={testimonial.image}
                         alt={testimonial.name}
+                        width={48}
+                        height={48}
                         className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.style.display = 'none'
-                          e.target.parentElement.innerHTML = `<span class="text-lg font-semibold text-black">${testimonial.name.charAt(0)}</span>`
-                        }}
+                        loading="lazy"
                       />
                     </div>
                     <div>
@@ -439,18 +433,13 @@ export default function Home() {
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
               <div className="grid md:grid-cols-2 gap-16 items-center">
-                {/* Vídeo */}
+                {/* Vídeo - Lazy loaded */}
                 <div className="relative">
                   <div className="bg-gradient-to-br from-purple-500 via-pink-500 to-indigo-600 rounded-[40px] p-8">
-                    <video
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full h-auto rounded-3xl"
-                    >
-                      <source src="/swiftbot-ia-demo.mp4" type="video/mp4" />
-                    </video>
+                    <LazyVideo
+                      src="/swiftbot-ia-demo.webm"
+                      className="w-full h-auto rounded-3xl overflow-hidden"
+                    />
                   </div>
                 </div>
 
@@ -523,13 +512,16 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Imagem */}
+                {/* Imagem - Optimized with next/image */}
                 <div className="relative">
                   <div className="bg-gradient-to-br from-green-500 via-emerald-500 to-teal-500 rounded-[40px] p-8">
-                    <img
-                      src="/chat-live-demo.png"
+                    <Image
+                      src="/chat-live-demo.webp"
                       alt="Chat ao Vivo SwiftBot"
+                      width={800}
+                      height={600}
                       className="w-full h-auto rounded-3xl"
+                      loading="lazy"
                     />
                   </div>
                 </div>
@@ -543,13 +535,16 @@ export default function Home() {
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
               <div className="grid md:grid-cols-2 gap-16 items-center">
-                {/* Imagem */}
+                {/* Imagem - Optimized with next/image */}
                 <div className="relative">
                   <div className="bg-gradient-to-br from-blue-500 via-cyan-500 to-teal-400 rounded-[40px] p-8">
-                    <img
-                      src="/contacts-demo.png"
+                    <Image
+                      src="/contacts-demo.webp"
                       alt="Gestão de Contatos"
+                      width={800}
+                      height={600}
                       className="w-full h-auto rounded-3xl"
+                      loading="lazy"
                     />
                   </div>
                 </div>
@@ -624,18 +619,13 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Vídeo */}
+                {/* Vídeo - Lazy loaded */}
                 <div className="relative">
                   <div className="bg-gradient-to-br from-orange-500 via-pink-500 to-purple-500 rounded-[40px] p-8">
-                    <video
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full h-auto rounded-3xl"
-                    >
-                      <source src="/crm-kanban-demo.mp4" type="video/mp4" />
-                    </video>
+                    <LazyVideo
+                      src="/crm-kanban-demo.webm"
+                      className="w-full h-auto rounded-3xl overflow-hidden"
+                    />
                   </div>
                 </div>
               </div>
@@ -648,13 +638,16 @@ export default function Home() {
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="animate-on-scroll opacity-0 translate-y-10 transition-all duration-1000">
               <div className="grid md:grid-cols-2 gap-16 items-center">
-                {/* Imagem */}
+                {/* Imagem - Optimized with next/image */}
                 <div className="relative">
                   <div className="bg-gradient-to-br from-yellow-400 via-orange-500 to-pink-500 rounded-[40px] p-8">
-                    <img
-                      src="/agent-config-demo.png"
+                    <Image
+                      src="/agent-config-demo.webp"
                       alt="Configuração do Agente"
+                      width={800}
+                      height={600}
                       className="w-full h-auto rounded-3xl"
+                      loading="lazy"
                     />
                   </div>
                 </div>
@@ -1059,16 +1052,11 @@ export default function Home() {
 
         {/* SEÇÃO 8: CTA FINAL COM VÍDEO DE FUNDO */}
         <section className="py-32 bg-black rounded-t-[40px] md:rounded-t-[80px] relative overflow-hidden -mt-1">
-          {/* Video Background */}
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover opacity-30"
-          >
-            <source src="/cta-background.mp4" type="video/mp4" />
-          </video>
+          {/* Video Background - Lazy loaded */}
+          <LazyVideo
+            src="/cta-background.webm"
+            className="absolute inset-0 w-full h-full opacity-30"
+          />
 
           {/* Overlay com gradiente sutil */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/90" />

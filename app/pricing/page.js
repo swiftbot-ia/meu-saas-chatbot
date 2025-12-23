@@ -266,8 +266,8 @@ export default function Precos() {
                 <button
                   onClick={() => setBillingPeriod('monthly')}
                   className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all duration-300 ${billingPeriod === 'monthly'
-                      ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black shadow-[0_0_20px_rgba(0,255,153,0.4)]'
-                      : 'text-gray-400 hover:text-white'
+                    ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black shadow-[0_0_20px_rgba(0,255,153,0.4)]'
+                    : 'text-gray-400 hover:text-white'
                     }`}
                 >
                   Mensal
@@ -275,8 +275,8 @@ export default function Precos() {
                 <button
                   onClick={() => setBillingPeriod('annual')}
                   className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all duration-300 flex items-center ${billingPeriod === 'annual'
-                      ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black shadow-[0_0_20px_rgba(0,255,153,0.4)]'
-                      : 'text-gray-400 hover:text-white'
+                    ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black shadow-[0_0_20px_rgba(0,255,153,0.4)]'
+                    : 'text-gray-400 hover:text-white'
                     }`}
                 >
                   Anual
@@ -407,7 +407,7 @@ export default function Precos() {
             playsInline
             className="absolute inset-0 w-full h-full object-cover opacity-30 rounded-t-[40px] md:rounded-t-[80px]"
           >
-            <source src="/cta-background.mp4" type="video/mp4" />
+            <source src="/cta-background.webm" type="video/webm" />
           </video>
 
           {/* Overlay com arredondamento */}
