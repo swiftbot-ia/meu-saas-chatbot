@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { Copy, Check, Users, DollarSign, Clock, Wallet, ExternalLink, ArrowRight, Send, Sparkles, TrendingUp, Gift, ChevronDown, AlertCircle } from 'lucide-react'
@@ -184,8 +184,8 @@ function AffiliateDashboard({ affiliate, stats, referralLink, onWithdraw, onRefr
                     <button
                         onClick={copyLink}
                         className={`px-4 py-3 rounded-xl font-bold transition-all flex items-center gap-2 ${copied
-                                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                : 'bg-[#00FF99] text-black hover:shadow-[0_0_20px_rgba(0,255,153,0.3)]'
+                            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                            : 'bg-[#00FF99] text-black hover:shadow-[0_0_20px_rgba(0,255,153,0.3)]'
                             }`}
                     >
                         {copied ? <Check size={18} /> : <Copy size={18} />}
@@ -434,6 +434,18 @@ function LandingPage({ onApply, loading, hasSubscription }) {
 // MAIN PAGE
 // ============================================================================
 export default function AffiliatesPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
+                <div className="w-12 h-12 border-2 border-[#00FF99] border-t-transparent rounded-full animate-spin" />
+            </div>
+        }>
+            <AffiliatesContent />
+        </Suspense>
+    )
+}
+
+function AffiliatesContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
 
@@ -625,8 +637,8 @@ export default function AffiliatesPage() {
                     {/* Messages */}
                     {message.text && (
                         <div className={`mb-8 p-4 rounded-xl border ${message.type === 'success'
-                                ? 'bg-green-500/20 border-green-500/30 text-green-400'
-                                : 'bg-red-500/20 border-red-500/30 text-red-400'
+                            ? 'bg-green-500/20 border-green-500/30 text-green-400'
+                            : 'bg-red-500/20 border-red-500/30 text-red-400'
                             }`}>
                             {message.text}
                         </div>
@@ -644,16 +656,16 @@ export default function AffiliatesPage() {
                     ) : status?.has_application ? (
                         <div className="bg-gradient-to-br from-[#1A1A1A] to-[#0F0F0F] border border-[#333] rounded-2xl p-8 text-center">
                             <div className={`w-16 h-16 mx-auto mb-6 rounded-full flex items-center justify-center ${status.application.status === 'pending'
-                                    ? 'bg-yellow-500/20'
-                                    : status.application.status === 'approved'
-                                        ? 'bg-green-500/20'
-                                        : 'bg-red-500/20'
+                                ? 'bg-yellow-500/20'
+                                : status.application.status === 'approved'
+                                    ? 'bg-green-500/20'
+                                    : 'bg-red-500/20'
                                 }`}>
                                 <Clock className={`w-8 h-8 ${status.application.status === 'pending'
-                                        ? 'text-yellow-500'
-                                        : status.application.status === 'approved'
-                                            ? 'text-green-500'
-                                            : 'text-red-500'
+                                    ? 'text-yellow-500'
+                                    : status.application.status === 'approved'
+                                        ? 'text-green-500'
+                                        : 'text-red-500'
                                     }`} />
                             </div>
                             <h2 className="text-2xl font-bold text-white mb-4">
