@@ -1,5 +1,5 @@
 # =============================================================================
-# SwiftBot - Dockerfile para Produção (Next.js 16)
+# SwiftBot - Dockerfile para Produção (Next.js 16 Standalone)
 # =============================================================================
 
 # Stage 1: Dependencies
@@ -45,7 +45,7 @@ ENV STRIPE_SECRET_KEY=sk_placeholder
 ENV STRIPE_WEBHOOK_SECRET=whsec_placeholder
 ENV OPENAI_API_KEY=sk-placeholder
 
-# Build da aplicação Next.js
+# Build da aplicação Next.js (standalone mode)
 RUN npm run build
 
 # Stage 3: Runner (imagem final)
@@ -62,12 +62,11 @@ RUN apk add --no-cache ffmpeg
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Copiar arquivos necessários para produção
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/.next ./.next
+# Copiar arquivos necessários para produção (standalone mode)
+# O standalone inclui um servidor minificado com apenas as dependências necessárias
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/next.config.ts ./next.config.ts
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 
 # Criar diretórios de mídia com permissões de escrita
 RUN mkdir -p /app/public/media/audio /app/public/media/image /app/public/media/video /app/public/media/document
@@ -89,5 +88,6 @@ ENV HOSTNAME="0.0.0.0"
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
-# Comando de inicialização
-CMD ["npm", "start"]
+# Comando de inicialização (standalone mode usa node server.js)
+CMD ["node", "server.js"]
+
