@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Gift } from 'lucide-react'
 
 export default function AuthPage() {
   // ==================================================================================
@@ -16,7 +17,9 @@ export default function AuthPage() {
   const [message, setMessage] = useState('')
   const [authView, setAuthView] = useState('login')
   const [errors, setErrors] = useState({})
+  const [referralInfo, setReferralInfo] = useState(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   // 🔒 URL FIXA DE PRODUÇÃO (Para garantir que o Supabase aceite)
   // Se um dia for testar local, altere para 'http://localhost:3000'
@@ -50,6 +53,46 @@ export default function AuthPage() {
     elements.forEach((el) => observer.observe(el))
     return () => observer.disconnect()
   }, [])
+
+  // ==================================================================================
+  // 🔗 CAPTURAR CÓDIGO DE AFILIADO DA URL
+  // ==================================================================================
+  useEffect(() => {
+    const refCode = searchParams.get('ref')
+    if (refCode) {
+      // Salvar no localStorage para usar no checkout
+      localStorage.setItem('affiliate_ref_code', refCode.toUpperCase())
+
+      // Validar código e buscar nome do afiliado
+      fetch(`/api/affiliates/validate-code?code=${refCode}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.valid) {
+            setReferralInfo({
+              code: data.code,
+              name: data.affiliate_name
+            })
+          }
+        })
+        .catch(err => console.log('Erro ao validar código:', err))
+    } else {
+      // Verificar se já tem código salvo
+      const savedCode = localStorage.getItem('affiliate_ref_code')
+      if (savedCode) {
+        fetch(`/api/affiliates/validate-code?code=${savedCode}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.valid) {
+              setReferralInfo({
+                code: data.code,
+                name: data.affiliate_name
+              })
+            }
+          })
+          .catch(err => console.log('Erro ao validar código salvo:', err))
+      }
+    }
+  }, [searchParams])
 
   // ==================================================================================
   // 🗣️ TRADUTOR DE ERROS
@@ -333,6 +376,18 @@ export default function AuthPage() {
 
                 /* VIEW: LOGIN / REGISTRO */
                 <>
+                  {/* Referral Banner */}
+                  {referralInfo && (
+                    <div className="mb-6 p-4 bg-gradient-to-r from-[#00FF99]/10 to-[#00E88C]/10 border border-[#00FF99]/20 rounded-2xl">
+                      <div className="flex items-center justify-center gap-2 text-sm">
+                        <Gift className="w-4 h-4 text-[#00FF99]" />
+                        <span className="text-gray-300">
+                          Você foi indicado por <span className="text-[#00FF99] font-bold">{referralInfo.name}</span>
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Badge Trial */}
                   <div className="flex justify-center mb-6">
                     <div className="inline-flex items-center gap-2 bg-[#1E1E1E] rounded-full px-5 py-2">

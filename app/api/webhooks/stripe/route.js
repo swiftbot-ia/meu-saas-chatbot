@@ -323,7 +323,7 @@ async function handleInvoicePaymentSucceeded(invoice) {
     }
 
     // ✅ LOG DO PAGAMENTO
-    const { error: logError } = await supabase
+    const { data: paymentLog, error: logError } = await supabase
       .from('payment_logs')
       .insert([{
         user_id: localSubscription.user_id,
@@ -343,10 +343,15 @@ async function handleInvoicePaymentSucceeded(invoice) {
         },
         created_at: new Date().toISOString()
       }])
+      .select()
+      .single()
 
     if (logError) {
       console.warn('⚠️ Erro ao criar log de pagamento:', logError)
     }
+
+    // ✅ PROCESSAR COMISSÃO DE AFILIADO (se aplicável)
+    await processAffiliateCommission(localSubscription.user_id, invoice, paymentLog?.id)
 
     console.log('✅ Pagamento processado com sucesso')
 
@@ -1094,5 +1099,136 @@ async function sendPaymentToN8n(subscription, invoice) {
     }
   } catch (error) {
     console.error('❌ [N8nPayment] Erro ao enviar:', error.message)
+  }
+}
+
+// ============================================================================
+// PROCESSAR COMISSÃO DE AFILIADO
+// ============================================================================
+async function processAffiliateCommission(userId, invoice, paymentLogId) {
+  try {
+    console.log('🔍 [Affiliate] Verificando comissão para usuário:', userId)
+
+    // 1. Verificar se usuário foi indicado por afiliado
+    const { data: referral, error: refError } = await supabase
+      .from('affiliate_referrals')
+      .select(`
+        id,
+        affiliate_id,
+        expires_at,
+        status,
+        first_payment_date,
+        affiliates (
+          id,
+          commission_rate,
+          status
+        )
+      `)
+      .eq('referred_user_id', userId)
+      .single()
+
+    if (refError || !referral) {
+      console.log('ℹ️ [Affiliate] Usuário não foi indicado por afiliado')
+      return
+    }
+
+    // 2. Verificar se afiliado está ativo
+    if (!referral.affiliates || referral.affiliates.status !== 'active') {
+      console.log('⚠️ [Affiliate] Afiliado não está ativo')
+      return
+    }
+
+    // 3. Verificar se ainda está no período de comissão (6 meses)
+    const now = new Date()
+
+    if (referral.expires_at && new Date(referral.expires_at) < now) {
+      console.log('⚠️ [Affiliate] Período de comissão expirado')
+
+      // Atualizar status do referral se ainda não estiver expirado
+      if (referral.status === 'active') {
+        await supabase
+          .from('affiliate_referrals')
+          .update({ status: 'expired' })
+          .eq('id', referral.id)
+      }
+      return
+    }
+
+    // 4. Se é o primeiro pagamento, definir datas de expiração
+    if (!referral.first_payment_date) {
+      const expiresAt = new Date(now)
+      expiresAt.setMonth(expiresAt.getMonth() + 6) // +6 meses
+
+      await supabase
+        .from('affiliate_referrals')
+        .update({
+          first_payment_date: now.toISOString(),
+          expires_at: expiresAt.toISOString(),
+          status: 'active'
+        })
+        .eq('id', referral.id)
+
+      console.log('📅 [Affiliate] Primeiro pagamento registrado, expira em:', expiresAt.toISOString())
+    }
+
+    // 5. Calcular valor da comissão
+    const paymentAmount = invoice.amount_paid / 100 // Converter centavos para reais
+    const commissionRate = parseFloat(referral.affiliates.commission_rate) // 0.30 = 30%
+    const commissionAmount = paymentAmount * commissionRate
+
+    // 6. Calcular data de disponibilidade (7 dias após pagamento)
+    const availableDate = new Date(now)
+    availableDate.setDate(availableDate.getDate() + 7)
+
+    // 7. Criar registro de comissão
+    const { data: commission, error: commError } = await supabase
+      .from('affiliate_commissions')
+      .insert([{
+        affiliate_id: referral.affiliate_id,
+        referral_id: referral.id,
+        payment_log_id: paymentLogId,
+        stripe_invoice_id: invoice.id,
+        payment_amount: paymentAmount,
+        commission_amount: commissionAmount,
+        commission_rate: commissionRate,
+        status: 'pending',
+        payment_date: now.toISOString(),
+        available_date: availableDate.toISOString()
+      }])
+      .select()
+      .single()
+
+    if (commError) {
+      console.error('❌ [Affiliate] Erro ao criar comissão:', commError)
+      return
+    }
+
+    // 8. Atualizar totais do referral
+    const { data: currentReferral } = await supabase
+      .from('affiliate_referrals')
+      .select('total_payments, total_commissions')
+      .eq('id', referral.id)
+      .single()
+
+    await supabase
+      .from('affiliate_referrals')
+      .update({
+        total_payments: (parseFloat(currentReferral?.total_payments) || 0) + paymentAmount,
+        total_commissions: (parseFloat(currentReferral?.total_commissions) || 0) + commissionAmount
+      })
+      .eq('id', referral.id)
+
+    console.log('✅ [Affiliate] Comissão criada:', {
+      commission_id: commission.id,
+      affiliate_id: referral.affiliate_id,
+      payment: paymentAmount,
+      commission: commissionAmount,
+      rate: `${commissionRate * 100}%`,
+      available_in: '7 dias'
+    })
+
+  } catch (error) {
+    console.error('❌ [Affiliate] Erro ao processar comissão:', error)
+    // Não throw - não queremos que erro de afiliado bloqueie o webhook principal
   }
 }

@@ -25,12 +25,12 @@ export default function DashboardSuportePage() {
     try {
       const response = await fetch('/api/portal-interno/auth/session')
       const data = await response.json()
-      
+
       if (!data.success) {
         router.push('/portal-interno/login')
         return
       }
-      
+
       setUser(data.user)
     } catch (error) {
       router.push('/portal-interno/login')
@@ -43,7 +43,7 @@ export default function DashboardSuportePage() {
     try {
       const response = await fetch('/api/portal-interno/stats')
       const data = await response.json()
-      
+
       if (data.success) {
         setStats(data.stats)
       }
@@ -56,7 +56,7 @@ export default function DashboardSuportePage() {
     try {
       const response = await fetch('/api/portal-interno/tickets/dashboard?status=open&limit=5')
       const data = await response.json()
-      
+
       if (data.success) {
         setTickets(data.tickets)
       }
@@ -172,7 +172,7 @@ export default function DashboardSuportePage() {
             )}
             onClick={() => router.push('/portal-interno/clientes')}
           />
-          
+
           {(user?.role === 'admin' || user?.role === 'gerente') && (
             <QuickActionCard
               title="Gerenciar Equipe"
@@ -185,7 +185,7 @@ export default function DashboardSuportePage() {
               onClick={() => router.push('/portal-interno/equipe')}
             />
           )}
-          
+
           <QuickActionCard
             title="Ver Logs"
             description="Histórico de ações realizadas"
@@ -196,6 +196,19 @@ export default function DashboardSuportePage() {
             )}
             onClick={() => router.push('/portal-interno/logs')}
           />
+
+          {(user?.role === 'admin' || user?.role === 'gerente') && (
+            <QuickActionCard
+              title="Afiliados"
+              description="Gerenciar candidaturas de afiliados"
+              icon={(
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              )}
+              onClick={() => router.push('/portal-interno/affiliates')}
+            />
+          )}
         </div>
 
         {/* Tickets Section */}
@@ -209,7 +222,7 @@ export default function DashboardSuportePage() {
               Ver todos →
             </button>
           </div>
-          
+
           {ticketsLoading ? (
             <div className="bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 p-8 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#04F5A0] mx-auto"></div>

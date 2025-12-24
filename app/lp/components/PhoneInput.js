@@ -8,27 +8,27 @@ import 'react-phone-number-input/style.css'
  * Estilizado para tema escuro das landing pages
  */
 export default function PhoneInput({
-    value,
-    onChange,
-    placeholder = 'Seu WhatsApp',
-    disabled = false,
-    className = '',
-    error = false
+  value,
+  onChange,
+  placeholder = 'Seu WhatsApp',
+  disabled = false,
+  className = '',
+  error = false
 }) {
-    return (
-        <div className={`lp-phone-input-wrapper ${error ? 'error' : ''} ${className}`}>
-            <PhoneInputLib
-                international
-                defaultCountry="BR"
-                countryCallingCodeEditable={false}
-                value={value}
-                onChange={onChange}
-                placeholder={placeholder}
-                disabled={disabled}
-                className="lp-phone-input"
-            />
+  return (
+    <div className={`lp-phone-input-wrapper ${error ? 'error' : ''} ${className}`}>
+      <PhoneInputLib
+        international
+        defaultCountry="BR"
+        countryCallingCodeEditable={false}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        disabled={disabled}
+        className="lp-phone-input"
+      />
 
-            <style jsx global>{`
+      <style jsx global>{`
         .lp-phone-input-wrapper {
           width: 100%;
         }
@@ -36,15 +36,23 @@ export default function PhoneInput({
         .lp-phone-input-wrapper .lp-phone-input {
           display: flex;
           width: 100%;
+          flex-wrap: nowrap;
+          min-width: 0;
+          background-color: #0D0D0D;
+          border: 1px solid #27272A;
+          border-radius: 100px;
+          overflow: hidden;
         }
         
         .lp-phone-input-wrapper .PhoneInputCountry {
           padding: 16px;
-          padding-right: 12px;
+          padding-right: 8px;
           background-color: #0D0D0D;
-          border: 1px solid #27272A;
-          border-right: none;
-          border-radius: 100px 0 0 100px;
+          border: none;
+          border-radius: 0;
+          display: flex;
+          align-items: center;
+          gap: 4px;
         }
         
         .lp-phone-input-wrapper .PhoneInputCountryIcon {
@@ -52,42 +60,46 @@ export default function PhoneInput({
           height: 18px;
           border-radius: 2px;
           overflow: hidden;
+          background: transparent;
+        }
+        
+        .lp-phone-input-wrapper .PhoneInputCountryIcon--border {
+          background-color: transparent;
+          box-shadow: none;
+        }
+        
+        .lp-phone-input-wrapper .PhoneInputCountryIconImg {
+          display: block;
         }
         
         .lp-phone-input-wrapper .PhoneInputCountrySelectArrow {
           color: #71717A;
-          margin-left: 8px;
+          margin-left: 4px;
         }
         
         .lp-phone-input-wrapper .PhoneInputInput {
           flex: 1;
           padding: 16px 24px;
-          padding-left: 12px;
+          padding-left: 8px;
           background-color: #0D0D0D;
-          border: 1px solid #27272A;
-          border-left: none;
-          border-radius: 0 100px 100px 0;
+          border: none;
+          border-radius: 0;
           color: #FFFFFF;
           font-size: 16px;
           font-family: inherit;
           outline: none;
-          transition: border-color 0.2s;
+          min-width: 0;
         }
         
         .lp-phone-input-wrapper .PhoneInputInput::placeholder {
           color: #71717A;
         }
         
-        .lp-phone-input-wrapper .PhoneInputInput:focus {
+        .lp-phone-input-wrapper:focus-within .lp-phone-input {
           border-color: #00E08F;
         }
         
-        .lp-phone-input-wrapper .PhoneInputCountry:has(+ .PhoneInputInput:focus) {
-          border-color: #00E08F;
-        }
-        
-        .lp-phone-input-wrapper.error .PhoneInputInput,
-        .lp-phone-input-wrapper.error .PhoneInputCountry {
+        .lp-phone-input-wrapper.error .lp-phone-input {
           border-color: #EF4444;
         }
         
@@ -104,6 +116,6 @@ export default function PhoneInput({
           cursor: pointer;
         }
       `}</style>
-        </div>
-    )
+    </div>
+  )
 }

@@ -14,18 +14,20 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(request) {
   try {
-    const { 
-      userId, 
-      paymentMethodId, 
+    const {
+      userId,
+      paymentMethodId,
       plan,
       userEmail,
-      userName 
+      userName,
+      affiliate_ref_code // Código de afiliado (se indicado)
     } = await request.json()
-    
+
     console.log('🎯 [STEP 2] Confirmando Subscription:', {
       userId,
       paymentMethodId,
-      plan
+      plan,
+      affiliate_ref_code
     })
 
     // ✅ VALIDAR DADOS OBRIGATÓRIOS
@@ -60,7 +62,7 @@ export async function POST(request) {
 
     // ✅ CRIAR CUSTOMER NA STRIPE (AGORA SIM!)
     console.log('📝 Criando customer na Stripe...')
-    
+
     const stripeCustomer = await createCustomer({
       name: userName || userEmail.split('@')[0],
       email: userEmail,
@@ -74,19 +76,19 @@ export async function POST(request) {
     console.log('✅ Customer criado:', stripeCustomer.id)
 
     // ✅ ANEXAR PAYMENT METHOD AO CUSTOMER
-console.log('📎 Anexando payment method ao customer...')
-await stripe.paymentMethods.attach(paymentMethodId, {
-  customer: stripeCustomer.id,
-})
+    console.log('📎 Anexando payment method ao customer...')
+    await stripe.paymentMethods.attach(paymentMethodId, {
+      customer: stripeCustomer.id,
+    })
 
-// ✅ DEFINIR COMO PAYMENT METHOD PADRÃO
-await stripe.customers.update(stripeCustomer.id, {
-  invoice_settings: {
-    default_payment_method: paymentMethodId,
-  },
-})
+    // ✅ DEFINIR COMO PAYMENT METHOD PADRÃO
+    await stripe.customers.update(stripeCustomer.id, {
+      invoice_settings: {
+        default_payment_method: paymentMethodId,
+      },
+    })
 
-console.log('✅ Payment method anexado e definido como padrão')
+    console.log('✅ Payment method anexado e definido como padrão')
 
     // ✅ DEFINIR PREÇOS
     const pricing = {
@@ -100,7 +102,7 @@ console.log('✅ Payment method anexado e definido como padrão')
 
     const planPrice = pricing[plan.billingPeriod][plan.connections]
     const billingFrequency = plan.billingPeriod === 'monthly' ? '/mês' : '/ano'
-    
+
     const isTrialEligible = !(await hasUserUsedTrial(userId))
     const trialDays = isTrialEligible ? TEST_TRIAL_DAYS : 0
 
@@ -113,7 +115,7 @@ console.log('✅ Payment method anexado e definido como padrão')
 
     // ✅ CRIAR SUBSCRIPTION NA STRIPE
     let stripeSubscription
-    
+
     try {
       console.log('📝 Criando assinatura na Stripe...')
 
@@ -143,12 +145,12 @@ console.log('✅ Payment method anexado e definido como padrão')
 
     } catch (stripeError) {
       console.error('❌ Erro na Stripe:', stripeError)
-      
+
       // Deletar customer criado em caso de erro
       try {
         await stripe.customers.del(stripeCustomer.id)
-      } catch (e) {}
-      
+      } catch (e) { }
+
       return NextResponse.json({
         success: false,
         error: 'Erro ao criar assinatura: ' + stripeError.message
@@ -157,7 +159,7 @@ console.log('✅ Payment method anexado e definido como padrão')
 
     // ✅ SALVAR NO BANCO LOCAL
     const now = new Date()
-    
+
     let trialEndDate = null
     if (isTrialEligible && stripeSubscription.trial_end) {
       trialEndDate = new Date(stripeSubscription.trial_end * 1000)
@@ -202,13 +204,13 @@ console.log('✅ Payment method anexado e definido como padrão')
 
     if (subscriptionError) {
       console.error('❌ Erro ao salvar:', subscriptionError)
-      
+
       // Cancelar na Stripe
       try {
         await cancelSubscription(stripeSubscription.id, 'database_error')
         await stripe.customers.del(stripeCustomer.id)
-      } catch (e) {}
-      
+      } catch (e) { }
+
       return NextResponse.json({
         success: false,
         error: 'Erro ao salvar assinatura: ' + subscriptionError.message
@@ -237,8 +239,58 @@ console.log('✅ Payment method anexado e definido como padrão')
         }])
     }
 
-    const successMessage = isTrialEligible 
-      ? `🎉 Trial de ${trialDays} dias ativado!` 
+    // ✅ CRIAR REFERRAL DE AFILIADO (se indicado)
+    if (affiliate_ref_code) {
+      try {
+        console.log('🔗 [Affiliate] Verificando código:', affiliate_ref_code)
+
+        // Buscar afiliado pelo código
+        const { data: affiliate, error: affError } = await supabase
+          .from('affiliates')
+          .select('id, status')
+          .eq('affiliate_code', affiliate_ref_code.toUpperCase())
+          .eq('status', 'active')
+          .single()
+
+        if (affiliate && !affError) {
+          // Verificar se usuário já não foi indicado antes
+          const { data: existingReferral } = await supabase
+            .from('affiliate_referrals')
+            .select('id')
+            .eq('referred_user_id', userId)
+            .single()
+
+          if (!existingReferral) {
+            // Criar referral
+            const { error: refError } = await supabase
+              .from('affiliate_referrals')
+              .insert([{
+                affiliate_id: affiliate.id,
+                referred_user_id: userId,
+                referral_code_used: affiliate_ref_code.toUpperCase(),
+                signup_date: now.toISOString(),
+                status: 'registered'
+              }])
+
+            if (refError) {
+              console.error('⚠️ [Affiliate] Erro ao criar referral:', refError)
+            } else {
+              console.log('✅ [Affiliate] Referral criado para afiliado:', affiliate.id)
+            }
+          } else {
+            console.log('ℹ️ [Affiliate] Usuário já foi indicado anteriormente')
+          }
+        } else {
+          console.log('⚠️ [Affiliate] Código inválido ou afiliado inativo:', affiliate_ref_code)
+        }
+      } catch (affError) {
+        console.error('⚠️ [Affiliate] Erro ao processar referral:', affError)
+        // Não bloquear checkout por erro de afiliado
+      }
+    }
+
+    const successMessage = isTrialEligible
+      ? `🎉 Trial de ${trialDays} dias ativado!`
       : `✅ Plano ativado com sucesso!`
 
     console.log('✅ SUBSCRIPTION CONFIRMADA:', subscription.id)
