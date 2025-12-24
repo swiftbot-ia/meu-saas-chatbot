@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { isValidPhoneNumber } from 'react-phone-number-input'
 import PhoneInput from '../components/PhoneInput'
-import { getUtmFromStorage } from '@/lib/utmUtils'
+import { getUtmFromStorage, saveLeadData } from '@/lib/utmUtils'
 
 export default function WhatsAppInteligentePage() {
     const router = useRouter()
@@ -117,6 +117,14 @@ export default function WhatsAppInteligentePage() {
             const data = await res.json()
 
             if (data.success) {
+                // Salva dados do lead no localStorage para tracking
+                saveLeadData({
+                    name,
+                    whatsapp: phone,
+                    email,
+                    source: 'lp-whatsapp-inteligente'
+                })
+
                 router.push('/lp/whatsApp-inteligente/obrigado')
             } else {
                 setError('Erro ao registrar. Tente novamente.')
