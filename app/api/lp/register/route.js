@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { sendLiveDubaiConfirmation } from '@/lib/brevoEmail'
 
 // Supabase client
 const supabase = createClient(
@@ -87,6 +88,17 @@ export async function POST(request) {
         } else {
             console.warn('[LP Register] N8N_WEBHOOK_LIVE_DUBAI não configurado')
         }
+
+        // Envia email de confirmação via Brevo (fire and forget)
+        sendLiveDubaiConfirmation({ name: leadData.name, email: leadData.email })
+            .then(result => {
+                if (result.success) {
+                    console.log('[LP Register] Email de confirmação enviado:', result.messageId)
+                } else {
+                    console.error('[LP Register] Erro ao enviar email:', result.error)
+                }
+            })
+            .catch(err => console.error('[LP Register] Erro no envio de email:', err))
 
         return NextResponse.json({
             success: true,
