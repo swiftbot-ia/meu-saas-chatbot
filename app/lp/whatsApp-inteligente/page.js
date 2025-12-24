@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { isValidPhoneNumber } from 'react-phone-number-input'
 import PhoneInput from '../components/PhoneInput'
-import { getUtmFromStorage, saveLeadData } from '@/lib/utmUtils'
+import { getUtmFromStorage, getUtmForSubmission, saveLeadData } from '@/lib/utmUtils'
 
 export default function WhatsAppInteligentePage() {
     const router = useRouter()
@@ -102,6 +102,9 @@ export default function WhatsAppInteligentePage() {
         setIsLoading(true)
 
         try {
+            // Captura UTMs atualizados do storage/URL no momento do envio
+            const currentUtmParams = getUtmForSubmission()
+
             const res = await fetch('/api/lp/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -109,7 +112,7 @@ export default function WhatsAppInteligentePage() {
                     whatsapp: phone,
                     name,
                     email,
-                    utmParams,
+                    utmParams: currentUtmParams,
                     source: 'lp-whatsapp-inteligente'
                 })
             })
