@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendLiveDubaiConfirmation } from '@/lib/brevoEmail'
+import { sendLeadEvent } from '@/lib/metaPixel'
 
 // Supabase client
 const supabase = createClient(
@@ -99,6 +100,34 @@ export async function POST(request) {
                 }
             })
             .catch(err => console.error('[LP Register] Erro no envio de email:', err))
+
+        // Envia evento Lead para Meta Conversions API (fire and forget)
+        const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0] ||
+            request.headers.get('x-real-ip') ||
+            'unknown'
+        const userAgent = request.headers.get('user-agent') || ''
+
+        sendLeadEvent(
+            {
+                email: leadData.email,
+                phone: cleanWhatsapp,
+                name: leadData.name,
+                source: leadData.source
+            },
+            {
+                eventSourceUrl: 'https://swiftbot.com.br/lp/whatsApp-inteligente',
+                clientIp,
+                userAgent
+            }
+        )
+            .then(result => {
+                if (result.success) {
+                    console.log('[LP Register] Evento Meta Lead enviado')
+                } else {
+                    console.error('[LP Register] Erro ao enviar evento Meta:', result.error)
+                }
+            })
+            .catch(err => console.error('[LP Register] Erro no evento Meta:', err))
 
         return NextResponse.json({
             success: true,
