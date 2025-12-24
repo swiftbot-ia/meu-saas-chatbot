@@ -27,7 +27,9 @@ import {
   List,
   Edit3,
   Save,
-  FileText
+  FileText,
+  Hash,
+  Check
 } from 'lucide-react';
 import NoSubscription from '../components/NoSubscription'
 import NewOpportunityModal from '../crm/components/NewOpportunityModal'
@@ -198,6 +200,7 @@ export default function ContactsPage() {
   const [tagToDelete, setTagToDelete] = useState(null);
   const [showDeleteOriginConfirm, setShowDeleteOriginConfirm] = useState(false);
   const [originToDelete, setOriginToDelete] = useState(null);
+  const [copiedTagId, setCopiedTagId] = useState(null);
 
   // New tag/origin form
   const [newTagName, setNewTagName] = useState('');
@@ -1080,6 +1083,18 @@ export default function ContactsPage() {
                     >
                       {tag.name}
                     </span>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        await navigator.clipboard.writeText(tag.id);
+                        setCopiedTagId(tag.id);
+                        setTimeout(() => setCopiedTagId(null), 2000);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-[#00FF99] transition-all p-1"
+                      title="Copiar ID da tag"
+                    >
+                      {copiedTagId === tag.id ? <Check size={14} className="text-[#00FF99]" /> : <Hash size={14} />}
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

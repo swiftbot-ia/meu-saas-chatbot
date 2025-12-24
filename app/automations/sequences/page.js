@@ -16,7 +16,9 @@ import {
     Loader2,
     X,
     ToggleLeft,
-    ToggleRight
+    ToggleRight,
+    Hash,
+    Check
 } from 'lucide-react'
 
 // ============================================================================
@@ -24,6 +26,14 @@ import {
 // ============================================================================
 const SequenceCard = ({ sequence, onToggle, onEdit, onDuplicate, onDelete }) => {
     const [showMenu, setShowMenu] = useState(false)
+    const [copied, setCopied] = useState(false)
+
+    const handleCopyId = async () => {
+        await navigator.clipboard.writeText(sequence.id)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+        setShowMenu(false)
+    }
 
     return (
         <div className={`
@@ -87,6 +97,13 @@ const SequenceCard = ({ sequence, onToggle, onEdit, onDuplicate, onDelete }) => 
                                         className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-white/5 flex items-center gap-2"
                                     >
                                         <Copy size={14} /> Duplicar
+                                    </button>
+                                    <button
+                                        onClick={handleCopyId}
+                                        className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-white/5 flex items-center gap-2"
+                                    >
+                                        {copied ? <Check size={14} className="text-[#00FF99]" /> : <Hash size={14} />}
+                                        {copied ? 'ID Copiado!' : 'Copiar ID'}
                                     </button>
                                     <hr className="border-white/10 my-1" />
                                     <button
