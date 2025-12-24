@@ -54,14 +54,38 @@ export async function POST(request) {
             console.log('[LP Register] Lead salvo no banco:', savedLead?.id)
         }
 
-        // Envia para webhook n8n (fire and forget)
-        const n8nWebhookUrl = process.env.N8N_LP_WEBHOOK_URL
-        if (n8nWebhookUrl) {
-            fetch(n8nWebhookUrl, {
+        // Envia para webhook n8n Live Dubai (fire and forget)
+        const webhookUrl = process.env.N8N_WEBHOOK_LIVE_DUBAI
+        if (webhookUrl) {
+            const webhookPayload = {
+                // Dados do lead
+                name: leadData.name,
+                whatsapp: leadData.whatsapp,
+                email: leadData.email,
+                source: leadData.source,
+                // UTMs
+                utm_source: leadData.utm_source,
+                utm_medium: leadData.utm_medium,
+                utm_campaign: leadData.utm_campaign,
+                utm_term: leadData.utm_term,
+                utm_content: leadData.utm_content,
+                // Metadados
+                lead_id: savedLead?.id || null,
+                created_at: savedLead?.created_at || new Date().toISOString(),
+                registered_at: new Date().toISOString()
+            }
+
+            console.log('[LP Register] Enviando para webhook:', webhookUrl)
+
+            fetch(webhookUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...leadData, created_at: savedLead?.created_at || new Date().toISOString() })
-            }).catch(err => console.error('[LP Register] Erro ao enviar para n8n:', err))
+                body: JSON.stringify(webhookPayload)
+            })
+                .then(res => console.log('[LP Register] Webhook respondeu:', res.status))
+                .catch(err => console.error('[LP Register] Erro ao enviar para webhook:', err))
+        } else {
+            console.warn('[LP Register] N8N_WEBHOOK_LIVE_DUBAI não configurado')
         }
 
         return NextResponse.json({
