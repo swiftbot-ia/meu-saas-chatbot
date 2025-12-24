@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   poweredByHeader: false,
   compress: true,
   images: {
@@ -11,8 +12,6 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Turbopack config (Next.js 16 usa Turbopack por padrão)
-  turbopack: {},
   // Cache headers for static assets
   async headers() {
     return [
@@ -30,3 +29,4 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
