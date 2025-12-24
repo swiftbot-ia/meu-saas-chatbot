@@ -76,7 +76,7 @@ export async function POST(request) {
         // Formato: [{ exists: true, jid: "5511999999999@s.whatsapp.net" }]
         const numberResult = result?.[0] || result
 
-        const isValid = numberResult?.exists === true || numberResult?.status === 'valid'
+        const isValid = numberResult?.isInWhatsapp === true || numberResult?.exists === true || numberResult?.status === 'valid'
         const jid = numberResult?.jid || null
 
         return NextResponse.json({

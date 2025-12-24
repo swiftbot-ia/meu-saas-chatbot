@@ -3,6 +3,10 @@
     {
       "path": "/api/subscription/sync-status",
       "schedule": "0 */12 * * *"
+    },
+    {
+      "path": "/api/cron/process-commissions",
+      "schedule": "0 6 * * *"
     }
   ]
 }
