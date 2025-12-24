@@ -156,10 +156,44 @@ const TabNavigation = ({ activeTab, onTabChange }) => {
 const ApiKeyCard = ({ connection, onGenerate, onRevoke, onCopy, loading }) => {
   const [showKey, setShowKey] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [fullKey, setFullKey] = useState(connection.fullApiKey || null)
+  const [loadingKey, setLoadingKey] = useState(false)
+
+  // Busca a chave completa do servidor
+  const fetchFullKey = async () => {
+    if (fullKey) return fullKey
+    if (!connection.connectionId) return null
+
+    setLoadingKey(true)
+    try {
+      const response = await fetch(`/api/settings/api-keys?connectionId=${connection.connectionId}&reveal=true`)
+      const data = await response.json()
+      if (data.success && data.apiKey) {
+        setFullKey(data.apiKey)
+        return data.apiKey
+      }
+    } catch (error) {
+      console.error('Error fetching full API key:', error)
+    } finally {
+      setLoadingKey(false)
+    }
+    return null
+  }
+
+  const handleShowToggle = async () => {
+    if (!showKey && !fullKey) {
+      await fetchFullKey()
+    }
+    setShowKey(!showKey)
+  }
 
   const handleCopy = async () => {
-    if (connection.apiKey?.maskedKey && connection.fullApiKey) {
-      await navigator.clipboard.writeText(connection.fullApiKey)
+    let keyToCopy = fullKey
+    if (!keyToCopy) {
+      keyToCopy = await fetchFullKey()
+    }
+    if (keyToCopy) {
+      await navigator.clipboard.writeText(keyToCopy)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
       onCopy?.()
@@ -186,17 +220,18 @@ const ApiKeyCard = ({ connection, onGenerate, onRevoke, onCopy, loading }) => {
               <div className="flex items-center gap-2">
                 <div className="bg-[#252525] px-4 py-2 rounded-lg font-mono text-sm flex-1">
                   <span className="text-gray-400">
-                    {showKey && connection.fullApiKey
-                      ? connection.fullApiKey
+                    {showKey && fullKey
+                      ? fullKey
                       : connection.apiKey.maskedKey}
                   </span>
                 </div>
                 <button
-                  onClick={() => setShowKey(!showKey)}
-                  className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                  onClick={handleShowToggle}
+                  disabled={loadingKey}
+                  className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors disabled:opacity-50"
                   title={showKey ? 'Ocultar' : 'Mostrar'}
                 >
-                  {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {loadingKey ? <Loader2 size={18} className="animate-spin" /> : showKey ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
                 <button
                   onClick={handleCopy}
@@ -261,7 +296,7 @@ const ApiDocumentation = () => {
       method: 'POST',
       path: '/api/v1/contact/update',
       description: 'Atualizar contato completo (nome, origem, etapa, tags, etc)',
-      example: `curl -X POST 'https://app.swiftbot.com.br/api/v1/contact/update' \\
+      example: `curl -X POST 'https://swiftbot.com.br/api/v1/contact/update' \\
   -H 'X-API-KEY: sua-api-key' \\
   -H 'Content-Type: application/json' \\
   -d '{
@@ -278,14 +313,14 @@ const ApiDocumentation = () => {
       method: 'GET',
       path: '/api/v1/contact/phone/{phone}',
       description: 'Buscar contato por telefone',
-      example: `curl -X GET 'https://app.swiftbot.com.br/api/v1/contact/phone/5511999999999' \\
+      example: `curl -X GET 'https://swiftbot.com.br/api/v1/contact/phone/5511999999999' \\
   -H 'X-API-KEY: sua-api-key'`
     },
     {
       method: 'PATCH',
       path: '/api/v1/contact/phone/{phone}',
       description: 'Atualizar contato por telefone (nome e campos)',
-      example: `curl -X PATCH 'https://app.swiftbot.com.br/api/v1/contact/phone/5511999999999' \\
+      example: `curl -X PATCH 'https://swiftbot.com.br/api/v1/contact/phone/5511999999999' \\
   -H 'X-API-KEY: sua-api-key' \\
   -H 'Content-Type: application/json' \\
   -d '{"name": "João Silva", "metadata": {"idCRM": "12345", "source": "landing"}}'`
@@ -294,7 +329,7 @@ const ApiDocumentation = () => {
       method: 'POST',
       path: '/api/v1/contact',
       description: 'Criar novo contato',
-      example: `curl -X POST 'https://app.swiftbot.com.br/api/v1/contact' \\
+      example: `curl -X POST 'https://swiftbot.com.br/api/v1/contact' \\
   -H 'X-API-KEY: sua-api-key' \\
   -H 'Content-Type: application/json' \\
   -d '{"phone": "5511999999999", "name": "João Silva"}'`
@@ -303,14 +338,14 @@ const ApiDocumentation = () => {
       method: 'GET',
       path: '/api/v1/contact/{contactId}/metadata',
       description: 'Buscar campos personalizados do contato',
-      example: `curl -X GET 'https://app.swiftbot.com.br/api/v1/contact/{contactId}/metadata' \\
+      example: `curl -X GET 'https://swiftbot.com.br/api/v1/contact/{contactId}/metadata' \\
   -H 'X-API-KEY: sua-api-key'`
     },
     {
       method: 'PATCH',
       path: '/api/v1/contact/{contactId}/metadata',
       description: 'Atualizar campos personalizados (merge)',
-      example: `curl -X PATCH 'https://app.swiftbot.com.br/api/v1/contact/{contactId}/metadata' \\
+      example: `curl -X PATCH 'https://swiftbot.com.br/api/v1/contact/{contactId}/metadata' \\
   -H 'X-API-KEY: sua-api-key' \\
   -H 'Content-Type: application/json' \\
   -d '{"idCRM": "12345", "source": "landing_page", "segment": "premium"}'`
@@ -319,7 +354,7 @@ const ApiDocumentation = () => {
       method: 'PUT',
       path: '/api/v1/contact/{contactId}/metadata',
       description: 'Substituir todos campos personalizados',
-      example: `curl -X PUT 'https://app.swiftbot.com.br/api/v1/contact/{contactId}/metadata' \\
+      example: `curl -X PUT 'https://swiftbot.com.br/api/v1/contact/{contactId}/metadata' \\
   -H 'X-API-KEY: sua-api-key' \\
   -H 'Content-Type: application/json' \\
   -d '{"idCRM": "12345"}'`
@@ -328,7 +363,7 @@ const ApiDocumentation = () => {
       method: 'POST',
       path: '/api/v1/contact/{contactId}/agent',
       description: 'Ativar/desativar agente IA para contato',
-      example: `curl -X POST 'https://app.swiftbot.com.br/api/v1/contact/{contactId}/agent' \\
+      example: `curl -X POST 'https://swiftbot.com.br/api/v1/contact/{contactId}/agent' \\
   -H 'X-API-KEY: sua-api-key' \\
   -H 'Content-Type: application/json' \\
   -d '{"enabled": false, "reason": "Atendimento manual"}'`
@@ -337,28 +372,28 @@ const ApiDocumentation = () => {
       method: 'POST',
       path: '/api/v1/contact/{contactId}/sequences/{sequenceId}',
       description: 'Adicionar contato a uma sequência',
-      example: `curl -X POST 'https://app.swiftbot.com.br/api/v1/contact/{contactId}/sequences/{sequenceId}' \\
+      example: `curl -X POST 'https://swiftbot.com.br/api/v1/contact/{contactId}/sequences/{sequenceId}' \\
   -H 'X-API-KEY: sua-api-key'`
     },
     {
       method: 'DELETE',
       path: '/api/v1/contact/{contactId}/sequences/{sequenceId}',
       description: 'Remover contato de uma sequência',
-      example: `curl -X DELETE 'https://app.swiftbot.com.br/api/v1/contact/{contactId}/sequences/{sequenceId}' \\
+      example: `curl -X DELETE 'https://swiftbot.com.br/api/v1/contact/{contactId}/sequences/{sequenceId}' \\
   -H 'X-API-KEY: sua-api-key'`
     },
     {
       method: 'POST',
       path: '/api/v1/contact/{contactId}/tags/{tagId}',
       description: 'Adicionar tag ao contato',
-      example: `curl -X POST 'https://app.swiftbot.com.br/api/v1/contact/{contactId}/tags/{tagId}' \\
+      example: `curl -X POST 'https://swiftbot.com.br/api/v1/contact/{contactId}/tags/{tagId}' \\
   -H 'X-API-KEY: sua-api-key'`
     },
     {
       method: 'DELETE',
       path: '/api/v1/contact/{contactId}/tags/{tagId}',
       description: 'Remover tag do contato',
-      example: `curl -X DELETE 'https://app.swiftbot.com.br/api/v1/contact/{contactId}/tags/{tagId}' \\
+      example: `curl -X DELETE 'https://swiftbot.com.br/api/v1/contact/{contactId}/tags/{tagId}' \\
   -H 'X-API-KEY: sua-api-key'`
     }
   ]
