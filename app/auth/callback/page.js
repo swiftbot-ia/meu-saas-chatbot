@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase/client'
+import { getUtmFromStorage, clearUtmFromStorage } from '@/lib/utmUtils'
 
 export default function AuthCallbackPage() {
     const router = useRouter()
@@ -37,6 +38,9 @@ export default function AuthCallbackPage() {
 
                     // Criar perfil se não existir
                     if (profileError && profileError.code === 'PGRST116') {
+                        // Captura UTMs do localStorage (salvos quando visitou /login)
+                        const utmData = getUtmFromStorage() || {}
+
                         await supabase
                             .from('user_profiles')
                             .insert([{
@@ -46,9 +50,19 @@ export default function AuthCallbackPage() {
                                 phone: '',
                                 email: session.user.email,
                                 avatar_url: session.user.user_metadata?.avatar_url || '',
+                                // Salva UTMs para rastrear origem do usuário
+                                utm_source: utmData.utm_source || null,
+                                utm_medium: utmData.utm_medium || null,
+                                utm_campaign: utmData.utm_campaign || null,
+                                utm_term: utmData.utm_term || null,
+                                utm_content: utmData.utm_content || null,
+                                registered_from: 'social_login',
                                 created_at: new Date().toISOString(),
                                 updated_at: new Date().toISOString()
                             }])
+
+                        // Limpa UTMs do storage após salvar
+                        clearUtmFromStorage()
 
                         setStatus('Primeiro acesso! Redirecionando para completar perfil...')
                         setTimeout(() => router.push('/complete-profile'), 1000)

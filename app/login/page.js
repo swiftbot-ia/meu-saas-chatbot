@@ -3,6 +3,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { supabase } from '../../lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Gift } from 'lucide-react'
+import { captureUtmFromCurrentUrl, getUtmForSubmission } from '@/lib/utmUtils'
 
 export default function AuthPageWrapper() {
   return (
@@ -50,6 +51,9 @@ function AuthPage() {
   const labelClass = "block text-xs font-medium text-[#B0B0B0] mb-2 ml-4 uppercase tracking-wider"
 
   useEffect(() => {
+    // Captura UTMs da URL ao carregar a página
+    captureUtmFromCurrentUrl()
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -202,17 +206,27 @@ function AuthPage() {
       } else if (authView === 'register') {
 
         // ==============================================================================
-        // 🔧 CORREÇÃO: URL FIXA
+        // 🔧 CORREÇÃO: URL FIXA + CAPTURA UTMs
         // ==============================================================================
         // Removemos o 'window.location.origin' e usamos a constante fixa
         // Isso garante que o Supabase receba uma URL absoluta válida.
+
+        // Captura UTMs do storage/URL para salvar com o usuário
+        const utmData = getUtmForSubmission()
 
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: {
-              full_name: fullName
+              full_name: fullName,
+              // Salva UTMs como metadata do usuário
+              utm_source: utmData.utm_source || null,
+              utm_medium: utmData.utm_medium || null,
+              utm_campaign: utmData.utm_campaign || null,
+              utm_term: utmData.utm_term || null,
+              utm_content: utmData.utm_content || null,
+              registered_from: 'login_page'
             },
             // Força o redirecionamento para o domínio oficial + /login
             emailRedirectTo: `${SITE_URL}/login`
