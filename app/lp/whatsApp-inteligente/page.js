@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { isValidPhoneNumber } from 'react-phone-number-input'
 import PhoneInput from '../components/PhoneInput'
 import { getUtmFromStorage } from '@/lib/utmUtils'
-import Header from '@/app/components/Header'
 
 export default function WhatsAppInteligentePage() {
     const router = useRouter()
@@ -134,9 +133,6 @@ export default function WhatsAppInteligentePage() {
 
     return (
         <div className="min-h-screen bg-[#E1DFDB] relative overflow-x-hidden">
-            {/* Header */}
-            <Header />
-
             <main className="relative z-10">
                 {/* Hero Section - Black with background image */}
                 <section className="relative min-h-screen flex items-center justify-center overflow-visible bg-transparent pb-12 md:pb-20">
