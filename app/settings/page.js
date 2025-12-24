@@ -290,6 +290,13 @@ const ApiKeyCard = ({ connection, onGenerate, onRevoke, onCopy, loading }) => {
 // ============================================================================
 const ApiDocumentation = () => {
   const [expandedEndpoint, setExpandedEndpoint] = useState(null)
+  const [copiedIndex, setCopiedIndex] = useState(null)
+
+  const handleCopyExample = async (example, index) => {
+    await navigator.clipboard.writeText(example.replace(/\\\\/g, '\\'))
+    setCopiedIndex(index)
+    setTimeout(() => setCopiedIndex(null), 2000)
+  }
 
   const endpoints = [
     {
@@ -445,9 +452,18 @@ const ApiDocumentation = () => {
             {expandedEndpoint === index && (
               <div className="px-4 py-3 bg-[#0A0A0A] border-t border-white/5">
                 <p className="text-sm text-gray-400 mb-3">{endpoint.description}</p>
-                <pre className="bg-[#1A1A1A] p-3 rounded-lg overflow-x-auto text-xs text-gray-300">
-                  {endpoint.example}
-                </pre>
+                <div className="relative">
+                  <button
+                    onClick={() => handleCopyExample(endpoint.example, index)}
+                    className="absolute top-2 right-2 p-1.5 bg-[#252525] hover:bg-[#333] rounded-md text-gray-400 hover:text-[#00FF99] transition-colors z-10"
+                    title="Copiar"
+                  >
+                    {copiedIndex === index ? <Check size={14} className="text-[#00FF99]" /> : <Copy size={14} />}
+                  </button>
+                  <pre className="bg-[#1A1A1A] p-3 pr-12 rounded-lg overflow-x-auto text-xs text-gray-300">
+                    {endpoint.example}
+                  </pre>
+                </div>
               </div>
             )}
           </div>
