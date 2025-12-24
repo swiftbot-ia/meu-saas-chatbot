@@ -125,6 +125,14 @@ export default function WhatsAppInteligentePage() {
                     source: 'lp-whatsapp-inteligente'
                 })
 
+                // Dispara evento Lead no Meta Pixel (client-side)
+                if (typeof window !== 'undefined' && window.fbq) {
+                    window.fbq('track', 'Lead', {
+                        content_name: 'LP Live Dubai',
+                        content_category: 'lead'
+                    })
+                }
+
                 router.push('/lp/whatsApp-inteligente/obrigado')
             } else {
                 setError('Erro ao registrar. Tente novamente.')
