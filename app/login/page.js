@@ -1,10 +1,22 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { supabase } from '../../lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Gift } from 'lucide-react'
 
-export default function AuthPage() {
+export default function AuthPageWrapper() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00FF99]"></div>
+      </div>
+    }>
+      <AuthPage />
+    </Suspense>
+  )
+}
+
+function AuthPage() {
   // ==================================================================================
   // 🧠 LÓGICA DE ESTADO (MANTIDA 100% IGUAL)
   // ==================================================================================
