@@ -3,9 +3,18 @@ import { NextResponse } from 'next/server';
 import { getCurrentSession } from '@/lib/support-auth';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+// Lazy initialization to avoid build-time errors
+let supabaseAdmin = null;
+function getSupabaseAdmin() {
+  if (!supabaseAdmin) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (url && key) {
+      supabaseAdmin = createClient(url, key);
+    }
+  }
+  return supabaseAdmin;
+}
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
@@ -13,7 +22,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request, { params }) {
   try {
     const session = await getCurrentSession();
-    
+
     if (!session) {
       return NextResponse.json(
         { success: false, error: 'Não autenticado' },
@@ -26,7 +35,7 @@ export async function GET(request, { params }) {
     console.log('📋 Buscando histórico do ticket:', id);
 
     // Buscar histórico de respostas e ações
-    const { data: responses, error: responsesError } = await supabaseAdmin
+    const { data: responses, error: responsesError } = await getSupabaseAdmin()
       .from('support_ticket_responses')
       .select(`
         *,
@@ -45,7 +54,7 @@ export async function GET(request, { params }) {
     }
 
     // Buscar logs de ações relacionadas ao ticket
-    const { data: logs, error: logsError } = await supabaseAdmin
+    const { data: logs, error: logsError } = await getSupabaseAdmin()
       .from('support_actions_log')
       .select(`
         *,
