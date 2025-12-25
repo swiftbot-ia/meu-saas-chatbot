@@ -29,14 +29,18 @@ async function getUser() {
     return user
 }
 
-export async function GET() {
+export async function GET(request) {
     try {
         const user = await getUser()
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const conversations = await chatService.getConversations(user.id)
+        // Ler connectionId da query string
+        const { searchParams } = new URL(request.url)
+        const connectionId = searchParams.get('connectionId')
+
+        const conversations = await chatService.getConversations(user.id, connectionId)
 
         // Format dates for display
         const formatted = conversations.map(conv => ({
