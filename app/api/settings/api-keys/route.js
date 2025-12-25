@@ -43,6 +43,10 @@ async function createAuthClient() {
 /**
  * GET /api/settings/api-keys
  * List API keys for all user's connections
+ * 
+ * Query params:
+ * - connectionId: (optional) Get single connection's key
+ * - reveal: (optional) If "true", return full API key for the specified connectionId
  */
 export async function GET(request) {
     try {
@@ -54,6 +58,9 @@ export async function GET(request) {
         }
 
         const userId = session.user.id
+        const { searchParams } = new URL(request.url)
+        const connectionId = searchParams.get('connectionId')
+        const reveal = searchParams.get('reveal') === 'true'
 
         // Get owner's user ID for team data sharing
         let ownerUserId = userId
@@ -64,6 +71,38 @@ export async function GET(request) {
             }
         } catch (accountError) {
             console.log('⚠️ [API Keys] Account check failed:', accountError.message)
+        }
+
+        // If requesting a specific connection with reveal=true, return full key
+        if (connectionId && reveal) {
+            // Verify connection belongs to owner
+            const { data: connection, error: connError } = await supabaseAdmin
+                .from('whatsapp_connections')
+                .select('id')
+                .eq('id', connectionId)
+                .eq('user_id', ownerUserId)
+                .single()
+
+            if (connError || !connection) {
+                return NextResponse.json({ error: 'Conexão não encontrada' }, { status: 404 })
+            }
+
+            // Get full API key
+            const { data: apiKeyData, error: keyError } = await supabaseAdmin
+                .from('api_keys')
+                .select('api_key')
+                .eq('connection_id', connectionId)
+                .eq('is_active', true)
+                .single()
+
+            if (keyError || !apiKeyData) {
+                return NextResponse.json({ error: 'API key não encontrada' }, { status: 404 })
+            }
+
+            return NextResponse.json({
+                success: true,
+                apiKey: apiKeyData.api_key
+            })
         }
 
         // Get all connections for this owner

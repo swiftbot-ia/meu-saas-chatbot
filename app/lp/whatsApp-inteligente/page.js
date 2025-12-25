@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { isValidPhoneNumber } from 'react-phone-number-input'
 import PhoneInput from '../components/PhoneInput'
-import { getUtmFromStorage } from '@/lib/utmUtils'
+import { getUtmFromStorage, getUtmForSubmission, saveLeadData } from '@/lib/utmUtils'
 
 export default function WhatsAppInteligentePage() {
     const router = useRouter()
@@ -102,6 +102,9 @@ export default function WhatsAppInteligentePage() {
         setIsLoading(true)
 
         try {
+            // Captura UTMs atualizados do storage/URL no momento do envio
+            const currentUtmParams = getUtmForSubmission()
+
             const res = await fetch('/api/lp/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -109,7 +112,7 @@ export default function WhatsAppInteligentePage() {
                     whatsapp: phone,
                     name,
                     email,
-                    utmParams,
+                    utmParams: currentUtmParams,
                     source: 'lp-whatsapp-inteligente'
                 })
             })
@@ -117,6 +120,22 @@ export default function WhatsAppInteligentePage() {
             const data = await res.json()
 
             if (data.success) {
+                // Salva dados do lead no localStorage para tracking
+                saveLeadData({
+                    name,
+                    whatsapp: phone,
+                    email,
+                    source: 'lp-whatsapp-inteligente'
+                })
+
+                // Dispara evento Lead no Meta Pixel (client-side)
+                if (typeof window !== 'undefined' && window.fbq) {
+                    window.fbq('track', 'Lead', {
+                        content_name: 'LP Live Dubai',
+                        content_category: 'lead'
+                    })
+                }
+
                 router.push('/lp/whatsApp-inteligente/obrigado')
             } else {
                 setError('Erro ao registrar. Tente novamente.')

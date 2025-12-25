@@ -367,10 +367,14 @@ export default function SwiftbotProPage() {
     }
   }
 
-  // Carregar conversas do usuário
-  const loadConversations = async () => {
+  // Carregar conversas do usuário filtradas por conexão
+  const loadConversations = async (connId = null) => {
     try {
-      const res = await fetch('/api/swiftbot-ia/conversations')
+      const targetConnId = connId || connectionId
+      const url = targetConnId
+        ? `/api/swiftbot-ia/conversations?connectionId=${targetConnId}`
+        : '/api/swiftbot-ia/conversations'
+      const res = await fetch(url)
       const data = await res.json()
       if (data.conversations) {
         setChatHistory(data.conversations)
@@ -433,6 +437,9 @@ export default function SwiftbotProPage() {
     setChatStarted(false)
     setMessages([])
     setActiveChatId(null)
+
+    // Recarregar conversas da nova conexão
+    loadConversations(connection.id)
   }
 
   const checkUser = async () => {

@@ -291,10 +291,11 @@ const EditAutomationModal = ({ isOpen, onClose, automation, onSave, connectionId
     const [responseContent, setResponseContent] = useState('')
     const [webhookUrl, setWebhookUrl] = useState('')
     const [webhookEnabled, setWebhookEnabled] = useState(false)
-    const [tagInput, setTagInput] = useState('')
+    const [selectedTagId, setSelectedTagId] = useState('')
     const [tagsToAdd, setTagsToAdd] = useState([])
     const [selectedOriginId, setSelectedOriginId] = useState(null)
     const [availableOrigins, setAvailableOrigins] = useState([])
+    const [availableTags, setAvailableTags] = useState([])
     const [loading, setLoading] = useState(false)
     const [activeSection, setActiveSection] = useState('trigger')
 
@@ -312,15 +313,25 @@ const EditAutomationModal = ({ isOpen, onClose, automation, onSave, connectionId
             setResponseContent(automation.automation_responses?.[0]?.content || '')
             setWebhookUrl(automation.action_webhook_url || '')
             setWebhookEnabled(automation.action_webhook_enabled || false)
-            setTagsToAdd(automation.action_add_tags || [])
+            // Carregar tags - pode ser array de IDs ou objetos
+            const savedTags = automation.action_add_tags || []
+            // Se já é array de objetos, usa direto; senão, deixa vazio (será preenchido pelo loadTags)
+            if (savedTags.length > 0 && typeof savedTags[0] === 'object') {
+                setTagsToAdd(savedTags)
+            } else {
+                setTagsToAdd([]) // Será populado quando loadTags()carregar
+                // Guardar IDs antigos para converter depois
+                window._pendingTagIds = savedTags
+            }
             setSelectedOriginId(automation.action_set_origin_id || null)
 
             // Carregar campos personalizados
             const savedFields = automation.action_custom_fields || {}
             setCustomFields(Object.entries(savedFields).map(([name, value]) => ({ name, value })))
 
-            // Carregar origens disponíveis
+            // Carregar origens e tags disponíveis
             loadOrigins()
+            loadTags()
         }
     }, [automation, isOpen])
 
@@ -333,6 +344,27 @@ const EditAutomationModal = ({ isOpen, onClose, automation, onSave, connectionId
             }
         } catch (error) {
             console.error('Erro ao carregar origens:', error)
+        }
+    }
+
+    const loadTags = async () => {
+        try {
+            const response = await fetch(`/api/contacts?connectionId=${connectionId}`)
+            const data = await response.json()
+            if (response.ok) {
+                const tags = data.tags || []
+                setAvailableTags(tags)
+                // Converter IDs antigos para objetos
+                if (window._pendingTagIds && window._pendingTagIds.length > 0) {
+                    const convertedTags = window._pendingTagIds
+                        .map(id => tags.find(t => t.id === id))
+                        .filter(Boolean)
+                    setTagsToAdd(convertedTags)
+                    window._pendingTagIds = null
+                }
+            }
+        } catch (error) {
+            console.error('Erro ao carregar tags:', error)
         }
     }
 
@@ -360,14 +392,17 @@ const EditAutomationModal = ({ isOpen, onClose, automation, onSave, connectionId
     }
 
     const handleAddTag = () => {
-        if (tagInput.trim() && !tagsToAdd.includes(tagInput.trim())) {
-            setTagsToAdd([...tagsToAdd, tagInput.trim()])
-            setTagInput('')
+        if (selectedTagId) {
+            const tag = availableTags.find(t => t.id === selectedTagId)
+            if (tag && !tagsToAdd.some(t => t.id === tag.id)) {
+                setTagsToAdd([...tagsToAdd, { id: tag.id, name: tag.name, color: tag.color }])
+            }
+            setSelectedTagId('')
         }
     }
 
-    const handleRemoveTag = (tag) => {
-        setTagsToAdd(tagsToAdd.filter(t => t !== tag))
+    const handleRemoveTag = (tagId) => {
+        setTagsToAdd(tagsToAdd.filter(t => t.id !== tagId))
     }
 
     const handleSubmit = async () => {
@@ -387,7 +422,7 @@ const EditAutomationModal = ({ isOpen, onClose, automation, onSave, connectionId
                 responses: responseContent ? [{ type: 'text', content: responseContent }] : [],
                 actionWebhookUrl: webhookUrl,
                 actionWebhookEnabled: webhookEnabled,
-                actionAddTags: tagsToAdd,
+                actionAddTags: tagsToAdd.map(t => t.id), // Salva apenas os IDs
                 actionSetOriginId: selectedOriginId,
                 actionCustomFields: customFieldsObj
             })
@@ -546,31 +581,41 @@ const EditAutomationModal = ({ isOpen, onClose, automation, onSave, connectionId
                                 </div>
 
                                 <div className="flex gap-2 mb-2">
-                                    <input
-                                        type="text"
-                                        value={tagInput}
-                                        onChange={(e) => setTagInput(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
-                                        placeholder="Nome da tag (ex: lead-quente)"
+                                    <select
+                                        value={selectedTagId}
+                                        onChange={(e) => setSelectedTagId(e.target.value)}
                                         className="flex-1 bg-[#1A1A1A] text-white px-4 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                                    />
+                                    >
+                                        <option value="">Selecione uma tag...</option>
+                                        {availableTags
+                                            .filter(tag => !tagsToAdd.some(t => t.id === tag.id))
+                                            .map(tag => (
+                                                <option key={tag.id} value={tag.id}>{tag.name}</option>
+                                            ))
+                                        }
+                                    </select>
                                     <button
                                         onClick={handleAddTag}
-                                        className="px-4 py-2 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors"
+                                        disabled={!selectedTagId}
+                                        className="px-4 py-2 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <Plus size={18} />
                                     </button>
                                 </div>
                                 {tagsToAdd.length > 0 && (
                                     <div className="flex flex-wrap gap-2">
-                                        {tagsToAdd.map((tag, i) => (
+                                        {tagsToAdd.map((tag) => (
                                             <span
-                                                key={i}
-                                                className="inline-flex items-center gap-1 bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full text-sm"
+                                                key={tag.id}
+                                                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm"
+                                                style={{
+                                                    backgroundColor: `${tag.color}20`,
+                                                    color: tag.color || '#3b82f6'
+                                                }}
                                             >
                                                 <Tag size={12} />
-                                                {tag}
-                                                <button onClick={() => handleRemoveTag(tag)} className="hover:text-white">
+                                                {tag.name}
+                                                <button onClick={() => handleRemoveTag(tag.id)} className="hover:opacity-70">
                                                     <X size={14} />
                                                 </button>
                                             </span>
