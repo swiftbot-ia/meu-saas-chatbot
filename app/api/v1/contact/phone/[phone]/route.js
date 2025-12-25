@@ -31,6 +31,37 @@ function getMainDb() {
 }
 
 /**
+ * Gera variações do número de telefone brasileiro
+ * Números brasileiros de celular podem ter 8 ou 9 dígitos após o DDD
+ * Ex: 5561995348617 (com 9) ou 556195348617 (sem 9)
+ */
+function generateBrazilianPhoneVariations(phone) {
+    const variations = [phone]
+
+    // Se começa com 55 (Brasil)
+    if (phone.startsWith('55') && phone.length >= 12) {
+        const countryCode = '55'
+        const ddd = phone.slice(2, 4)
+        const number = phone.slice(4)
+
+        // Se o número tem 9 dígitos (com o 9° dígito)
+        if (number.length === 9 && number.startsWith('9')) {
+            // Gerar versão sem o 9° dígito
+            const without9 = countryCode + ddd + number.slice(1)
+            variations.push(without9)
+        }
+        // Se o número tem 8 dígitos (sem o 9° dígito)
+        else if (number.length === 8) {
+            // Gerar versão com o 9° dígito
+            const with9 = countryCode + ddd + '9' + number
+            variations.push(with9)
+        }
+    }
+
+    return [...new Set(variations)] // Remove duplicatas
+}
+
+/**
  * GET /api/v1/contact/phone/{phone}
  * Find contact by phone number
  */
@@ -57,11 +88,15 @@ export async function GET(request, { params }) {
         // Normalize phone number
         const normalizedPhone = phone.replace(/\D/g, '')
 
+        // Gerar variações do número brasileiro (com/sem 9° dígito)
+        const phoneVariations = generateBrazilianPhoneVariations(normalizedPhone)
+        console.log('[ContactByPhone] Buscando variações:', phoneVariations)
+
         const chatDb = getChatDb()
         const mainDb = getMainDb()
 
-        // Find contact with conversation for this connection
-        const { data: contact, error: contactError } = await chatDb
+        // Find contact with any phone variation
+        const { data: contacts, error: contactError } = await chatDb
             .from('whatsapp_contacts')
             .select(`
                 id,
@@ -77,10 +112,13 @@ export async function GET(request, { params }) {
                     name
                 )
             `)
-            .eq('whatsapp_number', normalizedPhone)
-            .single()
+            .in('whatsapp_number', phoneVariations)
+            .limit(1)
+
+        const contact = contacts?.[0]
 
         if (contactError || !contact) {
+            console.log('[ContactByPhone] Não encontrado para:', phoneVariations)
             return NextResponse.json(
                 { success: false, error: 'Contact not found' },
                 { status: 404 }
