@@ -1,24 +1,15 @@
 // app/api/portal-interno/tickets/list/route.js
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { getCurrentSession } from '@/lib/support-auth'
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
-
-// Lazy initialization with dynamic import to avoid build-time errors
-let supabaseAdmin = null
-async function getSupabaseAdmin() {
-  if (!supabaseAdmin) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (url && key) {
-      const { createClient } = await import('@supabase/supabase-js')
-      supabaseAdmin = createClient(url, key)
-    }
-  }
-  return supabaseAdmin
-}
 
 export async function GET(request) {
   try {
@@ -43,7 +34,7 @@ export async function GET(request) {
     const offset = (page - 1) * limit
 
     // Construir query
-    let query = getSupabaseAdmin()
+    let query = supabaseAdmin
       .from('support_tickets')
       .select(`
         *,

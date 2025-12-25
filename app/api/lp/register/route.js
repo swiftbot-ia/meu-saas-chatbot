@@ -1,24 +1,13 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { sendLiveDubaiConfirmation } from '@/lib/brevoEmail'
 import { sendLeadEvent } from '@/lib/metaPixel'
 
-// Force dynamic rendering - prevents static analysis during build
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
-
-// Lazy initialization with dynamic import to avoid build-time errors
-let supabase = null
-async function getSupabase() {
-    if (!supabase) {
-        const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-        const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-        if (url && key) {
-            const { createClient } = await import('@supabase/supabase-js')
-            supabase = createClient(url, key)
-        }
-    }
-    return supabase
-}
+// Supabase client
+const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
 /**
  * POST /api/lp/register
@@ -54,25 +43,17 @@ export async function POST(request) {
         console.log('[LP Register] Novo lead:', leadData)
 
         // Salva no banco de dados Supabase
-        const client = await getSupabase()
-        let savedLead = null
+        const { data: savedLead, error: dbError } = await supabase
+            .from('lp_leads')
+            .insert(leadData)
+            .select()
+            .single()
 
-        if (client) {
-            const { data, error: dbError } = await client
-                .from('lp_leads')
-                .insert(leadData)
-                .select()
-                .single()
-
-            if (dbError) {
-                console.error('[LP Register] Erro ao salvar no banco:', dbError)
-                // Continua mesmo com erro no banco (fail-safe)
-            } else {
-                savedLead = data
-                console.log('[LP Register] Lead salvo no banco:', savedLead?.id)
-            }
+        if (dbError) {
+            console.error('[LP Register] Erro ao salvar no banco:', dbError)
+            // Continua mesmo com erro no banco (fail-safe)
         } else {
-            console.warn('[LP Register] Supabase client not configured')
+            console.log('[LP Register] Lead salvo no banco:', savedLead?.id)
         }
 
         // Envia para webhook n8n Live Dubai (fire and forget)
