@@ -678,24 +678,18 @@ export default function ContactsPage() {
     }
   };
 
-  // Load sequences the contact is enrolled in
+  // Load sequences the contact is enrolled in (from Chat DB via API)
   const loadContactSequences = async () => {
     if (!selectedContact?.id) return;
 
     try {
-      const { data, error } = await supabase
-        .from('automation_sequence_subscriptions')
-        .select(`
-          id,
-          sequence_id,
-          status,
-          sequence:automation_sequences(id, name)
-        `)
-        .eq('contact_id', selectedContact.id)
-        .in('status', ['active', 'pending']);
+      const response = await fetch(`/api/sequences/subscriptions?contactId=${selectedContact.id}`);
+      const data = await response.json();
 
-      if (!error && data) {
-        setContactSequences(data);
+      if (response.ok && data.success) {
+        setContactSequences(data.subscriptions || []);
+      } else {
+        console.error('Erro ao carregar inscrições:', data.error);
       }
     } catch (err) {
       console.error('Erro ao carregar inscrições:', err);
