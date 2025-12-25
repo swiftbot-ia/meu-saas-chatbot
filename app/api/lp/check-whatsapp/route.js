@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
 
+// Force dynamic rendering - prevents static analysis during build
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 // Lazy initialization with dynamic import to avoid build-time errors
 let supabase = null
 async function getSupabase() {
