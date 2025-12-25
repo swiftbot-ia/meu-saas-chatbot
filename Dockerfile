@@ -39,8 +39,12 @@ ENV NEXT_PUBLIC_CHAT_SUPABASE_ANON_KEY=$NEXT_PUBLIC_CHAT_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 ENV NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=$NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 
-# Runtime secrets are NOT set here - they must be provided at container runtime
-# This avoids Docker security warnings about secrets in build layers
+# Variáveis placeholder para build (substituídas em runtime)
+ENV SUPABASE_SERVICE_ROLE_KEY=placeholder
+ENV CHAT_SUPABASE_SERVICE_ROLE_KEY=placeholder
+ENV STRIPE_SECRET_KEY=sk_placeholder
+ENV STRIPE_WEBHOOK_SECRET=whsec_placeholder
+ENV OPENAI_API_KEY=sk-placeholder
 
 # Build da aplicação
 RUN npm run build
