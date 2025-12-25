@@ -77,6 +77,28 @@ services:
       - "traefik.http.services.swiftbot.loadbalancer.healthcheck.path=/api/health"
       - "traefik.http.services.swiftbot.loadbalancer.healthcheck.interval=30s"
 
+  # ==========================================================================
+  # SEQUENCE WORKER - Processa sequências de automação
+  # ==========================================================================
+  sequence-worker:
+    image: node:20-alpine
+    container_name: sequence-worker
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./workers:/app/workers
+      - ./package.json:/app/package.json
+      - ./node_modules:/app/node_modules
+    command: ["node", "workers/sequence-worker.js"]
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    networks:
+      - swiftbot_rede
+    depends_on:
+      - swiftbot
+
 volumes:
   traefik-certificates:
     name: traefik-certificates
