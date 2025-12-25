@@ -53,11 +53,17 @@ export default function AccountSubscription() {
         .eq('user_id', user.id)
         .single()
 
-      // Se não tem registro ou não é owner, redirecionar
-      if (error || !member || member.role !== 'owner') {
-        console.log('❌ Usuário não é owner, redirecionando...')
+      // Se tem registro e NÃO é owner, redirecionar
+      // Se não tem registro (usuário legado), permitir acesso (será tratado como owner)
+      if (member && member.role !== 'owner') {
+        console.log('❌ Usuário é member, não owner. Redirecionando...')
         router.push('/dashboard')
         return
+      }
+
+      // Se houve erro mas não é "PGRST116" (no rows), logar
+      if (error && error.code !== 'PGRST116') {
+        console.log('⚠️ Erro ao verificar role:', error.message)
       }
     } catch (err) {
       // Se a tabela não existe ainda (antes da migração), permitir acesso normal
