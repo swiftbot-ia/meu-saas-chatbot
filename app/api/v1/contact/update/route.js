@@ -11,36 +11,26 @@
 
 import { NextResponse } from 'next/server'
 import { validateApiKey } from '@/lib/api-auth'
+import { createClient } from '@supabase/supabase-js'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
 
-let chatDbClient = null
-let mainDbClient = null
+const chatSupabaseUrl = process.env.NEXT_PUBLIC_CHAT_SUPABASE_URL
+const chatSupabaseServiceKey = process.env.CHAT_SUPABASE_SERVICE_ROLE_KEY
+const mainSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const mainSupabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-async function getChatDb() {
-    if (!chatDbClient) {
-        const url = process.env.NEXT_PUBLIC_CHAT_SUPABASE_URL
-        const key = process.env.CHAT_SUPABASE_SERVICE_ROLE_KEY
-        if (url && key) {
-            const { createClient } = await import('@supabase/supabase-js')
-            chatDbClient = createClient(url, key, { auth: { persistSession: false } })
-        }
-    }
-    return chatDbClient
+function getChatDb() {
+    return createClient(chatSupabaseUrl, chatSupabaseServiceKey, {
+        auth: { persistSession: false }
+    })
 }
 
-async function getMainDb() {
-    if (!mainDbClient) {
-        const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-        const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-        if (url && key) {
-            const { createClient } = await import('@supabase/supabase-js')
-            mainDbClient = createClient(url, key, { auth: { persistSession: false } })
-        }
-    }
-    return mainDbClient
+function getMainDb() {
+    return createClient(mainSupabaseUrl, mainSupabaseServiceKey, {
+        auth: { persistSession: false }
+    })
 }
 
 // Valid funnel stages
@@ -101,8 +91,8 @@ export async function POST(request) {
             )
         }
 
-        const chatDb = await getChatDb()
-        const mainDb = await getMainDb()
+        const chatDb = getChatDb()
+        const mainDb = getMainDb()
         const updates = {}
 
         // 1. Find contact

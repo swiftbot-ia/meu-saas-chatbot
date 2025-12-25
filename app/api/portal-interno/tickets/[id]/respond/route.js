@@ -1,30 +1,20 @@
 // app/api/portal-interno/tickets/[id]/respond/route.js
 import { NextResponse } from 'next/server';
 import { getCurrentSession } from '@/lib/support-auth';
+import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
-
-// Lazy initialization with dynamic import to avoid build-time errors
-let supabaseAdmin = null;
-async function getSupabaseAdmin() {
-  if (!supabaseAdmin) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (url && key) {
-      const { createClient } = await import('@supabase/supabase-js');
-      supabaseAdmin = createClient(url, key);
-    }
-  }
-  return supabaseAdmin;
-}
 
 export async function POST(request, { params }) {
   try {
     const session = await getCurrentSession();
-
+    
     if (!session) {
       return NextResponse.json(
         { success: false, error: 'Não autenticado' },
@@ -59,7 +49,7 @@ export async function POST(request, { params }) {
     console.log('📧 ========================================');
 
     // Buscar ticket e cliente
-    const { data: ticket, error: ticketError } = await getSupabaseAdmin()
+    const { data: ticket, error: ticketError } = await supabaseAdmin
       .from('support_tickets')
       .select(`
         *,
@@ -307,7 +297,7 @@ export async function POST(request, { params }) {
       console.error('❌ Code:', sendError.code);
       console.error('❌ Command:', sendError.command);
       console.error('❌ ========================================');
-
+      
       return NextResponse.json(
         { success: false, error: `Erro ao enviar email: ${sendError.message}` },
         { status: 500 }
@@ -315,7 +305,7 @@ export async function POST(request, { params }) {
     }
 
     // Registrar resposta no banco
-    await getSupabaseAdmin()
+    await supabaseAdmin
       .from('support_ticket_responses')
       .insert({
         ticket_id: id,
@@ -325,15 +315,15 @@ export async function POST(request, { params }) {
       });
 
     // Log de ação
-    await getSupabaseAdmin()
+    await supabaseAdmin
       .from('support_actions_log')
       .insert({
         support_user_id: session.user.id,
         action_type: 'email_sent',
         target_ticket_id: id,
         description: `Email enviado para ${clientEmail}`,
-        metadata: {
-          subject,
+        metadata: { 
+          subject, 
           messageId: info.messageId,
           response: info.response
         }
@@ -353,7 +343,7 @@ export async function POST(request, { params }) {
     console.error('❌', error);
     console.error('❌ Stack:', error.stack);
     console.error('❌ ========================================');
-
+    
     return NextResponse.json(
       { success: false, error: `Erro fatal: ${error.message}` },
       { status: 500 }

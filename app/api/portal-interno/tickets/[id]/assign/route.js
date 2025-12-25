@@ -1,24 +1,15 @@
 // app/api/portal-interno/tickets/[id]/assign/route.js
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { getCurrentSession } from '@/lib/support-auth'
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
-
-// Lazy initialization with dynamic import to avoid build-time errors
-let supabaseAdmin = null
-async function getSupabaseAdmin() {
-  if (!supabaseAdmin) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (url && key) {
-      const { createClient } = await import('@supabase/supabase-js')
-      supabaseAdmin = createClient(url, key)
-    }
-  }
-  return supabaseAdmin
-}
 
 export async function POST(request, { params }) {
   try {
@@ -51,7 +42,7 @@ export async function POST(request, { params }) {
     }
 
     // Verificar se o membro da equipe existe
-    const { data: teamMember, error: memberError } = await getSupabaseAdmin()
+    const { data: teamMember, error: memberError } = await supabaseAdmin
       .from('support_users')
       .select('id, full_name')
       .eq('id', assignedTo)
@@ -66,7 +57,7 @@ export async function POST(request, { params }) {
     }
 
     // Atualizar ticket
-    const { data: ticket, error: updateError } = await getSupabaseAdmin()
+    const { data: ticket, error: updateError } = await supabaseAdmin
       .from('support_tickets')
       .update({
         assigned_to: assignedTo,
@@ -85,7 +76,7 @@ export async function POST(request, { params }) {
     }
 
     // Registrar ação no histórico
-    await getSupabaseAdmin()
+    await supabaseAdmin
       .from('support_ticket_responses')
       .insert({
         ticket_id: id,
@@ -95,7 +86,7 @@ export async function POST(request, { params }) {
       })
 
     // Registrar no log de ações
-    await getSupabaseAdmin()
+    await supabaseAdmin
       .from('support_actions_log')
       .insert({
         support_user_id: session.userId,

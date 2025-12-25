@@ -1,30 +1,20 @@
 // app/api/portal-interno/tickets/send-email/route.js
 import { NextResponse } from 'next/server';
 import { getCurrentSession } from '@/lib/support-auth';
+import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
-
-// Lazy initialization with dynamic import to avoid build-time errors
-let supabaseAdmin = null;
-async function getSupabaseAdmin() {
-  if (!supabaseAdmin) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (url && key) {
-      const { createClient } = await import('@supabase/supabase-js');
-      supabaseAdmin = createClient(url, key);
-    }
-  }
-  return supabaseAdmin;
-}
 
 export async function POST(request) {
   try {
     const session = await getCurrentSession();
-
+    
     if (!session) {
       return NextResponse.json(
         { success: false, error: 'Não autenticado' },
@@ -182,7 +172,7 @@ export async function POST(request) {
     console.log('✅ Email enviado:', info.messageId);
 
     // Registrar no histórico
-    await getSupabaseAdmin()
+    await supabaseAdmin
       .from('support_ticket_responses')
       .insert({
         ticket_id: ticketId,
@@ -192,7 +182,7 @@ export async function POST(request) {
       });
 
     // Log de ação
-    await getSupabaseAdmin()
+    await supabaseAdmin
       .from('support_actions_log')
       .insert({
         support_user_id: session.user.id,

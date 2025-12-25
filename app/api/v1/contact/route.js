@@ -8,22 +8,18 @@
 
 import { NextResponse } from 'next/server'
 import { validateApiKey } from '@/lib/api-auth'
+import { createClient } from '@supabase/supabase-js'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
 
-let chatDbClient = null
-async function getChatDb() {
-    if (!chatDbClient) {
-        const url = process.env.NEXT_PUBLIC_CHAT_SUPABASE_URL
-        const key = process.env.CHAT_SUPABASE_SERVICE_ROLE_KEY
-        if (url && key) {
-            const { createClient } = await import('@supabase/supabase-js')
-            chatDbClient = createClient(url, key, { auth: { persistSession: false } })
-        }
-    }
-    return chatDbClient
+const chatSupabaseUrl = process.env.NEXT_PUBLIC_CHAT_SUPABASE_URL
+const chatSupabaseServiceKey = process.env.CHAT_SUPABASE_SERVICE_ROLE_KEY
+
+function getChatDb() {
+    return createClient(chatSupabaseUrl, chatSupabaseServiceKey, {
+        auth: { persistSession: false }
+    })
 }
 
 /**
@@ -64,7 +60,7 @@ export async function POST(request) {
             )
         }
 
-        const chatDb = await getChatDb()
+        const chatDb = getChatDb()
 
         // Check if contact already exists
         const { data: existingContact } = await chatDb

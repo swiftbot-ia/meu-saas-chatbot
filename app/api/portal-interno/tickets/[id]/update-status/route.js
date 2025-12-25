@@ -1,24 +1,11 @@
 // app/api/portal-interno/tickets/[id]/update-status/route.js
 import { NextResponse } from 'next/server';
 import { getCurrentSession } from '@/lib/support-auth';
+import { createClient } from '@supabase/supabase-js';
 
-// Force dynamic rendering to prevent build-time execution
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
-
-// Lazy initialization with dynamic import to avoid build-time errors
-let supabaseAdmin = null;
-async function getSupabaseAdmin() {
-  if (!supabaseAdmin) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (url && key) {
-      const { createClient } = await import('@supabase/supabase-js');
-      supabaseAdmin = createClient(url, key);
-    }
-  }
-  return supabaseAdmin;
-}
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 const statusLabels = {
   open: 'Aberto',
@@ -27,10 +14,13 @@ const statusLabels = {
   closed: 'Fechado'
 };
 
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+
 export async function POST(request, { params }) {
   try {
     const session = await getCurrentSession();
-
+    
     if (!session) {
       return NextResponse.json(
         { success: false, error: 'Não autenticado' },
@@ -53,7 +43,7 @@ export async function POST(request, { params }) {
     console.log(`📝 Atualizando ticket ${id} para status: ${status} por ${session.user.full_name}`);
 
     // Buscar status anterior
-    const { data: ticketBefore } = await getSupabaseAdmin()
+    const { data: ticketBefore } = await supabaseAdmin
       .from('support_tickets')
       .select('status')
       .eq('id', id)
@@ -71,7 +61,7 @@ export async function POST(request, { params }) {
       updateData.resolved_at = new Date().toISOString();
     }
 
-    const { error: updateError } = await getSupabaseAdmin()
+    const { error: updateError } = await supabaseAdmin
       .from('support_tickets')
       .update(updateData)
       .eq('id', id);
@@ -88,7 +78,7 @@ export async function POST(request, { params }) {
     const oldStatusLabel = statusLabels[ticketBefore?.status] || ticketBefore?.status;
     const newStatusLabel = statusLabels[status];
 
-    await getSupabaseAdmin()
+    await supabaseAdmin
       .from('support_actions_log')
       .insert({
         support_user_id: session.user.id, // ✅ ID do usuário que fez a ação
@@ -104,7 +94,7 @@ export async function POST(request, { params }) {
 
     // Se houver nota interna, adicionar
     if (internalNote && internalNote.trim()) {
-      await getSupabaseAdmin()
+      await supabaseAdmin
         .from('support_ticket_responses')
         .insert({
           ticket_id: id,
@@ -114,7 +104,7 @@ export async function POST(request, { params }) {
         });
 
       // Log da nota interna
-      await getSupabaseAdmin()
+      await supabaseAdmin
         .from('support_actions_log')
         .insert({
           support_user_id: session.user.id,

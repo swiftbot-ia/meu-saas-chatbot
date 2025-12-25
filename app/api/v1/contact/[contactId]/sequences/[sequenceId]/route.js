@@ -9,37 +9,27 @@
 
 import { NextResponse } from 'next/server'
 import { validateApiKey } from '@/lib/api-auth'
+import { createClient } from '@supabase/supabase-js'
 import SequenceService from '@/lib/SequenceService'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
 
-let chatDbClient = null
-let mainDbClient = null
+const chatSupabaseUrl = process.env.NEXT_PUBLIC_CHAT_SUPABASE_URL
+const chatSupabaseServiceKey = process.env.CHAT_SUPABASE_SERVICE_ROLE_KEY
+const mainSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const mainSupabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-async function getChatDb() {
-    if (!chatDbClient) {
-        const url = process.env.NEXT_PUBLIC_CHAT_SUPABASE_URL
-        const key = process.env.CHAT_SUPABASE_SERVICE_ROLE_KEY
-        if (url && key) {
-            const { createClient } = await import('@supabase/supabase-js')
-            chatDbClient = createClient(url, key, { auth: { persistSession: false } })
-        }
-    }
-    return chatDbClient
+function getChatDb() {
+    return createClient(chatSupabaseUrl, chatSupabaseServiceKey, {
+        auth: { persistSession: false }
+    })
 }
 
-async function getMainDb() {
-    if (!mainDbClient) {
-        const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-        const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-        if (url && key) {
-            const { createClient } = await import('@supabase/supabase-js')
-            mainDbClient = createClient(url, key, { auth: { persistSession: false } })
-        }
-    }
-    return mainDbClient
+function getMainDb() {
+    return createClient(mainSupabaseUrl, mainSupabaseServiceKey, {
+        auth: { persistSession: false }
+    })
 }
 
 /**
@@ -66,8 +56,8 @@ export async function POST(request, { params }) {
             )
         }
 
-        const chatDb = await getChatDb()
-        const mainDb = await getMainDb()
+        const chatDb = getChatDb()
+        const mainDb = getMainDb()
 
         // Verify contact exists
         const { data: contact, error: contactError } = await chatDb
@@ -162,7 +152,7 @@ export async function DELETE(request, { params }) {
             )
         }
 
-        const mainDb = await getMainDb()
+        const mainDb = getMainDb()
 
         // Verify sequence belongs to this connection
         const { data: sequence, error: seqError } = await mainDb

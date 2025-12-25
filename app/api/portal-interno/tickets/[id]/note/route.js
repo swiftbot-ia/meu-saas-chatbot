@@ -1,24 +1,15 @@
 // app/api/portal-interno/tickets/[id]/note/route.js
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { getCurrentSession } from '@/lib/support-auth'
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
-
-// Lazy initialization with dynamic import to avoid build-time errors
-let supabaseAdmin = null
-async function getSupabaseAdmin() {
-  if (!supabaseAdmin) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (url && key) {
-      const { createClient } = await import('@supabase/supabase-js')
-      supabaseAdmin = createClient(url, key)
-    }
-  }
-  return supabaseAdmin
-}
 
 export async function POST(request, { params }) {
   try {
@@ -43,7 +34,7 @@ export async function POST(request, { params }) {
     }
 
     // Verificar se ticket existe
-    const { data: ticket, error: ticketError } = await getSupabaseAdmin()
+    const { data: ticket, error: ticketError } = await supabaseAdmin
       .from('support_tickets')
       .select('id, user_id')
       .eq('id', id)
@@ -57,7 +48,7 @@ export async function POST(request, { params }) {
     }
 
     // Adicionar nota interna
-    const { data: response, error: responseError } = await getSupabaseAdmin()
+    const { data: response, error: responseError } = await supabaseAdmin
       .from('support_ticket_responses')
       .insert({
         ticket_id: id,
@@ -77,13 +68,13 @@ export async function POST(request, { params }) {
     }
 
     // Atualizar timestamp do ticket
-    await getSupabaseAdmin()
+    await supabaseAdmin
       .from('support_tickets')
       .update({ updated_at: new Date().toISOString() })
       .eq('id', id)
 
     // Registrar no log de ações
-    await getSupabaseAdmin()
+    await supabaseAdmin
       .from('support_actions_log')
       .insert({
         support_user_id: session.userId,
