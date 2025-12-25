@@ -11,18 +11,22 @@
 
 import { NextResponse } from 'next/server'
 import { validateApiKey } from '@/lib/api-auth'
-import { createClient } from '@supabase/supabase-js'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
-const chatSupabaseUrl = process.env.NEXT_PUBLIC_CHAT_SUPABASE_URL
-const chatSupabaseServiceKey = process.env.CHAT_SUPABASE_SERVICE_ROLE_KEY
-
-function getChatDb() {
-    return createClient(chatSupabaseUrl, chatSupabaseServiceKey, {
-        auth: { persistSession: false }
-    })
+let chatDbClient = null
+async function getChatDb() {
+    if (!chatDbClient) {
+        const url = process.env.NEXT_PUBLIC_CHAT_SUPABASE_URL
+        const key = process.env.CHAT_SUPABASE_SERVICE_ROLE_KEY
+        if (url && key) {
+            const { createClient } = await import('@supabase/supabase-js')
+            chatDbClient = createClient(url, key, { auth: { persistSession: false } })
+        }
+    }
+    return chatDbClient
 }
 
 /**
@@ -48,7 +52,7 @@ export async function GET(request, { params }) {
             )
         }
 
-        const chatDb = getChatDb()
+        const chatDb = await getChatDb()
 
         const { data: contact, error } = await chatDb
             .from('whatsapp_contacts')
@@ -114,7 +118,7 @@ export async function PATCH(request, { params }) {
             )
         }
 
-        const chatDb = getChatDb()
+        const chatDb = await getChatDb()
 
         // Get existing contact
         const { data: contact, error: contactError } = await chatDb
@@ -202,7 +206,7 @@ export async function PUT(request, { params }) {
             )
         }
 
-        const chatDb = getChatDb()
+        const chatDb = await getChatDb()
 
         // Verify contact exists
         const { data: contact, error: contactError } = await chatDb
@@ -276,7 +280,7 @@ export async function DELETE(request, { params }) {
             )
         }
 
-        const chatDb = getChatDb()
+        const chatDb = await getChatDb()
 
         // Verify contact exists
         const { data: contact, error: contactError } = await chatDb

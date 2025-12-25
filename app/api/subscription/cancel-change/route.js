@@ -2,23 +2,25 @@
 // VERSÃO CORRIGIDA - Apenas chama Stripe, Webhook atualiza DB
 
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { cancelScheduledChange } from '@/lib/stripe-plan-changes'
-
-// Lazy initialization to avoid build-time errors
-let supabase = null
-function getSupabase() {
-  if (!supabase && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    )
-  }
-  return supabase
-}
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
+// Lazy initialization with dynamic import to avoid build-time errors
+let supabase = null
+async function getSupabase() {
+  if (!supabase) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (url && key) {
+      const { createClient } = await import('@supabase/supabase-js')
+      supabase = createClient(url, key)
+    }
+  }
+  return supabase
+}
 
 export async function POST(request) {
   try {

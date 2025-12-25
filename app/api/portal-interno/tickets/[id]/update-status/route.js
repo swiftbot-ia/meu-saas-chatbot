@@ -1,15 +1,19 @@
 // app/api/portal-interno/tickets/[id]/update-status/route.js
 import { NextResponse } from 'next/server';
 import { getCurrentSession } from '@/lib/support-auth';
-import { createClient } from '@supabase/supabase-js';
 
-// Lazy initialization to avoid build-time errors
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
+// Lazy initialization with dynamic import to avoid build-time errors
 let supabaseAdmin = null;
-function getSupabaseAdmin() {
+async function getSupabaseAdmin() {
   if (!supabaseAdmin) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (url && key) {
+      const { createClient } = await import('@supabase/supabase-js');
       supabaseAdmin = createClient(url, key);
     }
   }
@@ -22,9 +26,6 @@ const statusLabels = {
   resolved: 'Resolvido',
   closed: 'Fechado'
 };
-
-// Force dynamic rendering to prevent build-time execution
-export const dynamic = 'force-dynamic'
 
 export async function POST(request, { params }) {
   try {
