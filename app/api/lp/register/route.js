@@ -1,16 +1,21 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { sendLiveDubaiConfirmation } from '@/lib/brevoEmail'
 import { sendLeadEvent } from '@/lib/metaPixel'
 
-// Lazy initialization to avoid build-time errors
+// Force dynamic rendering - prevents static analysis during build
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
+// Lazy initialization with dynamic import to avoid build-time errors
 let supabase = null
-function getSupabase() {
-    if (!supabase && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL,
-            process.env.SUPABASE_SERVICE_ROLE_KEY
-        )
+async function getSupabase() {
+    if (!supabase) {
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+        const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+        if (url && key) {
+            const { createClient } = await import('@supabase/supabase-js')
+            supabase = createClient(url, key)
+        }
     }
     return supabase
 }
@@ -49,7 +54,7 @@ export async function POST(request) {
         console.log('[LP Register] Novo lead:', leadData)
 
         // Salva no banco de dados Supabase
-        const client = getSupabase()
+        const client = await getSupabase()
         let savedLead = null
 
         if (client) {
