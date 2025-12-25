@@ -768,6 +768,15 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
           direction: fromMe ? 'outbound' : 'inbound', // Kept original logic
           status: fromMe ? 'sent' : 'received', // Kept original logic
           received_at: new Date(messageTimestamp * 1000).toISOString(),
+          // NEW: Populate dedicated columns (defined in migration 20251201)
+          local_media_path: localMediaPath,
+          media_mime_type: mediaMimeType,
+          media_size: mediaSize,
+          transcription: transcription,
+          transcription_status: transcriptionStatus,
+          ai_interpretation: aiInterpretation,
+          media_downloaded_at: mediaDownloadedAt,
+          transcribed_at: transcribedAt,
           metadata: {
             ...metadata,
             local_media_path: localMediaPath,
