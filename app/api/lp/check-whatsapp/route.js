@@ -1,16 +1,17 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 
-// Lazy initialization to avoid build-time errors
+// Lazy initialization with dynamic import to avoid build-time errors
 let supabase = null
-function getSupabase() {
-    // Skip during build time - check if we have the required env vars
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+async function getSupabase() {
+    if (!supabase) {
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+        const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-    // Only create client if env vars are present (runtime only)
-    if (!supabase && url && key) {
-        supabase = createClient(url, key)
+        if (url && key) {
+            // Dynamic import to prevent build-time execution
+            const { createClient } = await import('@supabase/supabase-js')
+            supabase = createClient(url, key)
+        }
     }
     return supabase
 }
@@ -44,7 +45,7 @@ export async function POST(request) {
         }
 
         // Buscar token da instância no banco
-        const client = getSupabase()
+        const client = await getSupabase()
         if (!client) {
             console.warn('[LP Check WhatsApp] Supabase client not configured')
             return NextResponse.json({ valid: true, fallback: true })
