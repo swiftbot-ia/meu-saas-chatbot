@@ -3,10 +3,18 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getCurrentSession } from '@/lib/support-auth'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+// Lazy initialization to avoid build-time errors
+let supabaseAdmin = null
+function getSupabaseAdmin() {
+  if (!supabaseAdmin) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (url && key) {
+      supabaseAdmin = createClient(url, key)
+    }
+  }
+  return supabaseAdmin
+}
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
@@ -23,7 +31,7 @@ export async function GET(request) {
     }
 
     // Buscar membros ativos da equipe
-    const { data: teamMembers, error } = await supabaseAdmin
+    const { data: teamMembers, error } = await getSupabaseAdmin()
       .from('support_users')
       .select('id, full_name, email, role')
       .eq('is_active', true)

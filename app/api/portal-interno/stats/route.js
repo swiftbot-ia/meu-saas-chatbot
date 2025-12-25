@@ -3,9 +3,18 @@ import { NextResponse } from 'next/server';
 import { getCurrentSession } from '@/lib/support-auth';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+// Lazy initialization to avoid build-time errors
+let supabaseAdmin = null;
+function getSupabaseAdmin() {
+  if (!supabaseAdmin) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (url && key) {
+      supabaseAdmin = createClient(url, key);
+    }
+  }
+  return supabaseAdmin;
+}
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
@@ -13,7 +22,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request) {
   try {
     const session = await getCurrentSession();
-    
+
     if (!session) {
       return NextResponse.json(
         { success: false, error: 'Não autenticado' },
@@ -22,7 +31,7 @@ export async function GET(request) {
     }
 
     // 1. Total de Clientes (user_profiles)
-    const { count: totalClientes, error: totalError } = await supabaseAdmin
+    const { count: totalClientes, error: totalError } = await getSupabaseAdmin()
       .from('user_profiles')
       .select('*', { count: 'exact', head: true });
 
@@ -31,7 +40,7 @@ export async function GET(request) {
     }
 
     // 2. Clientes Ativos (com assinatura ativa ou trial)
-    const { count: clientesAtivos, error: ativosError } = await supabaseAdmin
+    const { count: clientesAtivos, error: ativosError } = await getSupabaseAdmin()
       .from('user_subscriptions')
       .select('*', { count: 'exact', head: true })
       .in('status', ['active', 'trial']);
@@ -43,8 +52,8 @@ export async function GET(request) {
     // 3. Ações Hoje (support_actions_log das últimas 24h)
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
-    
-    const { count: acoesHoje, error: acoesError } = await supabaseAdmin
+
+    const { count: acoesHoje, error: acoesError } = await getSupabaseAdmin()
       .from('support_actions_log')
       .select('*', { count: 'exact', head: true })
       .gte('created_at', hoje.toISOString());
@@ -54,7 +63,7 @@ export async function GET(request) {
     }
 
     // 4. Total da Equipe (support_users)
-    const { count: totalEquipe, error: equipeError } = await supabaseAdmin
+    const { count: totalEquipe, error: equipeError } = await getSupabaseAdmin()
       .from('support_users')
       .select('*', { count: 'exact', head: true })
       .eq('is_active', true);

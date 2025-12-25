@@ -4,9 +4,18 @@ import { getCurrentSession } from '@/lib/support-auth';
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+// Lazy initialization to avoid build-time errors
+let supabaseAdmin = null;
+function getSupabaseAdmin() {
+  if (!supabaseAdmin) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (url && key) {
+      supabaseAdmin = createClient(url, key);
+    }
+  }
+  return supabaseAdmin;
+}
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
@@ -14,7 +23,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(request, { params }) {
   try {
     const session = await getCurrentSession();
-    
+
     if (!session) {
       return NextResponse.json(
         { success: false, error: 'Não autenticado' },
@@ -49,7 +58,7 @@ export async function POST(request, { params }) {
     console.log('📧 ========================================');
 
     // Buscar ticket e cliente
-    const { data: ticket, error: ticketError } = await supabaseAdmin
+    const { data: ticket, error: ticketError } = await getSupabaseAdmin()
       .from('support_tickets')
       .select(`
         *,
@@ -297,7 +306,7 @@ export async function POST(request, { params }) {
       console.error('❌ Code:', sendError.code);
       console.error('❌ Command:', sendError.command);
       console.error('❌ ========================================');
-      
+
       return NextResponse.json(
         { success: false, error: `Erro ao enviar email: ${sendError.message}` },
         { status: 500 }
@@ -305,7 +314,7 @@ export async function POST(request, { params }) {
     }
 
     // Registrar resposta no banco
-    await supabaseAdmin
+    await getSupabaseAdmin()
       .from('support_ticket_responses')
       .insert({
         ticket_id: id,
@@ -315,15 +324,15 @@ export async function POST(request, { params }) {
       });
 
     // Log de ação
-    await supabaseAdmin
+    await getSupabaseAdmin()
       .from('support_actions_log')
       .insert({
         support_user_id: session.user.id,
         action_type: 'email_sent',
         target_ticket_id: id,
         description: `Email enviado para ${clientEmail}`,
-        metadata: { 
-          subject, 
+        metadata: {
+          subject,
           messageId: info.messageId,
           response: info.response
         }
@@ -343,7 +352,7 @@ export async function POST(request, { params }) {
     console.error('❌', error);
     console.error('❌ Stack:', error.stack);
     console.error('❌ ========================================');
-    
+
     return NextResponse.json(
       { success: false, error: `Erro fatal: ${error.message}` },
       { status: 500 }

@@ -3,9 +3,18 @@ import { NextResponse } from 'next/server';
 import { getCurrentSession } from '@/lib/support-auth';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+// Lazy initialization to avoid build-time errors
+let supabaseAdmin = null;
+function getSupabaseAdmin() {
+  if (!supabaseAdmin) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (url && key) {
+      supabaseAdmin = createClient(url, key);
+    }
+  }
+  return supabaseAdmin;
+}
 
 const statusLabels = {
   open: 'Aberto',
@@ -20,7 +29,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(request, { params }) {
   try {
     const session = await getCurrentSession();
-    
+
     if (!session) {
       return NextResponse.json(
         { success: false, error: 'Não autenticado' },
@@ -43,7 +52,7 @@ export async function POST(request, { params }) {
     console.log(`📝 Atualizando ticket ${id} para status: ${status} por ${session.user.full_name}`);
 
     // Buscar status anterior
-    const { data: ticketBefore } = await supabaseAdmin
+    const { data: ticketBefore } = await getSupabaseAdmin()
       .from('support_tickets')
       .select('status')
       .eq('id', id)
@@ -61,7 +70,7 @@ export async function POST(request, { params }) {
       updateData.resolved_at = new Date().toISOString();
     }
 
-    const { error: updateError } = await supabaseAdmin
+    const { error: updateError } = await getSupabaseAdmin()
       .from('support_tickets')
       .update(updateData)
       .eq('id', id);
@@ -78,7 +87,7 @@ export async function POST(request, { params }) {
     const oldStatusLabel = statusLabels[ticketBefore?.status] || ticketBefore?.status;
     const newStatusLabel = statusLabels[status];
 
-    await supabaseAdmin
+    await getSupabaseAdmin()
       .from('support_actions_log')
       .insert({
         support_user_id: session.user.id, // ✅ ID do usuário que fez a ação
@@ -94,7 +103,7 @@ export async function POST(request, { params }) {
 
     // Se houver nota interna, adicionar
     if (internalNote && internalNote.trim()) {
-      await supabaseAdmin
+      await getSupabaseAdmin()
         .from('support_ticket_responses')
         .insert({
           ticket_id: id,
@@ -104,7 +113,7 @@ export async function POST(request, { params }) {
         });
 
       // Log da nota interna
-      await supabaseAdmin
+      await getSupabaseAdmin()
         .from('support_actions_log')
         .insert({
           support_user_id: session.user.id,
