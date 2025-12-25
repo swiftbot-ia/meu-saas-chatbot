@@ -612,11 +612,11 @@ export default function ContactsPage() {
         setOriginToDelete(null);
       } else {
         const data = await response.json();
-        alert(data.error || 'Erro ao excluir origem');
+        setError(data.error || 'Erro ao excluir origem');
       }
     } catch (err) {
       console.error('Erro ao excluir origem:', err);
-      alert('Erro ao excluir origem');
+      setError('Erro ao excluir origem');
     } finally {
       setTagLoading(false);
     }
@@ -640,11 +640,11 @@ export default function ContactsPage() {
         setTagToDelete(null);
       } else {
         const data = await response.json();
-        alert(data.error || 'Erro ao excluir tag');
+        setError(data.error || 'Erro ao excluir tag');
       }
     } catch (err) {
       console.error('Erro ao excluir tag:', err);
-      alert('Erro ao excluir tag');
+      setError('Erro ao excluir tag');
     } finally {
       setTagLoading(false);
     }
@@ -722,7 +722,7 @@ export default function ContactsPage() {
         setShowSequenceModal(false);
       } else {
         const data = await response.json();
-        alert(data.error || 'Erro ao inscrever na sequência');
+        setError(data.error || 'Erro ao inscrever na sequência');
       }
     } catch (err) {
       console.error('Erro ao inscrever na sequência:', err);
@@ -745,7 +745,7 @@ export default function ContactsPage() {
         await loadContactSequences();
       } else {
         const data = await response.json();
-        alert(data.error || 'Erro ao remover da sequência');
+        setError(data.error || 'Erro ao remover da sequência');
       }
     } catch (err) {
       console.error('Erro ao remover da sequência:', err);
