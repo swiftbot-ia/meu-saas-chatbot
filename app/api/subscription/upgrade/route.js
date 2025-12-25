@@ -3,15 +3,22 @@
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { 
-  processUpgrade, 
-  determineChangeType 
+import {
+  processUpgrade,
+  determineChangeType
 } from '@/lib/stripe-plan-changes'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+// Lazy initialization to avoid build-time errors
+let supabase = null
+function getSupabase() {
+  if (!supabase && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    )
+  }
+  return supabase
+}
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
@@ -40,7 +47,7 @@ export async function POST(request) {
     // 2. BUSCAR ASSINATURA ATUAL
     // ============================================
 
-    const { data: subscription, error: subError } = await supabase
+    const { data: subscription, error: subError } = await getSupabase()
       .from('user_subscriptions')
       .select('*')
       .eq('user_id', userId)
@@ -86,7 +93,7 @@ export async function POST(request) {
     if (subscription.last_plan_change_date) {
       const lastChangeDate = new Date(subscription.last_plan_change_date)
       const daysSinceLastChange = Math.floor((Date.now() - lastChangeDate.getTime()) / (1000 * 60 * 60 * 24))
-      
+
       if (daysSinceLastChange < 30) {
         const daysRemaining = 30 - daysSinceLastChange
         return NextResponse.json({
@@ -136,7 +143,7 @@ export async function POST(request) {
 
     if (!upgradeResult.success) {
       console.error('❌ Erro no upgrade Stripe:', upgradeResult.error)
-      
+
       return NextResponse.json({
         success: false,
         error: `Erro ao processar upgrade: ${upgradeResult.error}`,
@@ -151,10 +158,10 @@ export async function POST(request) {
     // ============================================
 
     const now = new Date().toISOString()
-    
-    await supabase
+
+    await getSupabase()
       .from('user_subscriptions')
-      .update({ 
+      .update({
         last_plan_change_date: now,
         updated_at: now
       })
@@ -166,7 +173,7 @@ export async function POST(request) {
     // 8. REGISTRAR LOG DE TENTATIVA (não de conclusão)
     // ============================================
 
-    await supabase
+    await getSupabase()
       .from('payment_logs')
       .insert([{
         user_id: userId,

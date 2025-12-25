@@ -3,11 +3,17 @@ import { createClient } from '@supabase/supabase-js'
 import { sendLiveDubaiConfirmation } from '@/lib/brevoEmail'
 import { sendLeadEvent } from '@/lib/metaPixel'
 
-// Supabase client
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+// Lazy initialization to avoid build-time errors
+let supabase = null
+function getSupabase() {
+    if (!supabase && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+            process.env.SUPABASE_SERVICE_ROLE_KEY
+        )
+    }
+    return supabase
+}
 
 /**
  * POST /api/lp/register
@@ -43,17 +49,25 @@ export async function POST(request) {
         console.log('[LP Register] Novo lead:', leadData)
 
         // Salva no banco de dados Supabase
-        const { data: savedLead, error: dbError } = await supabase
-            .from('lp_leads')
-            .insert(leadData)
-            .select()
-            .single()
+        const client = getSupabase()
+        let savedLead = null
 
-        if (dbError) {
-            console.error('[LP Register] Erro ao salvar no banco:', dbError)
-            // Continua mesmo com erro no banco (fail-safe)
+        if (client) {
+            const { data, error: dbError } = await client
+                .from('lp_leads')
+                .insert(leadData)
+                .select()
+                .single()
+
+            if (dbError) {
+                console.error('[LP Register] Erro ao salvar no banco:', dbError)
+                // Continua mesmo com erro no banco (fail-safe)
+            } else {
+                savedLead = data
+                console.log('[LP Register] Lead salvo no banco:', savedLead?.id)
+            }
         } else {
-            console.log('[LP Register] Lead salvo no banco:', savedLead?.id)
+            console.warn('[LP Register] Supabase client not configured')
         }
 
         // Envia para webhook n8n Live Dubai (fire and forget)
