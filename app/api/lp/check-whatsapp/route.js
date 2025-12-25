@@ -4,11 +4,13 @@ import { createClient } from '@supabase/supabase-js'
 // Lazy initialization to avoid build-time errors
 let supabase = null
 function getSupabase() {
-    if (!supabase && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL,
-            process.env.SUPABASE_SERVICE_ROLE_KEY
-        )
+    // Skip during build time - check if we have the required env vars
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    // Only create client if env vars are present (runtime only)
+    if (!supabase && url && key) {
+        supabase = createClient(url, key)
     }
     return supabase
 }
