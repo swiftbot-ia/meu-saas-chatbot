@@ -528,10 +528,15 @@ function AgentConfigContent() {
       }
 
       try {
-        await fetch('/api/n8n/update-agent', {
+        await fetch('/api/webhooks/n8n-agent', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: user.id, connectionId, agentData })
+          body: JSON.stringify({
+            userId: user.id,
+            connectionId,
+            agentData: { ...agentData, id: upsertedAgent?.id },
+            isNew: !agentId
+          })
         })
       } catch (err) { console.warn('Webhook silencioso falhou') }
 

@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server'
 // CORREÇÃO AQUI: Usando o mesmo import do arquivo do seu sócio
 import { supabaseAdmin } from '../../../../lib/supabase/server.js'
+import { sendWhatsappConectadoWebhook } from '../../../../lib/webhooks/onboarding-webhook'
 
 export const dynamic = 'force-dynamic' // Garante que a rota não faça cache
 
@@ -451,6 +452,14 @@ export async function GET(request) {
                 .then(job => console.log('🔄 [Connect-GET] Sync iniciado:', job.id))
                 .catch(err => console.error('⚠️ [Connect-GET] Erro sync:', err.message))
             }).catch(err => console.error('⚠️ [Connect-GET] Erro import SyncService:', err.message))
+
+            // 📡 Enviar webhook de WhatsApp conectado
+            sendWhatsappConectadoWebhook(connection.user_id, {
+              id: connectionId,
+              instance_name: connection.instance_name,
+              phone_number: instanceInfo.owner ? instanceInfo.owner.replace('@s.whatsapp.net', '') : null,
+              profile_name: instanceInfo.profileName
+            }).catch(err => console.warn('⚠️ [Connect-GET] Erro webhook:', err.message))
 
             return NextResponse.json({
               success: true,

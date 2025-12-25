@@ -64,6 +64,19 @@ export default function AuthCallbackPage() {
                         // Limpa UTMs do storage após salvar
                         clearUtmFromStorage()
 
+                        // Enviar webhook de conta criada (fire and forget)
+                        fetch('/api/webhooks/n8n-onboarding', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                event: 'conta_criada',
+                                user_id: session.user.id,
+                                email: session.user.email,
+                                full_name: session.user.user_metadata?.full_name || '',
+                                registered_from: 'social_login'
+                            })
+                        }).catch(() => { })
+
                         setStatus('Primeiro acesso! Redirecionando para completar perfil...')
                         setTimeout(() => router.push('/complete-profile'), 1000)
                         return
