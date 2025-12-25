@@ -961,6 +961,11 @@ export default function Dashboard() {
   // 1. ADICIONAR SCRIPT DO STRIPE.JS NO HEAD
   // ============================================================================
   useEffect(() => {
+    // IMPORTANTE: Capturar a chave AQUI, no escopo do useEffect, pois NEXT_PUBLIC_*
+    // são inlined pelo Next.js durante o build. Dentro de callbacks dinâmicos (script.onload),
+    // process.env.* não estará disponível em runtime.
+    const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+
     // Carregar Stripe.js dinamicamente
     if (!window.Stripe) {
       const script = document.createElement('script')
@@ -968,10 +973,10 @@ export default function Dashboard() {
       script.async = true
       script.onload = () => {
         console.log('✅ Stripe.js carregado')
-        // Inicializar Stripe
-        // Certifique-se de que NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY está no seu .env.local
-        if (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
-          window.stripeInstance = window.Stripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+        // Inicializar Stripe usando a chave capturada no escopo externo
+        if (stripePublishableKey) {
+          window.stripeInstance = window.Stripe(stripePublishableKey)
+          console.log('✅ Stripe inicializado com sucesso')
         } else {
           console.error("❌ Chave publicável do Stripe não encontrada. Defina NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY em .env.local")
         }
@@ -980,8 +985,9 @@ export default function Dashboard() {
         console.error("❌ Erro ao carregar script do Stripe.js")
       }
       document.head.appendChild(script)
-    } else if (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
-      window.stripeInstance = window.Stripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+    } else if (stripePublishableKey) {
+      window.stripeInstance = window.Stripe(stripePublishableKey)
+      console.log('✅ Stripe já estava carregado, instância criada')
     }
   }, [])
 
