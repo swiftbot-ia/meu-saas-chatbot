@@ -72,6 +72,10 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/next.config.ts ./next.config.ts
 
+# Copiar workers e dependencies
+COPY --from=builder /app/workers ./workers
+COPY --from=builder /app/lib ./lib
+
 # Criar diretórios de mídia
 RUN mkdir -p /app/public/media/audio /app/public/media/image /app/public/media/video /app/public/media/document
 
