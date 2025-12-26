@@ -805,9 +805,9 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
 
       // 8.1 WEBHOOK: MENSAGEM ENVIADA (primeira mensagem outbound VIA API do agente)
       // Fire and forget - verifica se é a primeira mensagem outbound enviada pela API
-      // Só dispara se byApi=true (enviada via API, não manualmente pelo WhatsApp)
-      const byApi = fullPayload?.message?.byApi === true;
-      if (fromMe && byApi) {
+      // Só dispara se wasSentByApi=true (enviada via API, não manualmente pelo WhatsApp)
+      const wasSentByApi = fullPayload?.message?.wasSentByApi === true;
+      if (fromMe && wasSentByApi) {
         checkAndSendFirstMessageWebhook(requestId, connection, whatsappNumber, messageType)
           .catch(err => log(requestId, 'warn', '⚠️', `Erro ao verificar webhook mensagem_enviada: ${err.message}`));
       }
