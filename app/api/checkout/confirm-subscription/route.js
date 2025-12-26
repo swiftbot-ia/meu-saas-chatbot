@@ -8,7 +8,7 @@ import Stripe from 'stripe'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
-const TEST_TRIAL_DAYS = 1
+const TEST_TRIAL_DAYS = 4
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
