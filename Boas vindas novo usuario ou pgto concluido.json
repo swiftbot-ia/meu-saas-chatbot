@@ -1,0 +1,463 @@
+{
+  "name": "Boas vindas novo usuario ou pgto concluido",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "af039db8-f742-419f-b585-413058351e0c",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        64,
+        -112
+      ],
+      "id": "1b1500ba-2b76-43fa-8d79-f8b01258d70e",
+      "name": "Webhook",
+      "webhookId": "af039db8-f742-419f-b585-413058351e0c"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Webhook').item.json.body.event }}",
+                    "rightValue": "new_lead",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "a8d3b36a-85be-45c2-a7ea-0cb76c40fb8e"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "069552eb-434c-40c4-bbb0-24db3656a0b0",
+                    "leftValue": "={{ $('Webhook').item.json.body.event }}",
+                    "rightValue": "payment_confirmed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        1024,
+        -128
+      ],
+      "id": "9f7f3073-67ab-489b-8347-84dd2d6c79a7",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.pipe.run/v1/deals/{{ $('Get id contato').item.json.contact.metadata.idCRM }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            },
+            {
+              "name": "token",
+              "value": "1fc8276e06ebe118c66b413f82b4ce31"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "stage_id",
+              "value": "646334"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1344,
+        -256
+      ],
+      "id": "d59bcf29-7513-4a51-822d-52f9d7a46c3f",
+      "name": "Trial / Conta Criada"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "https://api.pipe.run/v1/deals/{{ $('Get id contato').item.json.contact.metadata.idCRM }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            },
+            {
+              "name": "token",
+              "value": "1fc8276e06ebe118c66b413f82b4ce31"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "stage_id",
+              "value": "646335"
+            },
+            {
+              "name": "status",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1344,
+        64
+      ],
+      "id": "2a5cd948-cf67-433e-8bbd-f8cea9e947dd",
+      "name": "Ativo no Produto"
+    },
+    {
+      "parameters": {
+        "url": "=https://swiftbot.com.br/api/v1/contact/phone/{{ $json.phone }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "ec21664d-4f01-406c-96db-7866bad1afb0"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        528,
+        -112
+      ],
+      "id": "9728f444-cd3c-4b73-8dcb-248b7458ad00",
+      "name": "Get id contato",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "798a7dda-afec-45f3-9e1e-09d2c2b00d19",
+              "name": "phone",
+              "value": "={{ ($json.body.lead.phone || '').replace(/@lid.*/, '').replace(/\\D/g, '') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        272,
+        -112
+      ],
+      "id": "3760114c-3115-4743-9511-32b1b9e5e178",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Webhook').item.json.body.event }}",
+                    "rightValue": "new_lead",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "a8d3b36a-85be-45c2-a7ea-0cb76c40fb8e"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "069552eb-434c-40c4-bbb0-24db3656a0b0",
+                    "leftValue": "={{ $('Webhook').item.json.body.event }}",
+                    "rightValue": "payment_confirmed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        1056,
+        352
+      ],
+      "id": "c64c0bc7-4087-4355-ab64-7278711b90ca",
+      "name": "Switch1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://app.pipe.run/webservice/integradorJson?hash=40499794-2356-4bf8-8589-f53f45cf2ff1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"rules\": {\n    \"update\": true,\n    \"status\": \"open\"\n  },\n  \"leads\": [\n    {\n      \"id\": \"\",\n      \"user\": \"\",\n      \"title\": \"{{ $('Webhook').item.json.body.lead.full_name }} - {{ $('Webhook').item.json.body.lead.phone }}\",\n      \"value\": \"\",\n      \"value_mrr\": \"\",\n      \"email\": \"\",\n      \"name\": \"{{ $('Webhook').item.json.body.lead.full_name }}\",\n      \"cpf\": \"\",\n      \"personal_phone\": \"{{ $('Webhook').item.json.body.lead.phone }}\",\n      \"mobile_phone\": \"{{ $('Webhook').item.json.body.lead.phone }}\",\n      \"public_url\": \"\",\n      \"job_title\": \"\",\n      \"cnpj\": \"\",\n      \"company\": \"\",\n      \"city_name\": \"\",\n      \"city_state\": \"\",\n      \"last_conversion\": {\n        \"source\": \"Direto App\"\n      },\n      \"custom_fields\": {\n        \"Nome do Form\": \"\",\n        \"Anúncio\": \"\",\n        \"Conjunto de Anúncio\": \"\",\n        \"Nome da Campanha\": \"\",\n        \"Plataforma\": \"\"\n      },\n      \"tags\": [],\n      \"notes\": [\n        \"\"\n      ]\n    }\n  ]\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1344,
+        256
+      ],
+      "id": "273884a0-0723-4181-8b20-3fb14e1975e1",
+      "name": "Trial / Conta Criada - Sem CRM"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://app.pipe.run/webservice/integradorJson?hash=6cb9c511-698e-429c-b3e8-de10d0ae5d28",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"rules\": {\n    \"update\": true,\n    \"status\": \"open\"\n  },\n  \"leads\": [\n    {\n      \"id\": \"\",\n      \"user\": \"\",\n      \"title\": \"{{ $('Webhook').item.json.body.lead.full_name }} - {{ $('Webhook').item.json.body.lead.phone }}\",\n      \"value\": \"\",\n      \"value_mrr\": \"\",\n      \"email\": \"\",\n      \"name\": \"{{ $('Webhook').item.json.body.lead.full_name }}\",\n      \"cpf\": \"\",\n      \"personal_phone\": \"{{ $('Webhook').item.json.body.lead.phone }}\",\n      \"mobile_phone\": \"{{ $('Webhook').item.json.body.lead.phone }}\",\n      \"public_url\": \"\",\n      \"job_title\": \"\",\n      \"cnpj\": \"\",\n      \"company\": \"\",\n      \"city_name\": \"\",\n      \"city_state\": \"\",\n      \"last_conversion\": {\n        \"source\": \"Direto App\"\n      },\n      \"custom_fields\": {\n        \"Nome do Form\": \"\",\n        \"Anúncio\": \"\",\n        \"Conjunto de Anúncio\": \"\",\n        \"Nome da Campanha\": \"\",\n        \"Plataforma\": \"\"\n      },\n      \"tags\": [],\n      \"notes\": [\n        \"\"\n      ]\n    }\n  ]\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1344,
+        496
+      ],
+      "id": "fa074fc1-e3cf-4a83-aa7e-e16cc7897608",
+      "name": "Ativo no Produto -  Sem CRM"
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "n8n.swiftbot.com.br",
+            "x-real-ip": "104.23.254.102",
+            "x-forwarded-for": "2a02:4780:66:7f3::1, 104.23.254.102",
+            "x-forwarded-proto": "https",
+            "x-forwarded-host": "n8n.swiftbot.com.br",
+            "connection": "upgrade",
+            "content-length": "292",
+            "accept": "*/*",
+            "accept-language": "*",
+            "accept-encoding": "gzip, br",
+            "user-agent": "node",
+            "cf-ray": "9ac766830a98501a-GRU",
+            "sec-fetch-mode": "cors",
+            "content-type": "application/json",
+            "cdn-loop": "cloudflare; loops=1",
+            "cf-connecting-ip": "2a02:4780:66:7f3::1",
+            "cf-ipcountry": "BR",
+            "cf-visitor": "{\"scheme\":\"https\"}"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "event": "new_lead",
+            "timestamp": "2025-12-11T19:31:07.345Z",
+            "lead": {
+              "user_id": "917e2b93-69d6-4336-af28-b374291e2d8f",
+              "email": "sos.chanel1@gmail.com",
+              "full_name": "Alexandre Sostenes",
+              "company_name": "sdasdsad",
+              "business_sector": "E-commerce / Varejo",
+              "phone": "+553423244444"
+            },
+            "subscription": null
+          },
+          "webhookUrl": "https://n8n.swiftbot.com.br/webhook-test/af039db8-f742-419f-b585-413058351e0c",
+          "executionMode": "test"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Trial / Conta Criada",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ativo no Produto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get id contato": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Switch1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Get id contato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch1": {
+      "main": [
+        [
+          {
+            "node": "Trial / Conta Criada - Sem CRM",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ativo no Produto -  Sem CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "4ddcf6fb-480d-4be4-9d78-47d48d08e4a2",
+  "meta": {
+    "instanceId": "927ec75e4a832ed7cf78182c273b52e172f5734b9e4271d5d57c93c0229043d7"
+  },
+  "id": "LO7Svy9Nl3gZVi7P",
+  "tags": []
+}

@@ -3,7 +3,7 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '../../../../lib/supabase'
 import crypto from 'crypto'
-import { sendAssinaturaCriadaWebhook } from '@/lib/webhooks/onboarding-webhook'
+import { sendAssinaturaCriadaWebhook, sendAssinaturaCanceladaWebhook } from '@/lib/webhooks/onboarding-webhook'
 
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET
 const N8N_WEBHOOK_PAYMENT_URL = process.env.N8N_WEBHOOK_PAYMENT_URL
@@ -269,6 +269,14 @@ async function handleSubscriptionDeleted(subscription) {
 
     if (logError) {
       console.warn('⚠️ Erro ao criar log do webhook:', logError)
+    }
+
+    // 📡 WEBHOOK: Assinatura cancelada
+    try {
+      await sendAssinaturaCanceladaWebhook(localSubscription.user_id, localSubscription, 'stripe_canceled')
+      console.log('📡 Webhook assinatura_cancelada enviado')
+    } catch (webhookErr) {
+      console.warn('⚠️ Erro ao enviar webhook de cancelamento:', webhookErr.message)
     }
 
     console.log('✅ Cancelamento processado via webhook - WhatsApp desconectado')
