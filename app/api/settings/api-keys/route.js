@@ -118,11 +118,13 @@ export async function GET(request) {
 
         // Get API key info for each connection
         const apiKeys = await Promise.all(
-            (connections || []).map(async (conn) => {
+            (connections || []).map(async (conn, index) => {
                 const keyInfo = await getApiKeyInfo(conn.id)
+                // Use profile_name se disponível, senão "Conexão X"
+                const displayName = conn.profile_name || `Conexão ${index + 1}`
                 return {
                     connectionId: conn.id,
-                    connectionName: conn.profile_name || conn.instance_name,
+                    connectionName: displayName,
                     instanceName: conn.instance_name, // For global field API
                     isConnected: conn.is_connected,
                     hasApiKey: keyInfo.exists,
