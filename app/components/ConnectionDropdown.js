@@ -32,10 +32,16 @@ export default function ConnectionDropdown({
         c.id === selectedId || c.connectionId === selectedId
     )
 
-    // Nome de exibição da conexão
+    // Nome de exibição da conexão - NUNCA usar instance_name técnico
     const getDisplayName = (conn, index) => {
         if (!conn) return 'Selecione uma conexão'
-        return conn.profile_name || conn.connectionName || `Conexão ${index + 1}`
+        // Prioridade: profile_name > connectionName (se não for técnico) > Conexão X
+        if (conn.profile_name) return conn.profile_name
+        // Ignora connectionName se parecer um instance_name técnico (contém underscores e UUID)
+        if (conn.connectionName && !conn.connectionName.includes('_')) {
+            return conn.connectionName
+        }
+        return `Conexão ${index + 1}`
     }
 
     // Subtexto (telefone ou status)
@@ -49,10 +55,13 @@ export default function ConnectionDropdown({
     // Status de conexão
     const isConnected = (conn) => conn?.is_connected ?? conn?.isConnected
 
-    // Avatar/Inicial
-    const getInitial = (conn) => {
-        const name = conn?.profile_name || conn?.connectionName || ''
-        return name.charAt(0)?.toUpperCase() || '?'
+    // Avatar/Inicial - Usa nome amigável, nunca instance_name
+    const getInitial = (conn, index = 0) => {
+        if (!conn) return '?'
+        const name = conn.profile_name
+        if (name) return name.charAt(0).toUpperCase()
+        // Se não tem profile_name, usa número
+        return String(index + 1)
     }
 
     // Handler de seleção
@@ -99,7 +108,7 @@ export default function ConnectionDropdown({
                                 className={`w-10 h-10 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold ${selected?.profile_pic_url ? 'hidden' : 'flex'}`}
                                 style={{ display: selected?.profile_pic_url ? 'none' : 'flex' }}
                             >
-                                {getInitial(selected)}
+                                {getInitial(selected, connections.findIndex(c => (c.id || c.connectionId) === selectedId))}
                             </div>
                         </div>
 
@@ -161,7 +170,7 @@ export default function ConnectionDropdown({
                                                 className={`w-10 h-10 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold ${conn.profile_pic_url ? 'hidden' : 'flex'}`}
                                                 style={{ display: conn.profile_pic_url ? 'none' : 'flex' }}
                                             >
-                                                {getInitial(conn) || (index + 1)}
+                                                {getInitial(conn, index)}
                                             </div>
                                         </div>
 
