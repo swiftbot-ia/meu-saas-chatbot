@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
+import ConnectionDropdown from '@/app/components/ConnectionDropdown'
 import {
   Settings,
   Webhook,
@@ -24,86 +25,6 @@ import {
   Plus,
   AlertCircle
 } from 'lucide-react'
-
-// ============================================================================
-// CONNECTION DROPDOWN
-// ============================================================================
-const ConnectionDropdown = ({ connections, selectedConnection, onSelectConnection }) => {
-  const [isOpen, setIsOpen] = useState(false)
-
-  const selected = connections.find(c => c.connectionId === selectedConnection)
-  const displayValue = selected?.connectionName || 'Selecione uma instância'
-
-  return (
-    <div className="relative">
-      <div className="bg-[#1E1E1E] rounded-2xl overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          className="w-full px-4 py-3 flex items-center justify-between text-left outline-none"
-        >
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="w-10 h-10 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold">
-              {selected?.connectionName?.charAt(0)?.toUpperCase() || '?'}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-white text-sm font-medium truncate">
-                {displayValue}
-              </div>
-              {selected && (
-                <div className="text-xs text-gray-500 flex items-center gap-1.5">
-                  <span className={selected.isConnected ? 'text-[#00FF99]' : 'text-red-400'}>
-                    {selected.isConnected ? '●' : '○'}
-                  </span>
-                  <span>{selected.isConnected ? 'Conectado' : 'Desconectado'}</span>
-                </div>
-              )}
-            </div>
-          </div>
-          <ChevronDown
-            className={`w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ml-2 ${isOpen ? 'rotate-180' : 'rotate-0'}`}
-          />
-        </button>
-
-        {isOpen && (
-          <div className="absolute top-full left-0 right-0 mt-1 backdrop-blur-md bg-[#1E1E1E]/95 rounded-2xl shadow-2xl z-50 max-h-[300px] overflow-y-auto">
-            {connections.map((connection) => (
-              <button
-                key={connection.connectionId}
-                type="button"
-                onClick={() => {
-                  onSelectConnection(connection.connectionId)
-                  setIsOpen(false)
-                }}
-                className={`
-                  w-full p-3 text-sm text-left transition-all duration-150 border-b border-white/5 last:border-0
-                  ${selectedConnection === connection.connectionId
-                    ? 'bg-[#00FF99]/10 text-[#00FF99]'
-                    : 'text-gray-300 hover:bg-white/5 hover:text-white'}
-                `}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold">
-                    {connection.connectionName?.charAt(0)?.toUpperCase() || '?'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{connection.connectionName}</div>
-                    <div className="text-xs flex items-center gap-1.5 mt-0.5">
-                      <span className={connection.isConnected ? 'text-[#00FF99]' : 'text-red-400'}>
-                        {connection.isConnected ? '● Conectado' : '○ Desconectado'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-      {isOpen && <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />}
-    </div>
-  )
-}
 
 // ============================================================================
 // TAB NAVIGATION
