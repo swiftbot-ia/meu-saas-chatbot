@@ -1,0 +1,462 @@
+{
+    "name": "SwiftBot - Onboarding Webhook Events",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "af039db8-f742-419f-b585-413058351e0c",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2.1,
+            "position": [
+                64,
+                0
+            ],
+            "id": "1b1500ba-2b76-43fa-8d79-f8b01258d70e",
+            "name": "Webhook",
+            "webhookId": "af039db8-f742-419f-b585-413058351e0c"
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "798a7dda-afec-45f3-9e1e-09d2c2b00d19",
+                            "name": "phone",
+                            "value": "={{ ($json.body.lead?.phone || $json.body.user?.phone || '').replace(/@lid.*/, '').replace(/\\D/g, '') }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "event-extract",
+                            "name": "event",
+                            "value": "={{ $json.body.event }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "user-id-extract",
+                            "name": "user_id",
+                            "value": "={{ $json.body.lead?.user_id || $json.body.user?.user_id || $json.body.user_id || '' }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "email-extract",
+                            "name": "email",
+                            "value": "={{ $json.body.lead?.email || $json.body.user?.email || '' }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "name-extract",
+                            "name": "full_name",
+                            "value": "={{ $json.body.lead?.full_name || $json.body.user?.full_name || '' }}",
+                            "type": "string"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                280,
+                0
+            ],
+            "id": "3760114c-3115-4743-9511-32b1b9e5e178",
+            "name": "Extrair Dados"
+        },
+        {
+            "parameters": {
+                "url": "=https://swiftbot.com.br/api/v1/contact/phone/{{ $json.phone }}",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "X-API-KEY",
+                            "value": "ec21664d-4f01-406c-96db-7866bad1afb0"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.3,
+            "position": [
+                500,
+                0
+            ],
+            "id": "9728f444-cd3c-4b73-8dcb-248b7458ad00",
+            "name": "Buscar Contato CRM",
+            "onError": "continueErrorOutput"
+        },
+        {
+            "parameters": {
+                "rules": {
+                    "values": [
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict",
+                                    "version": 2
+                                },
+                                "conditions": [
+                                    {
+                                        "id": "cond-new-lead",
+                                        "leftValue": "={{ $('Extrair Dados').item.json.event }}",
+                                        "rightValue": "new_lead",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "outputKey": "new_lead"
+                        },
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict",
+                                    "version": 2
+                                },
+                                "conditions": [
+                                    {
+                                        "id": "cond-trial",
+                                        "leftValue": "={{ $('Extrair Dados').item.json.event }}",
+                                        "rightValue": "trial_iniciado",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "outputKey": "trial_iniciado"
+                        },
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict",
+                                    "version": 2
+                                },
+                                "conditions": [
+                                    {
+                                        "id": "cond-whatsapp",
+                                        "leftValue": "={{ $('Extrair Dados').item.json.event }}",
+                                        "rightValue": "whatsapp_conectado",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "outputKey": "whatsapp_conectado"
+                        },
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict",
+                                    "version": 2
+                                },
+                                "conditions": [
+                                    {
+                                        "id": "cond-agente",
+                                        "leftValue": "={{ $('Extrair Dados').item.json.event }}",
+                                        "rightValue": "agente_criado",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "outputKey": "agente_criado"
+                        },
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict",
+                                    "version": 2
+                                },
+                                "conditions": [
+                                    {
+                                        "id": "cond-mensagem",
+                                        "leftValue": "={{ $('Extrair Dados').item.json.event }}",
+                                        "rightValue": "mensagem_enviada",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "outputKey": "mensagem_enviada"
+                        },
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict",
+                                    "version": 2
+                                },
+                                "conditions": [
+                                    {
+                                        "id": "cond-assinatura",
+                                        "leftValue": "={{ $('Extrair Dados').item.json.event }}",
+                                        "rightValue": "assinatura_criada",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            },
+                            "outputKey": "assinatura_criada"
+                        }
+                    ]
+                },
+                "options": {
+                    "fallbackOutput": "extra"
+                }
+            },
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 3.3,
+            "position": [
+                740,
+                0
+            ],
+            "id": "switch-eventos",
+            "name": "Switch por Evento"
+        },
+        {
+            "parameters": {},
+            "type": "n8n-nodes-base.noOp",
+            "typeVersion": 1,
+            "position": [
+                980,
+                -300
+            ],
+            "id": "noop-new-lead",
+            "name": "→ new_lead",
+            "notes": "Lead novo - Completou cadastro (nome, empresa, telefone)"
+        },
+        {
+            "parameters": {},
+            "type": "n8n-nodes-base.noOp",
+            "typeVersion": 1,
+            "position": [
+                980,
+                -180
+            ],
+            "id": "noop-trial",
+            "name": "→ trial_iniciado",
+            "notes": "Trial iniciado - Checkout com trial ativado"
+        },
+        {
+            "parameters": {},
+            "type": "n8n-nodes-base.noOp",
+            "typeVersion": 1,
+            "position": [
+                980,
+                -60
+            ],
+            "id": "noop-whatsapp",
+            "name": "→ whatsapp_conectado",
+            "notes": "WhatsApp conectado - QR code lido com sucesso"
+        },
+        {
+            "parameters": {},
+            "type": "n8n-nodes-base.noOp",
+            "typeVersion": 1,
+            "position": [
+                980,
+                60
+            ],
+            "id": "noop-agente",
+            "name": "→ agente_criado",
+            "notes": "Agente configurado - Agente salvo pela primeira vez"
+        },
+        {
+            "parameters": {},
+            "type": "n8n-nodes-base.noOp",
+            "typeVersion": 1,
+            "position": [
+                980,
+                180
+            ],
+            "id": "noop-mensagem",
+            "name": "→ mensagem_enviada",
+            "notes": "Primeira mensagem - Agente enviou primeira mensagem via API"
+        },
+        {
+            "parameters": {},
+            "type": "n8n-nodes-base.noOp",
+            "typeVersion": 1,
+            "position": [
+                980,
+                300
+            ],
+            "id": "noop-assinatura",
+            "name": "→ assinatura_criada",
+            "notes": "Pagamento confirmado - Primeiro pagamento confirmado"
+        },
+        {
+            "parameters": {},
+            "type": "n8n-nodes-base.noOp",
+            "typeVersion": 1,
+            "position": [
+                980,
+                420
+            ],
+            "id": "noop-outros",
+            "name": "→ outros eventos",
+            "notes": "Eventos não mapeados"
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Extrair Dados",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Extrair Dados": {
+            "main": [
+                [
+                    {
+                        "node": "Buscar Contato CRM",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Buscar Contato CRM": {
+            "main": [
+                [
+                    {
+                        "node": "Switch por Evento",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Switch por Evento",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Switch por Evento": {
+            "main": [
+                [
+                    {
+                        "node": "→ new_lead",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "→ trial_iniciado",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "→ whatsapp_conectado",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "→ agente_criado",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "→ mensagem_enviada",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "→ assinatura_criada",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "→ outros eventos",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "pinData": {
+        "Webhook": [
+            {
+                "json": {
+                    "headers": {},
+                    "params": {},
+                    "query": {},
+                    "body": {
+                        "event": "new_lead",
+                        "timestamp": "2025-12-26T10:00:00.000Z",
+                        "lead": {
+                            "user_id": "uuid-exemplo",
+                            "email": "usuario@exemplo.com",
+                            "full_name": "Nome Exemplo",
+                            "company_name": "Empresa Exemplo",
+                            "business_sector": "Tecnologia",
+                            "phone": "+5511999999999"
+                        },
+                        "subscription": null
+                    }
+                }
+            }
+        ]
+    },
+    "active": false,
+    "settings": {
+        "executionOrder": "v1",
+        "callerPolicy": "workflowsFromSameOwner",
+        "availableInMCP": false
+    },
+    "meta": {
+        "instanceId": "927ec75e4a832ed7cf78182c273b52e172f5734b9e4271d5d57c93c0229043d7"
+    },
+    "tags": []
+}
