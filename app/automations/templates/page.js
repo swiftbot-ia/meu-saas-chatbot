@@ -14,6 +14,7 @@ import {
     Loader2,
     X
 } from 'lucide-react'
+import MessageInput from '@/app/components/MessageInput'
 
 // ============================================================================
 // TEMPLATE CARD (from original)
@@ -141,12 +142,11 @@ const CreateTemplateModal = ({ isOpen, onClose, onSave, template = null }) => {
                         <label className="block text-sm font-medium text-gray-300 mb-2">
                             Conteúdo da Mensagem
                         </label>
-                        <textarea
+                        <MessageInput
                             value={content}
                             onChange={(e) => setContent(e.target.value)}
                             placeholder="Digite o texto da mensagem..."
-                            rows={4}
-                            className="w-full bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30 resize-none"
+                            rows={8}
                         />
                     </div>
                 </div>
