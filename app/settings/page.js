@@ -611,7 +611,7 @@ export default function SettingsPage() {
   // Fetch API keys data
   const fetchApiKeys = useCallback(async () => {
     try {
-      const response = await fetch('/api/settings/api-keys')
+      const response = await fetch(`/api/settings/api-keys?t=${new Date().getTime()}`)
       const data = await response.json()
 
       if (data.success) {
