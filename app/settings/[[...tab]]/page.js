@@ -612,6 +612,13 @@ export default function SettingsPage() {
   // Tab ativa baseada na URL
   const activeTab = params?.tab?.[0] || 'webhook'
 
+  // Redireciona para /settings/webhook se acessar /settings puro
+  useEffect(() => {
+    if (!params?.tab) {
+      router.replace('/settings/webhook')
+    }
+  }, [params?.tab, router])
+
   const [loading, setLoading] = useState(true)
   // const [activeTab, setActiveTab] = useState('webhook') <-- REMOVIDO
   const [connections, setConnections] = useState([])
