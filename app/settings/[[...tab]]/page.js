@@ -600,13 +600,28 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
 // ============================================================================
 // MAIN PAGE
 // ============================================================================
+// ============================================================================
+// MAIN PAGE
+// ============================================================================
+import { useParams } from 'next/navigation'
+
 export default function SettingsPage() {
   const router = useRouter()
+  const params = useParams()
+
+  // Tab ativa baseada na URL
+  const activeTab = params?.tab?.[0] || 'webhook'
+
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('webhook')
+  // const [activeTab, setActiveTab] = useState('webhook') <-- REMOVIDO
   const [connections, setConnections] = useState([])
   const [selectedConnection, setSelectedConnection] = useState(null)
   const [actionLoading, setActionLoading] = useState(false)
+
+  // Handler para troca de tab
+  const handleTabChange = (tabId) => {
+    router.push(`/settings/${tabId}`)
+  }
 
   // Fetch API keys data
   const fetchApiKeys = useCallback(async () => {
@@ -754,7 +769,7 @@ export default function SettingsPage() {
       {/* Content */}
       <div className="max-w-6xl mx-auto px-4 py-6">
         {/* Tab Navigation */}
-        <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+        <TabNavigation activeTab={activeTab} onTabChange={handleTabChange} />
 
         {/* Tab Content */}
         <div className="mt-6">
