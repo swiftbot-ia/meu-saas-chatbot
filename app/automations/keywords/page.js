@@ -297,6 +297,7 @@ const EditAutomationModal = ({ isOpen, onClose, automation, onSave, connectionId
     const [availableOrigins, setAvailableOrigins] = useState([])
     const [availableTags, setAvailableTags] = useState([])
     const [loading, setLoading] = useState(false)
+    const [loadingTags, setLoadingTags] = useState(false)
     const [activeSection, setActiveSection] = useState('trigger')
 
     // Estado para campos personalizados
@@ -348,6 +349,7 @@ const EditAutomationModal = ({ isOpen, onClose, automation, onSave, connectionId
     }
 
     const loadTags = async () => {
+        setLoadingTags(true)
         try {
             const response = await fetch(`/api/contacts?connectionId=${connectionId}`)
             const data = await response.json()
@@ -365,6 +367,8 @@ const EditAutomationModal = ({ isOpen, onClose, automation, onSave, connectionId
             }
         } catch (error) {
             console.error('Erro ao carregar tags:', error)
+        } finally {
+            setLoadingTags(false)
         }
     }
 
@@ -581,22 +585,30 @@ const EditAutomationModal = ({ isOpen, onClose, automation, onSave, connectionId
                                 </div>
 
                                 <div className="flex gap-2 mb-2">
-                                    <select
-                                        value={selectedTagId}
-                                        onChange={(e) => setSelectedTagId(e.target.value)}
-                                        className="flex-1 bg-[#1A1A1A] text-white px-4 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                                    >
-                                        <option value="">Selecione uma tag...</option>
-                                        {availableTags
-                                            .filter(tag => !tagsToAdd.some(t => t.id === tag.id))
-                                            .map(tag => (
-                                                <option key={tag.id} value={tag.id}>{tag.name}</option>
-                                            ))
-                                        }
-                                    </select>
+                                    <div className="relative flex-1">
+                                        <select
+                                            value={selectedTagId}
+                                            onChange={(e) => setSelectedTagId(e.target.value)}
+                                            disabled={loadingTags}
+                                            className="w-full bg-[#1A1A1A] text-white px-4 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:opacity-50 appearance-none"
+                                        >
+                                            <option value="">{loadingTags ? 'Carregando tags...' : 'Selecione uma tag...'}</option>
+                                            {availableTags
+                                                .filter(tag => !tagsToAdd.some(t => t.id === tag.id))
+                                                .map(tag => (
+                                                    <option key={tag.id} value={tag.id}>{tag.name}</option>
+                                                ))
+                                            }
+                                        </select>
+                                        {loadingTags && (
+                                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                <Loader2 size={16} className="animate-spin text-gray-400" />
+                                            </div>
+                                        )}
+                                    </div>
                                     <button
                                         onClick={handleAddTag}
-                                        disabled={!selectedTagId}
+                                        disabled={!selectedTagId || loadingTags}
                                         className="px-4 py-2 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <Plus size={18} />
