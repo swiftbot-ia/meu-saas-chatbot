@@ -200,6 +200,8 @@ function AgentConfigContent() {
     forbiddenInstructions: '',
     responseDelay: 30,
     responseDelayUnit: 'seconds',
+    alwaysEndWithQuestion: true,
+    productsServices: '',
   })
 
   useEffect(() => {
@@ -313,8 +315,11 @@ function AgentConfigContent() {
           notifyLeads: data.notify_leads || false,
           ignoredKeywords: data.ignored_keywords || [],
           forbiddenInstructions: data.forbidden_instructions || '',
+          forbiddenInstructions: data.forbidden_instructions || '',
           responseDelay: data.response_delay !== null ? data.response_delay : 30,
-          responseDelayUnit: 'seconds'
+          responseDelayUnit: 'seconds',
+          alwaysEndWithQuestion: data.always_end_with_question !== false, // Default to true if null or undefined
+          productsServices: data.products_services || ''
         })
       }
     } catch (error) {
@@ -437,7 +442,9 @@ function AgentConfigContent() {
         salesCTA: formValues.salesCTA || prev.salesCTA,
         forbiddenInstructions: formValues.forbiddenInstructions || prev.forbiddenInstructions,
         responseDelay: formValues.responseDelay !== undefined ? formValues.responseDelay : 30,
-        responseDelayUnit: 'seconds'
+        responseDelayUnit: 'seconds',
+        alwaysEndWithQuestion: formValues.alwaysEndWithQuestion !== undefined ? formValues.alwaysEndWithQuestion : prev.alwaysEndWithQuestion,
+        productsServices: formValues.productsServices || prev.productsServices
       }))
 
       // Force re-render of form components
@@ -523,6 +530,8 @@ function AgentConfigContent() {
         ignored_keywords: formData.ignoredKeywords.filter(k => k.trim()),
         forbidden_instructions: formData.forbiddenInstructions,
         response_delay: finalDelay,
+        always_end_with_question: formData.alwaysEndWithQuestion,
+        products_services: formData.productsServices,
         is_active: true
       }
 
@@ -871,7 +880,27 @@ function AgentConfigContent() {
                       </div>
                     </div>
                     <p className="text-xs text-gray-600 mt-2 ml-2">Tempo de espera antes de enviar a resposta.</p>
+                    <p className="text-xs text-gray-600 mt-2 ml-2">Tempo de espera antes de enviar a resposta.</p>
                   </div>
+
+                  {/* Switch: Sempre terminar com pergunta */}
+                  <div className="flex flex-col justify-center">
+                    <label className="block text-xs font-medium text-[#B0B0B0] mb-2 ml-4 uppercase tracking-wider">Regra de Ouro</label>
+                    <div className="flex items-center justify-between bg-[#252525] p-3 rounded-xl border border-white/5">
+                      <span className="text-sm text-gray-300">Sempre terminar com pergunta</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, alwaysEndWithQuestion: !prev.alwaysEndWithQuestion }))}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#00FF99] focus:ring-offset-2 focus:ring-offset-[#181818] ${formData.alwaysEndWithQuestion ? 'bg-[#00FF99]' : 'bg-gray-700'}`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.alwaysEndWithQuestion ? 'translate-x-6' : 'translate-x-1'}`}
+                        />
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-2 ml-2">Força o agente a sempre fazer uma pergunta no final para engajar.</p>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-medium text-[#B0B0B0] mb-2 ml-4 uppercase tracking-wider">Link do Produto (Opcional)</label>
                     <input type="text" name="productUrl" value={formData.productUrl} onChange={handleInputChange} placeholder="www.seusite.com.br" className={getInputClass('productUrl')} />
@@ -881,6 +910,19 @@ function AgentConfigContent() {
                     <label className="block text-xs font-medium text-[#B0B0B0] mb-2 ml-4 uppercase tracking-wider">Preço / Faixa</label>
                     <input type="text" name="priceRange" value={formData.priceRange} onChange={handleInputChange} placeholder="Ex: R$ 99,90" className={getInputClass('priceRange')} />
                   </div>
+                </div>
+
+                {/* Produtos / Serviços */}
+                <div className="mt-6">
+                  <label className="block text-xs font-medium text-[#B0B0B0] mb-2 ml-4 uppercase tracking-wider">Produtos / Serviços (Lista Detalhada)</label>
+                  <textarea
+                    name="productsServices"
+                    value={formData.productsServices}
+                    onChange={handleInputChange}
+                    rows={5}
+                    placeholder="Liste seus produtos ou serviços com preços e detalhes...&#10;Ex:&#10;- Consultoria One-on-One: R$ 500/hora&#10;- Ebook Completo: R$ 97,00"
+                    className={`${getInputClass('productsServices')} resize-none font-mono text-sm`}
+                  />
                 </div>
               </div>
 
