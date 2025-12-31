@@ -198,7 +198,8 @@ function AgentConfigContent() {
     notifyLeads: false,
     ignoredKeywords: [],
     forbiddenInstructions: '',
-    responseDelay: 0,
+    responseDelay: 30,
+    responseDelayUnit: 'seconds',
   })
 
   useEffect(() => {
@@ -312,7 +313,8 @@ function AgentConfigContent() {
           notifyLeads: data.notify_leads || false,
           ignoredKeywords: data.ignored_keywords || [],
           forbiddenInstructions: data.forbidden_instructions || '',
-          responseDelay: data.response_delay || 0
+          responseDelay: data.response_delay !== null ? data.response_delay : 30,
+          responseDelayUnit: 'seconds'
         })
       }
     } catch (error) {
@@ -434,7 +436,8 @@ function AgentConfigContent() {
           : prev.objectiveQuestions,
         salesCTA: formValues.salesCTA || prev.salesCTA,
         forbiddenInstructions: formValues.forbiddenInstructions || prev.forbiddenInstructions,
-        responseDelay: formValues.responseDelay !== undefined ? formValues.responseDelay : prev.responseDelay
+        responseDelay: formValues.responseDelay !== undefined ? formValues.responseDelay : 30,
+        responseDelayUnit: 'seconds'
       }))
 
       // Force re-render of form components
@@ -494,6 +497,12 @@ function AgentConfigContent() {
         return item.question
       })
 
+      // Calcular delay em segundos
+      let finalDelay = parseInt(formData.responseDelay) || 0
+      if (formData.responseDelayUnit === 'minutes') {
+        finalDelay = finalDelay * 60
+      }
+
       const agentData = {
         user_id: ownerUserId,
         connection_id: connectionId,
@@ -513,7 +522,7 @@ function AgentConfigContent() {
         notify_leads: formData.notifyLeads,
         ignored_keywords: formData.ignoredKeywords.filter(k => k.trim()),
         forbidden_instructions: formData.forbiddenInstructions,
-        response_delay: parseInt(formData.responseDelay) || 0,
+        response_delay: finalDelay,
         is_active: true
       }
 
@@ -831,12 +840,37 @@ function AgentConfigContent() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-xs font-medium text-[#B0B0B0] mb-2 ml-4 uppercase tracking-wider text-yellow-500/80">Atraso na Resposta (segundos)</label>
-                    <div className="relative">
-                      <input type="number" name="responseDelay" value={formData.responseDelay} onChange={handleInputChange} min="0" max="60" className={`${getInputClass('responseDelay')}`} placeholder="0" />
-                      <span className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-500 text-sm">seg</span>
+                    <label className="block text-xs font-medium text-[#B0B0B0] mb-2 ml-4 uppercase tracking-wider text-yellow-500/80">Atraso na Resposta</label>
+                    <div className="flex gap-4">
+                      <div className="relative flex-1">
+                        <input
+                          type="number"
+                          name="responseDelay"
+                          value={formData.responseDelay}
+                          onChange={handleInputChange}
+                          min="0"
+                          className={`${getInputClass('responseDelay')}`}
+                          placeholder="30"
+                        />
+                      </div>
+                      <div className="w-1/3">
+                        <select
+                          value={formData.responseDelayUnit}
+                          onChange={(e) => setFormData(prev => ({ ...prev, responseDelayUnit: e.target.value }))}
+                          className={`${baseInputClass} !px-4 cursor-pointer appearance-none`}
+                          style={{
+                            backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                            backgroundPosition: 'right 0.5rem center',
+                            backgroundRepeat: 'no-repeat',
+                            backgroundSize: '1.5em 1.5em'
+                          }}
+                        >
+                          <option value="seconds">Segundos</option>
+                          <option value="minutes">Minutos</option>
+                        </select>
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-600 mt-2 ml-2">Tempo de espera antes de enviar a resposta para parecer mais humano.</p>
+                    <p className="text-xs text-gray-600 mt-2 ml-2">Tempo de espera antes de enviar a resposta.</p>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-[#B0B0B0] mb-2 ml-4 uppercase tracking-wider">Link do Produto (Opcional)</label>
