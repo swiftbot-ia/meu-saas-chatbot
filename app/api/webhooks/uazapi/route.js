@@ -26,6 +26,7 @@ import MediaServiceVPS from '@/lib/MediaServiceVPS';
 import N8nWebhookService from '@/lib/N8nWebhookService';
 import AutomationService from '@/lib/AutomationService';
 import SequenceService from '@/lib/SequenceService';
+import MessagePreFilterService from '@/lib/MessagePreFilterService';
 import { sendMensagemEnviadaWebhook } from '@/lib/webhooks/onboarding-webhook';
 import { randomUUID } from 'crypto';
 
@@ -929,28 +930,23 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
     // Por padrão (sem registro), agente está ATIVADO
     let shouldSendToAgent = !agentSettings || agentSettings.agent_enabled !== false;
 
-    // 11.1 VERIFICAR PALAVRAS IGNORADAS (se agente ainda está ativo)
+    // 11.1 PRÉ-FILTRO: Verificar emoji-only e palavras ignoradas
     // Apenas para mensagens recebidas (inbound)
-    if (shouldSendToAgent && !fromMe && messageContent) {
-      // Buscar palavras ignoradas da configuração do agente
-      const { data: agentConfig } = await supabaseAdmin
-        .from('ai_agents')
-        .select('ignored_keywords')
-        .eq('connection_id', connection.id)
-        .maybeSingle();
+    if (shouldSendToAgent && !fromMe) {
+      const preFilterResult = await MessagePreFilterService.shouldSendToAgent(
+        messageContent,
+        connection.id,
+        aiInterpretation
+      );
 
-      const ignoredKeywords = agentConfig?.ignored_keywords || [];
+      if (!preFilterResult.shouldSend) {
+        log(requestId, 'info', '🚫', `Pré-filtro bloqueou: ${preFilterResult.reason}`, {
+          details: preFilterResult.details,
+          whatsappNumber
+        });
 
-      if (ignoredKeywords.length > 0) {
-        const messageContentLower = messageContent.toLowerCase();
-        const matchedKeyword = ignoredKeywords.find(keyword =>
-          messageContentLower.includes(keyword.toLowerCase())
-        );
-
-        if (matchedKeyword) {
-          log(requestId, 'info', '🚫', `Palavra ignorada detectada: "${matchedKeyword}". Desativando agente para: ${whatsappNumber}`);
-
-          // Desativar agente para este contato
+        // Se foi palavra ignorada, desativar agente para este contato
+        if (preFilterResult.reason === 'ignored_keyword') {
           await supabaseAdmin
             .from('contact_agent_settings')
             .upsert({
@@ -958,11 +954,11 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
               whatsapp_number: whatsappNumber,
               agent_enabled: false,
               disabled_at: new Date().toISOString(),
-              disabled_reason: `Mensagem contém palavra ignorada: "${matchedKeyword}"`
+              disabled_reason: preFilterResult.details
             }, { onConflict: 'connection_id,whatsapp_number' });
-
-          shouldSendToAgent = false;
         }
+
+        shouldSendToAgent = false;
       }
     }
 
