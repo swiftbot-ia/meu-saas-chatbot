@@ -202,6 +202,8 @@ function AgentConfigContent() {
     responseDelayUnit: 'seconds',
     alwaysEndWithQuestion: true,
     productsServices: '',
+    ignoreEmojiOnly: true,
+    silenceConditions: '',
   })
 
   useEffect(() => {
@@ -319,7 +321,9 @@ function AgentConfigContent() {
           responseDelay: data.response_delay !== null ? data.response_delay : 30,
           responseDelayUnit: 'seconds',
           alwaysEndWithQuestion: data.always_end_with_question !== false, // Default to true if null or undefined
-          productsServices: data.products_services || ''
+          productsServices: data.products_services || '',
+          ignoreEmojiOnly: data.ignore_emoji_only !== false, // Default to true if null or undefined
+          silenceConditions: data.silence_conditions || '',
         })
       }
     } catch (error) {
@@ -532,6 +536,8 @@ function AgentConfigContent() {
         response_delay: finalDelay,
         always_end_with_question: formData.alwaysEndWithQuestion,
         products_services: formData.productsServices,
+        ignore_emoji_only: formData.ignoreEmojiOnly,
+        silence_conditions: formData.silenceConditions,
         is_active: true
       }
 
@@ -959,21 +965,47 @@ function AgentConfigContent() {
                 </div>
               </div>
 
-              {/* SEÇÃO: PALAVRAS IGNORADAS */}
+              {/* SEÇÃO: REGRAS DE SILÊNCIO */}
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h3 className="text-2xl font-bold text-white flex items-center gap-2">
-                    <svg className="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
-                    Palavras Ignoradas
+                    <svg className="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" /></svg>
+                    Regras de Silêncio
                   </h3>
                   <span className="text-xs text-gray-600 bg-white/5 px-3 py-1 rounded-full">
                     {formData.ignoredKeywords.length} palavras
                   </span>
                 </div>
                 <p className="text-gray-500 text-sm -mt-2">
-                  Mensagens que contiverem essas palavras serão ignoradas e o agente será <strong>desativado automaticamente</strong> para o contato.
-                  <br />Útil para formulários de campanha que enviam dados sensíveis.
+                  Configure quando o agente deve <strong>permanecer em silêncio</strong> e não responder.
                 </p>
+
+                {/* Toggle: Ignorar mensagens apenas com emoji */}
+                <div className="bg-[#181818] p-4 rounded-2xl flex items-center justify-between group hover:bg-[#1a1a1a] transition-all">
+                  <div>
+                    <h4 className="text-white font-medium text-sm mb-1 flex items-center gap-2">
+                      <span className="text-lg">😊</span>
+                      Ignorar mensagens apenas com emoji
+                    </h4>
+                    <p className="text-gray-500 text-xs">Quando ativado, mensagens contendo apenas emojis (sem texto) serão ignoradas silenciosamente.</p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, ignoreEmojiOnly: !prev.ignoreEmojiOnly }))}
+                    className={`
+                      relative w-12 h-6 rounded-full transition-all duration-300 ease-in-out focus:outline-none flex-shrink-0 ml-4
+                      ${formData.ignoreEmojiOnly ? 'bg-[#00FF99] shadow-[0_0_10px_rgba(0,255,153,0.3)]' : 'bg-gray-700'}
+                    `}
+                  >
+                    <span
+                      className={`
+                        absolute top-0.5 left-0.5 bg-white w-5 h-5 rounded-full shadow-md transition-transform duration-300 ease-in-out
+                        ${formData.ignoreEmojiOnly ? 'translate-x-6' : 'translate-x-0'}
+                      `}
+                    />
+                  </button>
+                </div>
 
                 <div className="bg-[#1E1E1E] rounded-3xl p-6">
                   <div className="flex gap-3 mb-4">
@@ -1045,6 +1077,25 @@ function AgentConfigContent() {
                       Nenhuma palavra ignorada configurada. Pressione Enter ou clique em Adicionar.
                     </p>
                   )}
+                </div>
+
+                {/* Condições Especiais */}
+                <div className="bg-[#1E1E1E] rounded-3xl p-6 mt-4">
+                  <h4 className="text-white font-medium text-sm mb-2 flex items-center gap-2">
+                    <span className="text-lg">🤖</span>
+                    Condições Especiais
+                  </h4>
+                  <p className="text-gray-500 text-xs mb-3">
+                    Descreva situações em que o agente deve permanecer em silêncio. A IA analisará cada mensagem.
+                  </p>
+                  <textarea
+                    name="silenceConditions"
+                    value={formData.silenceConditions}
+                    onChange={handleInputChange}
+                    rows={3}
+                    placeholder="Ex: Mensagens com apenas 'ok' ou 'sim', respostas de confirmação curtas, mensagens que parecem ser de bots automáticos..."
+                    className={`${getInputClass('silenceConditions')} resize-none`}
+                  />
                 </div>
               </div>
 
