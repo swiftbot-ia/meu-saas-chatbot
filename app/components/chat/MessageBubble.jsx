@@ -20,13 +20,18 @@ export default function MessageBubble({ message, isOwn, contact, connectionAvata
   };
 
   const getMediaUrl = () => {
-    // Prefer local_media_path (stored on VPS) over media_url (external URL)
+    // FIX: Prioritize media_url (API route) because direct access to /media fails for runtime files on VPS
+    // The API route (/api/media/...) correctly handles file serving
+    if (message.media_url) return message.media_url;
+
+    // Fallback to local_media_path only if media_url is missing
     if (message.local_media_path) {
       return message.local_media_path.startsWith('/')
         ? message.local_media_path
         : `/${message.local_media_path}`;
     }
-    return message.media_url;
+
+    return null;
   };
 
   const handleDownload = (url, filename) => {
