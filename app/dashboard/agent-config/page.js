@@ -984,7 +984,7 @@ function AgentConfigContent() {
                 <div className="bg-[#181818] p-4 rounded-2xl flex items-center justify-between group hover:bg-[#1a1a1a] transition-all">
                   <div>
                     <h4 className="text-white font-medium text-sm mb-1 flex items-center gap-2">
-                      <span className="text-lg">😊</span>
+                      <span className="text-lg"></span>
                       Ignorar mensagens apenas com emoji
                     </h4>
                     <p className="text-gray-500 text-xs">Quando ativado, mensagens contendo apenas emojis (sem texto) serão ignoradas silenciosamente.</p>
@@ -1082,7 +1082,7 @@ function AgentConfigContent() {
                 {/* Condições Especiais */}
                 <div className="bg-[#1E1E1E] rounded-3xl p-6 mt-4">
                   <h4 className="text-white font-medium text-sm mb-2 flex items-center gap-2">
-                    <span className="text-lg">🤖</span>
+                    <span className="text-lg"></span>
                     Condições Especiais
                   </h4>
                   <p className="text-gray-500 text-xs mb-3">

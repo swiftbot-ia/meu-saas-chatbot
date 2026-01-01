@@ -127,35 +127,66 @@ export default function ChatWindow({
                   return prev;
                 }
 
-                // Check if we have an optimistic message to replace
-                const tempIndex = prev.findIndex(m => {
-                  if (m.status !== 'sending' || m.direction !== 'outbound') return false;
+                // For OUTBOUND messages, try to find and replace the optimistic message
+                if (newMessage.direction === 'outbound') {
+                  // Strategy 1: Match by exact content
+                  let tempIndex = prev.findIndex(m => {
+                    if (m.status !== 'sending' || m.direction !== 'outbound') return false;
+                    if (m.message_type === 'text' && newMessage.message_type === 'text') {
+                      return m.message_content === newMessage.message_content;
+                    }
+                    if (m.message_type === newMessage.message_type) {
+                      return true;
+                    }
+                    return false;
+                  });
 
-                  // For text, match content exactly
-                  if (m.message_type === 'text' && newMessage.message_type === 'text') {
-                    return m.message_content === newMessage.message_content;
+                  // Strategy 2: If no exact match, find the most recent "sending" outbound message
+                  if (tempIndex < 0) {
+                    tempIndex = prev.findLastIndex(m =>
+                      m.status === 'sending' &&
+                      m.direction === 'outbound' &&
+                      m.message_type === newMessage.message_type
+                    );
                   }
 
-                  // For media (audio, image, video), match by type
-                  if (m.message_type === newMessage.message_type) {
-                    return true;
+                  // Strategy 3: Fallback - any sending outbound message of same type
+                  if (tempIndex < 0) {
+                    tempIndex = prev.findIndex(m =>
+                      m.status === 'sending' &&
+                      m.direction === 'outbound'
+                    );
                   }
 
-                  return false;
-                });
+                  if (tempIndex >= 0) {
+                    // Replace optimistic message with real one
+                    console.log('🔄 [Realtime] Replacing optimistic message at index:', tempIndex);
+                    const updated = [...prev];
+                    updated[tempIndex] = {
+                      ...newMessage,
+                      status: 'sent'  // ✓✓ Confirmed!
+                    };
+                    return updated;
+                  }
 
-                if (tempIndex >= 0) {
-                  // Replace optimistic message with real one
-                  console.log('🔄 [Realtime] Replacing optimistic message at index:', tempIndex);
-                  const updated = [...prev];
-                  updated[tempIndex] = {
-                    ...newMessage,
-                    status: 'sent'  // ✓✓ Confirmed!
-                  };
-                  return updated;
+                  // Outbound message but no optimistic to replace - might be sent from another device
+                  // Check if it's a truly new outbound message (not a duplicate content)
+                  const hasSameContent = prev.some(m =>
+                    m.direction === 'outbound' &&
+                    m.message_content === newMessage.message_content &&
+                    Math.abs(new Date(m.received_at) - new Date(newMessage.received_at)) < 5000 // Within 5 seconds
+                  );
+
+                  if (hasSameContent) {
+                    console.log('⚠️ [Realtime] Duplicate outbound content detected, skipping');
+                    return prev;
+                  }
+
+                  console.log('✅ [Realtime] Adding new outbound message (from another device?)');
+                  return [...prev, newMessage];
                 }
 
-                // New inbound message - add it
+                // INBOUND messages - just add them
                 console.log('✅ [Realtime] Adding new inbound message');
                 return [...prev, newMessage];
               });
