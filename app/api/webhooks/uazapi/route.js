@@ -26,6 +26,7 @@ import MediaServiceVPS from '@/lib/MediaServiceVPS';
 import N8nWebhookService from '@/lib/N8nWebhookService';
 import AutomationService from '@/lib/AutomationService';
 import SequenceService from '@/lib/SequenceService';
+import { sendMensagemEnviadaWebhook } from '@/lib/webhooks/onboarding-webhook';
 import { randomUUID } from 'crypto';
 
 // Force dynamic rendering
@@ -768,6 +769,15 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
           direction: fromMe ? 'outbound' : 'inbound', // Kept original logic
           status: fromMe ? 'sent' : 'received', // Kept original logic
           received_at: new Date(messageTimestamp * 1000).toISOString(),
+          // NEW: Populate dedicated columns (defined in migration 20251201)
+          local_media_path: localMediaPath,
+          media_mime_type: mediaMimeType,
+          media_size: mediaSize,
+          transcription: transcription,
+          transcription_status: transcriptionStatus,
+          ai_interpretation: aiInterpretation,
+          media_downloaded_at: mediaDownloadedAt,
+          transcribed_at: transcribedAt,
           metadata: {
             ...metadata,
             local_media_path: localMediaPath,
@@ -792,6 +802,15 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
         hasMedia: !!mediaUrl, // Changed to mediaUrl
         hasTranscription: !!transcription
       });
+
+      // 8.1 WEBHOOK: MENSAGEM ENVIADA (primeira mensagem outbound VIA API do agente)
+      // Fire and forget - verifica se é a primeira mensagem outbound enviada pela API
+      // Só dispara se wasSentByApi=true (enviada via API, não manualmente pelo WhatsApp)
+      const wasSentByApi = fullPayload?.message?.wasSentByApi === true;
+      if (fromMe && wasSentByApi) {
+        checkAndSendFirstMessageWebhook(requestId, connection, whatsappNumber, messageType)
+          .catch(err => log(requestId, 'warn', '⚠️', `Erro ao verificar webhook mensagem_enviada: ${err.message}`));
+      }
 
     } catch (error) {
       // Handle duplicate key error (race condition)
@@ -1008,6 +1027,62 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
   } catch (error) {
     log(requestId, 'error', '❌', `Erro em processIncomingMessage`, { error: error.message, stack: error.stack });
     throw error;
+  }
+}
+
+/**
+ * ===========================================================================
+ * WEBHOOK: Verifica e dispara evento de primeira mensagem enviada
+ * ===========================================================================
+ */
+async function checkAndSendFirstMessageWebhook(requestId, connection, toNumber, messageType) {
+  try {
+    // Verificar se já disparamos este webhook para esta conexão
+    // Usamos uma flag no metadata da conexão
+    const { data: connData } = await supabaseAdmin
+      .from('whatsapp_connections')
+      .select('metadata')
+      .eq('id', connection.id)
+      .single();
+
+    const metadata = connData?.metadata || {};
+
+    // Se já disparou, ignorar
+    if (metadata.first_message_webhook_sent) {
+      return;
+    }
+
+    // Contar mensagens outbound desta conexão
+    const { count } = await chatSupabaseAdmin
+      .from('whatsapp_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('connection_id', connection.id)
+      .eq('direction', 'outbound');
+
+    // Só dispara na primeira mensagem outbound (count == 1 pois já salvamos)
+    if (count === 1) {
+      log(requestId, 'info', '📡', `Disparando webhook mensagem_enviada para conexão ${connection.id}`);
+
+      await sendMensagemEnviadaWebhook(connection.user_id, connection.id, {
+        to_number: toNumber,
+        message_type: messageType,
+        is_first: true
+      });
+
+      // Marcar como enviado no metadata
+      await supabaseAdmin
+        .from('whatsapp_connections')
+        .update({
+          metadata: { ...metadata, first_message_webhook_sent: true, first_message_at: new Date().toISOString() }
+        })
+        .eq('id', connection.id);
+
+      log(requestId, 'success', '✅', 'Webhook mensagem_enviada disparado com sucesso');
+    }
+
+  } catch (error) {
+    log(requestId, 'error', '❌', `Erro em checkAndSendFirstMessageWebhook: ${error.message}`);
+    // Não propagar erro - não é crítico
   }
 }
 

@@ -3,11 +3,12 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '../../../../lib/supabase'
 import { createCustomer, createSubscription, cancelSubscription } from '../../../../lib/stripe'
+import { sendTrialIniciadoWebhook, sendAssinaturaCriadaWebhook } from '@/lib/webhooks/onboarding-webhook'
 import Stripe from 'stripe'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
-const TEST_TRIAL_DAYS = 1
+const TEST_TRIAL_DAYS = 4
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
@@ -237,6 +238,26 @@ export async function POST(request) {
           },
           created_at: now.toISOString()
         }])
+
+      // 📡 Enviar webhooks de onboarding (fire and forget)
+      if (isTrialEligible) {
+        sendTrialIniciadoWebhook(
+          { user_id: userId, email: userEmail, full_name: userName },
+          {
+            trial_start_date: now.toISOString(),
+            trial_end_date: trialEndDate?.toISOString(),
+            connections_purchased: plan.connections
+          }
+        ).catch(err => console.warn('⚠️ Webhook trial falhou:', err.message))
+      } else {
+        sendAssinaturaCriadaWebhook(userId, {
+          id: subscription.id,
+          status: 'active',
+          billing_period: plan.billingPeriod,
+          connections_purchased: plan.connections,
+          stripe_subscription_id: stripeSubscription.id
+        }, { amount: planPrice }).catch(err => console.warn('⚠️ Webhook assinatura falhou:', err.message))
+      }
     }
 
     // ✅ CRIAR REFERRAL DE AFILIADO (se indicado)

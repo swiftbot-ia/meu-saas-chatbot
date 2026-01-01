@@ -4,129 +4,12 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../../lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Menu, X, Plus, MessageCircle, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
+import { Menu, X, Plus, MessageCircle, ArrowLeft, ChevronDown, ChevronUp, Copy, Download, FileText, Share2, MoreHorizontal } from 'lucide-react'
 import NoSubscription from '../../components/NoSubscription'
 import SwiftBotTrial from '../../components/SwiftBotTrial'
+import ConnectionDropdown from '@/app/components/ConnectionDropdown'
 
-// ==================================================================================
-// CONNECTION DROPDOWN COMPONENT (igual ao CRM/Chat)
-// ==================================================================================
-const ConnectionDropdown = ({ connections, selectedConnection, onSelectConnection }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const selected = connections.find(c => c.id === selectedConnection?.id);
-  const displayValue = selected
-    ? (selected.profile_name || selected.instance_name)
-    : 'Selecione uma instância';
-
-  return (
-    <div className="relative w-full">
-      <div className="bg-[#272727] rounded-xl overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          className="w-full px-3 py-2.5 flex items-center justify-between text-left outline-none"
-        >
-          <div className="flex items-center gap-2.5 flex-1 min-w-0">
-            {selected && (
-              <div className="flex-shrink-0">
-                {selected.profile_pic_url ? (
-                  <img
-                    src={selected.profile_pic_url}
-                    alt={selected.profile_name || 'Conexão'}
-                    className="w-8 h-8 rounded-full object-cover bg-[#333333]"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.nextSibling.style.display = 'flex';
-                    }}
-                  />
-                ) : null}
-                <div
-                  className={`w-8 h-8 rounded-full bg-[#00A884] flex items-center justify-center text-white text-xs font-semibold ${selected.profile_pic_url ? 'hidden' : 'flex'}`}
-                  style={{ display: selected.profile_pic_url ? 'none' : 'flex' }}
-                >
-                  {selected.profile_name ? selected.profile_name.charAt(0).toUpperCase() : '?'}
-                </div>
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="text-white text-sm font-medium truncate">
-                {displayValue}
-              </div>
-              {selected && (
-                <div className="text-xs text-gray-500 flex items-center gap-1">
-                  <span className={selected.is_connected ? 'text-[#00FF99]' : 'text-red-400'}>
-                    {selected.is_connected ? '●' : '○'}
-                  </span>
-                  <span className="truncate">
-                    {selected.is_connected ? 'Conectado' : 'Desconectado'}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-          <ChevronDown
-            className={`w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ml-2 ${isOpen ? 'rotate-180' : 'rotate-0'}`}
-          />
-        </button>
-
-        {isOpen && (
-          <div className="absolute top-full left-0 right-0 mt-1 backdrop-blur-md bg-[#272727]/95 rounded-xl shadow-2xl z-50 max-h-[200px] overflow-y-auto">
-            {connections.map((connection, index) => (
-              <button
-                key={connection.id}
-                type="button"
-                onClick={() => {
-                  onSelectConnection(connection);
-                  setIsOpen(false);
-                }}
-                className={`
-                                    w-full p-2.5 text-sm text-left transition-all duration-150 border-b border-white/5 last:border-0
-                                    ${selectedConnection?.id === connection.id
-                    ? 'bg-[#00FF99]/10 text-[#00FF99]'
-                    : 'text-gray-300 hover:bg-white/5 hover:text-white'}
-                                `}
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="flex-shrink-0">
-                    {connection.profile_pic_url ? (
-                      <img
-                        src={connection.profile_pic_url}
-                        alt={connection.profile_name || `Conexão ${index + 1}`}
-                        className="w-8 h-8 rounded-full object-cover bg-[#333333]"
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.nextSibling.style.display = 'flex';
-                        }}
-                      />
-                    ) : null}
-                    <div
-                      className={`w-8 h-8 rounded-full bg-[#00A884] flex items-center justify-center text-white text-xs font-semibold ${connection.profile_pic_url ? 'hidden' : 'flex'}`}
-                      style={{ display: connection.profile_pic_url ? 'none' : 'flex' }}
-                    >
-                      {connection.profile_name ? connection.profile_name.charAt(0).toUpperCase() : (index + 1)}
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate text-sm">
-                      {connection.profile_name || connection.instance_name}
-                    </div>
-                    <div className="text-xs flex items-center gap-1 mt-0.5">
-                      <span className={connection.is_connected ? 'text-[#00FF99]' : 'text-red-400'}>
-                        {connection.is_connected ? '● Conectado' : '○ Desconectado'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-      {isOpen && <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />}
-    </div>
-  );
-};
+// ConnectionDropdown agora importado de @/app/components/ConnectionDropdown
 
 // ==================================================================================
 // SWIFTBOT IA
@@ -313,6 +196,138 @@ export default function SwiftbotProPage() {
       return part
     })
   }
+
+  // Estado para controle do menu de exportação
+  const [exportMenuOpen, setExportMenuOpen] = useState(null)
+
+  // Copiar texto para clipboard
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      alert('Copiado para a área de transferência!')
+      setExportMenuOpen(null)
+    } catch (err) {
+      console.error('Erro ao copiar:', err)
+    }
+  }
+
+  // Exportar como Markdown
+  const exportAsMarkdown = (content, title = 'resposta') => {
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${title.replace(/[^a-zA-Z0-9]/g, '_')}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    setExportMenuOpen(null)
+  }
+
+  // Exportar como PDF
+  const exportAsPdf = async (content, title = 'resposta') => {
+    try {
+      // Dinamicamente importar jspdf
+      const { default: jsPDF } = await import('jspdf')
+      const doc = new jsPDF()
+
+      // Configurar fonte e tamanho
+      doc.setFontSize(12)
+
+      // Quebrar texto em linhas
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const margin = 20
+      const maxWidth = pageWidth - (margin * 2)
+      const lines = doc.splitTextToSize(content, maxWidth)
+
+      // Adicionar linhas ao PDF
+      let y = 20
+      const lineHeight = 7
+      const pageHeight = doc.internal.pageSize.getHeight()
+
+      for (const line of lines) {
+        if (y + lineHeight > pageHeight - 20) {
+          doc.addPage()
+          y = 20
+        }
+        doc.text(line, margin, y)
+        y += lineHeight
+      }
+
+      doc.save(`${title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`)
+      setExportMenuOpen(null)
+    } catch (err) {
+      console.error('Erro ao gerar PDF:', err)
+      alert('Erro ao gerar PDF. Tente novamente.')
+    }
+  }
+
+  // Exportar como DOCX
+  const exportAsDocx = async (content, title = 'resposta') => {
+    try {
+      // Dinamicamente importar docx
+      const docx = await import('docx')
+      const { Document, Paragraph, TextRun, Packer } = docx
+
+      // Criar parágrafos a partir do conteúdo
+      const paragraphs = content.split('\n').map(line => {
+        // Verificar se é heading
+        if (line.startsWith('# ')) {
+          return new Paragraph({
+            children: [new TextRun({ text: line.slice(2), bold: true, size: 32 })],
+            spacing: { before: 200, after: 100 }
+          })
+        }
+        if (line.startsWith('## ')) {
+          return new Paragraph({
+            children: [new TextRun({ text: line.slice(3), bold: true, size: 28 })],
+            spacing: { before: 200, after: 100 }
+          })
+        }
+        if (line.startsWith('### ')) {
+          return new Paragraph({
+            children: [new TextRun({ text: line.slice(4), bold: true, size: 24 })],
+            spacing: { before: 150, after: 80 }
+          })
+        }
+        if (line.startsWith('- ')) {
+          return new Paragraph({
+            children: [new TextRun({ text: '• ' + line.slice(2) })],
+            indent: { left: 400 }
+          })
+        }
+        // Processar **bold**
+        const parts = line.split(/(\*\*.*?\*\*)/g)
+        const children = parts.map(part => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return new TextRun({ text: part.slice(2, -2), bold: true })
+          }
+          return new TextRun({ text: part })
+        })
+        return new Paragraph({ children })
+      })
+
+      const doc = new Document({
+        sections: [{ properties: {}, children: paragraphs }]
+      })
+
+      const blob = await Packer.toBlob(doc)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${title.replace(/[^a-zA-Z0-9]/g, '_')}.docx`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      setExportMenuOpen(null)
+    } catch (err) {
+      console.error('Erro ao gerar DOCX:', err)
+      alert('Erro ao gerar DOCX. Tente novamente.')
+    }
+  }
+
   // Scroll para última mensagem
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -884,7 +899,7 @@ export default function SwiftbotProPage() {
                   >
                     {/* Mensagem do Assistente - sem balão */}
                     {message.role === 'assistant' && (
-                      <div className="flex gap-3 max-w-[85%]">
+                      <div className="flex gap-3 max-w-[85%] group">
                         <div
                           className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mt-1 overflow-hidden"
                           style={{ background: 'linear-gradient(135deg, #00FF99 0%, #8B5CF6 100%)' }}
@@ -894,8 +909,62 @@ export default function SwiftbotProPage() {
                             <path d="M507.177,1105.829C493.786,1121.663 477.201,1132.121 457.867,1137.955L690.658,1372.989C705.266,1359.456 721.561,1351.518 738.923,1347.115L507.177,1105.829ZM429.844,939.939C485.576,939.939 530.824,985.187 530.824,1040.92C530.824,1096.653 485.576,1141.901 429.844,1141.901C374.111,1141.901 328.863,1096.653 328.863,1040.92C328.863,985.187 374.111,939.939 429.844,939.939ZM429.844,981.253C462.775,981.253 489.511,1007.989 489.511,1040.92C489.511,1073.851 462.775,1100.587 429.844,1100.587C396.912,1100.587 370.176,1073.851 370.176,1040.92C370.176,1007.989 396.912,981.253 429.844,981.253ZM1028.441,1105.372L797.555,1352.091C814.771,1359.117 830.462,1370.383 842.586,1387.319L1073.308,1136.429C1056.017,1130.603 1041.204,1119.974 1028.441,1105.372ZM760.432,1345.038C816.124,1345.076 861.398,1390.3 861.413,1446.019C861.428,1501.752 816.165,1547 760.432,1547C704.699,1547 659.451,1501.752 659.451,1446.019C659.451,1390.286 704.699,1345 760.432,1345.038ZM760.432,1386.352C793.363,1386.352 820.1,1413.088 820.1,1446.019C820.1,1478.951 793.363,1505.687 760.432,1505.687C727.501,1505.687 700.765,1478.951 700.765,1446.019C700.765,1413.088 727.501,1386.352 760.432,1386.352ZM1106.156,939.939C1161.889,939.939 1207.137,985.187 1207.137,1040.92C1207.137,1096.653 1161.889,1141.901 1106.156,1106.156C1050.424,1141.901 1005.176,1096.653 1005.176,1040.92C1005.176,985.187 1050.424,939.939 1106.156,939.939ZM1106.156,981.253C1139.088,981.253 1165.824,1007.989 1165.824,1040.92C1165.824,1073.851 1139.088,1100.587 1106.156,1100.587C1073.225,1100.587 1046.489,1073.851 1046.489,1040.92C1046.489,1007.989 1073.225,981.253 1106.156,981.253Z" fill="#ffffff" stroke="#ffffff" strokeWidth="1" />
                           </svg>
                         </div>
-                        <div className="text-white text-sm leading-relaxed whitespace-pre-wrap pt-1">
-                          {formatMessage(message.content)}
+                        <div className="flex-1">
+                          <div className="text-white text-sm leading-relaxed whitespace-pre-wrap pt-1">
+                            {formatMessage(message.content)}
+                          </div>
+
+                          {/* Barra de Ações do Assistente */}
+                          <div className="flex items-center gap-1 mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            {/* Botão Copiar */}
+                            <button
+                              onClick={() => copyToClipboard(message.content)}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-[#333] rounded-lg transition-all"
+                              title="Copiar"
+                            >
+                              <Copy size={14} />
+                              <span>Copiar</span>
+                            </button>
+
+                            {/* Menu de Download */}
+                            <div className="relative">
+                              <button
+                                onClick={() => setExportMenuOpen(exportMenuOpen === index ? null : index)}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-[#333] rounded-lg transition-all"
+                                title="Baixar"
+                              >
+                                <Download size={14} />
+                                <span>Baixar</span>
+                                <ChevronDown size={12} />
+                              </button>
+
+                              {exportMenuOpen === index && (
+                                <div className="absolute left-0 top-full mt-1 bg-[#1a1a1a] border border-[#333] rounded-xl shadow-2xl overflow-hidden z-50 min-w-[140px]">
+                                  <button
+                                    onClick={() => exportAsPdf(message.content, `swiftbot_resposta_${index}`)}
+                                    className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-gray-300 hover:bg-[#333] hover:text-white transition-colors"
+                                  >
+                                    <FileText size={16} className="text-red-400" />
+                                    <span>PDF</span>
+                                  </button>
+                                  <button
+                                    onClick={() => exportAsMarkdown(message.content, `swiftbot_resposta_${index}`)}
+                                    className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-gray-300 hover:bg-[#333] hover:text-white transition-colors"
+                                  >
+                                    <FileText size={16} className="text-blue-400" />
+                                    <span>Markdown</span>
+                                  </button>
+                                  <button
+                                    onClick={() => exportAsDocx(message.content, `swiftbot_resposta_${index}`)}
+                                    className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-gray-300 hover:bg-[#333] hover:text-white transition-colors"
+                                  >
+                                    <FileText size={16} className="text-blue-600" />
+                                    <span>DOCX</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}

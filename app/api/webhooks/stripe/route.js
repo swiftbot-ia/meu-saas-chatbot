@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '../../../../lib/supabase'
 import crypto from 'crypto'
+import { sendAssinaturaCriadaWebhook, sendAssinaturaCanceladaWebhook } from '@/lib/webhooks/onboarding-webhook'
 
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET
 const N8N_WEBHOOK_PAYMENT_URL = process.env.N8N_WEBHOOK_PAYMENT_URL
@@ -173,6 +174,23 @@ async function handleSubscriptionCreated(subscription) {
       console.error('❌ Erro ao atualizar assinatura criada:', error)
     } else {
       console.log('✅ Status da assinatura atualizado')
+
+      // Enviar webhook de assinatura criada
+      const { data: userData } = await supabase
+        .from('user_subscriptions')
+        .select('user_id, status, billing_period, connections_purchased, stripe_subscription_id')
+        .eq('stripe_subscription_id', subscription.id)
+        .single()
+
+      if (userData) {
+        sendAssinaturaCriadaWebhook(userData.user_id, {
+          id: userData.id,
+          status: userData.status,
+          billing_period: userData.billing_period,
+          connections_purchased: userData.connections_purchased,
+          stripe_subscription_id: userData.stripe_subscription_id
+        }, null).catch(err => console.warn('⚠️ Webhook assinação falhou:', err.message))
+      }
     }
 
   } catch (error) {
@@ -251,6 +269,14 @@ async function handleSubscriptionDeleted(subscription) {
 
     if (logError) {
       console.warn('⚠️ Erro ao criar log do webhook:', logError)
+    }
+
+    // 📡 WEBHOOK: Assinatura cancelada
+    try {
+      await sendAssinaturaCanceladaWebhook(localSubscription.user_id, localSubscription, 'stripe_canceled')
+      console.log('📡 Webhook assinatura_cancelada enviado')
+    } catch (webhookErr) {
+      console.warn('⚠️ Erro ao enviar webhook de cancelamento:', webhookErr.message)
     }
 
     console.log('✅ Cancelamento processado via webhook - WhatsApp desconectado')

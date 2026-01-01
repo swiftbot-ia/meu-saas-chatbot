@@ -5,17 +5,10 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { cancelScheduledChange } from '@/lib/stripe-plan-changes'
 
-// Lazy initialization to avoid build-time errors
-let supabase = null
-function getSupabase() {
-  if (!supabase && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    )
-  }
-  return supabase
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
@@ -44,7 +37,7 @@ export async function POST(request) {
     // 2. BUSCAR ASSINATURA ATUAL
     // ============================================
 
-    const { data: subscription, error: subError } = await getSupabase()
+    const { data: subscription, error: subError } = await supabase
       .from('user_subscriptions')
       .select('*')
       .eq('user_id', userId)
@@ -86,7 +79,7 @@ export async function POST(request) {
 
     if (!cancelResult.success) {
       console.error('❌ Erro ao cancelar na Stripe:', cancelResult.error)
-
+      
       return NextResponse.json({
         success: false,
         error: `Erro ao cancelar mudança: ${cancelResult.error}`
@@ -100,8 +93,8 @@ export async function POST(request) {
     // ============================================
 
     const now = new Date().toISOString()
-
-    await getSupabase()
+    
+    await supabase
       .from('user_subscriptions')
       .update({
         pending_change_type: null,
@@ -117,7 +110,7 @@ export async function POST(request) {
     // 6. REGISTRAR LOG
     // ============================================
 
-    await getSupabase()
+    await supabase
       .from('payment_logs')
       .insert([{
         user_id: userId,

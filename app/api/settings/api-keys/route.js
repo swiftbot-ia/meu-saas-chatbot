@@ -108,7 +108,7 @@ export async function GET(request) {
         // Get all connections for this owner
         const { data: connections, error: connError } = await supabaseAdmin
             .from('whatsapp_connections')
-            .select('id, instance_name, profile_name, is_connected')
+            .select('id, instance_name, profile_name, profile_pic_url, phone_number, is_connected')
             .eq('user_id', ownerUserId)
 
         if (connError) {
@@ -118,12 +118,20 @@ export async function GET(request) {
 
         // Get API key info for each connection
         const apiKeys = await Promise.all(
-            (connections || []).map(async (conn) => {
+            (connections || []).map(async (conn, index) => {
                 const keyInfo = await getApiKeyInfo(conn.id)
+                // Use profile_name se disponível, senão "Conexão X"
+                const displayName = conn.profile_name || `Conexão ${index + 1}`
                 return {
+                    // IDs compatíveis com componente unificado
+                    id: conn.id,
                     connectionId: conn.id,
-                    connectionName: conn.profile_name || conn.instance_name,
-                    instanceName: conn.instance_name, // For global field API
+                    connectionName: displayName,
+                    profile_name: conn.profile_name,
+                    profile_pic_url: conn.profile_pic_url,
+                    phone_number: conn.phone_number,
+                    instanceName: conn.instance_name,
+                    is_connected: conn.is_connected,
                     isConnected: conn.is_connected,
                     hasApiKey: keyInfo.exists,
                     apiKey: keyInfo.key || null

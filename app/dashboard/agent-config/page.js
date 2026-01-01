@@ -197,6 +197,11 @@ function AgentConfigContent() {
     salesCTA: '',
     notifyLeads: false,
     ignoredKeywords: [],
+    forbiddenInstructions: '',
+    responseDelay: 30,
+    responseDelayUnit: 'seconds',
+    alwaysEndWithQuestion: true,
+    productsServices: '',
   })
 
   useEffect(() => {
@@ -308,7 +313,13 @@ function AgentConfigContent() {
           objectiveQuestions: data.objective_questions || [],
           salesCTA: data.sales_cta || '',
           notifyLeads: data.notify_leads || false,
-          ignoredKeywords: data.ignored_keywords || []
+          ignoredKeywords: data.ignored_keywords || [],
+          forbiddenInstructions: data.forbidden_instructions || '',
+          forbiddenInstructions: data.forbidden_instructions || '',
+          responseDelay: data.response_delay !== null ? data.response_delay : 30,
+          responseDelayUnit: 'seconds',
+          alwaysEndWithQuestion: data.always_end_with_question !== false, // Default to true if null or undefined
+          productsServices: data.products_services || ''
         })
       }
     } catch (error) {
@@ -428,7 +439,12 @@ function AgentConfigContent() {
         objectiveQuestions: Array.isArray(formValues.objectiveQuestions) && formValues.objectiveQuestions.length > 0
           ? formValues.objectiveQuestions
           : prev.objectiveQuestions,
-        salesCTA: formValues.salesCTA || prev.salesCTA
+        salesCTA: formValues.salesCTA || prev.salesCTA,
+        forbiddenInstructions: formValues.forbiddenInstructions || prev.forbiddenInstructions,
+        responseDelay: formValues.responseDelay !== undefined ? formValues.responseDelay : 30,
+        responseDelayUnit: 'seconds',
+        alwaysEndWithQuestion: formValues.alwaysEndWithQuestion !== undefined ? formValues.alwaysEndWithQuestion : prev.alwaysEndWithQuestion,
+        productsServices: formValues.productsServices || prev.productsServices
       }))
 
       // Force re-render of form components
@@ -488,6 +504,12 @@ function AgentConfigContent() {
         return item.question
       })
 
+      // Calcular delay em segundos
+      let finalDelay = parseInt(formData.responseDelay) || 0
+      if (formData.responseDelayUnit === 'minutes') {
+        finalDelay = finalDelay * 60
+      }
+
       const agentData = {
         user_id: ownerUserId,
         connection_id: connectionId,
@@ -506,6 +528,10 @@ function AgentConfigContent() {
         sales_cta: formData.salesCTA,
         notify_leads: formData.notifyLeads,
         ignored_keywords: formData.ignoredKeywords.filter(k => k.trim()),
+        forbidden_instructions: formData.forbiddenInstructions,
+        response_delay: finalDelay,
+        always_end_with_question: formData.alwaysEndWithQuestion,
+        products_services: formData.productsServices,
         is_active: true
       }
 
@@ -528,10 +554,15 @@ function AgentConfigContent() {
       }
 
       try {
-        await fetch('/api/n8n/update-agent', {
+        await fetch('/api/webhooks/n8n-agent', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: user.id, connectionId, agentData })
+          body: JSON.stringify({
+            userId: user.id,
+            connectionId,
+            agentData: { ...agentData, id: upsertedAgent?.id },
+            isNew: !agentId
+          })
         })
       } catch (err) { console.warn('Webhook silencioso falhou') }
 
@@ -805,11 +836,71 @@ function AgentConfigContent() {
                   <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   Conhecimento do Produto
                 </h3>
+
                 <div>
-                  <label className="block text-xs font-medium text-[#B0B0B0] mb-2 ml-4 uppercase tracking-wider">Descrição do Produto/Serviço <span className="text-red-500">*</span></label>
-                  <textarea name="productDescription" value={formData.productDescription} onChange={handleInputChange} rows={4} placeholder="Descreva detalhadamente o que você vende..." className={`${getInputClass('productDescription')} resize-none`} />
+                  <label className="block text-xs font-medium text-[#B0B0B0] mb-2 ml-4 uppercase tracking-wider">Funções do Agente <span className="text-red-500">*</span></label>
+                  <textarea name="productDescription" value={formData.productDescription} onChange={handleInputChange} rows={4} placeholder="Descreva quais funções o agente deve executar (ex: Agendar reuniões, tirar dúvidas, vender produtos)..." className={`${getInputClass('productDescription')} resize-none`} />
                 </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-[#B0B0B0] mb-2 ml-4 uppercase tracking-wider text-red-400">Proibido (O que não fazer)</label>
+                  <textarea name="forbiddenInstructions" value={formData.forbiddenInstructions} onChange={handleInputChange} rows={3} placeholder="Ex: Não revelar que é uma IA, não falar sobre política, não dar descontos maiores que 10%..." className={`${getInputClass('forbiddenInstructions')} resize-none border-red-500/20 focus:border-red-500/50`} />
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-xs font-medium text-[#B0B0B0] mb-2 ml-4 uppercase tracking-wider text-yellow-500/80">Atraso na Resposta</label>
+                    <div className="flex gap-4">
+                      <div className="relative flex-1">
+                        <input
+                          type="number"
+                          name="responseDelay"
+                          value={formData.responseDelay}
+                          onChange={handleInputChange}
+                          min="0"
+                          className={`${getInputClass('responseDelay')}`}
+                          placeholder="30"
+                        />
+                      </div>
+                      <div className="w-1/3">
+                        <select
+                          value={formData.responseDelayUnit}
+                          onChange={(e) => setFormData(prev => ({ ...prev, responseDelayUnit: e.target.value }))}
+                          className={`${baseInputClass} !px-4 cursor-pointer appearance-none`}
+                          style={{
+                            backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                            backgroundPosition: 'right 0.5rem center',
+                            backgroundRepeat: 'no-repeat',
+                            backgroundSize: '1.5em 1.5em'
+                          }}
+                        >
+                          <option value="seconds">Segundos</option>
+                          <option value="minutes">Minutos</option>
+                        </select>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-2 ml-2">Tempo de espera antes de enviar a resposta.</p>
+                    <p className="text-xs text-gray-600 mt-2 ml-2">Tempo de espera antes de enviar a resposta.</p>
+                  </div>
+
+                  {/* Switch: Sempre terminar com pergunta */}
+                  <div className="flex flex-col justify-center">
+                    <label className="block text-xs font-medium text-[#B0B0B0] mb-2 ml-4 uppercase tracking-wider">Regra de Ouro</label>
+                    <div className="flex items-center justify-between bg-[#252525] p-3 rounded-xl border border-white/5">
+                      <span className="text-sm text-gray-300">Sempre terminar com pergunta</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, alwaysEndWithQuestion: !prev.alwaysEndWithQuestion }))}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#00FF99] focus:ring-offset-2 focus:ring-offset-[#181818] ${formData.alwaysEndWithQuestion ? 'bg-[#00FF99]' : 'bg-gray-700'}`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.alwaysEndWithQuestion ? 'translate-x-6' : 'translate-x-1'}`}
+                        />
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-2 ml-2">Força o agente a sempre fazer uma pergunta no final para engajar.</p>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-medium text-[#B0B0B0] mb-2 ml-4 uppercase tracking-wider">Link do Produto (Opcional)</label>
                     <input type="text" name="productUrl" value={formData.productUrl} onChange={handleInputChange} placeholder="www.seusite.com.br" className={getInputClass('productUrl')} />
@@ -819,6 +910,19 @@ function AgentConfigContent() {
                     <label className="block text-xs font-medium text-[#B0B0B0] mb-2 ml-4 uppercase tracking-wider">Preço / Faixa</label>
                     <input type="text" name="priceRange" value={formData.priceRange} onChange={handleInputChange} placeholder="Ex: R$ 99,90" className={getInputClass('priceRange')} />
                   </div>
+                </div>
+
+                {/* Produtos / Serviços */}
+                <div className="mt-6">
+                  <label className="block text-xs font-medium text-[#B0B0B0] mb-2 ml-4 uppercase tracking-wider">Produtos / Serviços (Lista Detalhada)</label>
+                  <textarea
+                    name="productsServices"
+                    value={formData.productsServices}
+                    onChange={handleInputChange}
+                    rows={5}
+                    placeholder="Liste seus produtos ou serviços com preços e detalhes...&#10;Ex:&#10;- Consultoria One-on-One: R$ 500/hora&#10;- Ebook Completo: R$ 97,00"
+                    className={`${getInputClass('productsServices')} resize-none font-mono text-sm`}
+                  />
                 </div>
               </div>
 
@@ -956,161 +1060,165 @@ function AgentConfigContent() {
 
             </form>
           </div>
-        </div>
+        </div >
 
         {/* MODAL DE SUCESSO */}
-        {showSuccessModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn">
-            <div className="bg-[#1E1E1E] p-8 rounded-3xl shadow-[0_0_50px_rgba(0,255,153,0.1)] max-w-md w-full text-center transform transition-all scale-100">
-              <div className="w-16 h-16 bg-[#00FF99]/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-8 h-8 text-[#00FF99]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+        {
+          showSuccessModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn">
+              <div className="bg-[#1E1E1E] p-8 rounded-3xl shadow-[0_0_50px_rgba(0,255,153,0.1)] max-w-md w-full text-center transform transition-all scale-100">
+                <div className="w-16 h-16 bg-[#00FF99]/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <svg className="w-8 h-8 text-[#00FF99]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-2">Sucesso!</h3>
+                <p className="text-gray-400 mb-8">Seu agente de inteligência artificial foi configurado e salvo com sucesso.</p>
+                <button
+                  onClick={() => router.push('/dashboard')}
+                  className="w-full py-4 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold rounded-2xl hover:shadow-[0_0_20px_rgba(0,255,153,0.3)] transition-all"
+                >
+                  Continuar para Dashboard
+                </button>
               </div>
-              <h3 className="text-2xl font-bold text-white mb-2">Sucesso!</h3>
-              <p className="text-gray-400 mb-8">Seu agente de inteligência artificial foi configurado e salvo com sucesso.</p>
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="w-full py-4 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold rounded-2xl hover:shadow-[0_0_20px_rgba(0,255,153,0.3)] transition-all"
-              >
-                Continuar para Dashboard
-              </button>
             </div>
-          </div>
-        )}
+          )
+        }
 
         {/* MODAL DE IA - GERAR AGENTE */}
-        {showAIModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn p-4">
-            <div className="bg-[#111111] rounded-3xl shadow-[0_0_60px_rgba(138,43,226,0.2)] max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              {/* Header */}
-              <div className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <img src="/LOGO-SWIFTBOT.png" alt="SwiftBot" className="w-12 h-12 object-contain" />
-                    <div>
-                      <h2 className="text-2xl font-bold text-white">Gerar Agente com IA</h2>
-                      <p className="text-gray-400 text-sm">Configure seu agente em segundos</p>
+        {
+          showAIModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn p-4">
+              <div className="bg-[#111111] rounded-3xl shadow-[0_0_60px_rgba(138,43,226,0.2)] max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                {/* Header */}
+                <div className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <img src="/LOGO-SWIFTBOT.png" alt="SwiftBot" className="w-12 h-12 object-contain" />
+                      <div>
+                        <h2 className="text-2xl font-bold text-white">Gerar Agente com IA</h2>
+                        <p className="text-gray-400 text-sm">Configure seu agente em segundos</p>
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAIModal(false)
+                        setAiSelectedStyle('')
+                        setAiSelectedObjective('')
+                      }}
+                      className="text-gray-500 hover:text-white transition-colors p-2 hover:bg-white/5 rounded-xl"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAIModal(false)
-                      setAiSelectedStyle('')
-                      setAiSelectedObjective('')
-                    }}
-                    className="text-gray-500 hover:text-white transition-colors p-2 hover:bg-white/5 rounded-xl"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
                 </div>
-              </div>
 
-              {/* Content */}
-              <div className="p-6 space-y-8">
-                {/* Estilo de Comunicação */}
-                <div className="space-y-4">
-                  <label className="block text-sm font-semibold text-white uppercase tracking-wider">
-                    Estilo de Comunicação
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {AI_COMMUNICATION_STYLES.map((style) => (
-                      <button
-                        key={style.value}
-                        type="button"
-                        onClick={() => setAiSelectedStyle(style.value)}
-                        className={`
+                {/* Content */}
+                <div className="p-6 space-y-8">
+                  {/* Estilo de Comunicação */}
+                  <div className="space-y-4">
+                    <label className="block text-sm font-semibold text-white uppercase tracking-wider">
+                      Estilo de Comunicação
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {AI_COMMUNICATION_STYLES.map((style) => (
+                        <button
+                          key={style.value}
+                          type="button"
+                          onClick={() => setAiSelectedStyle(style.value)}
+                          className={`
                           p-4 rounded-2xl text-left transition-all duration-300
                           ${aiSelectedStyle === style.value
-                            ? 'bg-[#00FF99]/10 shadow-[0_0_20px_rgba(0,255,153,0.2)]'
-                            : 'bg-[#1E1E1E] hover:bg-[#252525]'
-                          }
+                              ? 'bg-[#00FF99]/10 shadow-[0_0_20px_rgba(0,255,153,0.2)]'
+                              : 'bg-[#1E1E1E] hover:bg-[#252525]'
+                            }
                         `}
-                      >
-                        <div className="flex items-center gap-3">
-                          <ModalIcon type={style.icon} isSelected={aiSelectedStyle === style.value} />
-                          <p className={`font-semibold ${aiSelectedStyle === style.value ? 'text-[#00FF99]' : 'text-white'}`}>
-                            {style.label}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
+                        >
+                          <div className="flex items-center gap-3">
+                            <ModalIcon type={style.icon} isSelected={aiSelectedStyle === style.value} />
+                            <p className={`font-semibold ${aiSelectedStyle === style.value ? 'text-[#00FF99]' : 'text-white'}`}>
+                              {style.label}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                {/* Objetivo Principal */}
-                <div className="space-y-4">
-                  <label className="block text-sm font-semibold text-white uppercase tracking-wider">
-                    Objetivo Principal
-                  </label>
-                  <div className="grid grid-cols-1 gap-3">
-                    {AI_OBJECTIVES.map((obj) => (
-                      <button
-                        key={obj.value}
-                        type="button"
-                        onClick={() => setAiSelectedObjective(obj.value)}
-                        className={`
+                  {/* Objetivo Principal */}
+                  <div className="space-y-4">
+                    <label className="block text-sm font-semibold text-white uppercase tracking-wider">
+                      Objetivo Principal
+                    </label>
+                    <div className="grid grid-cols-1 gap-3">
+                      {AI_OBJECTIVES.map((obj) => (
+                        <button
+                          key={obj.value}
+                          type="button"
+                          onClick={() => setAiSelectedObjective(obj.value)}
+                          className={`
                           p-4 rounded-2xl text-left transition-all duration-300
                           ${aiSelectedObjective === obj.value
-                            ? 'bg-[#00FF99]/10 shadow-[0_0_20px_rgba(0,255,153,0.2)]'
-                            : 'bg-[#1E1E1E] hover:bg-[#252525]'
-                          }
+                              ? 'bg-[#00FF99]/10 shadow-[0_0_20px_rgba(0,255,153,0.2)]'
+                              : 'bg-[#1E1E1E] hover:bg-[#252525]'
+                            }
                         `}
-                      >
-                        <div className="flex items-center gap-3">
-                          <ModalIcon type={obj.icon} isSelected={aiSelectedObjective === obj.value} />
-                          <p className={`font-semibold ${aiSelectedObjective === obj.value ? 'text-[#00FF99]' : 'text-white'}`}>
-                            {obj.label}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
+                        >
+                          <div className="flex items-center gap-3">
+                            <ModalIcon type={obj.icon} isSelected={aiSelectedObjective === obj.value} />
+                            <p className={`font-semibold ${aiSelectedObjective === obj.value ? 'text-[#00FF99]' : 'text-white'}`}>
+                              {obj.label}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Footer */}
-              <div className="p-6">
-                <button
-                  type="button"
-                  onClick={handleGenerateWithAI}
-                  disabled={!aiSelectedStyle || !aiSelectedObjective || isGenerating}
-                  className={`
+                {/* Footer */}
+                <div className="p-6">
+                  <button
+                    type="button"
+                    onClick={handleGenerateWithAI}
+                    disabled={!aiSelectedStyle || !aiSelectedObjective || isGenerating}
+                    className={`
                     w-full py-4 rounded-2xl font-bold text-lg transition-all duration-300 flex items-center justify-center gap-3
                     ${(!aiSelectedStyle || !aiSelectedObjective)
-                      ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                      : 'text-white hover:scale-[1.02] hover:shadow-[0_0_40px_rgba(138,43,226,0.4)]'
-                    }
+                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                        : 'text-white hover:scale-[1.02] hover:shadow-[0_0_40px_rgba(138,43,226,0.4)]'
+                      }
                   `}
-                  style={aiSelectedStyle && aiSelectedObjective && !isGenerating ? { backgroundImage: 'linear-gradient(to right, #8A2BE2, #00BFFF, #00FF99)' } : {}}
-                >
-                  {isGenerating ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Gerando seu agente...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                      Gerar seu Agente
-                    </>
+                    style={aiSelectedStyle && aiSelectedObjective && !isGenerating ? { backgroundImage: 'linear-gradient(to right, #8A2BE2, #00BFFF, #00FF99)' } : {}}
+                  >
+                    {isGenerating ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Gerando seu agente...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        Gerar seu Agente
+                      </>
+                    )}
+                  </button>
+                  {(!aiSelectedStyle || !aiSelectedObjective) && (
+                    <p className="text-center text-xs text-gray-500 mt-3">
+                      Selecione o estilo e objetivo para continuar
+                    </p>
                   )}
-                </button>
-                {(!aiSelectedStyle || !aiSelectedObjective) && (
-                  <p className="text-center text-xs text-gray-500 mt-3">
-                    Selecione o estilo e objetivo para continuar
-                  </p>
-                )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )
+        }
 
-      </main>
-    </div>
+      </main >
+    </div >
   )
 }
 

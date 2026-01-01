@@ -1,17 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Lazy initialization to avoid build-time errors
-let supabase = null
-function getSupabase() {
-    if (!supabase && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL,
-            process.env.SUPABASE_SERVICE_ROLE_KEY
-        )
-    }
-    return supabase
-}
+// Supabase client para buscar token da instância
+const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
 // ID da conexão para validação de WhatsApp
 const VALIDATION_CONNECTION_ID = 'b20764e7-88f1-4fe2-8394-d7deec94ad8c'
@@ -42,13 +36,7 @@ export async function POST(request) {
         }
 
         // Buscar token da instância no banco
-        const client = getSupabase()
-        if (!client) {
-            console.warn('[LP Check WhatsApp] Supabase client not configured')
-            return NextResponse.json({ valid: true, fallback: true })
-        }
-
-        const { data: connection, error: connError } = await client
+        const { data: connection, error: connError } = await supabase
             .from('whatsapp_connections')
             .select('instance_token')
             .eq('id', VALIDATION_CONNECTION_ID)

@@ -39,8 +39,12 @@ ENV NEXT_PUBLIC_CHAT_SUPABASE_ANON_KEY=$NEXT_PUBLIC_CHAT_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 ENV NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=$NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 
-# Runtime secrets are NOT set here - they must be provided at container runtime
-# This avoids Docker security warnings about secrets in build layers
+# Variáveis placeholder para build (substituídas em runtime)
+ENV SUPABASE_SERVICE_ROLE_KEY=placeholder
+ENV CHAT_SUPABASE_SERVICE_ROLE_KEY=placeholder
+ENV STRIPE_SECRET_KEY=sk_placeholder
+ENV STRIPE_WEBHOOK_SECRET=whsec_placeholder
+ENV OPENAI_API_KEY=sk-placeholder
 
 # Build da aplicação
 RUN npm run build
@@ -67,6 +71,10 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/next.config.ts ./next.config.ts
+
+# Copiar workers e dependencies
+COPY --from=builder /app/workers ./workers
+COPY --from=builder /app/lib ./lib
 
 # Criar diretórios de mídia
 RUN mkdir -p /app/public/media/audio /app/public/media/image /app/public/media/video /app/public/media/document

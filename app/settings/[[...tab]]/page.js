@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
+import ConnectionDropdown from '@/app/components/ConnectionDropdown'
 import {
   Settings,
   Webhook,
@@ -24,86 +25,6 @@ import {
   Plus,
   AlertCircle
 } from 'lucide-react'
-
-// ============================================================================
-// CONNECTION DROPDOWN
-// ============================================================================
-const ConnectionDropdown = ({ connections, selectedConnection, onSelectConnection }) => {
-  const [isOpen, setIsOpen] = useState(false)
-
-  const selected = connections.find(c => c.connectionId === selectedConnection)
-  const displayValue = selected?.connectionName || 'Selecione uma instância'
-
-  return (
-    <div className="relative">
-      <div className="bg-[#1E1E1E] rounded-2xl overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          className="w-full px-4 py-3 flex items-center justify-between text-left outline-none"
-        >
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="w-10 h-10 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold">
-              {selected?.connectionName?.charAt(0)?.toUpperCase() || '?'}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-white text-sm font-medium truncate">
-                {displayValue}
-              </div>
-              {selected && (
-                <div className="text-xs text-gray-500 flex items-center gap-1.5">
-                  <span className={selected.isConnected ? 'text-[#00FF99]' : 'text-red-400'}>
-                    {selected.isConnected ? '●' : '○'}
-                  </span>
-                  <span>{selected.isConnected ? 'Conectado' : 'Desconectado'}</span>
-                </div>
-              )}
-            </div>
-          </div>
-          <ChevronDown
-            className={`w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ml-2 ${isOpen ? 'rotate-180' : 'rotate-0'}`}
-          />
-        </button>
-
-        {isOpen && (
-          <div className="absolute top-full left-0 right-0 mt-1 backdrop-blur-md bg-[#1E1E1E]/95 rounded-2xl shadow-2xl z-50 max-h-[300px] overflow-y-auto">
-            {connections.map((connection) => (
-              <button
-                key={connection.connectionId}
-                type="button"
-                onClick={() => {
-                  onSelectConnection(connection.connectionId)
-                  setIsOpen(false)
-                }}
-                className={`
-                  w-full p-3 text-sm text-left transition-all duration-150 border-b border-white/5 last:border-0
-                  ${selectedConnection === connection.connectionId
-                    ? 'bg-[#00FF99]/10 text-[#00FF99]'
-                    : 'text-gray-300 hover:bg-white/5 hover:text-white'}
-                `}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold">
-                    {connection.connectionName?.charAt(0)?.toUpperCase() || '?'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{connection.connectionName}</div>
-                    <div className="text-xs flex items-center gap-1.5 mt-0.5">
-                      <span className={connection.isConnected ? 'text-[#00FF99]' : 'text-red-400'}>
-                        {connection.isConnected ? '● Conectado' : '○ Desconectado'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-      {isOpen && <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />}
-    </div>
-  )
-}
 
 // ============================================================================
 // TAB NAVIGATION
@@ -580,17 +501,7 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
         </div>
       </div>
 
-      {/* Connection Selector */}
-      {connections.length > 1 && (
-        <div>
-          <label className="block text-sm text-gray-400 mb-2">Conexão</label>
-          <ConnectionDropdown
-            connections={connections}
-            selectedConnection={selectedConnection}
-            onSelectConnection={onSelectConnection}
-          />
-        </div>
-      )}
+      {/* Seletor de conexão removido - agora está no header global */}
 
       {/* Existing Fields List */}
       <div className="bg-[#1A1A1A] rounded-xl p-6 border border-white/5">
@@ -689,18 +600,40 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
 // ============================================================================
 // MAIN PAGE
 // ============================================================================
+// ============================================================================
+// MAIN PAGE
+// ============================================================================
+import { useParams } from 'next/navigation'
+
 export default function SettingsPage() {
   const router = useRouter()
+  const params = useParams()
+
+  // Tab ativa baseada na URL
+  const activeTab = params?.tab?.[0] || 'webhook'
+
+  // Redireciona para /settings/webhook se acessar /settings puro
+  useEffect(() => {
+    if (!params?.tab) {
+      router.replace('/settings/webhook')
+    }
+  }, [params?.tab, router])
+
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('webhook')
+  // const [activeTab, setActiveTab] = useState('webhook') <-- REMOVIDO
   const [connections, setConnections] = useState([])
   const [selectedConnection, setSelectedConnection] = useState(null)
   const [actionLoading, setActionLoading] = useState(false)
 
+  // Handler para troca de tab
+  const handleTabChange = (tabId) => {
+    router.push(`/settings/${tabId}`)
+  }
+
   // Fetch API keys data
   const fetchApiKeys = useCallback(async () => {
     try {
-      const response = await fetch('/api/settings/api-keys')
+      const response = await fetch(`/api/settings/api-keys?t=${new Date().getTime()}`)
       const data = await response.json()
 
       if (data.success) {
@@ -802,9 +735,9 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-[#0A0A0A]">
       {/* Header */}
-      <div className="bg-[#0A0A0A] border-b border-white/10 sticky top-0 z-30">
+      <div className="bg-[#0A0A0A]/95 backdrop-blur-md border-b border-white/5 sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => router.push('/dashboard')}
@@ -822,6 +755,20 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+
+            {/* Connection Dropdown - Igual ao padrão Automações */}
+            {connections.length > 0 && (
+              <div className="w-64">
+                <ConnectionDropdown
+                  connections={connections}
+                  selectedConnection={selectedConnection}
+                  onSelectConnection={(connId) => {
+                    setSelectedConnection(connId)
+                    localStorage.setItem('activeConnectionId', connId)
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -829,7 +776,7 @@ export default function SettingsPage() {
       {/* Content */}
       <div className="max-w-6xl mx-auto px-4 py-6">
         {/* Tab Navigation */}
-        <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+        <TabNavigation activeTab={activeTab} onTabChange={handleTabChange} />
 
         {/* Tab Content */}
         <div className="mt-6">
@@ -849,32 +796,30 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* API Keys Section */}
+              {/* API Keys Section - Mostra apenas a conexão selecionada */}
               <div>
-                <h3 className="text-white font-medium mb-4">Suas API Keys</h3>
+                <h3 className="text-white font-medium mb-4">API Key da Conexão</h3>
                 <div className="space-y-4">
-                  {connections.length === 0 ? (
-                    <div className="bg-[#1A1A1A] rounded-xl p-8 text-center border border-white/5">
-                      <Key className="mx-auto text-gray-600 mb-3" size={32} />
-                      <p className="text-gray-400">Nenhuma conexão WhatsApp encontrada</p>
-                      <button
-                        onClick={() => router.push('/dashboard')}
-                        className="mt-4 text-[#00FF99] text-sm hover:underline"
-                      >
-                        Conectar WhatsApp
-                      </button>
-                    </div>
-                  ) : (
-                    connections.map(connection => (
+                  {(() => {
+                    const selectedConn = connections.find(c => c.connectionId === selectedConnection)
+                    if (!selectedConn) {
+                      return (
+                        <div className="bg-[#1A1A1A] rounded-xl p-8 text-center border border-white/5">
+                          <Key className="mx-auto text-gray-600 mb-3" size={32} />
+                          <p className="text-gray-400">Selecione uma conexão para gerenciar a API key</p>
+                        </div>
+                      )
+                    }
+                    return (
                       <ApiKeyCard
-                        key={connection.connectionId}
-                        connection={connection}
+                        key={selectedConn.connectionId}
+                        connection={selectedConn}
                         onGenerate={handleGenerateKey}
                         onRevoke={handleRevokeKey}
                         loading={actionLoading}
                       />
-                    ))
-                  )}
+                    )
+                  })()}
                 </div>
               </div>
 
