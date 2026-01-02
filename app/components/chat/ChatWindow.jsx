@@ -9,7 +9,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import Avatar from '@/app/components/Avatar';
-import { Phone, MoreVertical, Archive, Trash2, X, MessageSquare, Bot } from 'lucide-react';
+import { Phone, MoreVertical, Archive, Trash2, X, MessageSquare, Bot, ArrowLeft } from 'lucide-react';
 import { createChatSupabaseClient } from '@/lib/supabase/chat-client';
 
 const chatSupabase = createChatSupabaseClient();
@@ -554,6 +554,16 @@ export default function ChatWindow({
       {/* Header */}
       <div className="bg-[#111111] px-4 py-3 flex items-center justify-between">
         <div className="flex items-center space-x-3">
+          {/* Back Button (Mobile only) */}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="mr-1 p-1 hover:bg-white/10 rounded-full transition-colors md:hidden text-gray-300"
+            >
+              <ArrowLeft size={24} />
+            </button>
+          )}
+
           {/* Avatar */}
           <Avatar
             src={conversation.contact?.profile_pic_url}
@@ -627,16 +637,6 @@ export default function ChatWindow({
               </div>
             )}
           </div>
-
-          {/* Close button (mobile) */}
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white/5 rounded-full transition-colors md:hidden"
-            >
-              <X size={20} className="text-gray-400" />
-            </button>
-          )}
         </div>
       </div>
 

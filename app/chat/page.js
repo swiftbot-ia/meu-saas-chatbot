@@ -485,8 +485,12 @@ function ChatContent() {
   // Main chat interface
   return (
     <div className="flex h-screen bg-[#111111]">
-      {/* Conversations list */}
-      <div className="w-96">
+      {/* Conversations list - Hidden on mobile if conversation selected */}
+      <div className={`
+        flex-col border-r border-white/5 bg-[#111111]
+        ${selectedConversation ? 'hidden md:flex' : 'flex'}
+        w-full md:w-96 h-full
+      `}>
         <ConversationList
           conversations={conversations}
           selectedConversation={selectedConversation}
@@ -498,13 +502,19 @@ function ChatContent() {
         />
       </div>
 
-      {/* Chat window */}
-      <ChatWindow
-        conversation={selectedConversation}
-        connection={connections.find(c => c.id === selectedConnection)}
-        onArchive={handleArchiveConversation}
-        onDelete={handleDeleteConversation}
-      />
+      {/* Chat window - Full screen on mobile if selected, hidden otherwise */}
+      <div className={`
+        flex-1 flex flex-col h-full bg-[#111111]
+        ${selectedConversation ? 'flex' : 'hidden md:flex'}
+      `}>
+        <ChatWindow
+          conversation={selectedConversation}
+          connection={connections.find(c => c.id === selectedConnection)}
+          onArchive={handleArchiveConversation}
+          onDelete={handleDeleteConversation}
+          onClose={() => setSelectedConversation(null)}
+        />
+      </div>
 
       {/* Error toast */}
       {error && (
