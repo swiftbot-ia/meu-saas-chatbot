@@ -73,7 +73,7 @@ export default function ConversationList({
           onSelectConnection={onSelectConnection}
         />
 
-        <h2 className="text-xl font-bold text-white flex items-center">
+        <h2 className="text-xl font-bold text-white flex items-center mt-4">
           <MessageCircle className="mr-2" size={24} />
           Conversas
         </h2>
