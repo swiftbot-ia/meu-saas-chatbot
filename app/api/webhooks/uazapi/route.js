@@ -278,14 +278,57 @@ async function handleNewFormatMessage(requestId, instanceName, payload) {
     log(requestId, 'info', '💬', `NEW FORMAT MESSAGE: ${instanceName}`);
 
     const messageData = payload.message;
-    const instanceToken = payload.token; // Token já vem no payload!
+    const instanceToken = payload.token;
+
+    // DETECTAR EDIÇÃO: Se 'edited' existe, é uma edição
+    // O ID da mensagem editada vem em 'edited' e o ID 'novo' em 'id'
+    // Mas para o nosso banco, precisamos identificar a mensagem ORIGINAL
+    const isEdited = !!messageData.edited;
+    const originalMessageId = isEdited ? messageData.edited : (messageData.messageid || messageData.id.split(':')[1]);
+
+    // Se for edição, precisamos buscar os dados da mensagem original para manter media_url, etc.
+    let originalMediaData = {};
+    if (isEdited) {
+      log(requestId, 'info', '✏️', `Mensagem editada detectada! Buscando original: ${originalMessageId}`);
+
+      const { data: originalMsg } = await chatSupabaseAdmin
+        .from('whatsapp_messages')
+        .select('*')
+        .eq('message_id', originalMessageId)
+        .maybeSingle();
+
+      if (originalMsg) {
+        log(requestId, 'info', '✅', `Dados originais recuperados para edição`, { hasMedia: !!originalMsg.media_url });
+        originalMediaData = {
+          mediaUrl: originalMsg.media_url,
+          mimetype: originalMsg.media_mime_type,
+          localPath: originalMsg.local_media_path,
+          transcription: originalMsg.transcription,
+          aiInterpretation: originalMsg.ai_interpretation,
+          mediaSize: originalMsg.media_size,
+          fileName: originalMsg.from_number // Hack: fileName não temos col separada facil, mas ok
+        };
+
+        // Se a mensagem original tinha mídia, precisamos garantir que o tipo seja preservado
+        // O UAZapi pode mandar type='text' na edição de uma legenda de imagem
+        if (originalMsg.message_type !== 'text' && messageData.type === 'text') {
+          log(requestId, 'info', '🔄', `Forçando tipo da mensagem editada para: ${originalMsg.message_type}`);
+          messageData.messageType = capitalizeFirstLetter(originalMsg.message_type) + 'Message'; // Ex: ImageMessage
+
+          // Mockar o content para passar no switch abaixo
+          if (!messageData.content) messageData.content = {};
+          messageData.content.URL = originalMsg.media_url;
+          messageData.content.mimetype = originalMsg.media_mime_type;
+        }
+      }
+    }
 
     // Converter novo formato para formato padrão
     const convertedMessage = {
       key: {
         remoteJid: messageData.chatid,
         fromMe: messageData.fromMe,
-        id: messageData.messageid || messageData.id.split(':')[1]
+        id: originalMessageId // Mantemos o ID original para atualizar o registro correto
       },
       messageTimestamp: messageData.messageTimestamp
         ? (messageData.messageTimestamp > 9999999999
@@ -293,47 +336,52 @@ async function handleNewFormatMessage(requestId, instanceName, payload) {
           : messageData.messageTimestamp)
         : Math.floor(Date.now() / 1000),
       pushName: messageData.senderName,
-      message: {}
+      message: {},
+      isEdited: isEdited, // Flag interna para saber que é edição
+      originalMediaData: originalMediaData // Passar dados recuperados
     };
 
     // Converter tipo de mensagem
+    // IMPORTANTE: Em edições, o UAZapi manda o texto novo em messageData.content.caption ou messageData.text
+    // Precisamos ser robustos na extração
     switch (messageData.messageType) {
       case 'AudioMessage':
         convertedMessage.message.audioMessage = {
-          url: messageData.content.URL,
-          mimetype: messageData.content.mimetype,
-          seconds: messageData.content.seconds
+          url: messageData.content?.URL || originalMediaData.mediaUrl,
+          mimetype: messageData.content?.mimetype || originalMediaData.mimetype,
+          seconds: messageData.content?.seconds
         };
         break;
 
       case 'ImageMessage':
         convertedMessage.message.imageMessage = {
-          url: messageData.content.URL,
-          mimetype: messageData.content.mimetype,
-          caption: messageData.text || ''
+          url: messageData.content?.URL || originalMediaData.mediaUrl,
+          mimetype: messageData.content?.mimetype || originalMediaData.mimetype,
+          // Caption pode vir em vários lugares dependendo se é edit ou não
+          caption: messageData.content?.caption || messageData.text || originalMediaData.caption || ''
         };
         break;
 
       case 'VideoMessage':
         convertedMessage.message.videoMessage = {
-          url: messageData.content.URL,
-          mimetype: messageData.content.mimetype,
-          caption: messageData.text || '',
-          seconds: messageData.content.seconds
+          url: messageData.content?.URL || originalMediaData.mediaUrl,
+          mimetype: messageData.content?.mimetype || originalMediaData.mimetype,
+          caption: messageData.content?.caption || messageData.text || originalMediaData.caption || '',
+          seconds: messageData.content?.seconds
         };
         break;
 
       case 'DocumentMessage':
         convertedMessage.message.documentMessage = {
-          url: messageData.content.URL,
-          mimetype: messageData.content.mimetype,
-          fileName: messageData.content.fileName || 'document'
+          url: messageData.content?.URL || originalMediaData.mediaUrl,
+          mimetype: messageData.content?.mimetype || originalMediaData.mimetype,
+          fileName: messageData.content?.fileName || originalMediaData.fileName || 'document'
         };
         break;
 
       case 'TextMessage':
       default:
-        convertedMessage.message.conversation = messageData.text;
+        convertedMessage.message.conversation = messageData.text || messageData.content?.text || messageData.content || '';
         break;
     }
 
@@ -343,6 +391,10 @@ async function handleNewFormatMessage(requestId, instanceName, payload) {
     log(requestId, 'error', '❌', 'Erro em handleNewFormatMessage', { error: error.message });
     throw error;
   }
+}
+
+function capitalizeFirstLetter(string) {
+  return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
 /**
@@ -473,15 +525,20 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
     });
 
     // 1. VERIFICAR SE MENSAGEM JÁ EXISTE (idempotência)
+    // Se for EDIÇÃO (isEdited=true), nós QUEREMOS processar novamente para atualizar
     const { data: existingMessage } = await chatSupabaseAdmin
       .from('whatsapp_messages')
-      .select('id')
+      .select('id, transcription, ai_interpretation, media_url, media_mime_type, local_media_path, media_size, media_downloaded_at, transcribed_at')
       .eq('message_id', messageId)
       .maybeSingle();
 
-    if (existingMessage) {
+    if (existingMessage && !messageData.isEdited) {
       log(requestId, 'info', 'ℹ️', `Mensagem duplicada, ignorando: ${messageId}`);
       return;
+    }
+
+    if (existingMessage && messageData.isEdited) {
+      log(requestId, 'info', '✏️', `Processando EDIÇÃO de mensagem existente: ${messageId}`);
     }
 
     // 2. BUSCAR CONEXÃO NO MAIN DB (ROBUSTA - em cascata)
@@ -620,6 +677,26 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
     let metadata = { raw_message: messageData };
 
     // 7. PROCESSAR CONTEÚDO
+    // Se for edição e já tínhamos dados de IA/Mídia no banco, vamos preservar se o novo processamento não trouxer nada
+    // Isso é útil pois não queremos re-baixar ou re-transcrever se só mudou a legenda
+    if (messageData.isEdited && existingMessage) {
+      if (!mediaUrl) mediaUrl = existingMessage.media_url;
+      if (!localMediaPath) localMediaPath = existingMessage.local_media_path;
+      if (!mediaMimeType) mediaMimeType = existingMessage.media_mime_type;
+      if (!mediaSize) mediaSize = existingMessage.media_size;
+
+      // Dados de IA
+      if (!transcription) transcription = existingMessage.transcription;
+      if (!aiInterpretation) aiInterpretation = existingMessage.ai_interpretation;
+      if (!mediaDownloadedAt) mediaDownloadedAt = existingMessage.media_downloaded_at;
+      if (!transcribedAt) transcribedAt = existingMessage.transcribed_at;
+
+      // Metadata
+      if (messageData.originalMediaData) {
+        metadata.original_data_restored = true;
+      }
+    }
+
     if (messageInfo.conversation) {
       messageType = 'text';
       messageContent = messageInfo.conversation;
@@ -753,9 +830,10 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
 
     let savedMessage; // Renamed from 'message' to avoid conflict with 'message' in the outer scope
     try {
+      // USAR UPSERT PARA SUPORTAR EDIÇÕES
       const { data: insertedMessage, error: msgError } = await chatSupabaseAdmin // Changed to chatSupabaseAdmin
         .from('whatsapp_messages')
-        .insert({
+        .upsert({
           instance_name: realInstanceName, // IMPORTANTE: Usa o instance_name real da conexão
           connection_id: connection.id, // Kept original connection.id
           conversation_id: conversation.id,
@@ -779,6 +857,7 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
           ai_interpretation: aiInterpretation,
           media_downloaded_at: mediaDownloadedAt,
           transcribed_at: transcribedAt,
+          updated_at: new Date().toISOString(), // Sempre atualizar o updated_at no upsert
           metadata: {
             ...metadata,
             local_media_path: localMediaPath,
@@ -788,27 +867,24 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
             transcription_status: transcriptionStatus,
             ai_interpretation: aiInterpretation,
             media_downloaded_at: mediaDownloadedAt,
-            transcribed_at: transcribedAt
+            transcribed_at: transcribedAt,
+            is_edited: messageData.isEdited || false
           }
-        })
+        }, { onConflict: 'message_id' }) // Conflito no message_id dispara update
         .select()
         .single();
 
       if (msgError) throw msgError;
       savedMessage = insertedMessage; // Assign to savedMessage
 
-      log(requestId, 'success', '✅', `Mensagem salva: ${messageId}`, { // Kept original messageId
-        type: messageType,
-        direction: fromMe ? 'outbound' : 'inbound', // Kept original logic
-        hasMedia: !!mediaUrl, // Changed to mediaUrl
-        hasTranscription: !!transcription
-      });
+      log(requestId, 'success', '✅', `Mensagem salva/atualizada: ${messageId} (edited=${messageData.isEdited || false})`);
 
       // 8.1 WEBHOOK: MENSAGEM ENVIADA (primeira mensagem outbound VIA API do agente)
       // Fire and forget - verifica se é a primeira mensagem outbound enviada pela API
       // Só dispara se wasSentByApi=true (enviada via API, não manualmente pelo WhatsApp)
+      // E SE NÃO FOR EDIÇÃO (edit não conta como primeira msg nova)
       const wasSentByApi = fullPayload?.message?.wasSentByApi === true;
-      if (fromMe && wasSentByApi) {
+      if (fromMe && wasSentByApi && !messageData.isEdited) {
         checkAndSendFirstMessageWebhook(requestId, connection, whatsappNumber, messageType)
           .catch(err => log(requestId, 'warn', '⚠️', `Erro ao verificar webhook mensagem_enviada: ${err.message}`));
       }
