@@ -30,7 +30,8 @@ import {
   Save,
   FileText,
   Hash,
-  Check
+  Check,
+  ArrowLeft
 } from 'lucide-react';
 import NoSubscription from '../components/NoSubscription'
 import NewOpportunityModal from '../crm/components/NewOpportunityModal'
@@ -816,7 +817,7 @@ export default function ContactsPage() {
       {/* ========================================== */}
       {/* SIDEBAR - Filtros */}
       {/* ========================================== */}
-      <div className="w-64 bg-[#111111] flex flex-col overflow-hidden border-r border-white/5">
+      <div className="w-64 bg-[#111111] flex-col overflow-hidden border-r border-white/5 hidden md:flex">
 
         {/* Header */}
         <div className="p-4 pt-6">
@@ -989,7 +990,11 @@ export default function ContactsPage() {
       {/* ========================================== */}
       {/* LISTA DE CONTATOS */}
       {/* ========================================== */}
-      <div className="w-96 bg-[#111111] flex flex-col border-r border-white/5">
+      <div className={`
+        flex-col border-r border-white/5 bg-[#111111]
+        ${selectedContact ? 'hidden md:flex' : 'flex'}
+        w-full md:w-96
+      `}>
 
         {/* Connection Dropdown - Mesmo estilo do chat */}
         <div className="p-4 border-b border-white/5">
@@ -1153,13 +1158,24 @@ export default function ContactsPage() {
       {/* ========================================== */}
       {/* DETALHES DO CONTATO */}
       {/* ========================================== */}
-      <div className="flex-1 bg-[#0A0A0A] flex flex-col">
+      <div className={`
+        flex-1 bg-[#0A0A0A] flex flex-col
+        ${selectedContact ? 'flex' : 'hidden md:flex'}
+      `}>
         {selectedContact ? (
           <>
             {/* Header */}
             <div className="p-6 border-b border-white/5">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-4">
+                  {/* Back Button (Mobile only) */}
+                  <button
+                    onClick={() => setSelectedContact(null)}
+                    className="mr-2 p-2 hover:bg-white/10 rounded-full transition-colors md:hidden text-gray-300"
+                  >
+                    <ArrowLeft size={24} />
+                  </button>
+
                   {/* Avatar Grande */}
                   {selectedContact.profile_pic_url ? (
                     <img
@@ -1194,7 +1210,7 @@ export default function ContactsPage() {
                     className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-semibold rounded-xl hover:shadow-[0_0_20px_rgba(0,255,153,0.3)] transition-all"
                   >
                     <MessageCircle size={18} />
-                    Abrir Chat
+                    <span className="hidden sm:inline">Abrir Chat</span>
                   </button>
                   <button
                     onClick={() => setSelectedContact(null)}

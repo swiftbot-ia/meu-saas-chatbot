@@ -32,13 +32,22 @@ import {
 const TabNavigation = ({ activeTab, onTabChange }) => {
   const tabs = [
     { id: 'webhook', label: 'Webhook', icon: Webhook, soon: false },
-    { id: 'custom-fields', label: 'Campos Personalizados', icon: FileText, soon: false },
+    { id: 'custom-fields', label: 'Campos', icon: FileText, soon: false },
     { id: 'cadencia', label: 'Cadência', icon: Clock, soon: true },
-    { id: 'gatilhos', label: 'Gatilhos Automáticos', icon: Zap, soon: true }
+    { id: 'gatilhos', label: 'Gatilhos', icon: Zap, soon: true }
   ]
 
   return (
-    <div className="flex gap-2 border-b border-white/10">
+    <div className="flex gap-2 border-b border-white/10 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 scroll-smooth">
+      <style jsx>{`
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
       {tabs.map(tab => {
         const Icon = tab.icon
         const isActive = activeTab === tab.id
@@ -49,19 +58,19 @@ const TabNavigation = ({ activeTab, onTabChange }) => {
             disabled={tab.soon}
             className={`
               flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all
-              border-b-2 -mb-[2px] relative
+              border-b-2 -mb-[2px] whitespace-nowrap flex-shrink-0
               ${isActive
                 ? 'text-[#00FF99] border-[#00FF99]'
                 : tab.soon
-                  ? 'text-gray-600 border-transparent cursor-not-allowed'
+                  ? 'text-gray-600 border-transparent cursor-not-allowed opacity-60'
                   : 'text-gray-400 border-transparent hover:text-white hover:border-white/20'}
             `}
           >
             <Icon size={16} />
             {tab.label}
             {tab.soon && (
-              <span className="text-[10px] bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded-full">
-                Em breve
+              <span className="ml-1 text-[10px] bg-white/5 text-gray-500 border border-white/5 px-1.5 py-0.5 rounded-full font-normal">
+                Breve
               </span>
             )}
           </button>
@@ -123,12 +132,12 @@ const ApiKeyCard = ({ connection, onGenerate, onRevoke, onCopy, loading }) => {
 
   return (
     <div className="bg-[#1A1A1A] rounded-xl p-5 border border-white/5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+        <div className="flex-1 w-full overflow-hidden">
           <div className="flex items-center gap-2 mb-2">
             <Key className="text-[#00FF99]" size={18} />
-            <h3 className="text-white font-medium">{connection.connectionName}</h3>
-            <span className={`text-xs px-2 py-0.5 rounded-full ${connection.isConnected
+            <h3 className="text-white font-medium truncate">{connection.connectionName}</h3>
+            <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${connection.isConnected
               ? 'bg-[#00FF99]/20 text-[#00FF99]'
               : 'bg-red-500/20 text-red-400'
               }`}>
@@ -139,7 +148,7 @@ const ApiKeyCard = ({ connection, onGenerate, onRevoke, onCopy, loading }) => {
           {connection.hasApiKey && connection.apiKey ? (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <div className="bg-[#252525] px-4 py-2 rounded-lg font-mono text-sm flex-1">
+                <div className="bg-[#252525] px-4 py-2 rounded-lg font-mono text-sm flex-1 truncate">
                   <span className="text-gray-400">
                     {showKey && fullKey
                       ? fullKey
@@ -149,26 +158,26 @@ const ApiKeyCard = ({ connection, onGenerate, onRevoke, onCopy, loading }) => {
                 <button
                   onClick={handleShowToggle}
                   disabled={loadingKey}
-                  className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors disabled:opacity-50"
+                  className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors disabled:opacity-50 flex-shrink-0"
                   title={showKey ? 'Ocultar' : 'Mostrar'}
                 >
                   {loadingKey ? <Loader2 size={18} className="animate-spin" /> : showKey ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
                 <button
                   onClick={handleCopy}
-                  className="p-2 text-gray-400 hover:text-[#00FF99] hover:bg-[#00FF99]/10 rounded-lg transition-colors"
+                  className="p-2 text-gray-400 hover:text-[#00FF99] hover:bg-[#00FF99]/10 rounded-lg transition-colors flex-shrink-0"
                   title="Copiar"
                 >
                   {copied ? <Check size={18} className="text-[#00FF99]" /> : <Copy size={18} />}
                 </button>
               </div>
 
-              <div className="flex items-center gap-4 text-xs text-gray-500">
+              <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
                 {connection.apiKey.lastUsedAt && (
-                  <span>Último uso: {new Date(connection.apiKey.lastUsedAt).toLocaleDateString('pt-BR')}</span>
+                  <span>Último: {new Date(connection.apiKey.lastUsedAt).toLocaleDateString('pt-BR')}</span>
                 )}
                 {connection.apiKey.createdAt && (
-                  <span>Criada em: {new Date(connection.apiKey.createdAt).toLocaleDateString('pt-BR')}</span>
+                  <span>Criada: {new Date(connection.apiKey.createdAt).toLocaleDateString('pt-BR')}</span>
                 )}
               </div>
             </div>
@@ -177,11 +186,11 @@ const ApiKeyCard = ({ connection, onGenerate, onRevoke, onCopy, loading }) => {
           )}
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full sm:w-auto">
           <button
             onClick={() => onGenerate(connection.connectionId)}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-[#00FF99]/10 text-[#00FF99] rounded-lg text-sm font-medium hover:bg-[#00FF99]/20 transition-colors disabled:opacity-50"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-[#00FF99]/10 text-[#00FF99] rounded-lg text-sm font-medium hover:bg-[#00FF99]/20 transition-colors disabled:opacity-50"
           >
             {loading ? (
               <Loader2 size={16} className="animate-spin" />
@@ -194,10 +203,11 @@ const ApiKeyCard = ({ connection, onGenerate, onRevoke, onCopy, loading }) => {
             <button
               onClick={() => onRevoke(connection.connectionId)}
               disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/20 transition-colors disabled:opacity-50"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-red-500/10 text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/20 transition-colors disabled:opacity-50"
             >
               <Trash2 size={16} />
-              Revogar
+              <span className="hidden sm:inline">Revogar</span>
+              <span className="sm:hidden">Excluir</span>
             </button>
           )}
         </div>
@@ -223,7 +233,7 @@ const ApiDocumentation = () => {
     {
       method: 'POST',
       path: '/api/v1/contact/update',
-      description: 'Atualizar contato completo (nome, origem, etapa, tags, etc)',
+      description: 'Atualizar contato completo',
       example: `curl -X POST 'https://swiftbot.com.br/api/v1/contact/update' \\
   -H 'X-API-KEY: sua-api-key' \\
   -H 'Content-Type: application/json' \\
@@ -247,7 +257,7 @@ const ApiDocumentation = () => {
     {
       method: 'PATCH',
       path: '/api/v1/contact/phone/{phone}',
-      description: 'Atualizar contato por telefone (nome e campos)',
+      description: 'Atualizar contato por telefone',
       example: `curl -X PATCH 'https://swiftbot.com.br/api/v1/contact/phone/5511999999999' \\
   -H 'X-API-KEY: sua-api-key' \\
   -H 'Content-Type: application/json' \\
@@ -265,14 +275,14 @@ const ApiDocumentation = () => {
     {
       method: 'GET',
       path: '/api/v1/contact/{contactId}/metadata',
-      description: 'Buscar campos personalizados do contato',
+      description: 'Buscar campos personalizados',
       example: `curl -X GET 'https://swiftbot.com.br/api/v1/contact/{contactId}/metadata' \\
   -H 'X-API-KEY: sua-api-key'`
     },
     {
       method: 'PATCH',
       path: '/api/v1/contact/{contactId}/metadata',
-      description: 'Atualizar campos personalizados (merge)',
+      description: 'Atualizar campos (merge)',
       example: `curl -X PATCH 'https://swiftbot.com.br/api/v1/contact/{contactId}/metadata' \\
   -H 'X-API-KEY: sua-api-key' \\
   -H 'Content-Type: application/json' \\
@@ -281,7 +291,7 @@ const ApiDocumentation = () => {
     {
       method: 'PUT',
       path: '/api/v1/contact/{contactId}/metadata',
-      description: 'Substituir todos campos personalizados',
+      description: 'Substituir todos campos',
       example: `curl -X PUT 'https://swiftbot.com.br/api/v1/contact/{contactId}/metadata' \\
   -H 'X-API-KEY: sua-api-key' \\
   -H 'Content-Type: application/json' \\
@@ -290,7 +300,7 @@ const ApiDocumentation = () => {
     {
       method: 'POST',
       path: '/api/v1/contact/{contactId}/agent',
-      description: 'Ativar/desativar agente IA para contato',
+      description: 'Ativar/desativar agente IA',
       example: `curl -X POST 'https://swiftbot.com.br/api/v1/contact/{contactId}/agent' \\
   -H 'X-API-KEY: sua-api-key' \\
   -H 'Content-Type: application/json' \\
@@ -299,28 +309,28 @@ const ApiDocumentation = () => {
     {
       method: 'POST',
       path: '/api/v1/contact/{contactId}/sequences/{sequenceId}',
-      description: 'Adicionar contato a uma sequência',
+      description: 'Inscrever em sequência',
       example: `curl -X POST 'https://swiftbot.com.br/api/v1/contact/{contactId}/sequences/{sequenceId}' \\
   -H 'X-API-KEY: sua-api-key'`
     },
     {
       method: 'DELETE',
       path: '/api/v1/contact/{contactId}/sequences/{sequenceId}',
-      description: 'Remover contato de uma sequência',
+      description: 'Remover de sequência',
       example: `curl -X DELETE 'https://swiftbot.com.br/api/v1/contact/{contactId}/sequences/{sequenceId}' \\
   -H 'X-API-KEY: sua-api-key'`
     },
     {
       method: 'POST',
       path: '/api/v1/contact/{contactId}/tags/{tagId}',
-      description: 'Adicionar tag ao contato',
+      description: 'Adicionar tag',
       example: `curl -X POST 'https://swiftbot.com.br/api/v1/contact/{contactId}/tags/{tagId}' \\
   -H 'X-API-KEY: sua-api-key'`
     },
     {
       method: 'DELETE',
       path: '/api/v1/contact/{contactId}/tags/{tagId}',
-      description: 'Remover tag do contato',
+      description: 'Remover tag',
       example: `curl -X DELETE 'https://swiftbot.com.br/api/v1/contact/{contactId}/tags/{tagId}' \\
   -H 'X-API-KEY: sua-api-key'`
     }
@@ -372,7 +382,7 @@ const ApiDocumentation = () => {
 
             {expandedEndpoint === index && (
               <div className="px-4 py-3 bg-[#0A0A0A] border-t border-white/5">
-                <p className="text-sm text-gray-400 mb-3">{endpoint.description}</p>
+                <p className="text-sm text-gray-400 mb-3 block sm:hidden">{endpoint.description}</p>
                 <div className="relative">
                   <button
                     onClick={() => handleCopyExample(endpoint.example, index)}
