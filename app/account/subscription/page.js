@@ -343,9 +343,8 @@ export default function AccountSubscription() {
     setChangingPlan(true)
 
     try {
-      const endpoint = changeType === 'upgrade'
-        ? '/api/subscription/upgrade'
-        : '/api/subscription/downgrade'
+      // Rota unificada para upgrades, downgrades e correções
+      const endpoint = '/api/subscription/upgrade'
 
       const response = await fetch(endpoint, {
         method: 'POST',

@@ -1174,7 +1174,6 @@ export default function Dashboard() {
 
       if (confirmError) {
         console.error('❌ Erro na validação do cartão:', confirmError)
-        // Set specific user-friendly error message for card issues
         setPaymentError('Seu cartão não foi aprovado. Por favor, tente novamente ou use outro cartão.')
         setCheckoutLoading(false)
         return // Stop execution
@@ -1206,13 +1205,38 @@ export default function Dashboard() {
         throw new Error(subscriptionData.error || 'Erro ao criar assinatura')
       }
 
-      console.log('✅ Subscription criada!')
+      // ✅ [NOVO] VERIFICAR SE PRECISA CONFIRMAR O PAGAMENTO FINAL (SCA/3DS)
+      // Se o status for 'incomplete', significa que a fatura foi criada mas precisa de confirmação
+      const subStatus = subscriptionData.subscription?.status
+      const paymentIntent = subscriptionData.subscription?.latest_invoice?.payment_intent
+
+      if (subStatus === 'incomplete' && paymentIntent?.client_secret) {
+        console.log('💳 [STEP 2C] Confirmando pagamento final (3DS/SCA)...')
+
+        const { error: finalPayError, paymentIntent: finalPI } = await window.stripeInstance.confirmCardPayment(
+          paymentIntent.client_secret
+        )
+
+        if (finalPayError) {
+          console.error('❌ Erro na confirmação final:', finalPayError)
+          throw new Error(finalPayError.message || 'Falha na confirmação do pagamento.')
+        }
+
+        if (finalPI.status !== 'succeeded') {
+          throw new Error(`Pagamento não completado. Status: ${finalPI.status}`)
+        }
+
+        console.log('✅ Pagamento final confirmado com sucesso!')
+      }
+
+      console.log('✅ Subscription criada e ativa!')
 
       // ✅ LIMPAR E FECHAR
       setShowCheckoutModal(false)
       setCheckoutStep('plan')
       setClientSecret(null)
 
+      // Atualiza dados na tela
       await loadSubscription(user.id)
       await loadConnections(user.id)
 
@@ -1402,7 +1426,7 @@ export default function Dashboard() {
         {/* Fim da Linha Welcome+Header */}
 
         {/* Subscription Alert - FUNDO PRETO COM BORDA GRADIENTE */}
-        {(subscriptionStatus === 'none' || subscriptionStatus === 'expired' || subscriptionStatus === 'past_due') && !hasUsedTrialBefore && (
+        {(subscriptionStatus === 'none' || subscriptionStatus === 'expired' || subscriptionStatus === 'past_due' || subscriptionStatus === 'pending') && !hasUsedTrialBefore && (
           <div
             className="mb-12 bg-black rounded-2xl p-8 relative"
             style={{
@@ -1425,11 +1449,11 @@ export default function Dashboard() {
                     </svg>
                   </div>
                   <h3 className="text-2xl font-bold text-white">
-                    {subscriptionStatus === 'past_due' ? 'Pagamento Pendente' : 'Teste Gratuito Disponível'}
+                    {subscriptionStatus === 'past_due' || subscriptionStatus === 'pending' ? 'Pagamento Pendente' : 'Teste Gratuito Disponível'}
                   </h3>
                 </div>
                 <p className="text-[#B0B0B0] mb-5 text-lg">
-                  {subscriptionStatus === 'past_due'
+                  {subscriptionStatus === 'past_due' || subscriptionStatus === 'pending'
                     ? 'Atualize seu pagamento para continuar usando a plataforma'
                     : 'Ative 4 dias grátis e comece a automatizar seu atendimento agora'}
                 </p>
@@ -1437,7 +1461,7 @@ export default function Dashboard() {
                   onClick={() => setShowCheckoutModal(true)}
                   className="inline-flex items-center gap-2 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold px-8 py-4 rounded-xl hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] transition-all duration-300"
                 >
-                  {subscriptionStatus === 'past_due' ? 'Atualizar Pagamento' : 'Ativar Teste Gratuito'}
+                  {subscriptionStatus === 'past_due' || subscriptionStatus === 'pending' ? 'Atualizar Pagamento' : 'Ativar Teste Gratuito'}
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                   </svg>
@@ -1459,7 +1483,7 @@ export default function Dashboard() {
           </div>
         )}
         {/* Card para usuários que JÁ USARAM trial */}
-        {(subscriptionStatus === 'none' || subscriptionStatus === 'expired' || subscriptionStatus === 'past_due') && hasUsedTrialBefore && (
+        {(subscriptionStatus === 'none' || subscriptionStatus === 'expired' || subscriptionStatus === 'past_due' || subscriptionStatus === 'pending') && hasUsedTrialBefore && (
           <div
             className="mb-12 bg-black rounded-2xl p-8 relative"
             style={{
