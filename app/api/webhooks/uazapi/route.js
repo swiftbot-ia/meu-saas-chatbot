@@ -418,8 +418,7 @@ async function handleEditedMessage(requestId, instanceName, messageData, instanc
       .from('whatsapp_messages')
       .update({
         message_content: newText,
-        metadata: updatedMetadata,
-        updated_at: new Date().toISOString()
+        metadata: updatedMetadata
       })
       .eq('message_id', originalMessageId)
       .select()
