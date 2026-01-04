@@ -157,6 +157,7 @@ async function processEvent(requestId, eventType, instanceName, payload) {
       break;
 
     case 'MESSAGES_UPDATE':
+    case 'messages_update': // Formato alternativo
       await handleMessagesUpdate(requestId, instanceName, payload);
       break;
 
@@ -347,18 +348,60 @@ async function handleNewFormatMessage(requestId, instanceName, payload) {
 
 /**
  * ===========================================================================
- * HANDLER: MESSAGES_UPDATE (status de mensagem)
+ * HANDLER: MESSAGES_UPDATE (status de mensagem + edições)
  * ===========================================================================
  */
 async function handleMessagesUpdate(requestId, instanceName, payload) {
   try {
     log(requestId, 'info', '📊', `MESSAGES_UPDATE: ${instanceName}`);
 
+    // 🔍 DEBUG: Log completo do payload para descobrir formato de edições
+    log(requestId, 'info', '🔍', 'MESSAGES_UPDATE PAYLOAD COMPLETO:', {
+      event: payload.event,
+      instance: payload.instance,
+      data: payload.data,
+      message: payload.message,
+      token: payload.token ? '[PRESENTE]' : '[AUSENTE]',
+      fullPayload: payload
+    });
+
     const updates = Array.isArray(payload.data) ? payload.data : [payload.data];
 
     for (const update of updates) {
+      // 🔍 DEBUG: Log de cada update individual
+      log(requestId, 'info', '🔍', 'UPDATE INDIVIDUAL:', update);
+
       const messageId = update.key?.id;
-      const status = update.update?.status; // 'delivered', 'read', etc
+
+      // Detectar se é edição de mensagem
+      const editedMessage = update.update?.message?.editedMessage ||
+        update.update?.editedMessage ||
+        update.message?.editedMessage ||
+        update.editedMessage;
+
+      const newText = editedMessage?.message?.protocolMessage?.editedMessage?.conversation ||
+        editedMessage?.message?.conversation ||
+        editedMessage?.conversation ||
+        update.update?.message?.conversation ||
+        update.update?.text ||
+        update.text;
+
+      if (editedMessage || newText) {
+        // 🔍 DEBUG: Detectou possível edição
+        log(requestId, 'info', '✏️', 'POSSÍVEL EDIÇÃO DETECTADA:', {
+          messageId,
+          editedMessage,
+          newText,
+          updateKeys: Object.keys(update.update || update || {})
+        });
+
+        // TODO: Implementar atualização da mensagem e reenvio para n8n
+        // Por enquanto, apenas loga para descobrir o formato
+        continue;
+      }
+
+      // Atualização de status normal
+      const status = update.update?.status;
 
       if (!messageId || !status) continue;
 
