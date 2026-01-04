@@ -153,6 +153,7 @@ export default function Dashboard() {
   const [paymentElement, setPaymentElement] = useState(null)
   const [stripeElements, setStripeElements] = useState(null)
   const [isPaymentElementReady, setIsPaymentElementReady] = useState(false)
+  const [paymentError, setPaymentError] = useState(null)
 
   // Standard Modal state
   const [modalConfig, setModalConfig] = useState(initialModalConfig)
@@ -1157,6 +1158,7 @@ export default function Dashboard() {
     }
 
     setCheckoutLoading(true)
+    setPaymentError(null) // Clear previous errors
 
     try {
       console.log('💳 [STEP 2A] Validando cartão...')
@@ -1171,7 +1173,11 @@ export default function Dashboard() {
       })
 
       if (confirmError) {
-        throw new Error(confirmError.message)
+        console.error('❌ Erro na validação do cartão:', confirmError)
+        // Set specific user-friendly error message for card issues
+        setPaymentError('Seu cartão não foi aprovado. Por favor, tente novamente ou use outro cartão.')
+        setCheckoutLoading(false)
+        return // Stop execution
       }
 
       console.log('✅ Cartão validado!')
@@ -1475,17 +1481,19 @@ export default function Dashboard() {
                     </svg>
                   </div>
                   <h3 className="text-2xl font-bold text-white">
-                    Assinatura Necessária
+                    {subscriptionStatus === 'past_due' ? 'Pagamento Pendente' : 'Assinatura Necessária'}
                   </h3>
                 </div>
                 <p className="text-[#B0B0B0] mb-5 text-lg">
-                  Assine um plano para continuar automatizando seu atendimento
+                  {subscriptionStatus === 'past_due'
+                    ? 'Não conseguimos processar seu pagamento. Atualize seus dados para continuar.'
+                    : 'Assine um plano para continuar automatizando seu atendimento'}
                 </p>
                 <button
                   onClick={() => setShowCheckoutModal(true)}
                   className="inline-flex items-center gap-2 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold px-8 py-4 rounded-xl hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] transition-all duration-300"
                 >
-                  Ver Planos
+                  {subscriptionStatus === 'past_due' ? 'Atualizar Pagamento' : 'Ver Planos'}
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                   </svg>
@@ -2328,16 +2336,38 @@ export default function Dashboard() {
 
                     <form onSubmit={handleConfirmPayment}>
                       <div className="space-y-4 mb-6">
+                        {/* Payment Error Alert - Premium Gradient Border */}
+                        {paymentError && (
+                          <div
+                            className="rounded-xl p-4 flex items-start gap-3 relative overflow-hidden"
+                            style={{
+                              backgroundColor: 'rgba(239, 68, 68, 0.1)', // Red tint background
+                              border: '1px solid transparent',
+                              backgroundImage: 'linear-gradient(rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.1)), linear-gradient(135deg, #EF4444 0%, #FF0080 100%)',
+                              backgroundOrigin: 'border-box',
+                              backgroundClip: 'padding-box, border-box'
+                            }}
+                          >
+                            <svg className="w-5 h-5 text-red-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            <div>
+                              <h4 className="text-white font-bold text-sm">Pagamento não aprovado</h4>
+                              <p className="text-gray-300 text-sm mt-1">{paymentError}</p>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Stripe Payment Element */}
                         <div>
                           <div
                             id="payment-element"
                             className="min-h-[200px]"
                           />
-                          {/* Mensagens de erro aparecem aqui */}
+                          {/* Mensagens de erro do elemento (fallback) */}
                           <div
                             id="payment-message"
-                            className="text-red-400 text-sm mt-2"
+                            className="hidden"
                           />
                         </div>
                       </div>

@@ -1,1260 +1,154 @@
-// app/api/webhooks/stripe/route.js
-// WEBHOOK HANDLER PARA STRIPE - Substitui o Pagar.me
 import { NextResponse } from 'next/server'
-import { supabase } from '../../../../lib/supabase'
-import crypto from 'crypto'
-import { sendAssinaturaCriadaWebhook, sendAssinaturaCanceladaWebhook } from '@/lib/webhooks/onboarding-webhook'
+import { headers } from 'next/headers'
+import Stripe from 'stripe'
+import { supabase } from '@/lib/supabase'
 
-const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET
-const N8N_WEBHOOK_PAYMENT_URL = process.env.N8N_WEBHOOK_PAYMENT_URL
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
 
-// Force dynamic rendering to prevent build-time execution
-export const dynamic = 'force-dynamic'
-
-export async function POST(request) {
+export async function POST(req) {
   try {
-    const body = await request.text()
-    const signature = request.headers.get('stripe-signature')
+    const body = await req.text()
+    const signature = headers().get('stripe-signature')
 
-    console.log('📡 Webhook Stripe recebido')
+    let event
 
-    // ✅ VERIFICAR ASSINATURA DO WEBHOOK (CRÍTICO PARA SEGURANÇA)
-    if (STRIPE_WEBHOOK_SECRET && signature) {
-      try {
-        const verified = verifyStripeSignature(body, signature, STRIPE_WEBHOOK_SECRET)
-        if (!verified) {
-          console.error('❌ Assinatura do webhook inválida')
-          return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
-        }
-        console.log('✅ Assinatura do webhook verificada')
-      } catch (verifyError) {
-        console.error('❌ Erro ao verificar assinatura:', verifyError)
-        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
-      }
-    }
-
-    const event = JSON.parse(body)
-
-    console.log('📡 Evento Stripe:', {
-      type: event.type,
-      id: event.id,
-      created: new Date(event.created * 1000).toISOString()
-    })
-
-    // ✅ PROCESSAR EVENTOS DA STRIPE
-    switch (event.type) {
-      // EVENTOS DE ASSINATURA
-      case 'customer.subscription.created':
-        await handleSubscriptionCreated(event.data.object)
-        break
-
-      // ============================================
-      // INÍCIO DO MERGE - SWITCH
-      // Este case agora chama o NOVO handler
-      // ============================================
-      case 'customer.subscription.updated':
-        await handleSubscriptionUpdated(event.data.object)
-        break
-      // ============================================
-      // FIM DO MERGE - SWITCH (case duplicado removido)
-      // ============================================
-
-      case 'customer.subscription.deleted':
-        await handleSubscriptionDeleted(event.data.object)
-        break
-
-      case 'customer.subscription.trial_will_end':
-        await handleTrialWillEnd(event.data.object)
-        break
-
-      // ============================================
-      // INÍCIO DO MERGE - SWITCH
-      // Este case agora chama o NOVO handler
-      // ============================================
-      case 'invoice.paid':
-        await handleInvoicePaidWithProration(event.data.object)
-        break
-
-      case 'subscription_schedule.updated':
-        await handleSubscriptionScheduleUpdated(event.data.object)
-        break
-
-      case 'subscription_schedule.released':
-        await handleSubscriptionScheduleReleased(event.data.object)
-        break
-      // ============================================
-      // FIM DO MERGE - SWITCH
-      // ============================================
-
-      // EVENTOS DE PAGAMENTO
-      case 'invoice.payment_succeeded':
-        await handleInvoicePaymentSucceeded(event.data.object)
-        break
-
-      case 'invoice.payment_failed':
-        await handleInvoicePaymentFailed(event.data.object)
-        break
-
-      case 'payment_intent.succeeded':
-        await handlePaymentIntentSucceeded(event.data.object)
-        break
-
-      case 'payment_intent.payment_failed':
-        await handlePaymentIntentFailed(event.data.object)
-        break
-
-      // EVENTOS DE CUSTOMER
-      case 'customer.created':
-        console.log('👤 Customer criado:', event.data.object.id)
-        break
-
-      case 'customer.updated':
-        console.log('👤 Customer atualizado:', event.data.object.id)
-        break
-
-      case 'customer.deleted':
-        await handleCustomerDeleted(event.data.object)
-        break
-
-      default:
-        console.log('⚠️ Evento não processado:', event.type)
-    }
-
-    return NextResponse.json({ received: true }, { status: 200 })
-
-  } catch (error) {
-    console.error('❌ Erro ao processar webhook Stripe:', error)
-    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 })
-  }
-}
-
-// ============================================================================
-// VERIFICAR ASSINATURA DO WEBHOOK (Segurança)
-// ============================================================================
-function verifyStripeSignature(payload, header, secret) {
-  try {
-    const timestamp = header.split(',')[0].split('=')[1]
-    const signatures = header.split(',').slice(1).map(s => s.split('=')[1])
-
-    const signedPayload = `${timestamp}.${payload}`
-    const expectedSignature = crypto
-      .createHmac('sha256', secret)
-      .update(signedPayload)
-      .digest('hex')
-
-    return signatures.some(sig => crypto.timingSafeEqual(
-      Buffer.from(sig),
-      Buffer.from(expectedSignature)
-    ))
-  } catch (error) {
-    console.error('Erro ao verificar assinatura:', error)
-    return false
-  }
-}
-
-// ============================================================================
-// HANDLERS DE EVENTOS DE ASSINATURA
-// ============================================================================
-
-// ✅ ASSINATURA CRIADA
-async function handleSubscriptionCreated(subscription) {
-  try {
-    console.log('📝 Assinatura criada via webhook:', subscription.id)
-
-    // Atualizar status no banco local
-    const { error } = await supabase
-      .from('user_subscriptions')
-      .update({
-        status: mapStripeStatus(subscription.status),
-        updated_at: new Date().toISOString()
-      })
-      .eq('stripe_subscription_id', subscription.id)
-
-    if (error) {
-      console.error('❌ Erro ao atualizar assinatura criada:', error)
-    } else {
-      console.log('✅ Status da assinatura atualizado')
-
-      // Enviar webhook de assinatura criada
-      const { data: userData } = await supabase
-        .from('user_subscriptions')
-        .select('user_id, status, billing_period, connections_purchased, stripe_subscription_id')
-        .eq('stripe_subscription_id', subscription.id)
-        .single()
-
-      if (userData) {
-        sendAssinaturaCriadaWebhook(userData.user_id, {
-          id: userData.id,
-          status: userData.status,
-          billing_period: userData.billing_period,
-          connections_purchased: userData.connections_purchased,
-          stripe_subscription_id: userData.stripe_subscription_id
-        }, null).catch(err => console.warn('⚠️ Webhook assinação falhou:', err.message))
-      }
-    }
-
-  } catch (error) {
-    console.error('❌ Erro ao processar criação de assinatura:', error)
-  }
-}
-
-// ============================================================================
-// INÍCIO DO MERGE - FUNÇÕES ANTIGAS REMOVIDAS
-// As funções handleSubscriptionUpdated, handleSubscriptionUpdatedWithUpgrade,
-// handleInvoicePaidWithProration, handleSubscriptionScheduleUpdated,
-// handleSubscriptionScheduleReleased, e disconnectExcessWhatsApp
-// foram removidas daqui e substituídas pelo bloco de código do patch.
-// ============================================================================
-
-// ✅ ASSINATURA CANCELADA (CRÍTICO)
-async function handleSubscriptionDeleted(subscription) {
-  try {
-    console.log('🚨 Processando cancelamento de assinatura:', subscription.id)
-
-    // Buscar assinatura no banco local
-    const { data: localSubscription, error: fetchError } = await supabase
-      .from('user_subscriptions')
-      .select('*')
-      .eq('stripe_subscription_id', subscription.id)
-      .single()
-
-    if (fetchError || !localSubscription) {
-      console.error('❌ Assinatura não encontrada no banco local:', subscription.id)
-      return
-    }
-
-    // ✅ DESCONECTAR WHATSAPP IMEDIATAMENTE
-    await disconnectUserWhatsApp(localSubscription.user_id)
-
-    // ✅ ATUALIZAR STATUS NO BANCO
-    const now = new Date().toISOString()
-    const { error: updateError } = await supabase
-      .from('user_subscriptions')
-      .update({
-        status: 'canceled',
-        canceled_at: now,
-        updated_at: now
-      })
-      .eq('id', localSubscription.id)
-
-    if (updateError) {
-      console.error('❌ Erro ao atualizar status da assinatura:', updateError)
-      return
-    }
-
-    // ✅ LOG DO EVENTO
-    const { error: logError } = await supabase
-      .from('payment_logs')
-      .insert([{
-        user_id: localSubscription.user_id,
-        subscription_id: localSubscription.id,
-        event_type: 'subscription_canceled_webhook',
-        amount: 0,
-        payment_method: 'credit_card',
-        stripe_transaction_id: subscription.id,
-        status: 'canceled',
-        metadata: {
-          reason: 'webhook_notification',
-          canceled_by: 'stripe',
-          webhook_data: {
-            subscription_id: subscription.id,
-            customer_id: subscription.customer,
-            cancel_at_period_end: subscription.cancel_at_period_end
-          },
-          whatsapp_disconnected: true,
-          processed_at: now
-        },
-        created_at: now
-      }])
-
-    if (logError) {
-      console.warn('⚠️ Erro ao criar log do webhook:', logError)
-    }
-
-    // 📡 WEBHOOK: Assinatura cancelada
     try {
-      await sendAssinaturaCanceladaWebhook(localSubscription.user_id, localSubscription, 'stripe_canceled')
-      console.log('📡 Webhook assinatura_cancelada enviado')
-    } catch (webhookErr) {
-      console.warn('⚠️ Erro ao enviar webhook de cancelamento:', webhookErr.message)
+      event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+    } catch (err) {
+      console.error(`❌ Erro de assinatura no webhook: ${err.message}`)
+      return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 })
     }
 
-    console.log('✅ Cancelamento processado via webhook - WhatsApp desconectado')
+    const { type, data } = event
+    console.log(`🔔 Evento Stripe recebido: ${type}`)
 
-  } catch (error) {
-    console.error('❌ Erro ao processar cancelamento via webhook:', error)
-  }
-}
-
-// ✅ TRIAL VAI TERMINAR (3 dias antes)
-async function handleTrialWillEnd(subscription) {
-  try {
-    console.log('⏰ Trial vai terminar em breve:', subscription.id)
-
-    // Buscar dados do usuário
-    const { data: localSubscription } = await supabase
-      .from('user_subscriptions')
-      .select('user_id')
-      .eq('stripe_subscription_id', subscription.id)
-      .single()
-
-    if (localSubscription) {
-      // TODO: Enviar email/notificação para o usuário
-      console.log('📧 Enviar notificação de fim de trial para user:', localSubscription.user_id)
+    switch (type) {
+      case 'invoice.payment_succeeded':
+        await handleInvoicePaymentSucceeded(data.object)
+        break
+      case 'invoice.payment_failed':
+        await handleInvoicePaymentFailed(data.object)
+        break
+      case 'customer.subscription.updated':
+        await handleSubscriptionUpdated(data.object)
+        break
+      case 'customer.subscription.deleted':
+        await handleSubscriptionDeleted(data.object)
+        break
+      default:
+        console.log(`🤷‍♂️ Evento não tratado: ${type}`)
     }
 
-  } catch (error) {
-    console.error('❌ Erro ao processar aviso de fim de trial:', error)
+    return NextResponse.json({ received: true })
+  } catch (err) {
+    console.error(`❌ Erro no processamento do webhook: ${err.message}`)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
 
 // ============================================================================
-// HANDLERS DE EVENTOS DE PAGAMENTO
+// HANDLERS
 // ============================================================================
 
-// ✅ FATURA PAGA (Renovação bem-sucedida)
 async function handleInvoicePaymentSucceeded(invoice) {
-  try {
-    console.log('💰 Fatura paga via webhook:', invoice.id)
+  if (!invoice.subscription) return
 
-    if (!invoice.subscription) {
-      console.log('⚠️ Fatura sem subscription_id associado')
-      return
-    }
+  const subscriptionId = invoice.subscription
+  const periodEnd = new Date(invoice.lines.data[0].period.end * 1000)
 
-    // Buscar assinatura no banco
-    const { data: localSubscription } = await supabase
-      .from('user_subscriptions')
-      .select('*')
-      .eq('stripe_subscription_id', invoice.subscription)
-      .single()
+  console.log(`✅ Pagamento aprovado para assinatura: ${subscriptionId}`)
 
-    if (!localSubscription) {
-      console.log('⚠️ Assinatura não encontrada para fatura:', invoice.subscription)
-      return
-    }
-
-    // ✅ ATUALIZAR STATUS PARA ACTIVE
-    const { error: updateError } = await supabase
-      .from('user_subscriptions')
-      .update({
-        status: 'active',
-        updated_at: new Date().toISOString(),
-        next_billing_date: invoice.period_end ? new Date(invoice.period_end * 1000).toISOString() : null
-      })
-      .eq('id', localSubscription.id)
-
-    if (updateError) {
-      console.error('❌ Erro ao atualizar assinatura após pagamento:', updateError)
-    }
-
-    // ✅ LOG DO PAGAMENTO
-    const { data: paymentLog, error: logError } = await supabase
-      .from('payment_logs')
-      .insert([{
-        user_id: localSubscription.user_id,
-        subscription_id: localSubscription.id,
-        event_type: 'invoice_paid_webhook',
-        amount: invoice.amount_paid / 100, // Stripe usa centavos
-        payment_method: 'credit_card',
-        stripe_transaction_id: invoice.id,
-        status: 'paid',
-        metadata: {
-          invoice_id: invoice.id,
-          subscription_id: invoice.subscription,
-          customer_id: invoice.customer,
-          amount_paid: invoice.amount_paid / 100,
-          currency: invoice.currency,
-          processed_at: new Date().toISOString()
-        },
-        created_at: new Date().toISOString()
-      }])
-      .select()
-      .single()
-
-    if (logError) {
-      console.warn('⚠️ Erro ao criar log de pagamento:', logError)
-    }
-
-    // ✅ PROCESSAR COMISSÃO DE AFILIADO (se aplicável)
-    await processAffiliateCommission(localSubscription.user_id, invoice, paymentLog?.id)
-
-    console.log('✅ Pagamento processado com sucesso')
-
-    // Enviar para n8n (fire and forget)
-    sendPaymentToN8n(localSubscription, invoice).catch(err => {
-      console.warn('⚠️ [N8nPayment] Erro ao enviar:', err.message)
+  const { error } = await supabase
+    .from('user_subscriptions')
+    .update({
+      status: 'active',
+      next_billing_date: periodEnd.toISOString(),
+      updated_at: new Date().toISOString()
     })
+    .eq('stripe_subscription_id', subscriptionId)
 
-  } catch (error) {
-    console.error('❌ Erro ao processar fatura paga:', error)
+  if (error) {
+    console.error('❌ Erro ao atualizar assinatura (succeeded):', error)
   }
 }
 
-// ✅ FATURA COM FALHA (Renovação falhou)
 async function handleInvoicePaymentFailed(invoice) {
-  try {
-    console.log('❌ Falha no pagamento da fatura:', invoice.id)
+  if (!invoice.subscription) return
 
-    if (!invoice.subscription) {
-      console.log('⚠️ Fatura sem subscription_id associado')
-      return
-    }
+  const subscriptionId = invoice.subscription
+  console.log(`❌ Pagamento falhou para assinatura: ${subscriptionId}`)
 
-    // Buscar assinatura no banco
-    const { data: localSubscription } = await supabase
-      .from('user_subscriptions')
-      .select('*')
-      .eq('stripe_subscription_id', invoice.subscription)
-      .single()
+  // O status exato (past_due, unpaid) será atualizado pelo evento customer.subscription.updated
+  // Mas podemos forçar uma verificação ou notificar o usuário aqui
 
-    if (!localSubscription) {
-      console.log('⚠️ Assinatura não encontrada para fatura:', invoice.subscription)
-      return
-    }
+  // Exemplo: Atualizar para 'past_due' (atrasado) se já não estiver
+  const { error } = await supabase
+    .from('user_subscriptions')
+    .update({
+      status: 'past_due',
+      updated_at: new Date().toISOString()
+    })
+    .eq('stripe_subscription_id', subscriptionId)
 
-    // ✅ DESCONECTAR WHATSAPP POR FALHA DE PAGAMENTO
-    console.log('🚨 Desconectando WhatsApp por falha de pagamento')
-    await disconnectUserWhatsApp(localSubscription.user_id)
-
-    // ✅ ATUALIZAR STATUS PARA CANCELED
-    const now = new Date().toISOString()
-    const { error: updateError } = await supabase
-      .from('user_subscriptions')
-      .update({
-        status: 'canceled',
-        canceled_at: now,
-        updated_at: now
-      })
-      .eq('id', localSubscription.id)
-
-    if (updateError) {
-      console.error('❌ Erro ao cancelar assinatura:', updateError)
-    }
-
-    // ✅ LOG DA FALHA
-    const { error: logError } = await supabase
-      .from('payment_logs')
-      .insert([{
-        user_id: localSubscription.user_id,
-        subscription_id: localSubscription.id,
-        event_type: 'invoice_payment_failed_webhook',
-        amount: invoice.amount_due / 100,
-        payment_method: 'credit_card',
-        stripe_transaction_id: invoice.id,
-        status: 'failed',
-        metadata: {
-          invoice_id: invoice.id,
-          subscription_id: invoice.subscription,
-          customer_id: invoice.customer,
-          amount_due: invoice.amount_due / 100,
-          currency: invoice.currency,
-          attempt_count: invoice.attempt_count,
-          next_payment_attempt: invoice.next_payment_attempt,
-          whatsapp_disconnected: true,
-          processed_at: now
-        },
-        created_at: now
-      }])
-
-    if (logError) {
-      console.warn('⚠️ Erro ao criar log de falha:', logError)
-    }
-
-    console.log('✅ Falha de pagamento processada - WhatsApp desconectado')
-
-  } catch (error) {
-    console.error('❌ Erro ao processar falha de pagamento:', error)
+  if (error) {
+    console.error('❌ Erro ao atualizar assinatura (failed):', error)
   }
 }
 
-// ✅ PAYMENT INTENT SUCESSO
-async function handlePaymentIntentSucceeded(paymentIntent) {
-  try {
-    console.log('💳 Payment Intent bem-sucedido:', paymentIntent.id)
-    // Pode ser usado para pagamentos únicos ou setup
-  } catch (error) {
-    console.error('❌ Erro ao processar Payment Intent:', error)
-  }
-}
-
-// ✅ PAYMENT INTENT FALHOU
-async function handlePaymentIntentFailed(paymentIntent) {
-  try {
-    console.log('💳❌ Payment Intent falhou:', paymentIntent.id)
-    // Notificar usuário sobre falha
-  } catch (error) {
-    console.error('❌ Erro ao processar falha de Payment Intent:', error)
-  }
-}
-
-// ============================================================================
-// HANDLERS DE EVENTOS DE CUSTOMER
-// ============================================================================
-
-// ✅ CUSTOMER DELETADO
-async function handleCustomerDeleted(customer) {
-  try {
-    console.log('👤 Customer deletado:', customer.id)
-
-    // Limpar dados relacionados ao customer
-    const { error } = await supabase
-      .from('user_subscriptions')
-      .update({
-        status: 'canceled',
-        canceled_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('stripe_customer_id', customer.id)
-
-    if (error) {
-      console.error('❌ Erro ao limpar assinaturas do customer:', error)
-    }
-
-  } catch (error) {
-    console.error('❌ Erro ao processar deleção de customer:', error)
-  }
-}
-
-// ============================================================================
-// INÍCIO DO MERGE - NOVOS HANDLERS CORRIGIDOS
-// O bloco de código abaixo foi colado do patch
-// ============================================================================
-
-// ✅ ASSINATURA ATUALIZADA (UPGRADE/DOWNGRADE APLICADO)
-// Handler genérico que sincroniza o plano do Stripe com seu DB
 async function handleSubscriptionUpdated(subscription) {
-  try {
-    console.log('🔄 [WEBHOOK] customer.subscription.updated:', subscription.id)
+  console.log(`🔄 Assinatura atualizada: ${subscription.id} -> Status: ${subscription.status}`)
 
-    // Buscar assinatura no banco
-    const { data: localSubscription, error: localSubError } = await supabase
-      .from('user_subscriptions')
-      .select('*')
-      .eq('stripe_subscription_id', subscription.id)
-      .single()
-
-    if (localSubError || !localSubscription) {
-      console.error('⚠️ Assinatura não encontrada no banco local:', subscription.id, localSubError)
-      return
-    }
-
-    // Extrair dados do novo plano dos metadados da Stripe
-    // IMPORTANTE: Seus Prices na Stripe DEVEM ter esses metadados
-    const newConnections = subscription.metadata?.connections
-      ? parseInt(subscription.metadata.connections)
-      : null
-
-    const newBillingPeriod = subscription.metadata?.billing_period
-      || null
-
-    if (!newConnections || !newBillingPeriod) {
-      console.error('❌ ERRO CRÍTICO: Metadados (connections, billing_period) não encontrados no Price da Stripe. Abortando sincronização.')
-      console.error('💡 SOLUÇÃO: Verifique se os Prices na Stripe têm metadata: { connections: "1", billing_period: "monthly" }')
-      return
-    }
-
-    // Verificar se houve mudança real
-    const hasChanged =
-      newConnections !== localSubscription.connections_purchased ||
-      newBillingPeriod !== localSubscription.billing_period
-
-    const now = new Date().toISOString()
-    const updateData = {
-      status: subscription.status === 'trialing' ? 'trial' : 'active',
-      next_billing_date: subscription.current_period_end
-        ? new Date(subscription.current_period_end * 1000).toISOString()
-        : localSubscription.next_billing_date,
-      updated_at: now
-    }
-
-    let eventType = 'plan_sync' // Evento de log padrão
-    let isDowngrade = false
-
-    // Se não houve mudança de plano, apenas sincronizar status e data
-    if (!hasChanged) {
-      console.log('ℹ️ Nenhuma mudança de plano detectada, apenas sincronizando status/data.')
-    } else {
-      console.log('✅ Mudança de plano detectada:', {
-        de: `${localSubscription.connections_purchased} ${localSubscription.billing_period}`,
-        para: `${newConnections} ${newBillingPeriod}`
-      })
-
-      // É uma mudança de plano, adicionar ao updateData
-      updateData.connections_purchased = newConnections
-      updateData.billing_period = newBillingPeriod
-      updateData.last_plan_change_date = now // ✅ REFINAMENTO: Atualizar apenas quando confirmado
-      updateData.pending_change_type = null   // Limpar flags pendentes
-      updateData.pending_connections = null
-      updateData.pending_billing_period = null
-
-      // Se estava em trial e mudou, mudar para active
-      if (localSubscription.status === 'trial' && subscription.status === 'active') {
-        updateData.trial_end_date = null
-      }
-
-      // =======================================================
-      // ✅ CORREÇÃO CRÍTICA 1: DESCONECTAR WHATSAPP EM DOWNGRADE
-      // =======================================================
-      if (newConnections < localSubscription.connections_purchased) {
-        console.log('📉 Detectado DOWNGRADE. Desconectando conexões excedentes...')
-        eventType = 'plan_downgrade_applied'
-        isDowngrade = true
-
-        // ✅ CHAMADA CRÍTICA (não bloquear o webhook por isso)
-        disconnectExcessWhatsApp(
-          localSubscription.user_id,
-          localSubscription.connections_purchased,
-          newConnections
-        ).catch(err => {
-          console.error('❌ Erro ao fundo ao desconectar WhatsApp:', err)
-        })
-
-      } else if (newConnections > localSubscription.connections_purchased || newBillingPeriod !== localSubscription.billing_period) {
-        console.log('🚀 Detectado UPGRADE.')
-        eventType = 'plan_upgrade_confirmed'
-      }
-    }
-
-    // ✅ ATUALIZAR BANCO COM NOVO PLANO / STATUS
-    const { error: updateError } = await supabase
-      .from('user_subscriptions')
-      .update(updateData)
-      .eq('id', localSubscription.id)
-
-    if (updateError) {
-      console.error('❌ Erro ao atualizar plano no DB:', updateError)
-      return
-    }
-
-    console.log('✅ Plano/Status atualizado no banco via webhook')
-
-    // ✅ LOG DA MUDANÇA (apenas se houve mudança)
-    if (hasChanged) {
-      await supabase
-        .from('payment_logs')
-        .insert([{
-          user_id: localSubscription.user_id,
-          subscription_id: localSubscription.id,
-          event_type: eventType, // ✅ CORREÇÃO CRÍTICA 3: Log correto para upgrade/downgrade
-          amount: 0,
-          payment_method: 'credit_card',
-          stripe_transaction_id: subscription.id,
-          status: 'completed',
-          metadata: {
-            from: {
-              connections: localSubscription.connections_purchased,
-              period: localSubscription.billing_period
-            },
-            to: {
-              connections: newConnections,
-              period: newBillingPeriod
-            },
-            is_downgrade: isDowngrade,
-            whatsapp_disconnected: isDowngrade,
-            confirmed_via: 'webhook (customer.subscription.updated)',
-            processed_at: now
-          },
-          created_at: now
-        }])
-
-      console.log(`✅ Log registrado: ${eventType}`)
-    }
-
-  } catch (error) {
-    console.error('❌ Erro fatal ao processar customer.subscription.updated:', error)
-  }
-}
-
-// ✅ FATURA PAGA (UPGRADE COM PRORATION)
-async function handleInvoicePaidWithProration(invoice) {
-  try {
-    console.log('💰 [WEBHOOK] invoice.paid:', invoice.id)
-
-    if (!invoice.subscription) {
-      console.log('⚠️ Fatura sem subscription_id associado')
-      return
-    }
-
-    // Buscar assinatura no banco
-    const { data: localSubscription } = await supabase
-      .from('user_subscriptions')
-      .select('*')
-      .eq('stripe_subscription_id', invoice.subscription)
-      .single()
-
-    if (!localSubscription) {
-      console.log('⚠️ Assinatura não encontrada para fatura')
-      return
-    }
-
-    // Verificar se é uma invoice de upgrade (tem proration)
-    const hasProration = invoice.lines.data.some(line => line.proration === true)
-
-    if (hasProration) {
-      console.log('✅ Invoice de upgrade com proration detectada')
-
-      // Calcular valor total da proration
-      const prorationAmount = invoice.lines.data
-        .filter(line => line.proration === true)
-        .reduce((sum, line) => sum + line.amount, 0) / 100 // Converter de centavos
-
-      // ✅ LOG DO PAGAMENTO DE UPGRADE
-      await supabase
-        .from('payment_logs')
-        .insert([{
-          user_id: localSubscription.user_id,
-          subscription_id: localSubscription.id,
-          event_type: 'upgrade_proration_paid',
-          amount: invoice.amount_paid / 100,
-          payment_method: 'credit_card',
-          stripe_transaction_id: invoice.id,
-          status: 'paid',
-          metadata: {
-            invoice_id: invoice.id,
-            subscription_id: invoice.subscription,
-            proration_amount: prorationAmount,
-            total_paid: invoice.amount_paid / 100,
-            currency: invoice.currency,
-            processed_at: new Date().toISOString()
-          },
-          created_at: new Date().toISOString()
-        }])
-
-      console.log('✅ Pagamento de upgrade registrado:', invoice.amount_paid / 100)
-    }
-
-    // ✅ ATUALIZAR STATUS PARA ACTIVE (se estava em outro status)
-    if (localSubscription.status !== 'active') {
-      await supabase
-        .from('user_subscriptions')
-        .update({
-          status: 'active',
-          updated_at: new Date().toISOString(),
-          next_billing_date: invoice.period_end
-            ? new Date(invoice.period_end * 1000).toISOString()
-            : localSubscription.next_billing_date
-        })
-        .eq('id', localSubscription.id)
-    }
-
-  } catch (error) {
-    console.error('❌ Erro ao processar invoice.paid:', error)
-  }
-}
-
-// ✅ SUBSCRIPTION SCHEDULE ATUALIZADO (RECONCILER DE DOWNGRADE)
-// ✅ CORREÇÃO CRÍTICA 2: Lógica invertida corrigida
-async function handleSubscriptionScheduleUpdated(schedule) {
-  try {
-    console.log('📅 [WEBHOOK] subscription_schedule.updated:', schedule.id)
-
-    if (!schedule.subscription) {
-      console.log('⚠️ Schedule sem subscription_id associado')
-      return
-    }
-
-    const { data: localSubscription } = await supabase
-      .from('user_subscriptions')
-      .select('*')
-      .eq('stripe_subscription_id', schedule.subscription)
-      .single()
-
-    if (!localSubscription) {
-      console.log('⚠️ Assinatura não encontrada para schedule')
-      return
-    }
-
-    // Verificar se é um agendamento ativo (phase futura)
-    if (schedule.phases && schedule.phases.length > 1 && schedule.status === 'active') {
-      const futurePhase = schedule.phases[1]
-
-      // =======================================================
-      // ✅ CORREÇÃO CRÍTICA 2: RECONCILER - EXTRAIR DA STRIPE
-      // =======================================================
-
-      // Opção 1: Usar metadados do schedule (você precisa adicioná-los na API)
-      const pendingConnections = schedule.metadata?.pending_connections
-        ? parseInt(schedule.metadata.pending_connections)
-        : null
-
-      const pendingBillingPeriod = schedule.metadata?.pending_billing_period
-        || null
-
-      if (!pendingConnections || !pendingBillingPeriod) {
-        console.error(`❌ ERRO CRÍTICO: Metadados (pending_connections, pending_billing_period) não encontrados no SCHEDULE da Stripe.`)
-        console.error(`💡 SOLUÇÃO: Na API /downgrade, adicione metadata ao criar o schedule:`)
-        console.error(`   metadata: { pending_connections: "3", pending_billing_period: "monthly" }`)
-        return
-      }
-
-      console.log('✅ Downgrade agendado confirmado via webhook')
-      console.log(`📊 Plano futuro: ${pendingConnections} ${pendingBillingPeriod}`)
-      console.log(`📅 Efetivo em: ${new Date(futurePhase.start_date * 1000).toISOString()}`)
-
-      // ✅ RECONCILER: Atualizar flags apenas se estiver diferente
-      if (localSubscription.pending_change_type !== 'downgrade' ||
-        localSubscription.pending_connections !== pendingConnections ||
-        localSubscription.pending_billing_period !== pendingBillingPeriod) {
-
-        console.log('🔄 Sincronizando flags de mudança pendente no DB (RECONCILER)...')
-
-        await supabase
-          .from('user_subscriptions')
-          .update({
-            pending_change_type: 'downgrade',
-            pending_connections: pendingConnections,
-            pending_billing_period: pendingBillingPeriod,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', localSubscription.id)
-
-        console.log('✅ Flags de mudança pendente (re)sincronizadas no DB via RECONCILER.')
-      } else {
-        console.log('ℹ️ Flags de mudança pendente já estão corretas no DB.')
-      }
-    }
-
-  } catch (error) {
-    console.error('❌ Erro ao processar subscription_schedule.updated:', error)
-  }
-}
-
-// ✅ SUBSCRIPTION SCHEDULE RELEASED (MUDANÇA CANCELADA)
-async function handleSubscriptionScheduleReleased(schedule) {
-  try {
-    console.log('🔓 [WEBHOOK] subscription_schedule.released:', schedule.id)
-
-    if (!schedule.subscription) {
-      console.log('⚠️ Schedule sem subscription_id associado')
-      return
-    }
-
-    const { data: localSubscription } = await supabase
-      .from('user_subscriptions')
-      .select('*')
-      .eq('stripe_subscription_id', schedule.subscription)
-      .single()
-
-    if (!localSubscription) {
-      console.log('⚠️ Assinatura não encontrada para schedule')
-      return
-    }
-
-    console.log('✅ Cancelamento de mudança confirmado via webhook')
-
-    // ✅ LIMPAR FLAGS DE MUDANÇA PENDENTE
-    const { error: updateError } = await supabase
-      .from('user_subscriptions')
-      .update({
-        pending_change_type: null,
-        pending_connections: null,
-        pending_billing_period: null,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', localSubscription.id)
-
-    if (updateError) {
-      console.error('❌ Erro ao limpar flags:', updateError)
-      return
-    }
-
-    console.log('✅ Flags de mudança pendente limpas via webhook')
-
-    // ✅ LOG DO CANCELAMENTO CONFIRMADO
-    await supabase
-      .from('payment_logs')
-      .insert([{
-        user_id: localSubscription.user_id,
-        subscription_id: localSubscription.id,
-        event_type: 'plan_change_canceled_confirmed',
-        amount: 0,
-        payment_method: 'credit_card',
-        stripe_transaction_id: schedule.id,
-        status: 'completed',
-        metadata: {
-          schedule_id: schedule.id,
-          confirmed_via: 'webhook (subscription_schedule.released)',
-          processed_at: new Date().toISOString()
-        },
-        created_at: new Date().toISOString()
-      }])
-
-  } catch (error) {
-    console.error('❌ Erro ao processar subscription_schedule.released:', error)
-  }
-}
-
-// ============================================================================
-// HELPER: DESCONECTAR WHATSAPP EXCEDENTE (chamado pelo handleSubscriptionUpdated)
-// ============================================================================
-
-async function disconnectExcessWhatsApp(userId, currentConnections, newConnections) {
-  try {
-    if (newConnections >= currentConnections) {
-      console.log('ℹ️ Nenhuma conexão precisa ser desconectada')
-      return
-    }
-
-    const excessCount = currentConnections - newConnections
-    console.log(`🔌 Desconectando ${excessCount} conexões excedentes para user ${userId}...`)
-
-    // Buscar conexões do usuário (ordenar por mais recentes)
-    const { data: connections, error: fetchError } = await supabase
-      .from('whatsapp_connections')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('status', 'connected') // Apenas conectadas
-      .order('created_at', { ascending: false })
-      .limit(excessCount)
-
-    if (fetchError) {
-      console.error('❌ Erro ao buscar conexões:', fetchError)
-      return
-    }
-
-    if (!connections || connections.length === 0) {
-      console.log('⚠️ Nenhuma conexão conectada encontrada para desconectar')
-      return
-    }
-
-    console.log(`📋 ${connections.length} conexões serão desconectadas`)
-
-    // Desconectar cada uma
-    for (const conn of connections) {
-      try {
-        // Chamar Evolution API para desconectar
-        const evolutionUrl = process.env.EVOLUTION_API_URL
-        const evolutionKey = process.env.EVOLUTION_API_KEY
-
-        if (evolutionUrl && evolutionKey && conn.instance_name) {
-          const logoutResponse = await fetch(`${evolutionUrl}/instance/logout/${conn.instance_name}`, {
-            method: 'DELETE',
-            headers: {
-              'apikey': evolutionKey
-            }
-          })
-
-          if (logoutResponse.ok) {
-            console.log(`✅ Evolution API: Logout de ${conn.instance_name}`)
-          } else {
-            console.warn(`⚠️ Evolution API retornou ${logoutResponse.status} para ${conn.instance_name}`)
-          }
-        }
-
-        // Atualizar status no banco (sempre atualizar, mesmo se Evolution falhar)
-        const { error: updateError } = await supabase
-          .from('whatsapp_connections')
-          .update({
-            status: 'disconnected',
-            qr_code: null,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', conn.id)
-
-        if (updateError) {
-          console.error(`❌ Erro ao atualizar status de ${conn.instance_name}:`, updateError)
-        } else {
-          console.log(`✅ Conexão desconectada no DB: ${conn.instance_name}`)
-        }
-
-      } catch (connError) {
-        console.error(`❌ Erro ao desconectar ${conn.instance_name}:`, connError)
-      }
-    }
-
-    console.log(`✅ Processo de desconexão concluído: ${connections.length} conexões`)
-
-  } catch (error) {
-    console.error('❌ Erro fatal ao desconectar WhatsApp excedente:', error)
-  }
-}
-
-// ============================================================================
-// FIM DO MERGE - NOVOS HANDLERS CORRIGIDOS
-// ============================================================================
-
-
-// ============================================================================
-// FUNÇÕES AUXILIARES
-// ============================================================================
-
-// ✅ MAPEAR STATUS STRIPE PARA STATUS LOCAL
-function mapStripeStatus(stripeStatus) {
+  // Mapear status do Stripe para nosso status interno
   const statusMap = {
     'active': 'active',
     'trialing': 'trial',
+    'past_due': 'past_due',
+    'unpaid': 'expired',
     'canceled': 'canceled',
     'incomplete': 'pending',
     'incomplete_expired': 'expired',
-    'past_due': 'expired',
-    'unpaid': 'expired',
     'paused': 'paused'
   }
 
-  return statusMap[stripeStatus] || 'expired'
-}
+  const newStatus = statusMap[subscription.status] || 'expired'
 
-// ✅ DESCONECTAR WHATSAPP DO USUÁRIO
-async function disconnectUserWhatsApp(userId) {
-  try {
-    console.log('🔌 Desconectando WhatsApp via webhook:', userId)
+  const updateData = {
+    status: newStatus,
+    updated_at: new Date().toISOString()
+  }
 
-    // Buscar todas as conexões WhatsApp do usuário
-    const { data: connections, error: fetchError } = await supabase
-      .from('user_connections') // <-- ERRO NO ARQUIVO ORIGINAL? Talvez seja 'whatsapp_connections'
-      .select('*')
-      .eq('user_id', userId)
+  // Atualizar datas de período se disponíveis
+  if (subscription.current_period_end) {
+    updateData.next_billing_date = new Date(subscription.current_period_end * 1000).toISOString()
+  }
 
-    if (fetchError) {
-      console.error('❌ Erro ao buscar conexões WhatsApp:', fetchError)
-      return false
-    }
+  if (subscription.trial_end) {
+    updateData.trial_end_date = new Date(subscription.trial_end * 1000).toISOString()
+  }
 
-    if (!connections || connections.length === 0) {
-      console.log('⚠️ Nenhuma conexão WhatsApp encontrada')
-      return true
-    }
+  const { error } = await supabase
+    .from('user_subscriptions')
+    .update(updateData)
+    .eq('stripe_subscription_id', subscription.id)
 
-    // Desconectar cada conexão
-    for (const connection of connections) {
-      if (connection.evolution_instance_name) {
-        try {
-          // Desconectar na Evolution API
-          const evolutionResponse = await fetch(
-            `${process.env.EVOLUTION_API_URL}/instance/logout/${connection.evolution_instance_name}`,
-            {
-              method: 'DELETE',
-              headers: {
-                'apikey': process.env.EVOLUTION_API_KEY,
-                'Content-Type': 'application/json'
-              }
-            }
-          )
-
-          if (evolutionResponse.ok) {
-            console.log('✅ WhatsApp desconectado na Evolution API:', connection.evolution_instance_name)
-          } else {
-            console.warn('⚠️ Erro ao desconectar na Evolution API:', evolutionResponse.status)
-          }
-        } catch (evolutionError) {
-          console.warn('⚠️ Erro na Evolution API:', evolutionError)
-        }
-      }
-
-      // Remover conexão do banco
-      const { error: deleteError } = await supabase
-        .from('user_connections') // <-- ERRO NO ARQUIVO ORIGINAL?
-        .delete()
-        .eq('id', connection.id)
-
-      if (deleteError) {
-        console.error('❌ Erro ao remover conexão do banco:', deleteError)
-      }
-    }
-
-    console.log('✅ Todas as conexões WhatsApp desconectadas')
-    return true
-
-  } catch (error) {
-    console.error('❌ Erro ao desconectar WhatsApp via webhook:', error)
-    return false
+  if (error) {
+    console.error('❌ Erro ao atualizar assinatura (updated):', error)
   }
 }
 
-// ============================================================================
-// ENVIAR PAGAMENTO PARA N8N
-// ============================================================================
-async function sendPaymentToN8n(subscription, invoice) {
-  if (!N8N_WEBHOOK_PAYMENT_URL) {
-    console.warn('⚠️ [N8nPayment] N8N_WEBHOOK_PAYMENT_URL não configurada')
-    return
-  }
+async function handleSubscriptionDeleted(subscription) {
+  console.log(`🗑️ Assinatura cancelada/deletada: ${subscription.id}`)
 
-  try {
-    // Buscar dados do usuário
-    const { data: user } = await supabase
-      .from('user_profiles')
-      .select('email, full_name, company_name, phone')
-      .eq('user_id', subscription.user_id)
-      .single()
-
-    const payload = {
-      event: 'payment_confirmed',
-      timestamp: new Date().toISOString(),
-
-      payment: {
-        invoice_id: invoice.id,
-        amount: invoice.amount_paid / 100,
-        currency: invoice.currency,
-        paid_at: new Date().toISOString()
-      },
-
-      subscription: {
-        id: subscription.id,
-        status: subscription.status,
-        plan_type: subscription.billing_period,
-        connections: subscription.connections_purchased,
-        next_billing_date: subscription.next_billing_date
-      },
-
-      customer: {
-        user_id: subscription.user_id,
-        email: user?.email,
-        full_name: user?.full_name,
-        company_name: user?.company_name,
-        phone: user?.phone
-      }
-    }
-
-    console.log('🚀 [N8nPayment] Enviando para n8n:', {
-      invoice_id: invoice.id,
-      amount: invoice.amount_paid / 100
+  const { error } = await supabase
+    .from('user_subscriptions')
+    .update({
+      status: 'canceled',
+      updated_at: new Date().toISOString()
     })
+    .eq('stripe_subscription_id', subscription.id)
 
-    const response = await fetch(N8N_WEBHOOK_PAYMENT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-
-    if (response.ok) {
-      console.log('✅ [N8nPayment] Pagamento enviado com sucesso')
-    } else {
-      console.error('❌ [N8nPayment] Erro:', response.status)
-    }
-  } catch (error) {
-    console.error('❌ [N8nPayment] Erro ao enviar:', error.message)
-  }
-}
-
-// ============================================================================
-// PROCESSAR COMISSÃO DE AFILIADO
-// ============================================================================
-async function processAffiliateCommission(userId, invoice, paymentLogId) {
-  try {
-    console.log('🔍 [Affiliate] Verificando comissão para usuário:', userId)
-
-    // 1. Verificar se usuário foi indicado por afiliado
-    const { data: referral, error: refError } = await supabase
-      .from('affiliate_referrals')
-      .select(`
-        id,
-        affiliate_id,
-        expires_at,
-        status,
-        first_payment_date,
-        affiliates (
-          id,
-          commission_rate,
-          status
-        )
-      `)
-      .eq('referred_user_id', userId)
-      .single()
-
-    if (refError || !referral) {
-      console.log('ℹ️ [Affiliate] Usuário não foi indicado por afiliado')
-      return
-    }
-
-    // 2. Verificar se afiliado está ativo
-    if (!referral.affiliates || referral.affiliates.status !== 'active') {
-      console.log('⚠️ [Affiliate] Afiliado não está ativo')
-      return
-    }
-
-    // 3. Verificar se ainda está no período de comissão (6 meses)
-    const now = new Date()
-
-    if (referral.expires_at && new Date(referral.expires_at) < now) {
-      console.log('⚠️ [Affiliate] Período de comissão expirado')
-
-      // Atualizar status do referral se ainda não estiver expirado
-      if (referral.status === 'active') {
-        await supabase
-          .from('affiliate_referrals')
-          .update({ status: 'expired' })
-          .eq('id', referral.id)
-      }
-      return
-    }
-
-    // 4. Se é o primeiro pagamento, definir datas de expiração
-    if (!referral.first_payment_date) {
-      const expiresAt = new Date(now)
-      expiresAt.setMonth(expiresAt.getMonth() + 6) // +6 meses
-
-      await supabase
-        .from('affiliate_referrals')
-        .update({
-          first_payment_date: now.toISOString(),
-          expires_at: expiresAt.toISOString(),
-          status: 'active'
-        })
-        .eq('id', referral.id)
-
-      console.log('📅 [Affiliate] Primeiro pagamento registrado, expira em:', expiresAt.toISOString())
-    }
-
-    // 5. Calcular valor da comissão
-    const paymentAmount = invoice.amount_paid / 100 // Converter centavos para reais
-    const commissionRate = parseFloat(referral.affiliates.commission_rate) // 0.30 = 30%
-    const commissionAmount = paymentAmount * commissionRate
-
-    // 6. Calcular data de disponibilidade (7 dias após pagamento)
-    const availableDate = new Date(now)
-    availableDate.setDate(availableDate.getDate() + 7)
-
-    // 7. Criar registro de comissão
-    const { data: commission, error: commError } = await supabase
-      .from('affiliate_commissions')
-      .insert([{
-        affiliate_id: referral.affiliate_id,
-        referral_id: referral.id,
-        payment_log_id: paymentLogId,
-        stripe_invoice_id: invoice.id,
-        payment_amount: paymentAmount,
-        commission_amount: commissionAmount,
-        commission_rate: commissionRate,
-        status: 'pending',
-        payment_date: now.toISOString(),
-        available_date: availableDate.toISOString()
-      }])
-      .select()
-      .single()
-
-    if (commError) {
-      console.error('❌ [Affiliate] Erro ao criar comissão:', commError)
-      return
-    }
-
-    // 8. Atualizar totais do referral
-    const { data: currentReferral } = await supabase
-      .from('affiliate_referrals')
-      .select('total_payments, total_commissions')
-      .eq('id', referral.id)
-      .single()
-
-    await supabase
-      .from('affiliate_referrals')
-      .update({
-        total_payments: (parseFloat(currentReferral?.total_payments) || 0) + paymentAmount,
-        total_commissions: (parseFloat(currentReferral?.total_commissions) || 0) + commissionAmount
-      })
-      .eq('id', referral.id)
-
-    console.log('✅ [Affiliate] Comissão criada:', {
-      commission_id: commission.id,
-      affiliate_id: referral.affiliate_id,
-      payment: paymentAmount,
-      commission: commissionAmount,
-      rate: `${commissionRate * 100}%`,
-      available_in: '7 dias'
-    })
-
-  } catch (error) {
-    console.error('❌ [Affiliate] Erro ao processar comissão:', error)
-    // Não throw - não queremos que erro de afiliado bloqueie o webhook principal
+  if (error) {
+    console.error('❌ Erro ao atualizar assinatura (deleted):', error)
   }
 }

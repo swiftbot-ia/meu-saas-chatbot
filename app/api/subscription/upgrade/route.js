@@ -3,9 +3,9 @@
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { 
-  processUpgrade, 
-  determineChangeType 
+import {
+  processUpgrade,
+  determineChangeType
 } from '@/lib/stripe-plan-changes'
 
 const supabase = createClient(
@@ -86,7 +86,7 @@ export async function POST(request) {
     if (subscription.last_plan_change_date) {
       const lastChangeDate = new Date(subscription.last_plan_change_date)
       const daysSinceLastChange = Math.floor((Date.now() - lastChangeDate.getTime()) / (1000 * 60 * 60 * 24))
-      
+
       if (daysSinceLastChange < 30) {
         const daysRemaining = 30 - daysSinceLastChange
         return NextResponse.json({
@@ -101,6 +101,9 @@ export async function POST(request) {
     // 5. VERIFICAR SE REALMENTE É UPGRADE
     // ============================================
 
+    // 5. DETERMINAR TIPO DE MUDANÇA
+    // ============================================
+
     const currentPlan = {
       connections: subscription.connections_purchased,
       billing_period: subscription.billing_period
@@ -110,101 +113,122 @@ export async function POST(request) {
     try {
       changeType = determineChangeType(currentPlan, newPlan)
     } catch (error) {
-      return NextResponse.json({
-        success: false,
-        error: error.message
-      }, { status: 400 })
+      // Se for mesmo valor, permitir re-processar (útil para correção de status)
+      changeType = 'same_value'
     }
 
-    if (changeType !== 'upgrade') {
-      return NextResponse.json({
-        success: false,
-        error: 'Este plano não é um upgrade. Use a rota /api/subscription/downgrade'
-      }, { status: 400 })
+    console.log(`📊 Tipo de mudança: ${changeType.toUpperCase()}`)
+
+    // ============================================
+    // 6. PROCESSAR MUDANÇA (UPGRADE OU DOWNGRADE)
+    // ============================================
+
+    let result
+    let actionTaken = ''
+
+    // REGRA DE EXCEÇÃO:
+    // Se estiver em TRIAL ou PAST_DUE (pagamento pendente),
+    // qualquer mudança (mesmo downgrade) deve ser IMEDIATA para corrigir a fatura/trial.
+    const isTrialOrPastDue = ['trialing', 'trial', 'past_due', 'expired', 'unpaid', 'incomplete'].includes(subscription.status)
+
+    if (changeType === 'upgrade' || isTrialOrPastDue || changeType === 'same_value') {
+      // 🚀 MUDANÇA IMEDIATA
+      console.log(`🚀 Processando mudança IMEDIATA (${changeType}) - Status: ${subscription.status}`)
+      result = await processUpgrade(subscription.stripe_subscription_id, newPlan)
+      actionTaken = 'immediate_update'
+
+    } else {
+      // 📅 DOWNGRADE AGENDADO (Apenas para assinaturas ativas e pagas)
+      console.log('📅 Processando DOWNGRADE agendado (fim do ciclo)')
+
+      // Precisamos da data do fim do período
+      const currentPeriodEnd = subscription.next_billing_date
+        ? Math.floor(new Date(subscription.next_billing_date).getTime() / 1000)
+        : undefined
+
+      result = await processDowngrade(subscription.stripe_subscription_id, newPlan, currentPeriodEnd)
+      actionTaken = 'scheduled_downgrade'
     }
 
-    console.log('✅ Confirmado como UPGRADE')
+    if (!result.success) {
+      console.error('❌ Erro na mudança de plano:', result.error)
 
-    // ============================================
-    // 6. PROCESSAR UPGRADE NA STRIPE (SEM ATUALIZAR DB!)
-    // ============================================
-
-    const upgradeResult = await processUpgrade(
-      subscription.stripe_subscription_id,
-      newPlan
-    )
-
-    if (!upgradeResult.success) {
-      console.error('❌ Erro no upgrade Stripe:', upgradeResult.error)
-      
       return NextResponse.json({
         success: false,
-        error: `Erro ao processar upgrade: ${upgradeResult.error}`,
-        stripe_error: upgradeResult.code
+        error: `Erro ao processar mudança: ${result.error}`,
+        stripe_error: result.code
       }, { status: 500 })
     }
 
-    console.log('✅ Upgrade processado na Stripe (aguardando webhook para atualizar DB)')
+    console.log(`✅ Mudança processada com sucesso: ${actionTaken}`)
 
     // ============================================
-    // 7. MARCAR DATA DA ÚLTIMA MUDANÇA (apenas para validação de 1x/mês)
+    // 7. ATUALIZAÇÕES LOCAIS (LOGS E DB)
     // ============================================
 
     const now = new Date().toISOString()
-    
+
+    // Atualizar data de última mudança
     await supabase
       .from('user_subscriptions')
-      .update({ 
+      .update({
         last_plan_change_date: now,
         updated_at: now
       })
       .eq('id', subscription.id)
 
-    console.log('✅ Data de última mudança atualizada (validação 1x/mês)')
-
-    // ============================================
-    // 8. REGISTRAR LOG DE TENTATIVA (não de conclusão)
-    // ============================================
-
+    // Registrar Log
     await supabase
       .from('payment_logs')
       .insert([{
         user_id: userId,
         subscription_id: subscription.id,
-        event_type: 'plan_upgrade_requested',
-        amount: 0, // Valor real virá do webhook
+        event_type: actionTaken === 'immediate_update' ? 'plan_change_immediate' : 'plan_change_scheduled',
+        amount: result.charged_amount || 0,
         payment_method: 'credit_card',
         stripe_transaction_id: subscription.stripe_subscription_id,
-        status: 'processing',
+        status: actionTaken === 'immediate_update' ? 'processing' : 'scheduled',
         metadata: {
           from: currentPlan,
           to: newPlan,
-          message: 'Upgrade solicitado, aguardando confirmação via webhook',
+          change_type: changeType,
+          action: actionTaken,
           gateway: 'stripe'
         },
         created_at: now
       }])
 
-    console.log('✅ Log de solicitação registrado')
-
     // ============================================
-    // 9. RETORNAR SUCESSO (PROCESSANDO)
+    // 8. RETORNAR SUCESSO
     // ============================================
 
-    return NextResponse.json({
-      success: true,
-      message: 'Upgrade sendo processado! A atualização será refletida em alguns segundos.',
-      data: {
-        new_plan: newPlan,
-        status: 'processing',
-        estimated_charge: upgradeResult.charged_amount || 0,
-        invoice_id: upgradeResult.invoice?.id
-      },
-      warning: 'A mudança será confirmada via webhook. Atualize a página em alguns segundos.'
-    })
+    if (actionTaken === 'scheduled_downgrade') {
+      return NextResponse.json({
+        success: true,
+        message: 'Downgrade agendado para o fim do ciclo atual!',
+        data: {
+          new_plan: newPlan,
+          status: 'scheduled',
+          effective_date: result.effective_date
+        },
+        action: 'schedule'
+      })
+    } else {
+      return NextResponse.json({
+        success: true,
+        message: 'Plano atualizado com sucesso! A mudança será refletida em instantes.',
+        data: {
+          new_plan: newPlan,
+          status: 'processing',
+          estimated_charge: result.charged_amount || 0,
+          invoice_id: result.invoice?.id
+        },
+        action: 'update'
+      })
+    }
 
   } catch (error) {
-    console.error('❌ Erro fatal no upgrade:', error)
+    console.error('❌ Erro fatal na mudança de plano:', error)
     return NextResponse.json({
       success: false,
       error: 'Erro interno do servidor: ' + error.message

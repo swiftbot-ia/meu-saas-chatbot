@@ -997,7 +997,16 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
         .catch(err => log(requestId, 'error', '❌', `Erro ao verificar sequências keyword: ${err.message}`));
     }
 
-    // 13. ENVIAR PARA N8N (agente de IA)
+    // 13. VERIFICAR ASSINATURA DO USUÁRIO
+    // Antes de acionar o agente (que consome recursos), verificar se o usuário está ativo
+    const isSubscriptionActive = await checkUserSubscription(connection.user_id);
+
+    if (shouldSendToAgent && !isSubscriptionActive) {
+      log(requestId, 'warn', '🔒', `Assinatura inativa/pagamento pendente. Agente bloqueado para connection: ${connection.id}`);
+      shouldSendToAgent = false;
+    }
+
+    // 14. ENVIAR PARA N8N (agente de IA)
     // Fire and forget - não bloqueia o webhook
     // Apenas mensagens inbound são enviadas (filtrado internamente)
     if (shouldSendToAgent) {
@@ -1017,12 +1026,48 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
         log(requestId, 'error', '❌', `Erro ao enviar para n8n: ${err.message}`);
       });
     } else {
-      log(requestId, 'info', '🔇', `Agente desabilitado para contato: ${whatsappNumber} (connection: ${connection.id})`);
+      if (!isSubscriptionActive) {
+        // Já logado acima
+      } else {
+        log(requestId, 'info', '🔇', `Agente desabilitado para contato: ${whatsappNumber} (connection: ${connection.id})`);
+      }
     }
 
   } catch (error) {
     log(requestId, 'error', '❌', `Erro em processIncomingMessage`, { error: error.message, stack: error.stack });
     throw error;
+  }
+}
+
+/**
+ * ===========================================================================
+ * HELPER: Verificar Assinatura
+ * ===========================================================================
+ */
+async function checkUserSubscription(userId) {
+  try {
+    // Buscar assinatura do usuário no Main DB
+    const { data: subscription } = await supabaseAdmin
+      .from('user_subscriptions')
+      .select('status')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!subscription) {
+      return false; // Sem assinatura = inativo
+    }
+
+    // Status permitidos para usar o agente
+    const allowedStatuses = ['active', 'trial', 'trialing'];
+
+    return allowedStatuses.includes(subscription.status);
+
+  } catch (error) {
+    console.error(`Erro ao verificar assinatura do usuário ${userId}:`, error);
+    // Em caso de erro no banco, por segurança, permitir (fail open) ou bloquear (fail closed)?
+    // Fail closed (bloquear) é mais seguro financeiramente, mas pode frustrar usuário se banco oscilar.
+    // Vamos de FAIL CLOSED para garantir que não haja uso indevido.
+    return false;
   }
 }
 
