@@ -380,10 +380,12 @@ async function handleNewFormatMessage(requestId, instanceName, payload) {
 async function handleEditedMessage(requestId, instanceName, messageData, instanceToken, fullPayload) {
   try {
     const originalMessageId = messageData.edited;
-    const newText = messageData.text;
+    // Para imagens editadas, o novo caption pode estar em content.caption
+    const newText = messageData.text || messageData.content?.caption || messageData.content;
     const whatsappNumber = messageData.chatid?.split('@')[0];
+    const isImageEdit = messageData.messageType === 'ImageMessage' || messageData.mediaType === 'image';
 
-    log(requestId, 'info', '✏️', `Processando edição de mensagem: ${originalMessageId} → "${newText?.substring(0, 50)}..."`);
+    log(requestId, 'info', '✏️', `Processando edição de mensagem: ${originalMessageId} → "${typeof newText === 'string' ? newText?.substring(0, 50) : JSON.stringify(newText)}..."${isImageEdit ? ' (IMAGEM)' : ''}`);
 
     // 1. BUSCAR MENSAGEM ORIGINAL NO BANCO
     const { data: originalMessage, error: findError } = await chatSupabaseAdmin
@@ -399,6 +401,7 @@ async function handleEditedMessage(requestId, instanceName, messageData, instanc
 
     // 2. GUARDAR CONTEÚDO ORIGINAL NO METADATA
     const originalContent = originalMessage.message_content;
+    const originalAiInterpretation = originalMessage.metadata?.ai_interpretation;
     const updatedMetadata = {
       ...(originalMessage.metadata || {}),
       is_edited: true,
@@ -413,11 +416,14 @@ async function handleEditedMessage(requestId, instanceName, messageData, instanc
       ]
     };
 
+    // Extrair novo conteúdo corretamente
+    const finalNewText = typeof newText === 'string' ? newText : (newText?.caption || originalContent);
+
     // 3. ATUALIZAR MENSAGEM NO BANCO
     const { data: updatedMessage, error: updateError } = await chatSupabaseAdmin
       .from('whatsapp_messages')
       .update({
-        message_content: newText,
+        message_content: finalNewText,
         metadata: updatedMetadata
       })
       .eq('message_id', originalMessageId)
@@ -429,7 +435,7 @@ async function handleEditedMessage(requestId, instanceName, messageData, instanc
       return;
     }
 
-    log(requestId, 'success', '✅', `Mensagem atualizada: "${originalContent?.substring(0, 30)}..." → "${newText?.substring(0, 30)}..."`);
+    log(requestId, 'success', '✅', `Mensagem atualizada: "${originalContent?.substring(0, 30)}..." → "${finalNewText?.substring(0, 30)}..."`);
 
     // 4. BUSCAR CONEXÃO PARA ENVIAR AO N8N
     const { data: connection } = await supabaseAdmin
@@ -457,7 +463,7 @@ async function handleEditedMessage(requestId, instanceName, messageData, instanc
             id: updatedMessage.id,
             message_id: originalMessageId,
             type: updatedMessage.message_type,
-            content: newText,
+            content: finalNewText,
             original_content: originalContent,
             direction: updatedMessage.direction,
             status: updatedMessage.status,
@@ -465,6 +471,13 @@ async function handleEditedMessage(requestId, instanceName, messageData, instanc
             is_edited: true,
             edited_at: new Date().toISOString()
           },
+
+          // Incluir ai_processing para imagens editadas
+          ai_processing: originalAiInterpretation ? {
+            ai_interpretation: originalAiInterpretation,
+            transcription: originalMessage.metadata?.transcription || null,
+            transcription_status: originalMessage.metadata?.transcription_status || 'not_applicable'
+          } : null,
 
           contact: originalMessage.contact ? {
             id: originalMessage.contact.id,
