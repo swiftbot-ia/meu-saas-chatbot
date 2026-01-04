@@ -264,6 +264,30 @@ export default function RootLayout({ children }) {
           {children}
           <CookieConsent />
           <UTMTracker />
+
+          {/* Cache Buster Script - Force clear localStorage on new version */}
+          <Script id="cache-buster" strategy="afterInteractive">
+            {`
+              (function() {
+                try {
+                  var currentVersion = 'v1.1';
+                  var savedVersion = localStorage.getItem('app_version');
+                  
+                  if (savedVersion !== currentVersion) {
+                    console.log('🧹 Clearing cache for version update:', currentVersion);
+                    // Preservar apenas itens essenciais se necessário, aqui limpamos tudo para segurança
+                    localStorage.clear();
+                    localStorage.setItem('app_version', currentVersion);
+                    
+                    // Opcional: Recarregar a página se for crítico
+                    // window.location.reload();
+                  }
+                } catch (e) {
+                  console.error('Cache clear failed:', e);
+                }
+              })();
+            `}
+          </Script>
         </div>
       </body>
     </html>

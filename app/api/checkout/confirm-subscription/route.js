@@ -1,7 +1,7 @@
 // app/api/checkout/confirm-subscription/route.js
 // ✅ ETAPA 2: Criar CUSTOMER + SUBSCRIPTION após cartão validado
 import { NextResponse } from 'next/server'
-import { supabase } from '../../../../lib/supabase'
+import { supabaseAdmin } from '../../../../lib/supabase'
 import { createCustomer, createSubscription, cancelSubscription, mapStripeStatus } from '../../../../lib/stripe'
 import { sendTrialIniciadoWebhook, sendAssinaturaCriadaWebhook } from '@/lib/webhooks/onboarding-webhook'
 import Stripe from 'stripe'
@@ -40,7 +40,7 @@ export async function POST(request) {
     }
 
     // ✅ VERIFICAR SE JÁ TEM ASSINATURA ATIVA
-    const { data: existingSubscription } = await supabase
+    const { data: existingSubscription } = await supabaseAdmin
       .from('user_subscriptions')
       .select('*')
       .eq('user_id', userId)
@@ -55,7 +55,7 @@ export async function POST(request) {
     }
 
     // ✅ BUSCAR DADOS DO PERFIL
-    const { data: userProfile } = await supabase
+    const { data: userProfile } = await supabaseAdmin
       .from('user_profiles')
       .select('phone, full_name')
       .eq('user_id', userId)
@@ -197,7 +197,7 @@ export async function POST(request) {
 
     console.log('💾 Salvando no banco:', subscriptionData)
 
-    const { data: subscription, error: subscriptionError } = await supabase
+    const { data: subscription, error: subscriptionError } = await supabaseAdmin
       .from('user_subscriptions')
       .insert([subscriptionData])
       .select()
@@ -220,7 +220,7 @@ export async function POST(request) {
 
     // ✅ LOG DA TRANSAÇÃO
     if (subscription && subscription.id) {
-      await supabase
+      await supabaseAdmin
         .from('payment_logs')
         .insert([{
           user_id: userId,
@@ -266,7 +266,7 @@ export async function POST(request) {
         console.log('🔗 [Affiliate] Verificando código:', affiliate_ref_code)
 
         // Buscar afiliado pelo código
-        const { data: affiliate, error: affError } = await supabase
+        const { data: affiliate, error: affError } = await supabaseAdmin
           .from('affiliates')
           .select('id, status')
           .eq('affiliate_code', affiliate_ref_code.toUpperCase())
@@ -275,7 +275,7 @@ export async function POST(request) {
 
         if (affiliate && !affError) {
           // Verificar se usuário já não foi indicado antes
-          const { data: existingReferral } = await supabase
+          const { data: existingReferral } = await supabaseAdmin
             .from('affiliate_referrals')
             .select('id')
             .eq('referred_user_id', userId)
@@ -283,7 +283,7 @@ export async function POST(request) {
 
           if (!existingReferral) {
             // Criar referral
-            const { error: refError } = await supabase
+            const { error: refError } = await supabaseAdmin
               .from('affiliate_referrals')
               .insert([{
                 affiliate_id: affiliate.id,
@@ -338,7 +338,7 @@ export async function POST(request) {
 
 async function hasUserUsedTrial(userId) {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('user_subscriptions')
       .select('id')
       .eq('user_id', userId)
