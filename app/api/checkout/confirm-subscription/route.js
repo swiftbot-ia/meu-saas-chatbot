@@ -2,7 +2,7 @@
 // ✅ ETAPA 2: Criar CUSTOMER + SUBSCRIPTION após cartão validado
 import { NextResponse } from 'next/server'
 import { supabase } from '../../../../lib/supabase'
-import { createCustomer, createSubscription, cancelSubscription } from '../../../../lib/stripe'
+import { createCustomer, createSubscription, cancelSubscription, mapStripeStatus } from '../../../../lib/stripe'
 import { sendTrialIniciadoWebhook, sendAssinaturaCriadaWebhook } from '@/lib/webhooks/onboarding-webhook'
 import Stripe from 'stripe'
 
@@ -184,7 +184,7 @@ export async function POST(request) {
       user_id: userId,
       billing_period: plan.billingPeriod,
       connections_purchased: plan.connections,
-      status: stripeSubscription.status === 'trialing' ? 'trial' : 'active',
+      status: mapStripeStatus(stripeSubscription.status),
       trial_start_date: isTrialEligible ? now.toISOString() : null,
       trial_end_date: trialEndDate ? trialEndDate.toISOString() : null,
       next_billing_date: nextBillingDate.toISOString(),
@@ -229,7 +229,7 @@ export async function POST(request) {
           amount: planPrice,
           payment_method: 'credit_card',
           stripe_transaction_id: stripeSubscription.id,
-          status: stripeSubscription.status === 'trialing' ? 'trial' : 'active',
+          status: mapStripeStatus(stripeSubscription.status),
           metadata: {
             trial_days: trialDays,
             billing_period: plan.billingPeriod,
