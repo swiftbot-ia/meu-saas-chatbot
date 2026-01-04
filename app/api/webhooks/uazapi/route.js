@@ -401,7 +401,8 @@ async function handleEditedMessage(requestId, instanceName, messageData, instanc
 
     // 2. GUARDAR CONTEÚDO ORIGINAL NO METADATA
     const originalContent = originalMessage.message_content;
-    const originalAiInterpretation = originalMessage.metadata?.ai_interpretation;
+    // Buscar ai_interpretation da coluna dedicada primeiro, depois do metadata
+    const originalAiInterpretation = originalMessage.ai_interpretation || originalMessage.metadata?.ai_interpretation;
     const updatedMetadata = {
       ...(originalMessage.metadata || {}),
       is_edited: true,
