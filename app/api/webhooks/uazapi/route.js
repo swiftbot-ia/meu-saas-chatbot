@@ -79,8 +79,25 @@ export async function POST(request) {
     }
 
     // 3. VALIDAÇÃO DE CAMPOS OBRIGATÓRIOS
-    const eventType = payload.event || payload.EventType;
+    let eventType = payload.event || payload.EventType;
     const instanceName = payload.instance || payload.instanceName;
+
+    // 🔍 DEBUG: Detectar quando event é um objeto (formato especial UAZAPI)
+    if (typeof eventType === 'object') {
+      log(requestId, 'info', '🔍', 'EVENT É UM OBJETO! Payload completo:', {
+        fullPayload: payload,
+        eventObject: eventType,
+        eventKeys: Object.keys(eventType || {}),
+        hasEditedMessage: !!(eventType?.editedMessage || payload.editedMessage)
+      });
+
+      // Se o evento contém editedMessage, tratar como messages_update
+      if (eventType?.editedMessage || payload.editedMessage || eventType?.message?.editedMessage) {
+        eventType = 'messages_update_edited';
+      } else {
+        eventType = 'unknown_object_event';
+      }
+    }
 
     if (!eventType || !instanceName) {
       log(requestId, 'warn', '⚠️', 'Payload incompleto', payload);
@@ -281,6 +298,14 @@ async function handleNewFormatMessage(requestId, instanceName, payload) {
     const messageData = payload.message;
     const instanceToken = payload.token; // Token já vem no payload!
 
+    // 🔍 DETECTAR MENSAGEM EDITADA
+    // Quando uma mensagem é editada, o campo `edited` contém o ID da mensagem original
+    if (messageData.edited) {
+      log(requestId, 'info', '✏️', `MENSAGEM EDITADA DETECTADA! Original ID: ${messageData.edited}`);
+      await handleEditedMessage(requestId, instanceName, messageData, instanceToken, payload);
+      return;
+    }
+
     // Converter novo formato para formato padrão
     const convertedMessage = {
       key: {
@@ -342,6 +367,154 @@ async function handleNewFormatMessage(requestId, instanceName, payload) {
 
   } catch (error) {
     log(requestId, 'error', '❌', 'Erro em handleNewFormatMessage', { error: error.message });
+    throw error;
+  }
+}
+
+/**
+ * ===========================================================================
+ * HANDLER: Mensagem Editada
+ * ===========================================================================
+ * Quando uma mensagem é editada, atualiza o conteúdo no banco e reenvia para n8n
+ */
+async function handleEditedMessage(requestId, instanceName, messageData, instanceToken, fullPayload) {
+  try {
+    const originalMessageId = messageData.edited;
+    const newText = messageData.text;
+    const whatsappNumber = messageData.chatid?.split('@')[0];
+
+    log(requestId, 'info', '✏️', `Processando edição de mensagem: ${originalMessageId} → "${newText?.substring(0, 50)}..."`);
+
+    // 1. BUSCAR MENSAGEM ORIGINAL NO BANCO
+    const { data: originalMessage, error: findError } = await chatSupabaseAdmin
+      .from('whatsapp_messages')
+      .select('*, conversation:whatsapp_conversations(*), contact:whatsapp_contacts(*)')
+      .eq('message_id', originalMessageId)
+      .maybeSingle();
+
+    if (findError || !originalMessage) {
+      log(requestId, 'warn', '⚠️', `Mensagem original não encontrada: ${originalMessageId}`);
+      return;
+    }
+
+    // 2. GUARDAR CONTEÚDO ORIGINAL NO METADATA
+    const originalContent = originalMessage.message_content;
+    const updatedMetadata = {
+      ...(originalMessage.metadata || {}),
+      is_edited: true,
+      edited_at: new Date().toISOString(),
+      original_content: originalContent,
+      edit_history: [
+        ...(originalMessage.metadata?.edit_history || []),
+        {
+          content: originalContent,
+          edited_at: new Date().toISOString()
+        }
+      ]
+    };
+
+    // 3. ATUALIZAR MENSAGEM NO BANCO
+    const { data: updatedMessage, error: updateError } = await chatSupabaseAdmin
+      .from('whatsapp_messages')
+      .update({
+        message_content: newText,
+        metadata: updatedMetadata,
+        updated_at: new Date().toISOString()
+      })
+      .eq('message_id', originalMessageId)
+      .select()
+      .single();
+
+    if (updateError) {
+      log(requestId, 'error', '❌', `Erro ao atualizar mensagem: ${updateError.message}`);
+      return;
+    }
+
+    log(requestId, 'success', '✅', `Mensagem atualizada: "${originalContent?.substring(0, 30)}..." → "${newText?.substring(0, 30)}..."`);
+
+    // 4. BUSCAR CONEXÃO PARA ENVIAR AO N8N
+    const { data: connection } = await supabaseAdmin
+      .from('whatsapp_connections')
+      .select('*')
+      .eq('instance_name', instanceName)
+      .maybeSingle();
+
+    if (!connection) {
+      log(requestId, 'warn', '⚠️', `Conexão não encontrada para enviar edição ao n8n`);
+      return;
+    }
+
+    // 5. ENVIAR PARA N8N COM FLAG DE EDIÇÃO
+    // Apenas se for mensagem inbound (do contato)
+    if (originalMessage.direction === 'inbound') {
+      const editedPayload = {
+        event: 'message_edited',
+        timestamp: new Date().toISOString(),
+
+        original_webhook: fullPayload,
+
+        processed_data: {
+          message: {
+            id: updatedMessage.id,
+            message_id: originalMessageId,
+            type: updatedMessage.message_type,
+            content: newText,
+            original_content: originalContent,
+            direction: updatedMessage.direction,
+            status: updatedMessage.status,
+            received_at: updatedMessage.received_at,
+            is_edited: true,
+            edited_at: new Date().toISOString()
+          },
+
+          contact: originalMessage.contact ? {
+            id: originalMessage.contact.id,
+            whatsapp_number: originalMessage.contact.whatsapp_number,
+            name: originalMessage.contact.name || originalMessage.contact.whatsapp_number
+          } : { whatsapp_number: whatsappNumber },
+
+          conversation: originalMessage.conversation ? {
+            id: originalMessage.conversation.id,
+            instance_name: originalMessage.conversation.instance_name
+          } : null,
+
+          connection: {
+            id: connection.id,
+            phone_number: connection.phone_number,
+            user_id: connection.user_id,
+            instance_name: connection.instance_name
+          }
+        }
+      };
+
+      // Enviar para n8n
+      const webhookUrl = process.env.N8N_WEBHOOK_URL;
+      if (webhookUrl) {
+        try {
+          const response = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'User-Agent': 'SwiftBot-Webhook/1.0'
+            },
+            body: JSON.stringify(editedPayload)
+          });
+
+          if (response.ok) {
+            log(requestId, 'success', '🤖', 'Edição enviada para n8n com sucesso');
+          } else {
+            log(requestId, 'warn', '⚠️', `Falha ao enviar edição para n8n: ${response.status}`);
+          }
+        } catch (error) {
+          log(requestId, 'error', '❌', `Erro ao enviar edição para n8n: ${error.message}`);
+        }
+      }
+    } else {
+      log(requestId, 'info', 'ℹ️', 'Edição de mensagem outbound, não enviando para n8n');
+    }
+
+  } catch (error) {
+    log(requestId, 'error', '❌', `Erro em handleEditedMessage: ${error.message}`);
     throw error;
   }
 }
