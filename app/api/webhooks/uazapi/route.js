@@ -1224,6 +1224,16 @@ async function processIncomingMessage(requestId, instanceName, messageData, inst
       // Fire and forget
       SequenceService.checkAndEnroll(contact.id, connection.id, 'keyword', messageContent)
         .catch(err => log(requestId, 'error', '❌', `Erro ao verificar sequências keyword: ${err.message}`));
+
+      // 12.3 VERIFICAR SEQUÊNCIAS FOLLOW-UP - REINÍCIO QUANDO LEAD RESPONDE
+      // Fire and forget - reinicia sequências configuradas para restart_on_reply
+      SequenceService.handleLeadReply(contact.id, connection.id)
+        .then(result => {
+          if (result.restarted > 0) {
+            log(requestId, 'info', '🔁', `Reiniciadas ${result.restarted} sequências follow-up`);
+          }
+        })
+        .catch(err => log(requestId, 'error', '❌', `Erro ao processar handleLeadReply: ${err.message}`));
     }
 
     // 13. VERIFICAR ASSINATURA DO USUÁRIO
