@@ -1,5 +1,9 @@
 # Dependências - EXCLUI do build context (não da imagem final)
 node_modules
+# User uploads / Heavy media (Mounted via volume)
+public/media
+public/videos
+
 npm-debug.log
 yarn-debug.log
 yarn-error.log

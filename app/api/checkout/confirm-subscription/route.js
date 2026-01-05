@@ -342,7 +342,8 @@ async function hasUserUsedTrial(userId) {
       .from('user_subscriptions')
       .select('id')
       .eq('user_id', userId)
-      .not('trial_start_date', 'is', null)
+      .not('trial_start_date', 'is', null) // Só considera se data de trial foi gerada
+      .neq('status', 'pending')            // IGNORA status 'pending' (Trial não validado/falha no cartão)
       .limit(1)
 
     if (error) {

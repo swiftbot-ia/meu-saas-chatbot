@@ -21,6 +21,7 @@ export default function AccountSubscription() {
   const [changeType, setChangeType] = useState(null) // 'upgrade' ou 'downgrade'
   const [changingPlan, setChangingPlan] = useState(false)
   const [showConfirmDowngradeModal, setShowConfirmDowngradeModal] = useState(false)
+  const [showUpdatePaymentModal, setShowUpdatePaymentModal] = useState(false) // 🆕 Modal para atualizar cartão
 
   const router = useRouter()
 
@@ -389,7 +390,19 @@ export default function AccountSubscription() {
 
     } catch (error) {
       console.error('Erro ao mudar plano:', error)
-      alert('❌ Erro ao processar mudança de plano: ' + error.message)
+
+      // 🚨 NOVO TRATAMENTO DE ERRO DE PAGAMENTO
+      const errorMsg = error.message.toLowerCase()
+      const isPaymentError = errorMsg.includes('card') || errorMsg.includes('declined') || errorMsg.includes('insufficient') || errorMsg.includes('payment') || errorMsg.includes('pagamento') || errorMsg.includes('funds')
+
+      if (isPaymentError) {
+        if (confirm('❌ Falha no pagamento: O cartão foi recusado.\n\nDeseja atualizar seu cartão de crédito agora?')) {
+          setShowUpdatePaymentModal(true)
+        }
+      } else {
+        alert('❌ Erro ao processar mudança de plano: ' + error.message)
+      }
+
     } finally {
       setChangingPlan(false)
     }
@@ -731,6 +744,19 @@ export default function AccountSubscription() {
                         {canceling ? 'Cancelando...' : 'Cancelar Assinatura'}
                       </button>
                     )}
+
+                    {/* ✅ BOTÃO NOVO: TROCAR CARTÃO */}
+                    {subscriptionStatus !== 'canceled' && subscriptionStatus !== 'expired' && (
+                      <button
+                        onClick={() => setShowUpdatePaymentModal(true)}
+                        className="w-full bg-[#1A1A1A] hover:bg-[#252525] text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center border border-white/10"
+                      >
+                        <svg className="w-5 h-5 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                        </svg>
+                        Trocar Cartão
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -795,353 +821,370 @@ export default function AccountSubscription() {
             </div>
           </div>
         </div>
-      </main>
+      </main >
+
+      {/* Modal de Atualizar Cartão */}
+      <UpdatePaymentModal
+        isOpen={showUpdatePaymentModal}
+        onClose={() => setShowUpdatePaymentModal(false)}
+        userId={user?.id}
+        onSuccess={async () => {
+          await loadSubscriptionData(user.id)
+          alert('✅ Cartão atualizado com sucesso! Tente o upgrade novamente.')
+        }}
+      />
 
       {/* Modal de Cancelamento */}
-      {showCancelModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          {/* MODIFICADO: Modal sem borda */}
-          <div className="relative bg-[#111111] rounded-2xl p-8 max-w-md w-full shadow-2xl z-[70]">
-            <div className="relative z-10">
-              <div className="text-center mb-6">
-                {/* MODIFICADO: Ícone do modal sem borda */}
-                <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-bold text-white mb-2">Cancelar Assinatura</h3>
-                <p className="text-gray-400">
-                  {isWithin7Days()
-                    ? 'Você está nos primeiros 7 dias - Lei do Arrependimento'
-                    : 'Seu plano será cancelado mas você mantém acesso'
-                  }
-                </p>
-              </div>
-
-              <div className="space-y-3 mb-6">
-                {isWithin7Days() ? (
-                  <>
-                    {/* MODIFICADO: Aviso sem borda */}
-                    <div className="bg-yellow-500/10 rounded-xl p-4">
-                      <p className="text-yellow-400 text-sm flex items-start">
-                        <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                        <span>
-                          <strong>Lei do Arrependimento (7 dias)</strong><br />
-                          Você está nos primeiros {getDaysSinceCreation()} dias da sua primeira assinatura.
-                        </span>
-                      </p>
-                    </div>
-                    {/* MODIFICADO: Aviso sem borda */}
-                    <div className="bg-red-500/10 rounded-xl p-4">
-                      <p className="text-red-400 text-sm">
-                        <strong>⚠️ Cancelamento IMEDIATO:</strong>
-                      </p>
-                      <ul className="text-sm text-red-300 mt-2 space-y-1 ml-4">
-                        <li>• Reembolso total será processado</li>
-                        <li>• WhatsApp desconectado agora</li>
-                        <li>• Perda de acesso imediata</li>
-                        <li>• Valor estornado em até 7 dias úteis</li>
-                      </ul>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    {/* MODIFICADO: Aviso sem borda */}
-                    <div className="bg-blue-500/10 rounded-xl p-4">
-                      <p className="text-blue-400 text-sm flex items-start">
-                        <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                        </svg>
-                        <span>
-                          <strong>Cancelamento no fim do período</strong><br />
-                          Você pode usar até {subscription?.next_billing_date
-                            ? new Date(subscription.next_billing_date).toLocaleDateString('pt-BR')
-                            : 'o fim do período'
-                          }
-                        </span>
-                      </p>
-                    </div>
-                    {/* MODIFICADO: Aviso sem borda */}
-                    <div className="bg-[#0A0A0A] rounded-xl p-4">
-                      <p className="text-gray-300 text-sm">
-                        <strong>ℹ️ O que acontece:</strong>
-                      </p>
-                      <ul className="text-sm text-gray-400 mt-2 space-y-1 ml-4">
-                        <li>• Renovação cancelada</li>
-                        <li>• Acesso mantido até o fim</li>
-                        <li>• WhatsApp continua conectado</li>
-                        <li>• Sem reembolso do período atual</li>
-                      </ul>
-                    </div>
-                  </>
-                )}
-
-                <div className="flex items-start space-x-3 pt-4">
-                  <input
-                    type="checkbox"
-                    id="confirmCancel"
-                    className="mt-1 w-5 h-5 rounded border-gray-600 text-red-500 focus:ring-red-500 bg-gray-800"
-                  />
-                  <label htmlFor="confirmCancel" className="text-sm text-gray-300">
-                    Eu entendo as consequências e quero cancelar minha assinatura
-                  </label>
-                </div>
-              </div>
-
-              <div className="flex space-x-3">
-                {/* MODIFICADO: Botão "Manter" com novo estilo */}
-                <button
-                  onClick={() => setShowCancelModal(false)}
-                  disabled={canceling}
-                  className="flex-1 bg-[#272727] hover:bg-[#333333] disabled:opacity-50 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300"
-                >
-                  Manter Assinatura
-                </button>
-                <button
-                  onClick={() => {
-                    const checkbox = document.getElementById('confirmCancel')
-                    if (!checkbox.checked) {
-                      alert('Por favor, confirme que você entende as consequências')
-                      return
+      {
+        showCancelModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+            {/* MODIFICADO: Modal sem borda */}
+            <div className="relative bg-[#111111] rounded-2xl p-8 max-w-md w-full shadow-2xl z-[70]">
+              <div className="relative z-10">
+                <div className="text-center mb-6">
+                  {/* MODIFICADO: Ícone do modal sem borda */}
+                  <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">Cancelar Assinatura</h3>
+                  <p className="text-gray-400">
+                    {isWithin7Days()
+                      ? 'Você está nos primeiros 7 dias - Lei do Arrependimento'
+                      : 'Seu plano será cancelado mas você mantém acesso'
                     }
-                    handleCancelSubscription()
-                  }}
-                  disabled={canceling}
-                  className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white py-3 px-4 rounded-xl font-bold transition-all duration-300 flex items-center justify-center"
-                >
-                  {canceling ? (
-                    <div className="flex items-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Cancelando...
-                    </div>
+                  </p>
+                </div>
+
+                <div className="space-y-3 mb-6">
+                  {isWithin7Days() ? (
+                    <>
+                      {/* MODIFICADO: Aviso sem borda */}
+                      <div className="bg-yellow-500/10 rounded-xl p-4">
+                        <p className="text-yellow-400 text-sm flex items-start">
+                          <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                          <span>
+                            <strong>Lei do Arrependimento (7 dias)</strong><br />
+                            Você está nos primeiros {getDaysSinceCreation()} dias da sua primeira assinatura.
+                          </span>
+                        </p>
+                      </div>
+                      {/* MODIFICADO: Aviso sem borda */}
+                      <div className="bg-red-500/10 rounded-xl p-4">
+                        <p className="text-red-400 text-sm">
+                          <strong>⚠️ Cancelamento IMEDIATO:</strong>
+                        </p>
+                        <ul className="text-sm text-red-300 mt-2 space-y-1 ml-4">
+                          <li>• Reembolso total será processado</li>
+                          <li>• WhatsApp desconectado agora</li>
+                          <li>• Perda de acesso imediata</li>
+                          <li>• Valor estornado em até 7 dias úteis</li>
+                        </ul>
+                      </div>
+                    </>
                   ) : (
                     <>
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                      Confirmar Cancelamento
+                      {/* MODIFICADO: Aviso sem borda */}
+                      <div className="bg-blue-500/10 rounded-xl p-4">
+                        <p className="text-blue-400 text-sm flex items-start">
+                          <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                          </svg>
+                          <span>
+                            <strong>Cancelamento no fim do período</strong><br />
+                            Você pode usar até {subscription?.next_billing_date
+                              ? new Date(subscription.next_billing_date).toLocaleDateString('pt-BR')
+                              : 'o fim do período'
+                            }
+                          </span>
+                        </p>
+                      </div>
+                      {/* MODIFICADO: Aviso sem borda */}
+                      <div className="bg-[#0A0A0A] rounded-xl p-4">
+                        <p className="text-gray-300 text-sm">
+                          <strong>ℹ️ O que acontece:</strong>
+                        </p>
+                        <ul className="text-sm text-gray-400 mt-2 space-y-1 ml-4">
+                          <li>• Renovação cancelada</li>
+                          <li>• Acesso mantido até o fim</li>
+                          <li>• WhatsApp continua conectado</li>
+                          <li>• Sem reembolso do período atual</li>
+                        </ul>
+                      </div>
                     </>
                   )}
-                </button>
+
+                  <div className="flex items-start space-x-3 pt-4">
+                    <input
+                      type="checkbox"
+                      id="confirmCancel"
+                      className="mt-1 w-5 h-5 rounded border-gray-600 text-red-500 focus:ring-red-500 bg-gray-800"
+                    />
+                    <label htmlFor="confirmCancel" className="text-sm text-gray-300">
+                      Eu entendo as consequências e quero cancelar minha assinatura
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex space-x-3">
+                  {/* MODIFICADO: Botão "Manter" com novo estilo */}
+                  <button
+                    onClick={() => setShowCancelModal(false)}
+                    disabled={canceling}
+                    className="flex-1 bg-[#272727] hover:bg-[#333333] disabled:opacity-50 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300"
+                  >
+                    Manter Assinatura
+                  </button>
+                  <button
+                    onClick={() => {
+                      const checkbox = document.getElementById('confirmCancel')
+                      if (!checkbox.checked) {
+                        alert('Por favor, confirme que você entende as consequências')
+                        return
+                      }
+                      handleCancelSubscription()
+                    }}
+                    disabled={canceling}
+                    className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white py-3 px-4 rounded-xl font-bold transition-all duration-300 flex items-center justify-center"
+                  >
+                    {canceling ? (
+                      <div className="flex items-center">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Cancelando...
+                      </div>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Confirmar Cancelamento
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* ============================================
       // 4. MODAIS ADICIONADOS
       // ============================================ */}
 
       {/* Modal de Seleção de Plano */}
-      {showPlanChangeModal && subscription && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="relative bg-[#111111] rounded-2xl p-8 max-w-4xl w-full shadow-2xl z-[70] my-8">
-            <div className="relative z-10">
-              {/* Header */}
-              <div className="flex items-start justify-between mb-6">
-                <div>
-                  <h3 className="text-2xl font-bold text-white mb-2">Alterar Plano</h3>
-                  <p className="text-gray-400">
-                    Plano atual: {subscription.connections_purchased} {subscription.connections_purchased === 1 ? 'conexão' : 'conexões'} - {subscription.billing_period === 'monthly' ? 'Mensal' : 'Anual'}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowPlanChangeModal(false)}
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Tabs Mensal/Anual */}
-              <div className="flex justify-center mb-6">
-                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-full p-1.5 flex">
+      {
+        showPlanChangeModal && subscription && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
+            <div className="relative bg-[#111111] rounded-2xl p-8 max-w-4xl w-full shadow-2xl z-[70] my-8">
+              <div className="relative z-10">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-6">
+                  <div>
+                    <h3 className="text-2xl font-bold text-white mb-2">Alterar Plano</h3>
+                    <p className="text-gray-400">
+                      Plano atual: {subscription.connections_purchased} {subscription.connections_purchased === 1 ? 'conexão' : 'conexões'} - {subscription.billing_period === 'monthly' ? 'Mensal' : 'Anual'}
+                    </p>
+                  </div>
                   <button
-                    onClick={() => handleSelectNewPlan(selectedNewPlan.connections, 'monthly')}
-                    className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all duration-300 ${selectedNewPlan.billing_period === 'monthly'
-                      ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black'
-                      : 'text-gray-400 hover:text-white'
-                      }`}
+                    onClick={() => setShowPlanChangeModal(false)}
+                    className="text-gray-400 hover:text-white transition-colors"
                   >
-                    Mensal
-                  </button>
-                  <button
-                    onClick={() => handleSelectNewPlan(selectedNewPlan.connections, 'annual')}
-                    className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all duration-300 ${selectedNewPlan.billing_period === 'annual'
-                      ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black'
-                      : 'text-gray-400 hover:text-white'
-                      }`}
-                  >
-                    Anual
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                   </button>
                 </div>
-              </div>
 
-              {/* Grid de Planos */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                {[1, 2, 3, 4, 5, 6, 7].map(connections => {
-                  const prices = {
-                    monthly: { 1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875 },
-                    annual: { 1: 1776, 2: 3294, 3: 4806, 4: 6318, 5: 6750, 6: 8100, 7: 9450 }
-                  }
-                  const price = prices[selectedNewPlan.billing_period][connections]
-                  const isCurrentPlan = subscription.connections_purchased === connections && subscription.billing_period === selectedNewPlan.billing_period
-                  const isSelected = selectedNewPlan.connections === connections
-
-                  return (
+                {/* Tabs Mensal/Anual */}
+                <div className="flex justify-center mb-6">
+                  <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-full p-1.5 flex">
                     <button
-                      key={connections}
-                      onClick={() => handleSelectNewPlan(connections, selectedNewPlan.billing_period)}
-                      disabled={isCurrentPlan}
-                      className={`p-4 rounded-xl border-2 transition-all duration-300 ${isCurrentPlan
-                        ? 'border-gray-600 bg-gray-900/50 cursor-not-allowed opacity-50'
-                        : isSelected
-                          ? 'border-[#00FF99] bg-[#00FF99]/10'
-                          : 'border-white/10 hover:border-white/30 bg-[#0A0A0A]'
+                      onClick={() => handleSelectNewPlan(selectedNewPlan.connections, 'monthly')}
+                      className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all duration-300 ${selectedNewPlan.billing_period === 'monthly'
+                        ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black'
+                        : 'text-gray-400 hover:text-white'
                         }`}
                     >
-                      <div className="text-center">
-                        <div className="text-3xl font-bold text-white mb-1">{connections}</div>
-                        <div className="text-xs text-gray-400 mb-2">{connections === 1 ? 'conexão' : 'conexões'}</div>
-                        <div className="text-lg font-semibold text-[#00FF99]">
-                          R$ {price}
+                      Mensal
+                    </button>
+                    <button
+                      onClick={() => handleSelectNewPlan(selectedNewPlan.connections, 'annual')}
+                      className={`px-6 py-2.5 rounded-full font-medium text-sm transition-all duration-300 ${selectedNewPlan.billing_period === 'annual'
+                        ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black'
+                        : 'text-gray-400 hover:text-white'
+                        }`}
+                    >
+                      Anual
+                    </button>
+                  </div>
+                </div>
+
+                {/* Grid de Planos */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  {[1, 2, 3, 4, 5, 6, 7].map(connections => {
+                    const prices = {
+                      monthly: { 1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875 },
+                      annual: { 1: 1776, 2: 3294, 3: 4806, 4: 6318, 5: 6750, 6: 8100, 7: 9450 }
+                    }
+                    const price = prices[selectedNewPlan.billing_period][connections]
+                    const isCurrentPlan = subscription.connections_purchased === connections && subscription.billing_period === selectedNewPlan.billing_period
+                    const isSelected = selectedNewPlan.connections === connections
+
+                    return (
+                      <button
+                        key={connections}
+                        onClick={() => handleSelectNewPlan(connections, selectedNewPlan.billing_period)}
+                        disabled={isCurrentPlan}
+                        className={`p-4 rounded-xl border-2 transition-all duration-300 ${isCurrentPlan
+                          ? 'border-gray-600 bg-gray-900/50 cursor-not-allowed opacity-50'
+                          : isSelected
+                            ? 'border-[#00FF99] bg-[#00FF99]/10'
+                            : 'border-white/10 hover:border-white/30 bg-[#0A0A0A]'
+                          }`}
+                      >
+                        <div className="text-center">
+                          <div className="text-3xl font-bold text-white mb-1">{connections}</div>
+                          <div className="text-xs text-gray-400 mb-2">{connections === 1 ? 'conexão' : 'conexões'}</div>
+                          <div className="text-lg font-semibold text-[#00FF99]">
+                            R$ {price}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            /{selectedNewPlan.billing_period === 'monthly' ? 'mês' : 'ano'}
+                          </div>
+                          {isCurrentPlan && (
+                            <div className="mt-2 text-xs text-gray-500">Plano Atual</div>
+                          )}
                         </div>
-                        <div className="text-xs text-gray-500">
-                          /{selectedNewPlan.billing_period === 'monthly' ? 'mês' : 'ano'}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Info sobre tipo de mudança */}
+                {changeType && (
+                  <div className={`p-4 rounded-xl mb-6 ${changeType === 'upgrade'
+                    ? 'bg-blue-500/10 border border-blue-500/30'
+                    : 'bg-orange-500/10 border border-orange-500/30'
+                    }`}>
+                    <div className="flex items-start gap-3">
+                      <svg className={`w-5 h-5 mt-0.5 ${changeType === 'upgrade' ? 'text-blue-400' : 'text-orange-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div className="flex-1">
+                        <div className={`font-semibold mb-1 ${changeType === 'upgrade' ? 'text-blue-400' : 'text-orange-400'}`}>
+                          {changeType === 'upgrade' ? '⬆️ Upgrade' : '⬇️ Downgrade'}
                         </div>
-                        {isCurrentPlan && (
-                          <div className="mt-2 text-xs text-gray-500">Plano Atual</div>
+                        <div className="text-sm text-gray-300">
+                          {changeType === 'upgrade'
+                            ? 'Será cobrado o valor proporcional imediatamente. Seu período de renovação continua o mesmo.'
+                            : `A mudança será aplicada na próxima renovação (${new Date(subscription.next_billing_date).toLocaleDateString('pt-BR')}). Você continuará usando o plano atual até lá.`
+                          }
+                        </div>
+                        {changeType === 'downgrade' && selectedNewPlan.connections < subscription.connections_purchased && (
+                          <div className="text-sm text-orange-400 mt-2">
+                            ⚠️ As {subscription.connections_purchased - selectedNewPlan.connections} conexões excedentes serão desconectadas automaticamente na renovação.
+                          </div>
                         )}
                       </div>
-                    </button>
-                  )
-                })}
-              </div>
+                    </div>
+                  </div>
+                )}
 
-              {/* Info sobre tipo de mudança */}
-              {changeType && (
-                <div className={`p-4 rounded-xl mb-6 ${changeType === 'upgrade'
-                  ? 'bg-blue-500/10 border border-blue-500/30'
-                  : 'bg-orange-500/10 border border-orange-500/30'
-                  }`}>
+                {/* Aviso de limite 1x/mês */}
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-6">
                   <div className="flex items-start gap-3">
-                    <svg className={`w-5 h-5 mt-0.5 ${changeType === 'upgrade' ? 'text-blue-400' : 'text-orange-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <svg className="w-5 h-5 text-yellow-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
-                    <div className="flex-1">
-                      <div className={`font-semibold mb-1 ${changeType === 'upgrade' ? 'text-blue-400' : 'text-orange-400'}`}>
-                        {changeType === 'upgrade' ? '⬆️ Upgrade' : '⬇️ Downgrade'}
-                      </div>
-                      <div className="text-sm text-gray-300">
-                        {changeType === 'upgrade'
-                          ? 'Será cobrado o valor proporcional imediatamente. Seu período de renovação continua o mesmo.'
-                          : `A mudança será aplicada na próxima renovação (${new Date(subscription.next_billing_date).toLocaleDateString('pt-BR')}). Você continuará usando o plano atual até lá.`
-                        }
-                      </div>
-                      {changeType === 'downgrade' && selectedNewPlan.connections < subscription.connections_purchased && (
-                        <div className="text-sm text-orange-400 mt-2">
-                          ⚠️ As {subscription.connections_purchased - selectedNewPlan.connections} conexões excedentes serão desconectadas automaticamente na renovação.
-                        </div>
-                      )}
+                    <div className="flex-1 text-sm text-gray-300">
+                      Você só pode alterar o plano <strong>1 vez por mês</strong>. Após confirmar esta alteração, precisará aguardar 30 dias para fazer outra mudança.
                     </div>
                   </div>
                 </div>
-              )}
 
-              {/* Aviso de limite 1x/mês */}
-              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-6">
-                <div className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-yellow-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  <div className="flex-1 text-sm text-gray-300">
-                    Você só pode alterar o plano <strong>1 vez por mês</strong>. Após confirmar esta alteração, precisará aguardar 30 dias para fazer outra mudança.
-                  </div>
+                {/* Botões */}
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => setShowPlanChangeModal(false)}
+                    className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleConfirmPlanChange}
+                    disabled={!changeType || changingPlan}
+                    className="flex-1 bg-gradient-to-r from-[#00FF99] to-[#00E88C] hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] disabled:opacity-50 disabled:cursor-not-allowed text-black py-3 px-4 rounded-xl font-bold transition-all duration-300"
+                  >
+                    {changingPlan ? (
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black mr-2"></div>
+                        Processando...
+                      </div>
+                    ) : (
+                      `Confirmar ${changeType === 'upgrade' ? 'Upgrade' : 'Downgrade'}`
+                    )}
+                  </button>
                 </div>
-              </div>
-
-              {/* Botões */}
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setShowPlanChangeModal(false)}
-                  className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleConfirmPlanChange}
-                  disabled={!changeType || changingPlan}
-                  className="flex-1 bg-gradient-to-r from-[#00FF99] to-[#00E88C] hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] disabled:opacity-50 disabled:cursor-not-allowed text-black py-3 px-4 rounded-xl font-bold transition-all duration-300"
-                >
-                  {changingPlan ? (
-                    <div className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black mr-2"></div>
-                      Processando...
-                    </div>
-                  ) : (
-                    `Confirmar ${changeType === 'upgrade' ? 'Upgrade' : 'Downgrade'}`
-                  )}
-                </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Modal de Confirmação de Downgrade */}
-      {showConfirmDowngradeModal && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="relative bg-[#111111] rounded-2xl p-8 max-w-md w-full shadow-2xl z-[80]">
-            <div className="relative z-10">
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-orange-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
+      {
+        showConfirmDowngradeModal && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+            <div className="relative bg-[#111111] rounded-2xl p-8 max-w-md w-full shadow-2xl z-[80]">
+              <div className="relative z-10">
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 bg-orange-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">Confirmar Downgrade</h3>
+                  <p className="text-gray-400 mb-4">
+                    O downgrade será aplicado em {new Date(subscription.next_billing_date).toLocaleDateString('pt-BR')}.
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Você continuará usando o plano atual até a data de renovação. Após isso, o plano será alterado automaticamente.
+                  </p>
                 </div>
-                <h3 className="text-xl font-bold text-white mb-2">Confirmar Downgrade</h3>
-                <p className="text-gray-400 mb-4">
-                  O downgrade será aplicado em {new Date(subscription.next_billing_date).toLocaleDateString('pt-BR')}.
-                </p>
-                <p className="text-sm text-gray-500">
-                  Você continuará usando o plano atual até a data de renovação. Após isso, o plano será alterado automaticamente.
-                </p>
-              </div>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowConfirmDowngradeModal(false)}
-                  disabled={changingPlan}
-                  className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={processPlanChange}
-                  disabled={changingPlan}
-                  className="flex-1 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center"
-                >
-                  {changingPlan ? (
-                    <div className="flex items-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Processando...
-                    </div>
-                  ) : (
-                    'Confirmar Downgrade'
-                  )}
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowConfirmDowngradeModal(false)}
+                    disabled={changingPlan}
+                    className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={processPlanChange}
+                    disabled={changingPlan}
+                    className="flex-1 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 flex items-center justify-center"
+                  >
+                    {changingPlan ? (
+                      <div className="flex items-center">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Processando...
+                      </div>
+                    ) : (
+                      'Confirmar Downgrade'
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
-    </div>
+    </div >
   )
 }
