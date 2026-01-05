@@ -68,7 +68,7 @@ export async function PUT(request, { params }) {
         }
 
         const body = await request.json()
-        const { name, description, isActive, steps, triggerType, triggerTagId, triggerOriginId, triggerKeywords } = body
+        const { name, description, isActive, steps, triggerType, triggerTagId, triggerOriginId, triggerKeywords, isFollowUp, restartOnReply } = body
 
         // Verificar propriedade
         const { data: existing } = await supabase
@@ -91,6 +91,8 @@ export async function PUT(request, { params }) {
         if (triggerTagId !== undefined) updateData.trigger_tag_id = triggerTagId || null
         if (triggerOriginId !== undefined) updateData.trigger_origin_id = triggerOriginId || null
         if (triggerKeywords !== undefined) updateData.trigger_keywords = triggerKeywords || []
+        if (isFollowUp !== undefined) updateData.is_follow_up = isFollowUp
+        if (restartOnReply !== undefined) updateData.restart_on_reply = restartOnReply
 
         await supabase.from('automation_sequences').update(updateData).eq('id', id)
 

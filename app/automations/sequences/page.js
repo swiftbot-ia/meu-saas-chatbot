@@ -133,6 +133,8 @@ const SequenceModal = ({ isOpen, onClose, onSave, sequence = null, templates = [
     const [triggerKeywords, setTriggerKeywords] = useState('')
     const [steps, setSteps] = useState([])
     const [loading, setLoading] = useState(false)
+    const [isFollowUp, setIsFollowUp] = useState(false)
+    const [restartOnReply, setRestartOnReply] = useState(false)
 
     const isEditing = !!sequence
 
@@ -169,6 +171,8 @@ const SequenceModal = ({ isOpen, onClose, onSave, sequence = null, templates = [
             setTriggerTagId(sequence.trigger_tag_id || '')
             setTriggerOriginId(sequence.trigger_origin_id || '')
             setTriggerKeywords((sequence.trigger_keywords || []).join(', '))
+            setIsFollowUp(sequence.is_follow_up || false)
+            setRestartOnReply(sequence.restart_on_reply || false)
 
             // Load existing steps
             const existingSteps = (sequence.automation_sequence_steps || [])
@@ -191,6 +195,8 @@ const SequenceModal = ({ isOpen, onClose, onSave, sequence = null, templates = [
             setTriggerTagId('')
             setTriggerOriginId('')
             setTriggerKeywords('')
+            setIsFollowUp(false)
+            setRestartOnReply(false)
             setSteps([])
         }
     }, [sequence, isOpen])
@@ -248,6 +254,8 @@ const SequenceModal = ({ isOpen, onClose, onSave, sequence = null, templates = [
                 triggerTagId: triggerType === 'has_tag' ? triggerTagId : null,
                 triggerOriginId: triggerType === 'has_origin' ? triggerOriginId : null,
                 triggerKeywords: triggerType === 'keyword' ? triggerKeywords.split(',').map(k => k.trim()).filter(Boolean) : [],
+                isFollowUp,
+                restartOnReply: isFollowUp ? restartOnReply : false,
                 steps: steps.map(s => ({
                     templateId: s.templateId,
                     delayValue: s.delayUnit === 'immediately' ? 0 : s.delayValue,
@@ -356,6 +364,49 @@ const SequenceModal = ({ isOpen, onClose, onSave, sequence = null, templates = [
                                     placeholder="Ex: promoção, desconto, quero saber (separadas por vírgula)"
                                     className="w-full bg-[#252525] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
                                 />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Modo Acompanhamento (Follow-up) */}
+                    <div className="bg-[#252525] rounded-xl p-4">
+                        <div className="flex items-center justify-between mb-2">
+                            <div>
+                                <h3 className="text-white font-medium flex items-center gap-2">
+                                    🔄 Modo Acompanhamento
+                                </h3>
+                                <p className="text-xs text-gray-400 mt-1">
+                                    Ative para sequências de follow-up que consideram a resposta do lead
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setIsFollowUp(!isFollowUp)
+                                    if (!isFollowUp === false) setRestartOnReply(false)
+                                }}
+                                className={`p-1 rounded ${isFollowUp ? 'text-[#00FF99]' : 'text-gray-500'}`}
+                            >
+                                {isFollowUp ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+                            </button>
+                        </div>
+
+                        {/* Restart on Reply - só mostra se modo acompanhamento ativo */}
+                        {isFollowUp && (
+                            <div className="mt-4 pt-4 border-t border-white/10">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-white">Reiniciar quando lead responder</p>
+                                        <p className="text-xs text-gray-400 mt-1">
+                                            A sequência recomeça do início quando o lead enviar uma mensagem
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => setRestartOnReply(!restartOnReply)}
+                                        className={`p-1 rounded ${restartOnReply ? 'text-[#00FF99]' : 'text-gray-500'}`}
+                                    >
+                                        {restartOnReply ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -603,6 +654,8 @@ export default function SequencesPage() {
                     trigger_tag_id: data.triggerTagId,
                     trigger_origin_id: data.triggerOriginId,
                     trigger_keywords: data.triggerKeywords,
+                    is_follow_up: data.isFollowUp || false,
+                    restart_on_reply: data.restartOnReply || false,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', data.id)
@@ -642,6 +695,8 @@ export default function SequencesPage() {
                     trigger_tag_id: data.triggerTagId,
                     trigger_origin_id: data.triggerOriginId,
                     trigger_keywords: data.triggerKeywords,
+                    is_follow_up: data.isFollowUp || false,
+                    restart_on_reply: data.restartOnReply || false,
                     is_active: true
                 })
                 .select()
