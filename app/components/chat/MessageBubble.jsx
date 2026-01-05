@@ -5,14 +5,52 @@
 
 'use client';
 
-import React from 'react';
-import { Check, CheckCheck, Clock, XCircle, Image as ImageIcon, Video as VideoIcon, FileText, Mic, Download, Play } from 'lucide-react';
+import React, { useState } from 'react';
+import { Check, CheckCheck, Clock, XCircle, Image as ImageIcon, Video as VideoIcon, FileText, Mic, Download, Play, ThumbsUp, ThumbsDown } from 'lucide-react';
 import MediaModal from './MediaModal';
 import AudioPlayer from './AudioPlayer';
 
-export default function MessageBubble({ message, isOwn, contact, connectionAvatar }) {
-  const [showTranscription, setShowTranscription] = React.useState(false);
-  const [showMediaModal, setShowMediaModal] = React.useState(false);
+export default function MessageBubble({ message, isOwn, contact, connectionAvatar, onFeedback }) {
+  const [showTranscription, setShowTranscription] = useState(false);
+  const [showMediaModal, setShowMediaModal] = useState(false);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [currentFeedback, setCurrentFeedback] = useState(message.feedback_rating || null);
+
+  // Handle feedback (like/dislike)
+  const handleFeedback = async (rating) => {
+    if (feedbackLoading) return;
+
+    setFeedbackLoading(true);
+    try {
+      const isRemovingFeedback = currentFeedback === rating;
+
+      if (isRemovingFeedback) {
+        // Remove feedback
+        const response = await fetch(`/api/chat/messages/${message.id}/feedback`, {
+          method: 'DELETE',
+        });
+        if (response.ok) {
+          setCurrentFeedback(null);
+          onFeedback?.(message.id, null);
+        }
+      } else {
+        // Add/update feedback
+        const response = await fetch(`/api/chat/messages/${message.id}/feedback`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rating }),
+        });
+        if (response.ok) {
+          setCurrentFeedback(rating);
+          onFeedback?.(message.id, rating);
+        }
+      }
+    } catch (error) {
+      console.error('Error saving feedback:', error);
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
 
   const formatTime = (timestamp) => {
     const date = new Date(timestamp);
@@ -239,6 +277,34 @@ export default function MessageBubble({ message, isOwn, contact, connectionAvata
 
             {renderStatusIcon()}
           </div>
+
+          {/* Feedback buttons - Only for outbound (agent) messages */}
+          {isOwn && (
+            <div className="flex items-center justify-end mt-2 space-x-2 opacity-60 hover:opacity-100 transition-opacity">
+              <button
+                onClick={() => handleFeedback('like')}
+                disabled={feedbackLoading}
+                className={`p-1.5 rounded-full transition-all ${currentFeedback === 'like'
+                    ? 'bg-green-500/20 text-green-400'
+                    : 'hover:bg-white/10 text-gray-400 hover:text-green-400'
+                  }`}
+                title="Boa resposta"
+              >
+                <ThumbsUp size={14} className={currentFeedback === 'like' ? 'fill-current' : ''} />
+              </button>
+              <button
+                onClick={() => handleFeedback('dislike')}
+                disabled={feedbackLoading}
+                className={`p-1.5 rounded-full transition-all ${currentFeedback === 'dislike'
+                    ? 'bg-red-500/20 text-red-400'
+                    : 'hover:bg-white/10 text-gray-400 hover:text-red-400'
+                  }`}
+                title="Resposta ruim"
+              >
+                <ThumbsDown size={14} className={currentFeedback === 'dislike' ? 'fill-current' : ''} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
