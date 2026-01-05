@@ -85,10 +85,10 @@ export async function POST(request, { params }) {
       );
     }
 
-    // Find the message
+    // Find the message (need conversation_id and received_at for context)
     const { data: message, error: findError } = await chatSupabaseAdmin
       .from('whatsapp_messages')
-      .select('id, message_id, direction, user_id, feedback_rating')
+      .select('id, message_id, direction, user_id, feedback_rating, conversation_id, received_at')
       .eq('id', id)
       .maybeSingle();
 
@@ -115,12 +115,45 @@ export async function POST(request, { params }) {
       );
     }
 
-    // Update the feedback rating
+    // Fetch last 3 inbound messages before this response (lead's context)
+    let feedbackContext = null;
+    try {
+      const { data: previousMessages } = await chatSupabaseAdmin
+        .from('whatsapp_messages')
+        .select('message_content, message_type, transcription, ai_interpretation')
+        .eq('conversation_id', message.conversation_id)
+        .eq('direction', 'inbound')
+        .lt('received_at', message.received_at)
+        .order('received_at', { ascending: false })
+        .limit(3);
+
+      if (previousMessages && previousMessages.length > 0) {
+        // Build context string from lead messages (oldest to newest)
+        const contextParts = previousMessages.reverse().map(msg => {
+          // Prioritize: transcription (audio) > ai_interpretation (image) > message_content
+          if (msg.message_type === 'audio' && msg.transcription) {
+            return `[Áudio]: ${msg.transcription}`;
+          } else if (msg.message_type === 'image' && msg.ai_interpretation) {
+            return `[Imagem]: ${msg.ai_interpretation}`;
+          } else {
+            return msg.message_content || '';
+          }
+        }).filter(Boolean);
+
+        feedbackContext = contextParts.join(' → ');
+      }
+    } catch (contextError) {
+      console.warn('⚠️ [Feedback] Error fetching context:', contextError.message);
+      // Continue without context - not critical
+    }
+
+    // Update the feedback rating with context
     const { data: updated, error: updateError } = await chatSupabaseAdmin
       .from('whatsapp_messages')
       .update({
         feedback_rating: rating,
-        feedback_at: new Date().toISOString()
+        feedback_at: new Date().toISOString(),
+        feedback_context: feedbackContext
       })
       .eq('id', id)
       .select()
@@ -134,7 +167,8 @@ export async function POST(request, { params }) {
       );
     }
 
-    console.log(`✅ [Feedback] Message ${id} rated as "${rating}" by user ${userId}`);
+    console.log(`✅ [Feedback] Message ${id} rated as "${rating}" by user ${userId}`,
+      feedbackContext ? `Context: "${feedbackContext.substring(0, 100)}..."` : 'No context');
 
     return NextResponse.json({
       success: true,
@@ -206,12 +240,13 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    // Remove feedback
+    // Remove feedback (including context)
     const { error: updateError } = await chatSupabaseAdmin
       .from('whatsapp_messages')
       .update({
         feedback_rating: null,
-        feedback_at: null
+        feedback_at: null,
+        feedback_context: null
       })
       .eq('id', id);
 

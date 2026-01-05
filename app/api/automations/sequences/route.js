@@ -116,7 +116,9 @@ export async function POST(request) {
             triggerType = 'manual',
             triggerTagId = null,
             triggerOriginId = null,
-            triggerKeywords = []
+            triggerKeywords = [],
+            isFollowUp = false,
+            restartOnReply = false
         } = body
 
         if (!connectionId) {
@@ -150,7 +152,9 @@ export async function POST(request) {
                 trigger_type: triggerType,
                 trigger_tag_id: triggerTagId || null,
                 trigger_origin_id: triggerOriginId || null,
-                trigger_keywords: triggerKeywords || []
+                trigger_keywords: triggerKeywords || [],
+                is_follow_up: isFollowUp,
+                restart_on_reply: restartOnReply
             })
             .select()
             .single()
