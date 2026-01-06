@@ -10,7 +10,7 @@ export default function SupportPage() {
   const [subscription, setSubscription] = useState(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
-  
+
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -19,13 +19,13 @@ export default function SupportPage() {
     message: '',
     priority: 'normal'
   })
-  
+
   const [errors, setErrors] = useState({})
   const router = useRouter()
 
   const categories = [
     { value: 'technical', label: 'Problema Técnico', svg: <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774a1.125 1.125 0 01.12 1.45l-.527.737c-.25.35-.272.806-.108 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.11v1.093c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.108 1.204l.527.738c.313.436.337.996.12 1.45l-.773.773a1.125 1.125 0 01-1.45.12l-.737-.527c-.35-.25-.806-.272-1.204-.108-.397.165-.71.505-.78.93l-.15.893c-.09.543-.56.94-1.11.94h-1.093c-.55 0-1.02-.398-1.11-.94l-.149-.894c-.07-.424-.384-.764-.78-.93-.398-.164-.855-.142-1.205.108l-.737.527a1.125 1.125 0 01-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.272-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.893-.15c-.543-.09-.94-.56-.94-1.11v-1.093c0-.55.397-1.02.94-1.11l.893-.149c.425-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.527-.738a1.125 1.125 0 01-.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.806.272 1.204.108.397-.165.71-.505.78-.93l.15-.893zM12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z" /></svg> },
-    { value: 'billing', label: 'Cobrança/Pagamento', svg: <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" x2="22" y1="10" y2="10" /></svg>},
+    { value: 'billing', label: 'Cobrança/Pagamento', svg: <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" x2="22" y1="10" y2="10" /></svg> },
     { value: 'connection', label: 'Conexão WhatsApp', svg: <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg> },
     { value: 'agent', label: 'Agente IA', svg: <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><rect width="18" height="10" x="3" y="11" rx="2" /><circle cx="12" cy="5" r="2" /><path d="M12 7v4" /><line x1="8" x2="8" y1="16" y2="16" /><line x1="16" x2="16" y1="16" y2="16" /></svg> },
     { value: 'account', label: 'Conta/Perfil', svg: <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg> },
@@ -43,82 +43,83 @@ export default function SupportPage() {
     checkUser()
   }, [])
 
-const checkUser = async () => {
-  try {
-    // Primeiro, pega o user do Supabase Auth
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-    
-    if (!authUser) {
-      router.push('/login')
-      return
-    }
-    
-    // Depois, pega os dados do profile
-    const response = await fetch('/api/user/profile-id')
-    const data = await response.json()
-    
-    if (!data.success) {
-      router.push('/login')
-      return
-    }
-    setUser({
-      id: data.profileId,
-      email: data.email
-    })
-    
-    setUserProfile({
-      full_name: data.fullName,
-      company_name: data.companyName
-    })
-    
-    // ✅ USA O authUser.id, NÃO o data.profileId
-    await loadSubscription(authUser.id)
-    
-  } catch (error) {
-    console.error('Erro ao verificar usuário:', error)
-    router.push('/login')
-  } finally {
-    setLoading(false)
-  }
-}
-const loadSubscription = async (userId) => {
-  try {
-    console.log('🔍 [SUPORTE] Carregando subscription para userId:', userId)
-    
-    const { data, error } = await supabase
-      .from('user_subscriptions')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-    
-    console.log('📦 [SUPORTE] Resultado da query:', { data, error })
-    
-    if (!error && data) {
-      const isActive = ['active', 'trial', 'trialing'].includes(data.status) || data.stripe_subscription_id === 'super_account_bypass'
-      const isExpired = data.trial_end_date && new Date() > new Date(data.trial_end_date)
-      
-      console.log('✅ [SUPORTE] Validação:', { 
-        status: data.status, 
-        isActive, 
-        isExpired,
-        trial_end_date: data.trial_end_date 
-      })
-      
-      if (isActive && !isExpired) {
-        setSubscription(data)
-        console.log('✅ [SUPORTE] Subscription definida!')
-      } else {
-        console.log('❌ [SUPORTE] Subscription não é ativa ou está expirada')
+  const checkUser = async () => {
+    try {
+      // Primeiro, pega o user do Supabase Auth
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+
+      if (!authUser) {
+        router.push('/login')
+        return
       }
-    } else {
-      console.log('❌ [SUPORTE] Nenhuma subscription encontrada ou erro:', error)
+
+      // Depois, pega os dados do profile
+      const response = await fetch('/api/user/profile-id')
+      const data = await response.json()
+
+      if (!data.success) {
+        router.push('/login')
+        return
+      }
+      setUser({
+        id: data.profileId,
+        email: data.email
+      })
+
+      setUserProfile({
+        full_name: data.fullName,
+        company_name: data.companyName
+      })
+
+      // ✅ USA O authUser.id, NÃO o data.profileId
+      await loadSubscription(authUser.id)
+
+    } catch (error) {
+      console.error('Erro ao verificar usuário:', error)
+      router.push('/login')
+    } finally {
+      setLoading(false)
     }
-  } catch (error) {
-    console.error('❌ [SUPORTE] Erro ao carregar assinatura:', error)
   }
-}
+  const loadSubscription = async (userId) => {
+    try {
+      console.log('🔍 [SUPORTE] Carregando subscription para userId:', userId)
+
+      const { data, error } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      console.log('📦 [SUPORTE] Resultado da query:', { data, error })
+
+      if (!error && data) {
+        const isActive = ['active', 'trial', 'trialing'].includes(data.status) || data.stripe_subscription_id === 'super_account_bypass'
+        const isTrial = ['trial', 'trialing'].includes(data.status)
+        const isExpired = isTrial && data.trial_end_date && new Date() > new Date(data.trial_end_date)
+
+        console.log('✅ [SUPORTE] Validação:', {
+          status: data.status,
+          isActive,
+          isExpired,
+          trial_end_date: data.trial_end_date
+        })
+
+        if (isActive && !isExpired) {
+          setSubscription(data)
+          console.log('✅ [SUPORTE] Subscription definida!')
+        } else {
+          console.log('❌ [SUPORTE] Subscription não é ativa ou está expirada')
+        }
+      } else {
+        console.log('❌ [SUPORTE] Nenhuma subscription encontrada ou erro:', error)
+      }
+    } catch (error) {
+      console.error('❌ [SUPORTE] Erro ao carregar assinatura:', error)
+    }
+  }
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -126,34 +127,34 @@ const loadSubscription = async (userId) => {
 
   const validateForm = () => {
     const newErrors = {}
-    
+
     if (!formData.category) {
       newErrors.category = 'Selecione uma categoria'
     }
-    
+
     if (!formData.subject.trim()) {
       newErrors.subject = 'Assunto é obrigatório'
     } else if (formData.subject.trim().length < 5) {
       newErrors.subject = 'Assunto deve ter pelo menos 5 caracteres'
     }
-    
+
     if (!formData.message.trim()) {
       newErrors.message = 'Mensagem é obrigatória'
     } else if (formData.message.trim().length < 20) {
       newErrors.message = 'Mensagem deve ter pelo menos 20 caracteres'
     }
-    
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     if (!validateForm()) return
-    
+
     setSending(true)
-    
+
     try {
       const response = await fetch('/api/suporte/tickets/create', {
         method: 'POST',
@@ -168,9 +169,9 @@ const loadSubscription = async (userId) => {
       })
 
       const data = await response.json()
-      
+
       if (!data.success) throw new Error(data.error)
-      
+
       await fetch('/api/support/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -184,9 +185,9 @@ const loadSubscription = async (userId) => {
           priority: formData.priority
         })
       })
-      
+
       alert('✅ Solicitação enviada com sucesso! Nossa equipe responderá em breve.')
-      
+
       setFormData({
         category: '',
         subject: '',
@@ -194,7 +195,7 @@ const loadSubscription = async (userId) => {
         priority: 'normal'
       })
       setErrors({})
-      
+
     } catch (error) {
       console.error('Erro ao enviar:', error)
       alert('❌ Erro ao enviar solicitação. Tente novamente.')
@@ -210,23 +211,23 @@ const loadSubscription = async (userId) => {
       </div>
     )
   }
-if (!loading && !subscription) {
-  return <NoSubscription />
-}
+  if (!loading && !subscription) {
+    return <NoSubscription />
+  }
   const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'Usuário'
   const initials = displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] relative">
-      
+
       {/* Conteúdo Principal */}
       {/* CORRIGIDO: Alterado de max-w-4xl para max-w-7xl para igualar ao Feedback */}
       <main className="relative z-10 max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
 
         <div className="mb-12 flex justify-between items-start gap-4">
-          
+
           {/* Coluna da Esquerda */}
-          <div className="flex-1">            
+          <div className="flex-1">
             <h1 className="text-5xl font-bold text-white flex items-center gap-4">
               Central de Ajuda
             </h1>
@@ -238,11 +239,11 @@ if (!loading && !subscription) {
 
         {/* Form Card */}
         <div className="bg-[#111111] rounded-2xl overflow-hidden relative">
-          
+
           <form onSubmit={handleSubmit} className="relative z-20">
             <div className="p-8">
               <div className="space-y-6">
-                
+
                 {/* Categoria */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
@@ -255,12 +256,11 @@ if (!loading && !subscription) {
                       <button
                         key={cat.value}
                         type="button"
-                        onClick={() => setFormData({...formData, category: cat.value})}
-                        className={`p-4 rounded-xl transition-all duration-300 text-left ${
-                          formData.category === cat.value
+                        onClick={() => setFormData({ ...formData, category: cat.value })}
+                        className={`p-4 rounded-xl transition-all duration-300 text-left ${formData.category === cat.value
                             ? 'bg-[#0A0A0A] ring-2 ring-[#00FF99]'
                             : 'bg-[#0A0A0A] hover:bg-[#1C1C1C]'
-                        }`}
+                          }`}
                       >
                         <div className="text-3xl mb-2 text-[#00FF99]">{cat.svg}</div>
                         <div className="text-sm text-white font-medium">{cat.label}</div>
@@ -281,12 +281,11 @@ if (!loading && !subscription) {
                       <button
                         key={p.value}
                         type="button"
-                        onClick={() => setFormData({...formData, priority: p.value})}
-                        className={`flex-1 p-3 rounded-xl transition-all duration-300 ${
-                          formData.priority === p.value
+                        onClick={() => setFormData({ ...formData, priority: p.value })}
+                        className={`flex-1 p-3 rounded-xl transition-all duration-300 ${formData.priority === p.value
                             ? 'bg-[#0A0A0A] ring-2 ring-white/50'
                             : 'bg-[#0A0A0A] hover:bg-[#1C1C1C]'
-                        }`}
+                          }`}
                       >
                         <div className={`text-sm font-medium ${p.color}`}>{p.label}</div>
                       </button>
@@ -303,7 +302,7 @@ if (!loading && !subscription) {
                   <input
                     type="text"
                     value={formData.subject}
-                    onChange={(e) => setFormData({...formData, subject: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                     placeholder="Ex: Erro ao conectar WhatsApp"
                     className="w-full bg-[#0A0A0A] border-0 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] outline-none transition-all duration-300"
                   />
@@ -318,7 +317,7 @@ if (!loading && !subscription) {
                   </label>
                   <textarea
                     value={formData.message}
-                    onChange={(e) => setFormData({...formData, message: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                     placeholder="Descreva detalhadamente seu problema ou dúvida. Quanto mais informações você fornecer, mais rápido poderemos ajudar!"
                     rows={8}
                     className="w-full bg-[#0A0A0A] border-0 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FF99] outline-none transition-all duration-300 resize-none"
@@ -342,7 +341,7 @@ if (!loading && !subscription) {
                     <div>
                       <p className="text-blue-300 text-sm font-medium mb-1">Dica</p>
                       <p className="text-gray-400 text-sm">
-                        Nossa equipe de suporte responde em até 72 horas úteis. Para problemas urgentes, 
+                        Nossa equipe de suporte responde em até 72 horas úteis. Para problemas urgentes,
                         selecione prioridade "Urgente". Você receberá uma cópia desta solicitação no email: <span className="font-semibold text-white">{user?.email || '...'}</span>
                       </p>
                     </div>
