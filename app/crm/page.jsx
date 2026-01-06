@@ -167,7 +167,8 @@ const SalesFunnelPage = () => {
                 .single()
             if (!error && data) {
                 const isActive = ['active', 'trial', 'trialing'].includes(data.status) || data.stripe_subscription_id === 'super_account_bypass'
-                const isExpired = data.trial_end_date && new Date() > new Date(data.trial_end_date)
+                const isTrial = ['trial', 'trialing'].includes(data.status)
+                const isExpired = isTrial && data.trial_end_date && new Date() > new Date(data.trial_end_date)
 
                 if (isActive && !isExpired) {
                     setSubscription(data)
