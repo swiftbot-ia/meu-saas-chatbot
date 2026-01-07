@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(request) {
   try {
     const { phoneNumber } = await request.json()
-    
+
     if (!phoneNumber) {
       return NextResponse.json(
         { error: 'phoneNumber é obrigatório' },
@@ -71,40 +71,47 @@ export async function POST(request) {
       success: true,
       phoneNumber: phoneNumber,
       userId: connectionData.user_id,
-      
+
       // 🎯 ADICIONANDO DADOS DE CONEXÃO EVOLUTION
       evolution: {
         instanceName: connectionData.waba_id,
         apiKey: connectionData.api_credentials,
         baseUrl: process.env.EVOLUTION_API_URL || 'https://evolution.swiftbot.com.br'
       },
-      
+
       agent: {
         // Informações básicas
         company_name: agentData.company_name || 'Assistente Virtual',
         business_sector: agentData.business_sector || 'Geral',
         personality: agentData.personality || 'amigavel',
         bot_objective: agentData.bot_objective || 'suporte',
-        
+
         // Mensagens
         welcome_message: agentData.welcome_message || `Olá! Sou o assistente virtual. Como posso ajudá-lo?`,
         default_response: agentData.default_response || 'Desculpe, não entendi. Pode reformular?',
-        
+
         // Produto/Serviço
         product_description: agentData.product_description || '',
         product_url: agentData.product_url || '',
+        product_urls: agentData.product_urls || [],
         price_range: agentData.price_range || '',
         objections_qa: agentData.objections_qa || [], // 🎯 NOVO: Sistema de objeções estruturadas
-        
+
         // Horários
         business_hours: agentData.business_hours || '24h',
         start_time: agentData.start_time || '08:00',
         end_time: agentData.end_time || '18:00',
         off_hours_message: agentData.off_hours_message || '',
-        
+
         // Instruções comportamentais
         behavior_instructions: agentData.behavior_instructions || '',
-        
+
+        // Novos campos - Melhorias 2026-01-07
+        company_context: agentData.company_context || '',
+        response_mode: agentData.response_mode || 'single',
+        typing_speed: agentData.typing_speed || 'normal',
+        products_services: agentData.products_services || '',
+
         // Status
         is_active: agentData.is_active || false
       }
@@ -123,7 +130,7 @@ export async function POST(request) {
 export async function GET(request) {
   const { searchParams } = new URL(request.url)
   const phoneNumber = searchParams.get('phone')
-  
+
   if (!phoneNumber) {
     return NextResponse.json({
       success: false,
@@ -131,7 +138,7 @@ export async function GET(request) {
       example: 'Substitua pelo número com código do país'
     })
   }
-  
+
   return POST(new Request(request.url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

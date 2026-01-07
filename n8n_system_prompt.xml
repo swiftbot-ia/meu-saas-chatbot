@@ -90,8 +90,14 @@
     <AgentFunctions>{{ $('Variaveis').item.json.descricao }}</AgentFunctions>
     <ProductsServices>{{ $('Variaveis').item.json.products_services }}</ProductsServices>
     <ProductURL>{{ $('Variaveis').item.json.url }}</ProductURL>
+    <ProductURLs>{{ $('Variaveis').item.json.product_urls ? $('Variaveis').item.json.product_urls.join(', ') : '' }}</ProductURLs>
     <PriceRange>{{ $('Variaveis').item.json.preco_medio }}</PriceRange>
     <PrimaryObjective>{{ $('Variaveis').item.json.objetivo_chatbot }}</PrimaryObjective>
+    
+    <!-- Novos campos - Melhorias 2026-01-07 -->
+    <CompanyContext>{{ $('Variaveis').item.json.company_context || '' }}</CompanyContext>
+    <ResponseMode>{{ $('Variaveis').item.json.response_mode || 'single' }}</ResponseMode>
+    <TypingSpeed>{{ $('Variaveis').item.json.typing_speed || 'normal' }}</TypingSpeed>
 
     <ExpertPostura>
         <Definition>Você não é uma enciclopédia, você é um CONSULTOR COM VIVÊNCIA PRÁTICA.</Definition>
