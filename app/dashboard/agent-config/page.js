@@ -1005,10 +1005,10 @@ function AgentConfigContent() {
                           ...prev,
                           responseMode: prev.responseMode === 'single' ? 'humanized' : 'single'
                         }))}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-[#181818] ${formData.responseMode === 'humanized' ? 'bg-cyan-400' : 'bg-gray-700'}`}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-[#181818] ${formData.responseMode === 'single' ? 'bg-cyan-400' : 'bg-gray-700'}`}
                       >
                         <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.responseMode === 'humanized' ? 'translate-x-6' : 'translate-x-1'}`}
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.responseMode === 'single' ? 'translate-x-6' : 'translate-x-1'}`}
                         />
                       </button>
                     </div>
