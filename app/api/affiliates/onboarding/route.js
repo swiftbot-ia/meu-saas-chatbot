@@ -196,7 +196,6 @@ export async function GET(request) {
         })
 
         const isComplete = account.details_submitted &&
-            account.payouts_enabled &&
             (account.capabilities?.transfers === 'active' || account.capabilities?.transfers === 'pending')
 
         // Atualizar status se necessário
