@@ -94,6 +94,7 @@ export async function POST(request) {
                 country: 'BR',
                 email: application?.email || user.email,
                 capabilities: {
+                    card_payments: { requested: true },
                     transfers: { requested: true }
                 },
                 business_type: 'individual',
