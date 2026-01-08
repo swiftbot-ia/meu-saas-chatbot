@@ -140,6 +140,130 @@ const ModalIcon = ({ type, isSelected }) => {
 
 const MAX_ITEMS = 15
 
+// Velocidades de digitação para o dropdown
+const TYPING_SPEEDS = [
+  { value: 'slow', label: 'Lento', description: 'Simula digitação humana mais lenta' },
+  { value: 'normal', label: 'Normal', description: 'Velocidade padrão de digitação' },
+  { value: 'fast', label: 'Rápido', description: 'Respostas quase instantâneas' }
+]
+
+// ==================================================================================
+// ✨ COMPONENTE: SMART GENERATE BUTTON (Otimizar com IA)
+// ==================================================================================
+const SmartGenerateButton = ({ fieldName, currentValue, onSuggestion, disabled = false }) => {
+  const [isLoading, setIsLoading] = useState(false)
+  const [showSuggestion, setShowSuggestion] = useState(false)
+  const [suggestion, setSuggestion] = useState('')
+
+  const handleGenerate = async () => {
+    if (isLoading || disabled) return
+    setIsLoading(true)
+
+    try {
+      const response = await fetch('/api/agent/generate-field', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fieldName, currentValue })
+      })
+
+      const data = await response.json()
+
+      if (data.suggestion) {
+        setSuggestion(data.suggestion)
+        setShowSuggestion(true)
+      }
+    } catch (error) {
+      console.error('Erro ao gerar sugestão:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleAccept = () => {
+    onSuggestion(suggestion)
+    setShowSuggestion(false)
+    setSuggestion('')
+  }
+
+  const handleMerge = () => {
+    // Mescla o texto atual com a sugestão
+    const merged = currentValue ? `${currentValue}\n\n${suggestion}` : suggestion
+    onSuggestion(merged)
+    setShowSuggestion(false)
+    setSuggestion('')
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={handleGenerate}
+        disabled={isLoading || disabled}
+        className="ml-2 p-1.5 rounded-lg bg-gradient-to-r from-purple-500/10 to-cyan-500/10 hover:from-purple-500/20 hover:to-cyan-500/20 border border-purple-500/20 transition-all group"
+        title="Otimizar com IA"
+      >
+        {isLoading ? (
+          <svg className="w-4 h-4 text-purple-400 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+        ) : (
+          <svg className="w-4 h-4 text-purple-400 group-hover:text-purple-300" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 0L14.59 8.41L23 11L14.59 13.59L12 22L9.41 13.59L1 11L9.41 8.41L12 0Z" />
+          </svg>
+        )}
+      </button>
+
+      {/* Modal de Sugestão */}
+      {showSuggestion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn p-4">
+          <div className="bg-[#1E1E1E] rounded-3xl p-6 max-w-lg w-full shadow-[0_0_40px_rgba(138,43,226,0.2)]">
+            <div className="flex items-center gap-2 mb-4">
+              <svg className="w-5 h-5 text-purple-400" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 0L14.59 8.41L23 11L14.59 13.59L12 22L9.41 13.59L1 11L9.41 8.41L12 0Z" />
+              </svg>
+              <h3 className="text-lg font-bold text-white">Sugestão da IA</h3>
+            </div>
+
+            <div className="bg-[#111]/50 rounded-2xl p-4 mb-4 max-h-60 overflow-y-auto">
+              <p className="text-gray-300 text-sm whitespace-pre-wrap">{suggestion}</p>
+            </div>
+
+            {currentValue && (
+              <p className="text-xs text-gray-500 mb-4">
+                💡 Seu texto atual será preservado. Escolha "Mesclar" para combinar ambos.
+              </p>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowSuggestion(false)}
+                className="flex-1 py-3 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600 transition-colors"
+              >
+                Cancelar
+              </button>
+              {currentValue && (
+                <button
+                  onClick={handleMerge}
+                  className="flex-1 py-3 bg-blue-500/20 text-blue-400 rounded-xl hover:bg-blue-500/30 transition-colors"
+                >
+                  Mesclar
+                </button>
+              )}
+              <button
+                onClick={handleAccept}
+                className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-bold rounded-xl hover:shadow-lg transition-all"
+              >
+                {currentValue ? 'Substituir' : 'Aceitar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 // ==================================================================================
 // 🧠 LÓGICA DO AGENTE
 // ==================================================================================
@@ -204,6 +328,11 @@ function AgentConfigContent() {
     productsServices: '',
     ignoreEmojiOnly: true,
     silenceConditions: '',
+    // Novos campos - Melhorias 2026-01-07
+    companyContext: '',
+    productUrls: [],
+    responseMode: 'single',  // 'single' | 'humanized'
+    typingSpeed: 'normal',   // 'slow' | 'normal' | 'fast'
   })
 
   useEffect(() => {
@@ -325,6 +454,11 @@ function AgentConfigContent() {
           productsServices: data.products_services || '',
           ignoreEmojiOnly: data.ignore_emoji_only !== false, // Default to true if null or undefined
           silenceConditions: data.silence_conditions || '',
+          // Novos campos - Melhorias 2026-01-07
+          companyContext: data.company_context || '',
+          productUrls: Array.isArray(data.product_urls) ? data.product_urls : (data.product_url ? [data.product_url] : []),
+          responseMode: data.response_mode || 'single',
+          typingSpeed: data.typing_speed || 'normal',
         })
       }
     } catch (error) {
@@ -539,6 +673,11 @@ function AgentConfigContent() {
         products_services: formData.productsServices,
         ignore_emoji_only: formData.ignoreEmojiOnly,
         silence_conditions: formData.silenceConditions,
+        // Novos campos - Melhorias 2026-01-07
+        company_context: formData.companyContext,
+        product_urls: formData.productUrls.filter(url => url.trim()),
+        response_mode: formData.responseMode,
+        typing_speed: formData.typingSpeed,
         is_active: true
       }
 
@@ -816,6 +955,84 @@ function AgentConfigContent() {
 
               <hr className="border-white/5" />
 
+              {/* NOVA SEÇÃO: Sobre a Empresa e Configurações de Resposta */}
+              <div className="space-y-6">
+                <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                  <svg className="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                  Contexto da Empresa
+                </h3>
+
+                {/* Sobre a Empresa */}
+                <div>
+                  <div className="flex items-center mb-2 ml-4">
+                    <label className="block text-xs font-medium text-[#B0B0B0] uppercase tracking-wider">Sobre a Empresa</label>
+                    <SmartGenerateButton
+                      fieldName="companyContext"
+                      currentValue={formData.companyContext}
+                      onSuggestion={(value) => setFormData(prev => ({ ...prev, companyContext: value }))}
+                    />
+                  </div>
+                  <textarea
+                    name="companyContext"
+                    value={formData.companyContext}
+                    onChange={handleInputChange}
+                    rows={4}
+                    placeholder="Descreva a história, valores, missão e políticas da empresa... Informações que servem de contexto para a IA, mas não fazem parte do fluxo de conversa."
+                    className={`${getInputClass('companyContext')} resize-none`}
+                  />
+                  <p className="text-xs text-gray-600 mt-2 ml-2">Informações institucionais que ajudam a IA a entender melhor o contexto da empresa.</p>
+                </div>
+
+                {/* Grid: Modo de Resposta e Velocidade */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Toggle: Modo de Resposta */}
+                  <div className="bg-[#181818] p-4 rounded-2xl">
+                    <label className="block text-xs font-medium text-[#B0B0B0] mb-3 uppercase tracking-wider">Modo de Resposta</label>
+                    <div className="flex items-center justify-between bg-[#252525] p-3 rounded-xl border border-white/5">
+                      <div className="flex-1">
+                        <span className="text-sm text-gray-300">
+                          {formData.responseMode === 'single' ? 'Bloco Único' : 'Blocos Humanizados'}
+                        </span>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {formData.responseMode === 'single'
+                            ? 'Uma mensagem completa'
+                            : 'Várias mensagens menores'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({
+                          ...prev,
+                          responseMode: prev.responseMode === 'single' ? 'humanized' : 'single'
+                        }))}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-[#181818] ${formData.responseMode === 'single' ? 'bg-cyan-400' : 'bg-gray-700'}`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.responseMode === 'single' ? 'translate-x-6' : 'translate-x-1'}`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Select: Velocidade de Digitação */}
+                  <div className="bg-[#181818] p-4 rounded-2xl">
+                    <label className="block text-xs font-medium text-[#B0B0B0] mb-3 uppercase tracking-wider">Velocidade de Digitação</label>
+                    <CustomSelect
+                      label=""
+                      value={formData.typingSpeed}
+                      onChange={(val) => setFormData(prev => ({ ...prev, typingSpeed: val }))}
+                      options={TYPING_SPEEDS}
+                      placeholder="Selecione a velocidade"
+                    />
+                    <p className="text-xs text-gray-500 mt-2">
+                      Controla o delay de "digitando..." antes do envio.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <hr className="border-white/5" />
+
               <div className="space-y-6">
                 <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
                   <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -908,10 +1125,58 @@ function AgentConfigContent() {
                     <p className="text-xs text-gray-600 mt-2 ml-2">Força o agente a sempre fazer uma pergunta no final para engajar.</p>
                   </div>
 
+                  {/* Lista dinâmica de Links de Produtos */}
                   <div>
-                    <label className="block text-xs font-medium text-[#B0B0B0] mb-2 ml-4 uppercase tracking-wider">Link do Produto (Opcional)</label>
-                    <input type="text" name="productUrl" value={formData.productUrl} onChange={handleInputChange} placeholder="www.seusite.com.br" className={getInputClass('productUrl')} />
-                    <p className="text-xs text-gray-600 mt-2 ml-2">Adicionaremos https:// automaticamente se você esquecer.</p>
+                    <div className="flex justify-between items-center mb-2 ml-4">
+                      <label className="block text-xs font-medium text-[#B0B0B0] uppercase tracking-wider">Links de Produtos</label>
+                      <span className="text-xs text-gray-600 bg-white/5 px-2 py-0.5 rounded-full">
+                        {formData.productUrls.length} links
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {formData.productUrls.map((url, index) => (
+                        <div key={index} className="flex gap-2 items-center">
+                          <input
+                            type="text"
+                            value={url}
+                            onChange={(e) => {
+                              const newUrls = [...formData.productUrls]
+                              newUrls[index] = e.target.value
+                              setFormData(prev => ({ ...prev, productUrls: newUrls }))
+                            }}
+                            placeholder="www.seusite.com.br/produto"
+                            className={`${getInputClass('productUrl')} flex-1`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                productUrls: prev.productUrls.filter((_, i) => i !== index)
+                              }))
+                            }}
+                            className="p-3 bg-red-500/10 text-red-400 rounded-xl hover:bg-red-500/20 transition-all"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, productUrls: [...prev.productUrls, ''] }))}
+                        className="w-full py-3 border border-dashed border-gray-700 rounded-xl text-gray-400 hover:border-[#00FF99] hover:text-[#00FF99] transition-all flex justify-center items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Adicionar novo produto
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-2 ml-2">Adicione links para cada produto ou serviço que o agente pode compartilhar.</p>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-[#B0B0B0] mb-2 ml-4 uppercase tracking-wider">Preço / Faixa</label>
