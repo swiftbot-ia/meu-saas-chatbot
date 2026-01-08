@@ -188,9 +188,16 @@ export async function GET(request) {
             }, { status: 500 })
         }
 
+        console.log('🔍 Checando status Stripe:', {
+            id: account.id,
+            details_submitted: account.details_submitted,
+            payouts_enabled: account.payouts_enabled,
+            capabilities: account.capabilities
+        })
+
         const isComplete = account.details_submitted &&
             account.payouts_enabled &&
-            account.capabilities?.transfers === 'active'
+            (account.capabilities?.transfers === 'active' || account.capabilities?.transfers === 'pending')
 
         // Atualizar status se necessário
         if (isComplete && !affiliate.stripe_onboarding_complete) {
