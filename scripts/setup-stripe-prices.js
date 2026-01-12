@@ -13,21 +13,21 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
 const PLAN_PRICES = {
   monthly: {
-    1: 10, 
-    2: 305, 
-    3: 445, 
-    4: 585, 
-    5: 625, 
-    6: 750, 
+    1: 165,
+    2: 305,
+    3: 445,
+    4: 585,
+    5: 625,
+    6: 750,
     7: 875
   },
   annual: {
-    1: 1776, 
-    2: 3294, 
-    3: 4806, 
-    4: 6318, 
-    5: 6750, 
-    6: 8100, 
+    1: 1776,
+    2: 3294,
+    3: 4806,
+    4: 6318,
+    5: 6750,
+    6: 8100,
     7: 9450
   }
 }
@@ -49,14 +49,14 @@ const PLAN_NAMES = {
 async function getOrCreateProduct() {
   try {
     console.log('📦 Buscando produto existente...')
-    
+
     const products = await stripe.products.list({
       limit: 100,
       active: true
     })
 
-    const existingProduct = products.data.find(p => 
-      p.metadata?.app === 'swiftbot' && 
+    const existingProduct = products.data.find(p =>
+      p.metadata?.app === 'swiftbot' &&
       p.metadata?.type === 'subscription'
     )
 
@@ -66,7 +66,7 @@ async function getOrCreateProduct() {
     }
 
     console.log('🆕 Criando novo produto...')
-    
+
     const newProduct = await stripe.products.create({
       name: 'SwiftBot - Automação de WhatsApp',
       description: 'Plataforma SaaS de automação de WhatsApp com IA',
@@ -106,7 +106,7 @@ async function createPrice(product, connections, period) {
       limit: 100
     })
 
-    const existing = existingPrices.data.find(p => 
+    const existing = existingPrices.data.find(p =>
       p.metadata?.connections === String(connections) &&
       p.metadata?.billing_period === period
     )
@@ -159,7 +159,7 @@ async function setupAllPrices() {
 
     // 2. Criar todos os prices
     console.log('💰 Criando Prices...\n')
-    
+
     const createdPrices = {
       monthly: {},
       annual: {}
@@ -229,7 +229,7 @@ function checkEnvironment() {
 
   const isTestMode = process.env.STRIPE_SECRET_KEY.includes('test')
   console.log(`🔑 Stripe API Key detectada: ${isTestMode ? 'TEST MODE' : '🚨 LIVE MODE'}`)
-  
+
   if (!isTestMode) {
     console.warn('\n⚠️  ATENÇÃO: Você está usando a chave LIVE da Stripe!')
     console.warn('⚠️  Isso criará prices reais no seu ambiente de produção.')

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../../lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import UpdatePaymentModal from '../../components/UpdatePaymentModal'
 
 export default function AccountSubscription() {
   const [user, setUser] = useState(null)

@@ -166,33 +166,13 @@ export async function PATCH(request) {
             })
             .eq('id', application_id)
 
-        // 2. Gerar código de afiliado único
-        const baseName = application.full_name.split(' ')[0].toUpperCase()
-        let affiliateCode = baseName.substring(0, 6).replace(/[^A-Z]/g, '')
-        if (affiliateCode.length < 4) affiliateCode += 'SWIFT'
-
-        // Verificar unicidade
-        let suffix = 0
-        let finalCode = affiliateCode
-        while (true) {
-            const { data: existing } = await supabase
-                .from('affiliates')
-                .select('id')
-                .eq('affiliate_code', finalCode)
-                .single()
-
-            if (!existing) break
-            suffix++
-            finalCode = affiliateCode + suffix
-        }
-
-        // 3. Criar registro de afiliado
+        // 3. Criar registro de afiliado (SEM CÓDIGO - Será criado pelo usuário)
         const { data: affiliate, error: affError } = await supabase
             .from('affiliates')
             .insert([{
                 user_id: application.user_id,
                 application_id: application.id,
-                affiliate_code: finalCode,
+                affiliate_code: null, // Será definido pelo usuário
                 commission_rate: 0.30, // 30%
                 commission_months: 6,
                 status: 'pending_onboarding'
@@ -208,14 +188,13 @@ export async function PATCH(request) {
             }, { status: 500 })
         }
 
-        console.log('✅ Afiliado aprovado:', affiliate.id, '- Código:', finalCode)
+        console.log('✅ Afiliado aprovado:', affiliate.id, '- Aguardando criação do código')
 
         return NextResponse.json({
             success: true,
             message: 'Aplicação aprovada com sucesso!',
             affiliate: {
                 id: affiliate.id,
-                code: finalCode,
                 status: affiliate.status
             }
         })
