@@ -47,7 +47,7 @@ export async function GET(request) {
         // Buscar estatísticas de comissões
         const { data: commissions, error: commError } = await supabase
             .from('affiliate_commissions')
-            .select('commission_amount, status')
+            .select('commission_amount, status, created_at')
             .eq('affiliate_id', affiliate.id)
 
         const commissionStats = {
@@ -86,9 +86,46 @@ export async function GET(request) {
             .order('created_at', { ascending: false })
             .limit(5)
 
+        // Agregação de dados para gráficos
+        const now = new Date()
+        const dailyData = {}
+        const monthlyData = {}
+
+        // Inicializar últimos 12 meses com zero (mantendo logica mensal fixa por enquanto ou também dinâmica? O usuario pediu mensal 12 meses amostrativo)
+        // O usuario disse: "registro por mes de quanto foi vendido no periodo de até 12 meses amotrativo"
+        for (let i = 11; i >= 0; i--) {
+            const d = new Date()
+            d.setMonth(d.getMonth() - i)
+            const key = d.toISOString().substring(0, 7) // YYYY-MM
+            monthlyData[key] = 0
+        }
+
+        commissions?.forEach(comm => {
+            if (!comm.created_at) return
+            const date = comm.created_at.split('T')[0] // YYYY-MM-DD
+            const month = comm.created_at.substring(0, 7) // YYYY-MM
+            const amount = parseFloat(comm.commission_amount || 0)
+
+            // Acumular dia (histórico completo)
+            if (dailyData[date] === undefined) {
+                dailyData[date] = 0
+            }
+            dailyData[date] += amount
+
+            // Acumular mês (apenas se estiver no range dos ultimos 12 ou tudo? vamos pegar os ultimos 12 do loop acima e somar se existir)
+            if (monthlyData[month] !== undefined) {
+                monthlyData[month] += amount
+            }
+        })
+
+        const history = {
+            daily: Object.entries(dailyData).map(([date, value]) => ({ date, value })).sort((a, b) => a.date.localeCompare(b.date)),
+            monthly: Object.entries(monthlyData).map(([date, value]) => ({ date, value })).sort((a, b) => a.date.localeCompare(b.date))
+        }
+
         // Gerar link de referência
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://swiftbot.com.br'
-        const referralLink = `${baseUrl}/?ref=${affiliate.affiliate_code}`
+        const referralLink = affiliate.affiliate_code ? `${baseUrl}/?ref=${affiliate.affiliate_code}` : null
 
         return NextResponse.json({
             success: true,
@@ -108,6 +145,7 @@ export async function GET(request) {
                 available_balance: parseFloat(affiliate.available_balance),
                 total_withdrawn: parseFloat(affiliate.total_withdrawn)
             },
+            history,
             referral_link: referralLink,
             recent_commissions: recentCommissions || [],
             recent_withdrawals: recentWithdrawals || [],
