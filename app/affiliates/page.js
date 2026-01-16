@@ -144,7 +144,7 @@ function ApplicationForm({ onSubmit, loading }) {
 function ApplicationModal({ onClose, onSubmit, loading }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-[#0A0A0A] border border-[#333] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto custom-scrollbar relative shadow-2xl">
+            <div className="bg-[#0A0A0A] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto custom-scrollbar relative shadow-2xl">
                 <button
                     onClick={onClose}
                     className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white bg-[#1A1A1A] hover:bg-[#333] rounded-full transition-colors z-10"
@@ -204,25 +204,35 @@ function LandingPage({ onOpenModal, hasSubscription }) {
                             Junte-se a mais de <b className="text-white">600 afiliados</b> que já estão vendendo SwiftBot todos os dias e construindo uma renda recorrente sólida.
                         </p>
 
-                        <div className="flex flex-col sm:flex-row items-center gap-4 justify-center md:justify-start">
+                        <div className="flex flex-col sm:flex-row items-stretch gap-4 justify-center md:justify-start">
                             {hasSubscription ? (
                                 <button
                                     onClick={onOpenModal}
-                                    className="px-8 py-4 bg-[#00FF99] text-black text-lg font-bold rounded-xl hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] hover:bg-[#00E88C] transition-all transform hover:-translate-y-1 flex items-center gap-2"
+                                    className="px-8 py-4 bg-[#00FF99] text-black text-lg font-bold rounded-xl hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] hover:bg-[#00E88C] transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2"
                                 >
                                     Quero Me Tornar um Afiliado
                                     <ArrowRight size={20} />
                                 </button>
                             ) : (
-                                <a
-                                    href="/pricing"
-                                    className="px-8 py-4 bg-white text-black text-lg font-bold rounded-xl hover:bg-gray-100 transition-all flex items-center gap-2"
-                                >
-                                    Assinar SwiftBot para Começar
-                                    <ExternalLink size={20} />
-                                </a>
+                                <>
+                                    <button
+                                        onClick={onOpenModal}
+                                        className="w-full sm:w-auto px-6 py-4 bg-white/10 border border-white/20 text-white text-base font-bold rounded-xl hover:bg-white/20 transition-all flex items-center justify-center gap-2 text-center"
+                                    >
+                                        Começar com 20%
+                                        <ArrowRight size={18} />
+                                    </button>
+
+                                    <a
+                                        href="/dashboard?open_plans=true"
+                                        className="w-full sm:w-auto px-6 py-4 bg-[#00FF99] text-black text-base font-bold rounded-xl hover:bg-[#00E88C] hover:shadow-[0_0_20px_rgba(0,255,153,0.3)] transition-all flex items-center justify-center gap-2 text-center"
+                                    >
+                                        Assinar e Ganhar 30%
+                                        <Sparkles size={18} />
+                                    </a>
+                                </>
                             )}
-                            <div className="text-sm text-gray-300">
+                            <div className="hidden sm:flex items-center text-sm text-gray-400 max-w-[120px] leading-tight">
                                 * Vagas limitadas para este mês
                             </div>
                         </div>
@@ -285,7 +295,7 @@ function LandingPage({ onOpenModal, hasSubscription }) {
                     <p className="text-gray-500 text-sm">Afiliados Ativos</p>
                 </div>
                 <div className="bg-[#1A1A1A] rounded-2xl p-6 text-center border border-[#222] hover:border-[#333] transition-colors">
-                    <p className="text-3xl md:text-4xl font-bold text-white mb-1">30%</p>
+                    <p className="text-3xl md:text-4xl font-bold text-white mb-1">{hasSubscription ? '30%' : '20%'}</p>
                     <p className="text-gray-500 text-sm">Comissão Recorrente</p>
                 </div>
                 <div className="bg-[#1A1A1A] rounded-2xl p-6 text-center border border-[#222] hover:border-[#333] transition-colors">
@@ -307,9 +317,9 @@ function LandingPage({ onOpenModal, hasSubscription }) {
                     <div className="w-14 h-14 mb-6 rounded-xl bg-green-500/10 flex items-center justify-center border border-green-500/20 group-hover:border-green-500/50 transition-colors">
                         <TrendingUp className="w-7 h-7 text-green-400" />
                     </div>
-                    <h3 className="text-xl font-bold text-white mb-3">Comissão de Ouro</h3>
+                    <h3 className="text-xl font-bold text-white mb-3">Comissão Recorrente</h3>
                     <p className="text-gray-400 text-sm leading-relaxed">
-                        Ganhe 30% de comissão sobre TODAS as mensalidades do cliente durante os primeiros 6 meses. É a maior comissão do mercado de SaaS.
+                        Ganhe <b>{hasSubscription ? '30%' : '20%'} de comissão</b> sobre a <b>primeira mensalidade</b> do cliente indicado. Receba uma alta recompensa pelo seu esforço inicial de venda.
                     </p>
                 </div>
 
@@ -684,6 +694,28 @@ function AffiliateDashboard({ affiliate, stats, history, referralLink, onRefresh
         setTimeout(() => setCopied(false), 2000)
     }
 
+    const [portalLoading, setPortalLoading] = useState(false)
+
+    const handleOpenPortal = async () => {
+        setPortalLoading(true)
+        try {
+            const response = await fetch('/api/affiliates/portal', {
+                method: 'POST'
+            })
+            const data = await response.json()
+
+            if (data.success && data.url) {
+                window.open(data.url, '_blank')
+            } else {
+                alert('Erro ao abrir portal: ' + (data.error || 'Tente novamente'))
+            }
+        } catch (error) {
+            alert('Erro de conexão. Tente novamente.')
+        } finally {
+            setPortalLoading(false)
+        }
+    }
+
     const getChartData = () => {
         if (chartPeriod === 'monthly') {
             return history?.monthly?.slice(-12) || []
@@ -748,13 +780,47 @@ function AffiliateDashboard({ affiliate, stats, history, referralLink, onRefresh
 
     return (
         <div className="space-y-8">
+            {/* Invisible SVG definition for Gradient Icon */}
+            <svg width="0" height="0" className="absolute">
+                <defs>
+                    <linearGradient id="btnIconGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#8A2BE2" />
+                        <stop offset="50%" stopColor="#00BFFF" />
+                        <stop offset="100%" stopColor="#00FF99" />
+                    </linearGradient>
+                </defs>
+            </svg>
+
+            <div className="flex justify-end">
+                <div className="p-[2px] rounded-2xl bg-gradient-to-r from-[#8A2BE2] via-[#00BFFF] to-[#00FF99]">
+                    <button
+                        onClick={handleOpenPortal}
+                        disabled={portalLoading}
+                        className="px-8 py-4 bg-[#121212] hover:bg-[#1A1A1A] rounded-[14px] text-white transition-all flex items-center gap-3 text-base font-bold relative group"
+                    >
+                        {portalLoading ? (
+                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                            <ExternalLink
+                                size={20}
+                                style={{ stroke: "url(#btnIconGradient)" }}
+                                className="group-hover:scale-110 transition-transform duration-300"
+                            />
+                        )}
+                        <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-200">
+                            Acessar Painel Financeiro (Stripe)
+                        </span>
+                    </button>
+                </div>
+            </div>
+
             <div className="bg-gradient-to-br from-[#1A1A1A] to-[#0F0F0F] rounded-2xl p-6 shadow-lg flex flex-col md:flex-row items-center justify-between gap-6">
                 <div>
                     <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
                         <Gift className="text-[#00FF99]" />
                         Seu Link de Indicação
                     </h3>
-                    <p className="text-gray-400 text-sm">Compartilhe este link e ganhe 30% recorrente.</p>
+                    <p className="text-gray-400 text-sm">Compartilhe este link e ganhe 30% sobre a primeira venda.</p>
                 </div>
 
                 <div className="flex-1 w-full md:max-w-xl">

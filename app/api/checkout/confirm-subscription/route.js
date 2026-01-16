@@ -114,6 +114,44 @@ export async function POST(request) {
       trialDays
     })
 
+    // ✅ [AFILIADO] VERIFICAR E CONFIGURAR SPLIT (ANTES DE CRIAR ASSINATURA)
+    let transferData = null
+    let affiliateRecord = null
+
+    if (affiliate_ref_code) {
+      try {
+        console.log('🔗 [Affiliate] Verificando código pré-checkout:', affiliate_ref_code)
+
+        const { data: affData, error: affErr } = await supabaseAdmin
+          .from('affiliates')
+          .select('id, status, stripe_account_id, commission_rate')
+          .eq('affiliate_code', affiliate_ref_code.toUpperCase())
+          .eq('status', 'active')
+          .single()
+
+        if (affData && !affErr) {
+          affiliateRecord = affData
+
+          // Verificar se tem conta Stripe conectada para split automático (SAFEGUARD)
+          if (affData.stripe_account_id && affData.stripe_account_id.startsWith('acct_')) {
+            const commissionRate = affData.commission_rate ? (affData.commission_rate * 100) : 30
+
+            console.log(`💸 [Affiliate] Split configurado: ${commissionRate}% para ${affData.stripe_account_id}`)
+
+            transferData = {
+              destination: affData.stripe_account_id,
+              amountPercent: commissionRate
+            }
+          } else {
+            console.warn('⚠️ [Affiliate] Afiliado sem conta Stripe conectada. Split ignorado (venda segue normal).')
+          }
+        }
+      } catch (err) {
+        console.error('⚠️ [Affiliate] Erro na verificação pré-checkout:', err)
+        // Não falhar checkout
+      }
+    }
+
     // ✅ CRIAR SUBSCRIPTION NA STRIPE
     let stripeSubscription
 
@@ -138,11 +176,26 @@ export async function POST(request) {
           final_amount: planPrice,
           billing_frequency: billingFrequency,
           trial_days: trialDays,
-          phone: userProfile?.phone || 'not_provided'
-        }
+          phone: userProfile?.phone || 'not_provided',
+          affiliateCode: affiliate_ref_code ? affiliate_ref_code.toUpperCase() : undefined
+        },
+        transferData: transferData // ✅ Passar dados de split se existirem
       })
 
       console.log('✅ Subscription criada:', stripeSubscription.id)
+
+      // ✅ [FIRST PAYMENT ONLY] Remover transfer_data para cobranças futuras
+      if (transferData) {
+        try {
+          await stripe.subscriptions.update(stripeSubscription.id, {
+            transfer_data: null
+          })
+          console.log('✅ [Affiliate] Split removido de cobranças futuras (apenas 1ª parcela paga ao afiliado)')
+        } catch (updateError) {
+          console.error('⚠️ [Affiliate] Erro ao remover split de futuras cobranças:', updateError)
+          // Não falhamos o fluxo principal, mas logamos o alerta
+        }
+      }
 
     } catch (stripeError) {
       console.error('❌ Erro na Stripe:', stripeError)
@@ -265,13 +318,11 @@ export async function POST(request) {
       try {
         console.log('🔗 [Affiliate] Verificando código:', affiliate_ref_code)
 
-        // Buscar afiliado pelo código
-        const { data: affiliate, error: affError } = await supabaseAdmin
-          .from('affiliates')
-          .select('id, status')
-          .eq('affiliate_code', affiliate_ref_code.toUpperCase())
-          .eq('status', 'active')
           .single()
+
+        // Se já buscamos antes (affiliateRecord), usamos ele, senão consultamos agora
+        const affiliate = affiliateRecord || (affiliateQuery.data)
+        const affError = affiliateQuery.error
 
         if (affiliate && !affError) {
           // Verificar se usuário já não foi indicado antes

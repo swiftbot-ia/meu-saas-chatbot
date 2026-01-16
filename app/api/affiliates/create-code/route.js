@@ -43,12 +43,7 @@ export async function POST(request) {
             }, { status: 403 })
         }
 
-        if (affiliate.affiliate_code) {
-            return NextResponse.json({
-                success: false,
-                error: 'Você já possui um código de indicação'
-            }, { status: 400 })
-        }
+        // Allow updating code (removed check for existing code)
 
         // Verificar disponibilidade do código
         const { data: existing } = await supabase

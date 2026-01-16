@@ -3,6 +3,7 @@ import "./globals.css";
 import Script from 'next/script'
 import CookieConsent from '../components/CookieConsent'
 import UTMTracker from './components/UTMTracker'
+import AffiliateTracker from './components/AffiliateTracker'
 
 // IDs de tracking globais
 const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || '1946279805928418'
@@ -264,6 +265,7 @@ export default function RootLayout({ children }) {
           {children}
           <CookieConsent />
           <UTMTracker />
+          <AffiliateTracker />
 
           {/* Cache Buster Script - Force clear localStorage on new version */}
           <Script id="cache-buster" strategy="afterInteractive">
@@ -275,9 +277,15 @@ export default function RootLayout({ children }) {
                   
                   if (savedVersion !== currentVersion) {
                     console.log('🧹 Clearing cache for version update:', currentVersion);
-                    // Preservar apenas itens essenciais se necessário, aqui limpamos tudo para segurança
+                    
+                    // ✅ PRESERVAR DADOS IMPORTANTES
+                    var savedRef = localStorage.getItem('affiliate_ref');
+                    
                     localStorage.clear();
+                    
+                    // ✅ RESTAURAR DADOS
                     localStorage.setItem('app_version', currentVersion);
+                    if (savedRef) localStorage.setItem('affiliate_ref', savedRef);
                     
                     // Opcional: Recarregar a página se for crítico
                     // window.location.reload();

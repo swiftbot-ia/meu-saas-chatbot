@@ -16,31 +16,7 @@ export async function POST(request) {
             return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 401 })
         }
 
-        // Verificar se usuário tem assinatura ativa
-        const { data: subscription, error: subError } = await supabase
-            .from('user_subscriptions')
-            .select('status, stripe_subscription_id')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single()
-
-        if (subError || !subscription) {
-            return NextResponse.json({
-                success: false,
-                error: 'Você precisa ter uma assinatura ativa para se candidatar ao programa de afiliados'
-            }, { status: 403 })
-        }
-
-        const isActive = ['active', 'trial', 'trialing'].includes(subscription.status) ||
-            subscription.stripe_subscription_id === 'super_account_bypass'
-
-        if (!isActive) {
-            return NextResponse.json({
-                success: false,
-                error: 'Sua assinatura precisa estar ativa para se candidatar ao programa de afiliados'
-            }, { status: 403 })
-        }
+        // Subscription requirement removed to allow 20% commission for all users
 
         // Verificar se já existe uma aplicação
         const { data: existingApplication } = await supabase
