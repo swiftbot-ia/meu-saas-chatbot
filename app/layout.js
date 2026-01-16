@@ -1,6 +1,7 @@
 // import { Inter } from "next/font/google";
 import "./globals.css";
 import Script from 'next/script'
+import { Suspense } from 'react'
 import CookieConsent from '../components/CookieConsent'
 import UTMTracker from './components/UTMTracker'
 import AffiliateTracker from './components/AffiliateTracker'
@@ -264,8 +265,10 @@ export default function RootLayout({ children }) {
         <div className="min-h-screen">
           {children}
           <CookieConsent />
-          <UTMTracker />
-          <AffiliateTracker />
+          <Suspense fallback={null}>
+            <UTMTracker />
+            <AffiliateTracker />
+          </Suspense>
 
           {/* Cache Buster Script - Force clear localStorage on new version */}
           <Script id="cache-buster" strategy="afterInteractive">
