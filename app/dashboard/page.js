@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, Suspense } from 'react'
 import { supabase } from '../../lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import StandardModal, { initialModalConfig, createModalConfig } from '../components/StandardModal'
@@ -105,7 +105,7 @@ function SyncProgressBar({ connectionId }) {
 }
 
 
-export default function Dashboard() {
+function DashboardContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -2463,5 +2463,14 @@ export default function Dashboard() {
         showCancelButton={modalConfig.showCancelButton}
       />
     </div>
+  )
+
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen bg-black text-white">Carregando dashboard...</div>}>
+      <DashboardContent />
+    </Suspense>
   )
 }
