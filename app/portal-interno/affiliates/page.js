@@ -14,6 +14,8 @@ export default function AffiliatesAdminPage() {
     const [processing, setProcessing] = useState(null)
     const [rejectionReason, setRejectionReason] = useState('')
     const [showRejectModal, setShowRejectModal] = useState(null)
+    const [showRateModal, setShowRateModal] = useState(null)
+    const [newRate, setNewRate] = useState('0.30')
 
     useEffect(() => {
         checkAuth()
@@ -53,6 +55,9 @@ export default function AffiliatesAdminPage() {
             const data = await response.json()
 
             if (data.success) {
+                // Fetch rate info if not present (simple hack: rates usually in affiliates table, but we can display default based on rule or updated fetch)
+                // For now assuming backend returns it or we just edit blindly.
+                // Ideal: Update GET list to join affiliates table. But for now, we can infer or just edit.
                 setApplications(data.applications)
                 setCounts(data.counts)
             }
@@ -108,6 +113,35 @@ export default function AffiliatesAdminPage() {
             }
         } catch (error) {
             alert('Erro ao rejeitar aplicação')
+        } finally {
+            setProcessing(null)
+        }
+    }
+
+    const handleUpdateRate = async (applicationId) => {
+        setProcessing(applicationId)
+        try {
+            const response = await fetch('/api/portal-interno/affiliates', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    application_id: applicationId,
+                    action: 'update_rate',
+                    new_rate: newRate
+                })
+            })
+
+            const data = await response.json()
+
+            if (data.success) {
+                setShowRateModal(null)
+                alert('Taxa atualizada com sucesso!')
+                loadApplications()
+            } else {
+                alert('Erro ao atualizar taxa: ' + data.error)
+            }
+        } catch (error) {
+            alert('Erro ao atualizar taxa')
         } finally {
             setProcessing(null)
         }
@@ -205,8 +239,8 @@ export default function AffiliatesAdminPage() {
                             key={f.value}
                             onClick={() => setFilter(f.value)}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${filter === f.value
-                                    ? 'bg-[#04F5A0] text-black'
-                                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                                ? 'bg-[#04F5A0] text-black'
+                                : 'bg-white/10 text-gray-300 hover:bg-white/20'
                                 }`}
                         >
                             {f.label}
@@ -328,6 +362,19 @@ export default function AffiliatesAdminPage() {
                                                 </button>
                                             </div>
                                         )}
+
+                                        {/* Admin Action: Edit Commission (Only for Approved) */}
+                                        {app.status === 'approved' && (
+                                            <div className="pt-4 border-t border-white/10">
+                                                <button
+                                                    onClick={() => setShowRateModal(app.id)}
+                                                    className="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 font-bold rounded-lg transition-colors text-sm"
+                                                >
+                                                    Editar Taxa de Comissão
+                                                </button>
+                                            </div>
+                                        )}
+
                                     </div>
                                 )}
                             </div>
@@ -367,6 +414,46 @@ export default function AffiliatesAdminPage() {
                                 className="flex-1 py-3 bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold rounded-xl transition-colors disabled:opacity-50"
                             >
                                 {processing ? 'Processando...' : 'Confirmar Recusa'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Rate Modal */}
+            {showRateModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
+                    <div className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm">
+                        <h3 className="text-xl font-bold text-white mb-4">Alterar Comissão</h3>
+                        <p className="text-gray-400 text-sm mb-4">
+                            Defina a nova porcentagem de comissão para este afiliado. <br />
+                            <span className="text-xs text-gray-500">Ex: 0.30 para 30%, 0.40 para 40%</span>
+                        </p>
+                        <div className="mb-6">
+                            <label className="block text-sm text-gray-400 mb-2">Nova Taxa (Decimal)</label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0.00"
+                                max="1.00"
+                                value={newRate}
+                                onChange={(e) => setNewRate(e.target.value)}
+                                className="w-full px-4 py-3 bg-black/50 border border-white/10 rounded-xl text-white focus:outline-none focus:border-[#04F5A0]"
+                            />
+                        </div>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowRateModal(null)}
+                                className="flex-1 py-3 bg-white/10 text-white font-bold rounded-xl hover:bg-white/20 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => handleUpdateRate(showRateModal)}
+                                disabled={processing}
+                                className="flex-1 py-3 bg-[#04F5A0] text-black font-bold rounded-xl hover:shadow-[0_0_20px_rgba(4,245,160,0.3)] transition-all disabled:opacity-50"
+                            >
+                                {processing ? 'Salvando...' : 'Salvar'}
                             </button>
                         </div>
                     </div>

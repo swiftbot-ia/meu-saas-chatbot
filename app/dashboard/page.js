@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import StandardModal, { initialModalConfig, createModalConfig } from '../components/StandardModal'
 
 // ============================================================================
@@ -107,6 +107,7 @@ function SyncProgressBar({ connectionId }) {
 
 export default function Dashboard() {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   // Ref para timer de atualização de perfil
   const profileUpdateTimerRef = useRef(null)
@@ -164,6 +165,18 @@ export default function Dashboard() {
     setModalConfig(initialModalConfig)
     setPendingAction(null)
   }
+
+  // ============================================================================
+  // EFFECT: CHECK URL PARAMS FOR ACTIONS
+  // ============================================================================
+  useEffect(() => {
+    const openPlans = searchParams.get('open_plans')
+    if (openPlans === 'true') {
+      setShowCheckoutModal(true)
+      // Optional: Clean up URL
+      router.replace('/dashboard')
+    }
+  }, [searchParams, router])
 
   // ============================================================================
   // CARREGAMENTO INICIAL
@@ -1195,7 +1208,8 @@ export default function Dashboard() {
           paymentMethodId: setupIntent.payment_method,
           plan: selectedPlan,
           userEmail: user.email,
-          userName: userProfile?.full_name || user.email.split('@')[0]
+          userName: userProfile?.full_name || user.email.split('@')[0],
+          affiliate_ref_code: typeof window !== 'undefined' ? localStorage.getItem('affiliate_ref') : null
         })
       })
 
