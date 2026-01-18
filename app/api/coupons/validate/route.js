@@ -5,7 +5,9 @@ import Stripe from 'stripe'
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: '2024-06-20'
+})
 const AFFILIATE_COUPON_ID = 'AFFILIATE40'
 
 export async function GET(request) {
@@ -96,7 +98,7 @@ export async function GET(request) {
 
                 return NextResponse.json({
                     isValid: false,
-                    error: 'Erro ao gerar cupom de afiliado na Stripe'
+                    error: `Erro ao gerar cupom de afiliado na Stripe: ${stripeError.message}`
                 }, { status: 500 })
             }
         }
