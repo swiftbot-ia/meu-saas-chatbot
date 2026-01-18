@@ -33,25 +33,25 @@ export default function Precos() {
     return () => observer.disconnect()
   }, [])
 
-  // Pricing data - 7 PLANOS
+  // Pricing data - 7 PLANOS (Atualizado +75% Mensal / +45% Anual)
   const pricingData = {
     monthly: {
-      1: { price: 165, monthlyEquivalent: 165 },
-      2: { price: 305, monthlyEquivalent: 305 },
-      3: { price: 445, monthlyEquivalent: 445 },
-      4: { price: 585, monthlyEquivalent: 585 },
-      5: { price: 625, monthlyEquivalent: 625 },
-      6: { price: 750, monthlyEquivalent: 750 },
-      7: { price: 875, monthlyEquivalent: 875 }
+      1: { price: 288.75, monthlyEquivalent: 288.75 },
+      2: { price: 533.75, monthlyEquivalent: 533.75 },
+      3: { price: 778.75, monthlyEquivalent: 778.75 },
+      4: { price: 1023.75, monthlyEquivalent: 1023.75 },
+      5: { price: 1093.75, monthlyEquivalent: 1093.75 },
+      6: { price: 1312.50, monthlyEquivalent: 1312.50 },
+      7: { price: 1531.25, monthlyEquivalent: 1531.25 }
     },
     annual: {
-      1: { price: 1776, monthlyEquivalent: 148 },
-      2: { price: 3294, monthlyEquivalent: 274 },
-      3: { price: 4806, monthlyEquivalent: 400 },
-      4: { price: 6318, monthlyEquivalent: 526 },
-      5: { price: 6750, monthlyEquivalent: 562 },
-      6: { price: 8100, monthlyEquivalent: 675 },
-      7: { price: 9450, monthlyEquivalent: 787 }
+      1: { price: 2575.20, monthlyEquivalent: 214.60 },
+      2: { price: 4776.30, monthlyEquivalent: 398.02 },
+      3: { price: 6968.70, monthlyEquivalent: 580.72 },
+      4: { price: 9161.10, monthlyEquivalent: 763.42 },
+      5: { price: 9787.50, monthlyEquivalent: 815.62 },
+      6: { price: 11745.00, monthlyEquivalent: 978.75 },
+      7: { price: 13702.50, monthlyEquivalent: 1141.87 }
     }
   }
 
@@ -282,7 +282,7 @@ export default function Precos() {
                   Anual
                   <span className={`ml-2 px-2 py-0.5 rounded-lg text-xs font-semibold ${billingPeriod === 'annual' ? 'bg-black/30 text-[#00FF99]' : 'bg-white/10 text-gray-400'
                     }`}>
-                    -10%
+                    -25%
                   </span>
                 </button>
               </div>
@@ -331,7 +331,7 @@ export default function Precos() {
                   {billingPeriod === 'monthly' ? (
                     <>
                       <div className="text-5xl font-light text-white mb-2">
-                        R$ {getCurrentPricing().price}
+                        R$ {getCurrentPricing().price.toFixed(2).replace('.', ',')}
                         <span className="text-xl text-gray-400 font-light">/mês</span>
                       </div>
                     </>
@@ -339,11 +339,11 @@ export default function Precos() {
                     <>
                       <div className="text-5xl font-light text-white mb-2">
                         <span className="text-lg text-gray-400 font-light">equivalente a </span>
-                        R$ {getCurrentPricing().monthlyEquivalent}
+                        R$ {getCurrentPricing().monthlyEquivalent.toFixed(2).replace('.', ',')}
                         <span className="text-xl text-gray-400 font-light">/mês</span>
                       </div>
                       <div className="text-lg text-gray-400 font-light mb-2">
-                        R$ {getCurrentPricing().price}/ano
+                        R$ {getCurrentPricing().price.toFixed(2).replace('.', ',')}/ano
                       </div>
                     </>
                   )}

@@ -21,14 +21,16 @@ export async function POST(request) {
       plan,
       userEmail,
       userName,
-      affiliate_ref_code // Código de afiliado (se indicado)
+      affiliate_ref_code, // Código de afiliado (se indicado)
+      promotionCodeId // [NOVO] ID do Promotion Code da Stripe (ex: promo_xyz)
     } = await request.json()
 
     console.log('🎯 [STEP 2] Confirmando Subscription:', {
       userId,
       paymentMethodId,
       plan,
-      affiliate_ref_code
+      affiliate_ref_code,
+      promotionCodeId
     })
 
     // ✅ VALIDAR DADOS OBRIGATÓRIOS
@@ -92,12 +94,13 @@ export async function POST(request) {
     console.log('✅ Payment method anexado e definido como padrão')
 
     // ✅ DEFINIR PREÇOS
+    // ✅ DEFINIR PREÇOS (Atualizado 19/01/2026)
     const pricing = {
       monthly: {
-        1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875
+        1: 288.75, 2: 533.75, 3: 778.75, 4: 1023.75, 5: 1093.75, 6: 1312.50, 7: 1531.25
       },
       annual: {
-        1: 1776, 2: 3294, 3: 4806, 4: 6318, 5: 6750, 6: 8100, 7: 9450
+        1: 2575.20, 2: 4776.30, 3: 6968.70, 4: 9161.10, 5: 9787.50, 6: 11745.00, 7: 13702.50
       }
     }
 
@@ -168,6 +171,7 @@ export async function POST(request) {
           planPrice: planPrice,
           trialDays: trialDays
         },
+        promotionCode: promotionCodeId, // ✅ Usar Promotion Code Validado
         metadata: {
           userId: userId,
           userName: userName || userEmail.split('@')[0],
