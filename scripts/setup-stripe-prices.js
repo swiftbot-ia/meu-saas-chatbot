@@ -8,27 +8,27 @@ const Stripe = require('stripe')
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
 // ============================================
-// CONFIGURAÇÃO DE PREÇOS
+// CONFIGURAÇÃO DE PREÇOS (ATUALIZADO 19/01/2026)
 // ============================================
 
 const PLAN_PRICES = {
   monthly: {
-    1: 165,
-    2: 305,
-    3: 445,
-    4: 585,
-    5: 625,
-    6: 750,
-    7: 875
+    1: 288.75,
+    2: 533.75,
+    3: 778.75,
+    4: 1023.75,
+    5: 1093.75,
+    6: 1312.50,
+    7: 1531.25
   },
   annual: {
-    1: 1776,
-    2: 3294,
-    3: 4806,
-    4: 6318,
-    5: 6750,
-    6: 8100,
-    7: 9450
+    1: 2575.20,
+    2: 4776.30,
+    3: 6968.70,
+    4: 9161.10,
+    5: 9787.50,
+    6: 11745.00,
+    7: 13702.50
   }
 }
 
@@ -89,6 +89,46 @@ async function getOrCreateProduct() {
 }
 
 // ============================================
+// CRIAR CUPOM DE AFILIADO
+// ============================================
+async function createAffiliateCoupon() {
+  try {
+    console.log('🎟️ verificando cupom de afiliado...')
+    const couponId = 'AFFILIATE40'
+
+    try {
+      const existingCoupon = await stripe.coupons.retrieve(couponId)
+      console.log(`✅ Cupom já existe: ${existingCoupon.name} (${existingCoupon.id})`)
+      return existingCoupon
+    } catch (e) {
+      // Se erro for 404, cria
+      if (e.code !== 'resource_missing') {
+        throw e
+      }
+    }
+
+    console.log('🆕 Criando cupom AFFILIATE40...')
+    const newCoupon = await stripe.coupons.create({
+      id: couponId,
+      name: 'Desconto de Afiliado (40%)',
+      percent_off: 40,
+      duration: 'forever',
+      metadata: {
+        type: 'affiliate_discount',
+        created_at: new Date().toISOString()
+      }
+    })
+    console.log(`✅ Cupom criado com sucesso: ${newCoupon.name}`)
+    return newCoupon
+
+  } catch (error) {
+    console.error('❌ Erro ao criar cupom:', error.message)
+    throw error
+  }
+}
+
+
+// ============================================
 // CRIAR PRICE
 // ============================================
 
@@ -108,11 +148,12 @@ async function createPrice(product, connections, period) {
 
     const existing = existingPrices.data.find(p =>
       p.metadata?.connections === String(connections) &&
-      p.metadata?.billing_period === period
+      p.metadata?.billing_period === period &&
+      p.unit_amount === Math.round(amount * 100) // Verifica também o valor para não pegar preços antigos
     )
 
     if (existing) {
-      console.log(`⏭️  Price já existe: ${planName} ${periodLabel} - R$ ${amount} (${existing.id})`)
+      console.log(`⏭️  Price já existe (e atualizado): ${planName} ${periodLabel} - R$ ${amount.toFixed(2)} (${existing.id})`)
       return existing
     }
 
@@ -135,7 +176,7 @@ async function createPrice(product, connections, period) {
       nickname: `${planName} - ${periodLabel} (${connections} ${connections === 1 ? 'conexão' : 'conexões'})`
     })
 
-    console.log(`✅ Price criado: ${price.nickname} - R$ ${amount} (${price.id})`)
+    console.log(`✅ Price criado: ${price.nickname} - R$ ${amount.toFixed(2)} (${price.id})`)
     return price
 
   } catch (error) {
@@ -153,6 +194,10 @@ async function setupAllPrices() {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
 
   try {
+    // 0. Criar Cupom
+    await createAffiliateCoupon()
+    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
+
     // 1. Criar/buscar produto
     const product = await getOrCreateProduct()
     console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
@@ -197,7 +242,7 @@ async function setupAllPrices() {
     console.log('```\n')
     console.log('💡 PRÓXIMOS PASSOS:')
     console.log('1. Copie o objeto STRIPE_PRICE_IDS acima')
-    console.log('2. Cole no arquivo lib/stripe.js')
+    console.log('2. Cole no arquivo lib/stripe-plan-changes.js')
     console.log('3. Use esses IDs nas funções de upgrade/downgrade')
     console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
 

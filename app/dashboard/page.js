@@ -160,23 +160,72 @@ function DashboardContent() {
   const [modalConfig, setModalConfig] = useState(initialModalConfig)
   const [pendingAction, setPendingAction] = useState(null) // Para armazenar ações pendentes de confirmação
 
+  // Coupon State
+  const [couponCode, setCouponCode] = useState('')
+  const [couponStatus, setCouponStatus] = useState('idle') // idle, validating, valid, invalid
+  const [appliedCoupon, setAppliedCoupon] = useState(null) // { code, discount, type, promotionCodeId }
+  const [couponError, setCouponError] = useState('')
+
   // Helper para fechar o modal
   const closeModal = () => {
     setModalConfig(initialModalConfig)
     setPendingAction(null)
+    // Não limpamos o cupom ao fechar modal para persistir a intenção, mas pode ser discutível
   }
 
   // ============================================================================
-  // EFFECT: CHECK URL PARAMS FOR ACTIONS
+  // EFFECT: CHECK URL PARAMS FOR ACTIONS & REF
   // ============================================================================
   useEffect(() => {
     const openPlans = searchParams.get('open_plans')
     if (openPlans === 'true') {
       setShowCheckoutModal(true)
-      // Optional: Clean up URL
       router.replace('/dashboard')
     }
+
+    // Auto-fill coupon from localStorage (Affiliate logic)
+    const storedRef = localStorage.getItem('affiliate_ref')
+    if (storedRef && !appliedCoupon) {
+      setCouponCode(storedRef)
+      validateCoupon(storedRef)
+    }
   }, [searchParams, router])
+
+  // ============================================================================
+  // COUPON VALIDATION
+  // ============================================================================
+  const validateCoupon = async (codeToValidate) => {
+    if (!codeToValidate) return
+
+    setCouponStatus('validating')
+    setCouponError('')
+
+    try {
+      const res = await fetch(`/api/coupons/validate?code=${encodeURIComponent(codeToValidate)}`)
+      const data = await res.json()
+
+      if (data.isValid) {
+        setAppliedCoupon(data)
+        setCouponStatus('valid')
+        setCouponCode(data.code) // Normaliza para o código real (ex: uppercase)
+      } else {
+        setCouponStatus('invalid')
+        setCouponError(data.error || 'Cupom inválido')
+        setAppliedCoupon(null)
+      }
+    } catch (error) {
+      console.error('Erro ao validar cupom:', error)
+      setCouponStatus('invalid')
+      setCouponError('Erro ao verificar cupom')
+    }
+  }
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null)
+    setCouponCode('')
+    setCouponStatus('idle')
+    setCouponError('')
+  }
 
   // ============================================================================
   // CARREGAMENTO INICIAL
@@ -1209,7 +1258,8 @@ function DashboardContent() {
           plan: selectedPlan,
           userEmail: user.email,
           userName: userProfile?.full_name || user.email.split('@')[0],
-          affiliate_ref_code: typeof window !== 'undefined' ? localStorage.getItem('affiliate_ref') : null
+          affiliate_ref_code: appliedCoupon?.type === 'affiliate' ? appliedCoupon.code : undefined, // Check de afiliado
+          promotionCodeId: appliedCoupon?.promotionCodeId // ID do desconto na Stripe
         })
       })
 
@@ -1278,8 +1328,8 @@ function DashboardContent() {
   // <-- [MERGE] Funções helper de checkout substituídas/adicionadas
   const calculatePrice = () => {
     const pricing = {
-      monthly: { 1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875 },
-      annual: { 1: 150, 2: 275, 3: 400, 4: 525, 5: 525, 6: 630, 7: 735 }
+      monthly: { 1: 288.75, 2: 533.75, 3: 778.75, 4: 1023.75, 5: 1093.75, 6: 1312.50, 7: 1531.25 },
+      annual: { 1: 214.60, 2: 398.02, 3: 580.72, 4: 763.42, 5: 815.62, 6: 978.75, 7: 1141.87 } // Valor mensal do anual (2575.20 / 12 = 214.60)
     }
     return pricing[selectedPlan.billingPeriod][selectedPlan.connections] || 0;
   }
@@ -1300,8 +1350,8 @@ function DashboardContent() {
 
   const calculateAnnualDiscount = () => {
     const pricing = {
-      monthly: { 1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875 },
-      annual: { 1: 150, 2: 275, 3: 400, 4: 525, 5: 525, 6: 630, 7: 735 }
+      monthly: { 1: 288.75, 2: 533.75, 3: 778.75, 4: 1023.75, 5: 1093.75, 6: 1312.50, 7: 1531.25 },
+      annual: { 1: 214.60, 2: 398.02, 3: 580.72, 4: 763.42, 5: 815.62, 6: 978.75, 7: 1141.87 }
     }
     const monthlyPrice = pricing.monthly[selectedPlan.connections]
     const annualPrice = pricing.annual[selectedPlan.connections]
@@ -1314,7 +1364,7 @@ function DashboardContent() {
 
   const calculateAnnualTotal = () => {
     const pricing = {
-      annual: { 1: 150, 2: 275, 3: 400, 4: 525, 5: 525, 6: 630, 7: 735 }
+      annual: { 1: 214.60, 2: 398.02, 3: 580.72, 4: 763.42, 5: 815.62, 6: 978.75, 7: 1141.87 }
     }
     const annualMonthlyPrice = pricing.annual[selectedPlan.connections]
     return (annualMonthlyPrice || 0) * 12
@@ -1335,6 +1385,8 @@ function DashboardContent() {
     return !hasUsedTrial()
   }
   // -->
+
+
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -2206,10 +2258,85 @@ function DashboardContent() {
                             ✨ {hasDiscount()}% de desconto por conexão!
                           </div>
                         )}
+                        <div className="flex justify-between text-lg font-bold mt-2 pt-2 border-t border-[#333]">
+                          <span>Total:</span>
+                          <div className="text-right">
+                            {appliedCoupon ? (
+                              <>
+                                <span className="text-sm text-gray-500 line-through mr-2">
+                                  R$ {calculatePrice().toFixed(2)}
+                                </span>
+                                <span className="text-[#00E5BC]">
+                                  R$ {(calculatePrice() * (1 - appliedCoupon.discount / 100)).toFixed(2)}
+                                  <span className="text-xs ml-1 block font-normal text-gray-400">
+                                    /{selectedPlan.billingPeriod === 'monthly' ? 'mês' : 'ano'}
+                                  </span>
+                                </span>
+                              </>
+                            ) : (
+                              <span>R$ {calculatePrice().toFixed(2)}</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="bg-[#222222] rounded-xl p-6 mb-6 border border-[#333333]">
+                    {/* --- CUPOM INTERATIVO --- */}
+                    <div className="mt-4 pt-4 border-t border-[#333]">
+                      <label className="block text-sm font-medium text-gray-400 mb-2">
+                        Possui código de indicação ou cupom?
+                      </label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <input
+                            type="text"
+                            value={couponCode}
+                            onChange={(e) => {
+                              setCouponCode(e.target.value)
+                              if (couponStatus === 'invalid') setCouponStatus('idle')
+                            }}
+                            placeholder="Digite seu código..."
+                            className={`w-full bg-[#111] border ${couponStatus === 'invalid' ? 'border-red-500' : 'border-[#333]'} rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#00E5BC]`}
+                            disabled={couponStatus === 'valid'}
+                          />
+                          {couponStatus === 'valid' && (
+                            <div className="absolute right-2 top-2 text-green-500">
+                              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                            </div>
+                          )}
+                        </div>
+                        {couponStatus === 'valid' ? (
+                          <button
+                            onClick={removeCoupon}
+                            className="px-4 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-lg transition-colors"
+                          >
+                            Remover
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => validateCoupon(couponCode)}
+                            disabled={!couponCode || couponStatus === 'validating'}
+                            className="px-4 py-2 bg-[#1A1A1A] hover:bg-[#252525] border border-[#333] text-white rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {couponStatus === 'validating' ? '...' : 'Aplicar'}
+                          </button>
+                        )}
+                      </div>
+
+                      {couponStatus === 'valid' && appliedCoupon && (
+                        <div className="mt-2 text-sm text-green-400 flex items-center gap-1">
+                          <span>🏷️ Cupom <b>{appliedCoupon.code}</b> aplicado: -{appliedCoupon.discount}% OFF</span>
+                        </div>
+                      )}
+                      {couponStatus === 'invalid' && (
+                        <div className="mt-2 text-sm text-red-500">
+                          {couponError}
+                        </div>
+                      )}
+                    </div>
+                    {/* ------------------------ */}
+
+                    <div className="bg-[#222222] rounded-xl p-6 mb-6 border border-[#333333] mt-4">
                       <div className="text-center mb-4">
                         {shouldShowTrial() ? (
                           <>
