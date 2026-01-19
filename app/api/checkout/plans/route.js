@@ -25,7 +25,7 @@ export async function GET(request) {
     // Se não há planos no banco, retornar planos padrão
     if (!plans || plans.length === 0) {
       const defaultPlans = getDefaultPlans()
-      
+
       return NextResponse.json({
         success: true,
         plans: defaultPlans,
@@ -54,12 +54,12 @@ export async function POST(request) {
     if (action === 'seed') {
       // Inserir planos padrão no banco de dados
       const defaultPlans = getDefaultPlans()
-      
+
       const { data, error } = await supabase
         .from('subscription_plans')
-        .upsert(defaultPlans, { 
+        .upsert(defaultPlans, {
           onConflict: 'connections_limit',
-          ignoreDuplicates: false 
+          ignoreDuplicates: false
         })
         .select()
 
@@ -98,8 +98,8 @@ function getDefaultPlans() {
     {
       name: 'Starter',
       connections_limit: 1,
-      monthly_price: 165.00,
-      annual_price: 150.00,
+      monthly_price: 288.75,
+      annual_price: 214.60,
       features: {
         ai_powered: true,
         dashboard: true,
@@ -112,8 +112,8 @@ function getDefaultPlans() {
     {
       name: 'Business',
       connections_limit: 2,
-      monthly_price: 305.00,
-      annual_price: 275.00,
+      monthly_price: 533.75,
+      annual_price: 398.02,
       features: {
         ai_powered: true,
         dashboard: true,
@@ -127,8 +127,8 @@ function getDefaultPlans() {
     {
       name: 'Professional',
       connections_limit: 3,
-      monthly_price: 445.00,
-      annual_price: 400.00,
+      monthly_price: 778.75,
+      annual_price: 580.72,
       features: {
         ai_powered: true,
         dashboard: true,
@@ -143,8 +143,8 @@ function getDefaultPlans() {
     {
       name: 'Enterprise',
       connections_limit: 4,
-      monthly_price: 585.00,
-      annual_price: 525.00,
+      monthly_price: 1023.75,
+      annual_price: 763.42,
       features: {
         ai_powered: true,
         dashboard: true,
@@ -160,8 +160,8 @@ function getDefaultPlans() {
     {
       name: 'Scale',
       connections_limit: 5,
-      monthly_price: 625.00,
-      annual_price: 525.00,
+      monthly_price: 1093.75,
+      annual_price: 815.62,
       features: {
         ai_powered: true,
         dashboard: true,
@@ -178,8 +178,8 @@ function getDefaultPlans() {
     {
       name: 'Growth',
       connections_limit: 6,
-      monthly_price: 750.00,
-      annual_price: 630.00,
+      monthly_price: 1312.50,
+      annual_price: 978.75,
       features: {
         ai_powered: true,
         dashboard: true,
@@ -196,8 +196,8 @@ function getDefaultPlans() {
     {
       name: 'Enterprise Max',
       connections_limit: 7,
-      monthly_price: 875.00,
-      annual_price: 735.00,
+      monthly_price: 1531.25,
+      annual_price: 1141.87,
       features: {
         ai_powered: true,
         dashboard: true,

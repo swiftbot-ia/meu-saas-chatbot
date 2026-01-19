@@ -166,8 +166,8 @@ export default function AccountSubscription() {
 
   const calculatePrice = (connections, billingPeriod) => {
     const pricing = {
-      monthly: { 1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875 },
-      annual: { 1: 150, 2: 275, 3: 400, 4: 525, 5: 525, 6: 630, 7: 735 } // Nota: Os preços anuais do patch parecem diferentes, mantive os originais do page.js. Se precisar, ajuste esta linha.
+      monthly: { 1: 288.75, 2: 533.75, 3: 778.75, 4: 1023.75, 5: 1093.75, 6: 1312.50, 7: 1531.25 },
+      annual: { 1: 2575.20, 2: 4776.30, 3: 6968.70, 4: 9161.10, 5: 9787.50, 6: 11745.00, 7: 13702.50 }
     }
     return pricing[billingPeriod][connections] || 0
   }
@@ -286,8 +286,8 @@ export default function AccountSubscription() {
   const determineChangeType = (current, newPlan) => {
     // Nota: Usei os preços anuais do ARQUIVO DE PATCH (fonte 2)
     const prices = {
-      monthly: { 1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875 },
-      annual: { 1: 1776, 2: 3294, 3: 4806, 4: 6318, 5: 6750, 6: 8100, 7: 9450 }
+      monthly: { 1: 288.75, 2: 533.75, 3: 778.75, 4: 1023.75, 5: 1093.75, 6: 1312.50, 7: 1531.25 },
+      annual: { 1: 2575.20, 2: 4776.30, 3: 6968.70, 4: 9161.10, 5: 9787.50, 6: 11745.00, 7: 13702.50 }
     }
 
     const currentValue = prices[current.billing_period][current.connections]
@@ -1028,10 +1028,14 @@ export default function AccountSubscription() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                   {[1, 2, 3, 4, 5, 6, 7].map(connections => {
                     const prices = {
-                      monthly: { 1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875 },
-                      annual: { 1: 1776, 2: 3294, 3: 4806, 4: 6318, 5: 6750, 6: 8100, 7: 9450 }
+                      monthly: { 1: 288.75, 2: 533.75, 3: 778.75, 4: 1023.75, 5: 1093.75, 6: 1312.50, 7: 1531.25 },
+                      annual: { 1: 2575.20, 2: 4776.30, 3: 6968.70, 4: 9161.10, 5: 9787.50, 6: 11745.00, 7: 13702.50 }
                     }
-                    const price = prices[selectedNewPlan.billing_period][connections]
+                    const basePrice = prices[selectedNewPlan.billing_period][connections]
+                    const hasAffiliateCoupon = subscription.affiliate_code || subscription.promotion_code // Verifica se tem cupom
+                    const discount = hasAffiliateCoupon ? 0.40 : 0 // 40% de desconto
+                    const finalPrice = hasAffiliateCoupon ? basePrice * (1 - discount) : basePrice
+
                     const isCurrentPlan = subscription.connections_purchased === connections && subscription.billing_period === selectedNewPlan.billing_period
                     const isSelected = selectedNewPlan.connections === connections
 
@@ -1050,12 +1054,30 @@ export default function AccountSubscription() {
                         <div className="text-center">
                           <div className="text-3xl font-bold text-white mb-1">{connections}</div>
                           <div className="text-xs text-gray-400 mb-2">{connections === 1 ? 'conexão' : 'conexões'}</div>
-                          <div className="text-lg font-semibold text-[#00FF99]">
-                            R$ {price}
-                          </div>
+
+                          {hasAffiliateCoupon ? (
+                            <>
+                              <div className="text-xs text-gray-500 line-through">
+                                R$ {basePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </div>
+                              <div className="text-lg font-semibold text-[#00FF99]">
+                                R$ {finalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-lg font-semibold text-[#00FF99]">
+                              R$ {basePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </div>
+                          )}
+
                           <div className="text-xs text-gray-500">
                             /{selectedNewPlan.billing_period === 'monthly' ? 'mês' : 'ano'}
                           </div>
+                          {hasAffiliateCoupon && (
+                            <div className="mt-1 text-[10px] text-green-400 font-bold uppercase tracking-wider">
+                              Cupom Ativo
+                            </div>
+                          )}
                           {isCurrentPlan && (
                             <div className="mt-2 text-xs text-gray-500">Plano Atual</div>
                           )}
