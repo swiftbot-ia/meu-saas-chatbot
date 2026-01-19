@@ -1258,7 +1258,7 @@ function DashboardContent() {
           plan: selectedPlan,
           userEmail: user.email,
           userName: userProfile?.full_name || user.email.split('@')[0],
-          affiliate_ref_code: appliedCoupon?.type === 'affiliate' ? appliedCoupon.code : undefined, // Check de afiliado
+          affiliate_ref_code: appliedCoupon?.code, // Salva o código para persistência (seja afiliado ou genérico)
           promotionCodeId: appliedCoupon?.promotionCodeId // ID do desconto na Stripe
         })
       })
@@ -1629,8 +1629,8 @@ function DashboardContent() {
                   <p className="text-[#B0B0B0] text-lg">
                     <strong className="text-white">Plano atual:</strong> {subscription.connections_purchased} {subscription.connections_purchased === 1 ? 'conexão' : 'conexões'} - R$ {
                       subscription.billing_period === 'monthly'
-                        ? { 1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875 }[subscription.connections_purchased]
-                        : { 1: 1776, 2: 3294, 3: 4806, 4: 6318, 5: 6750, 6: 8100, 7: 9450 }[subscription.connections_purchased]
+                        ? { 1: 288.75, 2: 533.75, 3: 778.75, 4: 1023.75, 5: 1093.75, 6: 1312.50, 7: 1531.25 }[subscription.connections_purchased]
+                        : { 1: 2575.20, 2: 4776.30, 3: 6968.70, 4: 9161.10, 5: 9787.50, 6: 11745.00, 7: 13702.50 }[subscription.connections_purchased]
                     }/{subscription.billing_period === 'monthly' ? 'mês' : 'ano'}
                   </p>
 
@@ -1639,8 +1639,8 @@ function DashboardContent() {
                       <p className="text-[#B0B0B0] text-lg">
                         <strong className="text-orange-400">A partir de {new Date(subscription.next_billing_date).toLocaleDateString('pt-BR')}:</strong> {subscription.pending_connections} {subscription.pending_connections === 1 ? 'conexão' : 'conexões'} - R$ {
                           subscription.pending_billing_period === 'monthly'
-                            ? { 1: 165, 2: 305, 3: 445, 4: 585, 5: 625, 6: 750, 7: 875 }[subscription.pending_connections]
-                            : { 1: 1776, 2: 3294, 3: 4806, 4: 6318, 5: 6750, 6: 8100, 7: 9450 }[subscription.pending_connections]
+                            ? { 1: 288.75, 2: 533.75, 3: 778.75, 4: 1023.75, 5: 1093.75, 6: 1312.50, 7: 1531.25 }[subscription.pending_connections]
+                            : { 1: 2575.20, 2: 4776.30, 3: 6968.70, 4: 9161.10, 5: 9787.50, 6: 11745.00, 7: 13702.50 }[subscription.pending_connections]
                         }/{subscription.pending_billing_period === 'monthly' ? 'mês' : 'ano'}
                       </p>
                       {subscription.pending_connections < subscription.connections_purchased && (
