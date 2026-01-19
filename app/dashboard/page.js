@@ -2467,10 +2467,24 @@ function DashboardContent() {
                               <div className="text-lg font-bold text-[#04F5A0]">R$ 0,00</div>
                               <div className="text-xs text-gray-400">por 4 dias</div>
                               <div className="text-xs text-gray-500 mt-1">
-                                Depois: {selectedPlan.billingPeriod === 'annual'
-                                  ? `R$ ${calculateAnnualTotal().toLocaleString('pt-BR')}/ano`
-                                  : `R$ ${calculatePrice().toLocaleString('pt-BR')}/mês`
-                                }
+                                {appliedCoupon ? (
+                                  <>
+                                    <span className="line-through mr-1">R$ {selectedPlan.billingPeriod === 'annual'
+                                      ? calculateAnnualTotal().toLocaleString('pt-BR')
+                                      : calculatePrice().toLocaleString('pt-BR')}</span>
+                                    <span>Depois: {selectedPlan.billingPeriod === 'annual'
+                                      ? `R$ ${(calculateAnnualTotal() * (1 - appliedCoupon.discount / 100)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/ano`
+                                      : `R$ ${(calculatePrice() * (1 - appliedCoupon.discount / 100)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mês`
+                                    }</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    Depois: {selectedPlan.billingPeriod === 'annual'
+                                      ? `R$ ${calculateAnnualTotal().toLocaleString('pt-BR')}/ano`
+                                      : `R$ ${calculatePrice().toLocaleString('pt-BR')}/mês`
+                                    }
+                                  </>
+                                )}
                               </div>
                             </div>
                           ) : (
