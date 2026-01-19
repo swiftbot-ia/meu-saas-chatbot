@@ -249,7 +249,8 @@ export async function POST(request) {
       stripe_payment_method_id: paymentMethodId,
       stripe_subscription_id: stripeSubscription.id,
       created_at: now.toISOString(),
-      updated_at: now.toISOString()
+      updated_at: now.toISOString(),
+      affiliate_code: affiliate_ref_code ? affiliate_ref_code.toUpperCase() : null // ✅ Salvar cupom usado
     }
 
     console.log('💾 Salvando no banco:', subscriptionData)
