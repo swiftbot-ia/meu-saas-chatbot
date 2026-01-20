@@ -533,7 +533,7 @@ function SalesChart({ title, data, period, onPeriodChange, customRange, onCustom
                     {title}
                 </h3>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row items-center gap-3">
                     {period === 'daily' && (
                         <div className="relative" ref={pickerRef}>
                             <button
@@ -553,7 +553,7 @@ function SalesChart({ title, data, period, onPeriodChange, customRange, onCustom
                             </button>
 
                             {isPickerOpen && (
-                                <div id="custom-date-picker" className="absolute right-0 top-full mt-2 bg-[#1A1A1A] border border-[#333] rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] p-4 z-50 min-w-[320px] animate-in fade-in slide-in-from-top-2">
+                                <div id="custom-date-picker" className="absolute left-1/2 -translate-x-1/2 sm:left-auto sm:translate-x-0 sm:right-0 top-full mt-2 bg-[#1A1A1A] border border-[#333] rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] p-4 z-50 min-w-[320px] animate-in fade-in slide-in-from-top-2">
                                     <DayPicker
                                         mode="range"
                                         defaultMonth={range.from}
