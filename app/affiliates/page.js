@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
-import { Copy, Check, Users, DollarSign, Clock, Wallet, ExternalLink, ArrowRight, Send, Sparkles, TrendingUp, Gift, ChevronDown, AlertCircle, Calendar, X, Star, ShieldCheck } from 'lucide-react'
+import { Copy, Check, Users, DollarSign, Clock, Wallet, ExternalLink, ArrowRight, Send, Sparkles, TrendingUp, Gift, ChevronDown, AlertCircle, Calendar, X, Star, ShieldCheck, Info } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { DayPicker } from 'react-day-picker'
 import { format, addDays, differenceInDays, startOfDay } from 'date-fns'
@@ -852,7 +852,7 @@ function AffiliateDashboard({ affiliate, stats, history, referralLink, onRefresh
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="bg-[#1A1A1A] rounded-2xl p-6 hover:bg-[#222] transition-colors">
                     <div className="flex items-center gap-3 mb-3">
                         <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
@@ -863,24 +863,26 @@ function AffiliateDashboard({ affiliate, stats, history, referralLink, onRefresh
                     <p className="text-3xl font-bold text-white">{stats?.referrals?.active || 0}</p>
                 </div>
 
-                <div className="bg-[#1A1A1A] rounded-2xl p-6 hover:bg-[#222] transition-colors">
+                <div className="bg-[#1A1A1A] rounded-2xl p-6 hover:bg-[#222] transition-colors relative group">
                     <div className="flex items-center gap-3 mb-3">
                         <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center">
                             <Clock className="w-5 h-5 text-yellow-400" />
                         </div>
-                        <span className="text-gray-400 text-sm">Pendente (7 dias)</span>
+                        <span className="text-gray-400 text-sm flex items-center gap-2">
+                            Saldo Pendente (30 dias)
+                            <div className="relative group/tooltip">
+                                <Info size={16} className="text-gray-500 cursor-help hover:text-[#00FF99] transition-colors" />
+                                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-3 bg-black/90 border border-[#333] rounded-xl text-xs text-gray-300 shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-50 pointer-events-none">
+                                    <p>
+                                        Os repasses são <b>automáticos</b>! O valor será transferido diretamente para sua conta bancária cadastrada na Stripe 30 dias após a confirmação de cada pagamento. <span className="text-[#00FF99]">Sem burocracia de saque manual.</span>
+                                    </p>
+                                    {/* Seta do tooltip */}
+                                    <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-black/90"></div>
+                                </div>
+                            </div>
+                        </span>
                     </div>
                     <p className="text-3xl font-bold text-white">R$ {(stats?.commissions?.total_pending || 0).toFixed(2)}</p>
-                </div>
-
-                <div className="bg-[#1A1A1A] rounded-2xl p-6 hover:bg-[#222] transition-colors">
-                    <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-                            <Wallet className="w-5 h-5 text-green-400" />
-                        </div>
-                        <span className="text-gray-400 text-sm">Disponível</span>
-                    </div>
-                    <p className="text-3xl font-bold text-[#00FF99]">R$ {(stats?.available_balance || 0).toFixed(2)}</p>
                 </div>
 
                 <div className="bg-[#1A1A1A] rounded-2xl p-6 hover:bg-[#222] transition-colors">
