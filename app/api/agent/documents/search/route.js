@@ -130,7 +130,7 @@ export async function POST(request) {
             );
         }
 
-        // Filter by threshold and format results with context
+        // Filter matches by threshold
         const filteredMatches = (matches || [])
             .filter(m => m.similarity >= threshold)
             .map(match => ({
@@ -146,9 +146,29 @@ export async function POST(request) {
                 similarity: match.similarity
             }));
 
+        // Format context string for LLM injection
+        let context = '';
+        if (filteredMatches.length > 0) {
+            context = filteredMatches.map((doc, index) => {
+                let docContext = `### Documento ${index + 1}: ${doc.title || 'Sem título'}`;
+                if (doc.category) {
+                    docContext += ` [${doc.category}]`;
+                }
+                docContext += `\n${doc.content}`;
+
+                // Add context from surrounding chunks if available
+                if (doc.context_summary) {
+                    docContext += `\n**Resumo:** ${doc.context_summary}`;
+                }
+
+                return docContext;
+            }).join('\n\n---\n\n');
+        }
+
         console.log(`✅ RAG search found ${filteredMatches.length} relevant documents`);
 
         return NextResponse.json({
+            context: context,  // Formatted string for LLM prompt injection
             results: filteredMatches,
             total_found: filteredMatches.length,
             threshold_used: threshold,
