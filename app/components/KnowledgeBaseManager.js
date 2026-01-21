@@ -64,13 +64,29 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
         setLoading(true)
         setError(null)
         try {
-            const res = await fetch('/api/agent/documents')
+            // Get connectionId from URL
+            const urlParams = new URLSearchParams(window.location.search)
+            const connectionId = urlParams.get('connectionId')
+
+            const url = connectionId
+                ? `/api/agent/documents?connectionId=${connectionId}`
+                : '/api/agent/documents'
+
+            const res = await fetch(url)
             const data = await res.json()
             if (res.ok) {
                 setDocuments(data.documents || [])
                 setCategories(data.categories || [])
+                // Se retornou mensagem de agente não encontrado, mostrar alerta especial
+                if (data.message === 'Agente não encontrado') {
+                    setError('⚠️ Salve a configuração do agente primeiro para usar o Manual.')
+                }
             } else {
-                setError(data.error || 'Erro ao carregar documentos')
+                if (data.error?.includes('Agente não encontrado')) {
+                    setError('⚠️ Salve a configuração do agente primeiro para usar o Manual.')
+                } else {
+                    setError(data.error || 'Erro ao carregar documentos')
+                }
             }
         } catch (err) {
             setError('Erro ao conectar com o servidor')
@@ -87,10 +103,14 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
 
         setUploading(true)
         try {
+            // Get connectionId from URL
+            const urlParams = new URLSearchParams(window.location.search)
+            const connectionId = urlParams.get('connectionId')
+
             const res = await fetch('/api/agent/documents/categories', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: newCategoryName.trim() })
+                body: JSON.stringify({ name: newCategoryName.trim(), connectionId })
             })
 
             const data = await res.json()
@@ -217,6 +237,10 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
                 }
             }
 
+            // Get connectionId from URL
+            const urlParams = new URLSearchParams(window.location.search)
+            const connectionId = urlParams.get('connectionId')
+
             const res = await fetch('/api/agent/documents', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -226,7 +250,8 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
                     category: selectedCategory,
                     file_type: fileType,
                     file_name: fileName,
-                    file_size: fileSize
+                    file_size: fileSize,
+                    connectionId
                 })
             })
 
@@ -551,8 +576,8 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
                                                 type="button"
                                                 onClick={() => setInputType('text')}
                                                 className={`flex-1 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${inputType === 'text'
-                                                        ? 'bg-[#00FF99] text-black'
-                                                        : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
+                                                    ? 'bg-[#00FF99] text-black'
+                                                    : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
                                                     }`}
                                             >
                                                 <FileText size={18} />
@@ -562,8 +587,8 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
                                                 type="button"
                                                 onClick={() => setInputType('file')}
                                                 className={`flex-1 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${inputType === 'file'
-                                                        ? 'bg-[#00FF99] text-black'
-                                                        : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
+                                                    ? 'bg-[#00FF99] text-black'
+                                                    : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
                                                     }`}
                                             >
                                                 <Upload size={18} />
