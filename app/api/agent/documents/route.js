@@ -25,17 +25,25 @@ export async function GET(request) {
             );
         }
 
-        // Get agent for this user
-        console.log('🔍 [Documents API] Looking for agent with user_id:', user.id);
+        // Get agent for this user - support multiple agents by using connection_id if provided
+        const connectionId = searchParams.get('connectionId');
+        console.log('🔍 [Documents API] Looking for agent with user_id:', user.id, 'connectionId:', connectionId);
 
-        const { data: agent, error: agentError } = await supabaseAdmin
+        let agentQuery = supabaseAdmin
             .from('ai_agents')
             .select('id')
-            .eq('user_id', user.id)
-            .single();
+            .eq('user_id', user.id);
 
-        console.log('🔍 [Documents API] Agent query result:', { agent, error: agentError?.message });
+        // If connectionId is provided, filter by it
+        if (connectionId) {
+            agentQuery = agentQuery.eq('connection_id', connectionId);
+        }
 
+        const { data: agents, error: agentError } = await agentQuery.limit(1);
+
+        console.log('🔍 [Documents API] Agent query result:', { agents, error: agentError?.message });
+
+        const agent = agents?.[0];
         if (agentError || !agent) {
             console.log('⚠️ [Documents API] Agent not found for user:', user.id);
             return NextResponse.json(
@@ -120,20 +128,6 @@ export async function POST(request) {
             );
         }
 
-        // Get agent for this user
-        const { data: agent, error: agentError } = await supabaseAdmin
-            .from('ai_agents')
-            .select('id')
-            .eq('user_id', user.id)
-            .single();
-
-        if (agentError || !agent) {
-            return NextResponse.json(
-                { error: 'Agente não encontrado. Configure seu agente primeiro.' },
-                { status: 404 }
-            );
-        }
-
         // Parse request body
         const body = await request.json();
         const {
@@ -142,8 +136,31 @@ export async function POST(request) {
             category = 'geral',
             file_type = 'text_input',
             file_name,
-            file_size
+            file_size,
+            connectionId
         } = body;
+
+        // Get agent for this user - support multiple agents
+        let agentQuery = supabaseAdmin
+            .from('ai_agents')
+            .select('id')
+            .eq('user_id', user.id);
+
+        if (connectionId) {
+            agentQuery = agentQuery.eq('connection_id', connectionId);
+        }
+
+        const { data: agents, error: agentError } = await agentQuery.limit(1);
+        const agent = agents?.[0];
+
+        if (agentError || !agent) {
+            return NextResponse.json(
+                { error: 'Agente não encontrado. Configure seu agente primeiro.' },
+                { status: 404 }
+            );
+        }
+
+
 
         if (!content || typeof content !== 'string' || content.trim().length < 10) {
             return NextResponse.json(

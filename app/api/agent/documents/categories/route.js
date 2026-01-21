@@ -8,6 +8,9 @@ import { supabaseAdmin } from '@/lib/supabase/server';
  */
 export async function GET(request) {
     try {
+        const { searchParams } = new URL(request.url);
+        const connectionId = searchParams.get('connectionId');
+
         // Get user session using server client
         const supabase = await createClient();
         const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -16,12 +19,18 @@ export async function GET(request) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
 
-        // Get agent
-        const { data: agent } = await supabaseAdmin
+        // Get agent - support multiple agents
+        let agentQuery = supabaseAdmin
             .from('ai_agents')
             .select('id')
-            .eq('user_id', user.id)
-            .single();
+            .eq('user_id', user.id);
+
+        if (connectionId) {
+            agentQuery = agentQuery.eq('connection_id', connectionId);
+        }
+
+        const { data: agents } = await agentQuery.limit(1);
+        const agent = agents?.[0];
 
         if (!agent) {
             return NextResponse.json({ categories: [] });
@@ -48,7 +57,7 @@ export async function GET(request) {
 /**
  * POST /api/agent/documents/categories
  * Create a new category
- * Body: { name: string, description?: string, color?: string }
+ * Body: { name: string, description?: string, color?: string, connectionId?: string }
  */
 export async function POST(request) {
     try {
@@ -60,19 +69,25 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
 
-        // Get agent
-        const { data: agent } = await supabaseAdmin
+        const body = await request.json();
+        const { name, description, color, connectionId } = body;
+
+        // Get agent - support multiple agents
+        let agentQuery = supabaseAdmin
             .from('ai_agents')
             .select('id')
-            .eq('user_id', user.id)
-            .single();
+            .eq('user_id', user.id);
+
+        if (connectionId) {
+            agentQuery = agentQuery.eq('connection_id', connectionId);
+        }
+
+        const { data: agents } = await agentQuery.limit(1);
+        const agent = agents?.[0];
 
         if (!agent) {
             return NextResponse.json({ error: 'Agente não encontrado' }, { status: 404 });
         }
-
-        const body = await request.json();
-        const { name, description, color } = body;
 
         if (!name || !name.trim()) {
             return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 400 });

@@ -64,7 +64,15 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
         setLoading(true)
         setError(null)
         try {
-            const res = await fetch('/api/agent/documents')
+            // Get connectionId from URL
+            const urlParams = new URLSearchParams(window.location.search)
+            const connectionId = urlParams.get('connectionId')
+
+            const url = connectionId
+                ? `/api/agent/documents?connectionId=${connectionId}`
+                : '/api/agent/documents'
+
+            const res = await fetch(url)
             const data = await res.json()
             if (res.ok) {
                 setDocuments(data.documents || [])
@@ -95,10 +103,14 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
 
         setUploading(true)
         try {
+            // Get connectionId from URL
+            const urlParams = new URLSearchParams(window.location.search)
+            const connectionId = urlParams.get('connectionId')
+
             const res = await fetch('/api/agent/documents/categories', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: newCategoryName.trim() })
+                body: JSON.stringify({ name: newCategoryName.trim(), connectionId })
             })
 
             const data = await res.json()
@@ -225,6 +237,10 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
                 }
             }
 
+            // Get connectionId from URL
+            const urlParams = new URLSearchParams(window.location.search)
+            const connectionId = urlParams.get('connectionId')
+
             const res = await fetch('/api/agent/documents', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -234,7 +250,8 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
                     category: selectedCategory,
                     file_type: fileType,
                     file_name: fileName,
-                    file_size: fileSize
+                    file_size: fileSize,
+                    connectionId
                 })
             })
 
