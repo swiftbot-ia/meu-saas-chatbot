@@ -26,13 +26,18 @@ export async function GET(request) {
         }
 
         // Get agent for this user
+        console.log('🔍 [Documents API] Looking for agent with user_id:', user.id);
+
         const { data: agent, error: agentError } = await supabaseAdmin
             .from('ai_agents')
             .select('id')
             .eq('user_id', user.id)
             .single();
 
+        console.log('🔍 [Documents API] Agent query result:', { agent, error: agentError?.message });
+
         if (agentError || !agent) {
+            console.log('⚠️ [Documents API] Agent not found for user:', user.id);
             return NextResponse.json(
                 { documents: [], categories: [], message: 'Agente não encontrado' },
                 { status: 200 }
