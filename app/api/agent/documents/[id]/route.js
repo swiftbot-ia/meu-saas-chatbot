@@ -1,12 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
-
-// Initialize Supabase admin client
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/server';
 
 /**
  * DELETE /api/agent/documents/[id]
@@ -23,20 +17,8 @@ export async function DELETE(request, { params }) {
             );
         }
 
-        // Get user session
-        const cookieStore = await cookies();
-        const supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-            {
-                cookies: {
-                    get(name) {
-                        return cookieStore.get(name)?.value;
-                    }
-                }
-            }
-        );
-
+        // Get user session using server client
+        const supabase = await createClient();
         const { data: { user }, error: authError } = await supabase.auth.getUser();
 
         if (authError || !user) {
@@ -126,20 +108,8 @@ export async function GET(request, { params }) {
             );
         }
 
-        // Get user session
-        const cookieStore = await cookies();
-        const supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-            {
-                cookies: {
-                    get(name) {
-                        return cookieStore.get(name)?.value;
-                    }
-                }
-            }
-        );
-
+        // Get user session using server client
+        const supabase = await createClient();
         const { data: { user }, error: authError } = await supabase.auth.getUser();
 
         if (authError || !user) {
@@ -163,7 +133,7 @@ export async function GET(request, { params }) {
             );
         }
 
-        // Fetch document with new schema
+        // Fetch document
         const { data: doc, error: docError } = await supabaseAdmin
             .from('documents')
             .select('id, content, agent_id, title, category, file_type, file_name, chunk_number, total_chunks, context_summary, chunk_before, chunk_after, created_at')
