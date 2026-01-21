@@ -69,8 +69,16 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
             if (res.ok) {
                 setDocuments(data.documents || [])
                 setCategories(data.categories || [])
+                // Se retornou mensagem de agente não encontrado, mostrar alerta especial
+                if (data.message === 'Agente não encontrado') {
+                    setError('⚠️ Salve a configuração do agente primeiro para usar o Manual.')
+                }
             } else {
-                setError(data.error || 'Erro ao carregar documentos')
+                if (data.error?.includes('Agente não encontrado')) {
+                    setError('⚠️ Salve a configuração do agente primeiro para usar o Manual.')
+                } else {
+                    setError(data.error || 'Erro ao carregar documentos')
+                }
             }
         } catch (err) {
             setError('Erro ao conectar com o servidor')
@@ -551,8 +559,8 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
                                                 type="button"
                                                 onClick={() => setInputType('text')}
                                                 className={`flex-1 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${inputType === 'text'
-                                                        ? 'bg-[#00FF99] text-black'
-                                                        : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
+                                                    ? 'bg-[#00FF99] text-black'
+                                                    : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
                                                     }`}
                                             >
                                                 <FileText size={18} />
@@ -562,8 +570,8 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
                                                 type="button"
                                                 onClick={() => setInputType('file')}
                                                 className={`flex-1 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${inputType === 'file'
-                                                        ? 'bg-[#00FF99] text-black'
-                                                        : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
+                                                    ? 'bg-[#00FF99] text-black'
+                                                    : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
                                                     }`}
                                             >
                                                 <Upload size={18} />
