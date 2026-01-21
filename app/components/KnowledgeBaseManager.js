@@ -1,13 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { X, Plus, FileText, Upload, Trash2, FolderPlus, Loader2 } from 'lucide-react'
 
 /**
  * KnowledgeBaseManager Component
- * Modal for managing agent's knowledge base with:
- * - Category creation
- * - Text input or file upload (txt, pdf, doc, docx, xlsx)
- * - Document listing and deletion
+ * Modal para gerenciar a base de conhecimento do agente
+ * Segue o padrão visual do StandardModal
  */
 export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
     const [documents, setDocuments] = useState([])
@@ -17,23 +16,49 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
     const [error, setError] = useState(null)
     const [success, setSuccess] = useState(null)
 
+    // Controle de etapas
+    const [step, setStep] = useState('list') // 'list' | 'create_category' | 'add_document'
+
     // Form state
     const [inputType, setInputType] = useState('text') // 'text' | 'file'
     const [selectedCategory, setSelectedCategory] = useState('')
     const [newCategoryName, setNewCategoryName] = useState('')
-    const [showNewCategory, setShowNewCategory] = useState(false)
     const [title, setTitle] = useState('')
     const [textContent, setTextContent] = useState('')
     const [selectedFile, setSelectedFile] = useState(null)
 
+    // Confirmação de recriar/incluir
+    const [showReplaceConfirm, setShowReplaceConfirm] = useState(false)
+    const [existingDocTitle, setExistingDocTitle] = useState('')
+
     const fileInputRef = useRef(null)
 
-    // Load documents and categories when modal opens
+    // Handler: Fechar com ESC
+    const handleKeyDown = useCallback((event) => {
+        if (event.key === 'Escape') {
+            onClose()
+        }
+    }, [onClose])
+
+    // Handler: Clique no overlay
+    const handleOverlayClick = useCallback((event) => {
+        if (event.target === event.currentTarget) {
+            onClose()
+        }
+    }, [onClose])
+
+    // Efeito: Listener para ESC
     useEffect(() => {
         if (isOpen) {
+            document.addEventListener('keydown', handleKeyDown)
+            document.body.style.overflow = 'hidden'
             loadData()
         }
-    }, [isOpen])
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown)
+            document.body.style.overflow = 'unset'
+        }
+    }, [isOpen, handleKeyDown])
 
     const loadData = async () => {
         setLoading(true)
@@ -44,9 +69,6 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
             if (res.ok) {
                 setDocuments(data.documents || [])
                 setCategories(data.categories || [])
-                if (data.categories?.length > 0 && !selectedCategory) {
-                    setSelectedCategory(data.categories[0].name)
-                }
             } else {
                 setError(data.error || 'Erro ao carregar documentos')
             }
@@ -58,8 +80,12 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
     }
 
     const createCategory = async () => {
-        if (!newCategoryName.trim()) return
+        if (!newCategoryName.trim()) {
+            setError('Nome da categoria é obrigatório')
+            return
+        }
 
+        setUploading(true)
         try {
             const res = await fetch('/api/agent/documents/categories', {
                 method: 'POST',
@@ -72,14 +98,16 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
                 setCategories([...categories, data.category])
                 setSelectedCategory(data.category.name)
                 setNewCategoryName('')
-                setShowNewCategory(false)
-                setSuccess('Categoria criada!')
-                setTimeout(() => setSuccess(null), 2000)
+                setSuccess('Categoria criada com sucesso!')
+                setStep('add_document') // Avança para adicionar documento
+                setTimeout(() => setSuccess(null), 3000)
             } else {
                 setError(data.error)
             }
         } catch (err) {
             setError('Erro ao criar categoria')
+        } finally {
+            setUploading(false)
         }
     }
 
@@ -110,31 +138,45 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
     const readFileContent = async (file) => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader()
-
             if (file.type === 'text/plain') {
                 reader.onload = (e) => resolve(e.target.result)
                 reader.onerror = reject
                 reader.readAsText(file)
             } else {
-                // For binary files (PDF, DOC, XLSX), we'll need server-side parsing
-                // For now, return a placeholder and handle on backend
                 resolve(`[Binary file: ${file.name}]`)
             }
         })
     }
 
-    const handleSubmit = async (e) => {
-        e.preventDefault()
+    const checkExistingDocument = () => {
+        // Verifica se já existe documento com mesmo título na categoria
+        const existing = documents.find(
+            d => d.title === title.trim() && d.category === selectedCategory
+        )
+        if (existing) {
+            setExistingDocTitle(existing.title)
+            setShowReplaceConfirm(true)
+            return true
+        }
+        return false
+    }
+
+    const handleSubmit = async (replaceExisting = false) => {
         setError(null)
         setSuccess(null)
 
         if (!selectedCategory) {
-            setError('Selecione ou crie uma categoria')
+            setError('Selecione uma categoria primeiro')
             return
         }
 
         if (!title.trim()) {
             setError('Título é obrigatório')
+            return
+        }
+
+        // Verifica documento existente (se não está no modo replace)
+        if (!replaceExisting && checkExistingDocument()) {
             return
         }
 
@@ -154,19 +196,27 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
                 setError('Selecione um arquivo')
                 return
             }
-
             content = await readFileContent(selectedFile)
             fileName = selectedFile.name
             fileSize = selectedFile.size
-
-            // Determine file type from extension
             const ext = selectedFile.name.split('.').pop().toLowerCase()
             fileType = ext
         }
 
         setUploading(true)
+        setShowReplaceConfirm(false)
 
         try {
+            // Se substituir, deletar existente primeiro
+            if (replaceExisting) {
+                const existingDoc = documents.find(
+                    d => d.title === title.trim() && d.category === selectedCategory
+                )
+                if (existingDoc) {
+                    await fetch(`/api/agent/documents/${existingDoc.id}`, { method: 'DELETE' })
+                }
+            }
+
             const res = await fetch('/api/agent/documents', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -184,10 +234,7 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
 
             if (res.ok) {
                 setSuccess(`Documento adicionado! ${data.chunks_created} chunk(s) criado(s).`)
-                setTitle('')
-                setTextContent('')
-                setSelectedFile(null)
-                if (fileInputRef.current) fileInputRef.current.value = ''
+                resetForm()
                 loadData()
                 setTimeout(() => setSuccess(null), 3000)
             } else {
@@ -200,14 +247,19 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
         }
     }
 
+    const resetForm = () => {
+        setTitle('')
+        setTextContent('')
+        setSelectedFile(null)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        setStep('list')
+    }
+
     const deleteDocument = async (docId, docTitle) => {
         if (!confirm(`Deletar "${docTitle}"?`)) return
 
         try {
-            const res = await fetch(`/api/agent/documents/${docId}`, {
-                method: 'DELETE'
-            })
-
+            const res = await fetch(`/api/agent/documents/${docId}`, { method: 'DELETE' })
             if (res.ok) {
                 setDocuments(documents.filter(d => d.id !== docId))
                 setSuccess('Documento deletado')
@@ -228,7 +280,6 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
             const res = await fetch(`/api/agent/documents/categories/${encodeURIComponent(categoryName)}`, {
                 method: 'DELETE'
             })
-
             if (res.ok) {
                 loadData()
                 setSuccess('Categoria deletada')
@@ -242,7 +293,7 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
         }
     }
 
-    // Group documents by category
+    // Agrupar documentos por categoria
     const groupedDocs = documents.reduce((acc, doc) => {
         const cat = doc.category || 'Sem categoria'
         if (!acc[cat]) acc[cat] = []
@@ -253,245 +304,137 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Backdrop */}
-            <div
-                className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-                onClick={onClose}
-            />
+        <div
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn"
+            onClick={handleOverlayClick}
+            role="dialog"
+            aria-modal="true"
+        >
+            <div className="relative bg-[#1F1F1F] rounded-xl shadow-2xl p-6 max-w-2xl w-full max-h-[85vh] overflow-hidden transform transition-all duration-200 animate-slideIn border border-gray-800">
 
-            {/* Modal */}
-            <div className="relative bg-[#0a0a0a] rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-gray-800 shadow-2xl">
+                {/* Botão Fechar */}
+                <button
+                    onClick={onClose}
+                    className="absolute top-4 right-4 text-gray-500 hover:text-gray-300 transition-colors duration-200 p-1 rounded-lg hover:bg-gray-800"
+                >
+                    <X size={20} />
+                </button>
+
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-800">
-                    <div className="flex items-center gap-3">
-                        <span className="text-2xl">📚</span>
-                        <h2 className="text-xl font-bold text-white">Manual do Agente</h2>
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="bg-green-500/10 text-[#00FF99] p-3 rounded-full">
+                        <FileText size={24} />
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 text-gray-400 hover:text-white transition-colors"
-                    >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+                    <div>
+                        <h2 className="text-xl font-bold text-white">Manual do Agente</h2>
+                        <p className="text-sm text-gray-400">Base de conhecimento RAG</p>
+                    </div>
                 </div>
 
-                {/* Content */}
-                <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
-                    {/* Messages */}
-                    {error && (
-                        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
-                            {error}
-                        </div>
-                    )}
-                    {success && (
-                        <div className="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-xl text-green-400 text-sm">
-                            {success}
-                        </div>
-                    )}
+                {/* Mensagens */}
+                {error && (
+                    <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                        {error}
+                    </div>
+                )}
+                {success && (
+                    <div className="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-green-400 text-sm">
+                        {success}
+                    </div>
+                )}
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Left: Add Document Form */}
+                {/* Confirmação de Substituição */}
+                {showReplaceConfirm && (
+                    <div className="mb-4 p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+                        <p className="text-orange-400 mb-3">
+                            Já existe um documento "{existingDocTitle}" nesta categoria. O que deseja fazer?
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => handleSubmit(true)}
+                                className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm font-medium"
+                            >
+                                Substituir
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setTitle(title + ' (novo)')
+                                    setShowReplaceConfirm(false)
+                                    handleSubmit(false)
+                                }}
+                                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium"
+                            >
+                                Adicionar como novo
+                            </button>
+                            <button
+                                onClick={() => setShowReplaceConfirm(false)}
+                                className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Conteúdo baseado na etapa */}
+                <div className="overflow-y-auto max-h-[calc(85vh-200px)]">
+                    {loading ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                            <Loader2 className="animate-spin mb-2" size={32} />
+                            <p>Carregando...</p>
+                        </div>
+                    ) : step === 'list' ? (
+                        /* LISTA DE DOCUMENTOS */
                         <div className="space-y-4">
-                            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                                <span>➕</span> Adicionar Documento
-                            </h3>
-
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                {/* Category Selection */}
-                                <div>
-                                    <label className="block text-sm text-gray-400 mb-2">Categoria</label>
-                                    {!showNewCategory ? (
-                                        <div className="flex gap-2">
-                                            <select
-                                                value={selectedCategory}
-                                                onChange={(e) => setSelectedCategory(e.target.value)}
-                                                className="flex-1 bg-[#1a1a1a] text-white rounded-xl px-4 py-3 border border-gray-700 focus:border-[#00FF99] focus:outline-none"
-                                            >
-                                                <option value="">Selecione uma categoria</option>
-                                                {categories.map(cat => (
-                                                    <option key={cat.id} value={cat.name}>{cat.name}</option>
-                                                ))}
-                                            </select>
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowNewCategory(true)}
-                                                className="px-4 py-2 bg-[#00FF99]/10 text-[#00FF99] rounded-xl hover:bg-[#00FF99]/20 transition-colors"
-                                            >
-                                                + Nova
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                value={newCategoryName}
-                                                onChange={(e) => setNewCategoryName(e.target.value)}
-                                                placeholder="Nome da categoria"
-                                                className="flex-1 bg-[#1a1a1a] text-white rounded-xl px-4 py-3 border border-gray-700 focus:border-[#00FF99] focus:outline-none"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={createCategory}
-                                                className="px-4 py-2 bg-[#00FF99] text-black font-medium rounded-xl hover:bg-[#00FF99]/90 transition-colors"
-                                            >
-                                                Criar
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => { setShowNewCategory(false); setNewCategoryName('') }}
-                                                className="px-4 py-2 bg-gray-700 text-white rounded-xl hover:bg-gray-600 transition-colors"
-                                            >
-                                                Cancelar
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Title */}
-                                <div>
-                                    <label className="block text-sm text-gray-400 mb-2">Título</label>
-                                    <input
-                                        type="text"
-                                        value={title}
-                                        onChange={(e) => setTitle(e.target.value)}
-                                        placeholder="Ex: Política de Devolução"
-                                        className="w-full bg-[#1a1a1a] text-white rounded-xl px-4 py-3 border border-gray-700 focus:border-[#00FF99] focus:outline-none"
-                                    />
-                                </div>
-
-                                {/* Input Type Toggle */}
-                                <div>
-                                    <label className="block text-sm text-gray-400 mb-2">Tipo de Entrada</label>
-                                    <div className="flex gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setInputType('text')}
-                                            className={`flex-1 py-3 rounded-xl font-medium transition-all ${inputType === 'text'
-                                                    ? 'bg-[#00FF99] text-black'
-                                                    : 'bg-[#1a1a1a] text-gray-400 hover:text-white'
-                                                }`}
-                                        >
-                                            ✏️ Digitar Texto
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setInputType('file')}
-                                            className={`flex-1 py-3 rounded-xl font-medium transition-all ${inputType === 'file'
-                                                    ? 'bg-[#00FF99] text-black'
-                                                    : 'bg-[#1a1a1a] text-gray-400 hover:text-white'
-                                                }`}
-                                        >
-                                            📁 Upload Arquivo
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Content Input */}
-                                {inputType === 'text' ? (
-                                    <div>
-                                        <label className="block text-sm text-gray-400 mb-2">Conteúdo</label>
-                                        <textarea
-                                            value={textContent}
-                                            onChange={(e) => setTextContent(e.target.value)}
-                                            placeholder="Cole ou digite o conteúdo aqui..."
-                                            rows={8}
-                                            className="w-full bg-[#1a1a1a] text-white rounded-xl px-4 py-3 border border-gray-700 focus:border-[#00FF99] focus:outline-none resize-none"
-                                        />
-                                        <p className="text-xs text-gray-500 mt-1">{textContent.length} caracteres</p>
-                                    </div>
-                                ) : (
-                                    <div>
-                                        <label className="block text-sm text-gray-400 mb-2">Arquivo</label>
-                                        <div
-                                            onClick={() => fileInputRef.current?.click()}
-                                            className="border-2 border-dashed border-gray-700 rounded-xl p-8 text-center cursor-pointer hover:border-[#00FF99] transition-colors"
-                                        >
-                                            {selectedFile ? (
-                                                <div className="text-white">
-                                                    <span className="text-3xl mb-2 block">📄</span>
-                                                    <p className="font-medium">{selectedFile.name}</p>
-                                                    <p className="text-sm text-gray-400">{(selectedFile.size / 1024).toFixed(1)} KB</p>
-                                                </div>
-                                            ) : (
-                                                <div className="text-gray-400">
-                                                    <span className="text-3xl mb-2 block">📂</span>
-                                                    <p>Clique para selecionar ou arraste um arquivo</p>
-                                                    <p className="text-xs mt-1">txt, pdf, doc, docx, xlsx</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <input
-                                            ref={fileInputRef}
-                                            type="file"
-                                            accept=".txt,.pdf,.doc,.docx,.xlsx"
-                                            onChange={handleFileChange}
-                                            className="hidden"
-                                        />
-                                    </div>
-                                )}
-
-                                {/* Submit Button */}
+                            {/* Botões de Ação */}
+                            <div className="flex gap-2">
                                 <button
-                                    type="submit"
-                                    disabled={uploading}
-                                    className="w-full py-4 bg-[#00FF99] text-black font-bold rounded-xl hover:bg-[#00FF99]/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    onClick={() => setStep('create_category')}
+                                    className="flex items-center gap-2 px-4 py-2 bg-[#00FF99] text-black font-medium rounded-lg hover:bg-[#00E88C] transition-colors"
                                 >
-                                    {uploading ? (
-                                        <span className="flex items-center justify-center gap-2">
-                                            <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                            </svg>
-                                            Processando...
-                                        </span>
-                                    ) : (
-                                        'Adicionar ao Manual'
-                                    )}
+                                    <FolderPlus size={18} />
+                                    Nova Categoria
                                 </button>
-                            </form>
-                        </div>
+                                {categories.length > 0 && (
+                                    <button
+                                        onClick={() => setStep('add_document')}
+                                        className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white font-medium rounded-lg hover:bg-gray-600 transition-colors"
+                                    >
+                                        <Plus size={18} />
+                                        Adicionar Documento
+                                    </button>
+                                )}
+                            </div>
 
-                        {/* Right: Document List */}
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                                <span>📋</span> Documentos ({documents.length})
-                            </h3>
-
-                            {loading ? (
-                                <div className="text-center py-8 text-gray-400">
-                                    <svg className="animate-spin h-8 w-8 mx-auto mb-2" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                    </svg>
-                                    Carregando...
-                                </div>
-                            ) : documents.length === 0 ? (
-                                <div className="text-center py-8 text-gray-500">
-                                    <span className="text-4xl block mb-2">📭</span>
-                                    Nenhum documento adicionado ainda
+                            {/* Lista de Categorias e Documentos */}
+                            {categories.length === 0 ? (
+                                <div className="text-center py-12 text-gray-500">
+                                    <FolderPlus size={48} className="mx-auto mb-3 opacity-50" />
+                                    <p>Nenhuma categoria criada</p>
+                                    <p className="text-sm">Crie uma categoria para começar a adicionar documentos</p>
                                 </div>
                             ) : (
-                                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                                <div className="space-y-3">
                                     {Object.entries(groupedDocs).map(([category, docs]) => (
-                                        <div key={category} className="bg-[#1a1a1a] rounded-xl overflow-hidden">
-                                            <div className="flex items-center justify-between px-4 py-3 bg-[#252525]">
+                                        <div key={category} className="bg-gray-800/50 rounded-lg overflow-hidden">
+                                            <div className="flex items-center justify-between px-4 py-3 bg-gray-800">
                                                 <span className="font-medium text-white flex items-center gap-2">
-                                                    <span>📁</span> {category}
-                                                    <span className="text-xs text-gray-400">({docs.length})</span>
+                                                    📁 {category}
+                                                    <span className="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full">
+                                                        {docs.length}
+                                                    </span>
                                                 </span>
                                                 <button
                                                     onClick={() => deleteCategory(category)}
-                                                    className="text-xs text-red-400 hover:text-red-300"
+                                                    className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
                                                 >
-                                                    Deletar categoria
+                                                    <Trash2 size={14} />
+                                                    Deletar
                                                 </button>
                                             </div>
-                                            <div className="divide-y divide-gray-800">
+                                            <div className="divide-y divide-gray-700/50">
                                                 {docs.map(doc => (
-                                                    <div key={doc.id} className="flex items-center justify-between px-4 py-3">
+                                                    <div key={doc.id} className="flex items-center justify-between px-4 py-2">
                                                         <div className="flex-1 min-w-0">
                                                             <p className="text-sm font-medium text-white truncate">{doc.title}</p>
                                                             <p className="text-xs text-gray-500">
@@ -501,31 +444,204 @@ export default function KnowledgeBaseManager({ agentId, isOpen, onClose }) {
                                                         </div>
                                                         <button
                                                             onClick={() => deleteDocument(doc.id, doc.title)}
-                                                            className="ml-2 p-2 text-gray-400 hover:text-red-400 transition-colors"
+                                                            className="ml-2 p-1 text-gray-400 hover:text-red-400 transition-colors"
                                                         >
-                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                            </svg>
+                                                            <Trash2 size={16} />
                                                         </button>
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
                                     ))}
+                                    {/* Categorias vazias */}
+                                    {categories.filter(c => !groupedDocs[c.name]).map(cat => (
+                                        <div key={cat.id} className="bg-gray-800/50 rounded-lg overflow-hidden">
+                                            <div className="flex items-center justify-between px-4 py-3 bg-gray-800">
+                                                <span className="font-medium text-white flex items-center gap-2">
+                                                    📁 {cat.name}
+                                                    <span className="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full">0</span>
+                                                </span>
+                                                <button
+                                                    onClick={() => deleteCategory(cat.name)}
+                                                    className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
+                                                >
+                                                    <Trash2 size={14} />
+                                                    Deletar
+                                                </button>
+                                            </div>
+                                            <div className="px-4 py-3 text-sm text-gray-500">
+                                                Nenhum documento nesta categoria
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
                         </div>
-                    </div>
-                </div>
+                    ) : step === 'create_category' ? (
+                        /* CRIAR CATEGORIA */
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold text-white">Nova Categoria</h3>
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-2">Nome da Categoria</label>
+                                <input
+                                    type="text"
+                                    value={newCategoryName}
+                                    onChange={(e) => setNewCategoryName(e.target.value)}
+                                    placeholder="Ex: FAQ, Produtos, Políticas"
+                                    className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 border border-gray-700 focus:border-[#00FF99] focus:outline-none"
+                                    autoFocus
+                                />
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={createCategory}
+                                    disabled={uploading || !newCategoryName.trim()}
+                                    className="flex-1 px-4 py-3 bg-[#00FF99] text-black font-semibold rounded-lg hover:bg-[#00E88C] transition-colors disabled:opacity-50"
+                                >
+                                    {uploading ? <Loader2 className="animate-spin mx-auto" size={20} /> : 'Criar Categoria'}
+                                </button>
+                                <button
+                                    onClick={() => { setStep('list'); setNewCategoryName('') }}
+                                    className="px-4 py-3 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        /* ADICIONAR DOCUMENTO */
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold text-white">Adicionar Documento</h3>
 
-                {/* Footer */}
-                <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-800">
-                    <button
-                        onClick={onClose}
-                        className="px-6 py-3 bg-gray-700 text-white rounded-xl hover:bg-gray-600 transition-colors font-medium"
-                    >
-                        Fechar
-                    </button>
+                            {/* Seleção de Categoria */}
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-2">Categoria</label>
+                                <select
+                                    value={selectedCategory}
+                                    onChange={(e) => setSelectedCategory(e.target.value)}
+                                    className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 border border-gray-700 focus:border-[#00FF99] focus:outline-none"
+                                >
+                                    <option value="">Selecione uma categoria</option>
+                                    {categories.map(cat => (
+                                        <option key={cat.id} value={cat.name}>{cat.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Mostrar campos apenas se categoria selecionada */}
+                            {selectedCategory && (
+                                <>
+                                    {/* Título */}
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-2">Título</label>
+                                        <input
+                                            type="text"
+                                            value={title}
+                                            onChange={(e) => setTitle(e.target.value)}
+                                            placeholder="Ex: Política de Devolução"
+                                            className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 border border-gray-700 focus:border-[#00FF99] focus:outline-none"
+                                        />
+                                    </div>
+
+                                    {/* Tipo de Entrada */}
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-2">Tipo de Entrada</label>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setInputType('text')}
+                                                className={`flex-1 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${inputType === 'text'
+                                                        ? 'bg-[#00FF99] text-black'
+                                                        : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
+                                                    }`}
+                                            >
+                                                <FileText size={18} />
+                                                Digitar Texto
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setInputType('file')}
+                                                className={`flex-1 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${inputType === 'file'
+                                                        ? 'bg-[#00FF99] text-black'
+                                                        : 'bg-gray-800 text-gray-400 hover:text-white border border-gray-700'
+                                                    }`}
+                                            >
+                                                <Upload size={18} />
+                                                Upload Arquivo
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Conteúdo */}
+                                    {inputType === 'text' ? (
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-2">Conteúdo</label>
+                                            <textarea
+                                                value={textContent}
+                                                onChange={(e) => setTextContent(e.target.value)}
+                                                placeholder="Cole ou digite o conteúdo aqui..."
+                                                rows={6}
+                                                className="w-full bg-gray-800 text-white rounded-lg px-4 py-3 border border-gray-700 focus:border-[#00FF99] focus:outline-none resize-none"
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">{textContent.length} caracteres</p>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <label className="block text-sm text-gray-400 mb-2">Arquivo</label>
+                                            <div
+                                                onClick={() => fileInputRef.current?.click()}
+                                                className="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center cursor-pointer hover:border-[#00FF99] transition-colors"
+                                            >
+                                                {selectedFile ? (
+                                                    <div className="text-white">
+                                                        <FileText size={32} className="mx-auto mb-2 text-[#00FF99]" />
+                                                        <p className="font-medium">{selectedFile.name}</p>
+                                                        <p className="text-sm text-gray-400">{(selectedFile.size / 1024).toFixed(1)} KB</p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-gray-400">
+                                                        <Upload size={32} className="mx-auto mb-2" />
+                                                        <p>Clique para selecionar</p>
+                                                        <p className="text-xs mt-1">txt, pdf, doc, docx, xlsx</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <input
+                                                ref={fileInputRef}
+                                                type="file"
+                                                accept=".txt,.pdf,.doc,.docx,.xlsx"
+                                                onChange={handleFileChange}
+                                                className="hidden"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* Botão Enviar */}
+                                    <button
+                                        onClick={() => handleSubmit(false)}
+                                        disabled={uploading}
+                                        className="w-full py-3 bg-[#00FF99] text-black font-bold rounded-lg hover:bg-[#00E88C] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                    >
+                                        {uploading ? (
+                                            <>
+                                                <Loader2 className="animate-spin" size={20} />
+                                                Processando...
+                                            </>
+                                        ) : (
+                                            'Adicionar ao Manual'
+                                        )}
+                                    </button>
+                                </>
+                            )}
+
+                            <button
+                                onClick={() => { resetForm(); setSelectedCategory('') }}
+                                className="w-full py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors"
+                            >
+                                Voltar
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
