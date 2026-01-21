@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { supabase } from '../../../lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import NoSubscription from '../../components/NoSubscription'
+import KnowledgeBaseManager from '../../components/KnowledgeBaseManager'
 
 
 // ==================================================================================
@@ -142,6 +143,7 @@ const MAX_ITEMS = 15
 
 // Velocidades de digitação para o dropdown
 const TYPING_SPEEDS = [
+  { value: 'none', label: 'Nenhum', description: 'Resposta instantânea sem delay' },
   { value: 'slow', label: 'Lento', description: 'Simula digitação humana mais lenta' },
   { value: 'normal', label: 'Normal', description: 'Velocidade padrão de digitação' },
   { value: 'fast', label: 'Rápido', description: 'Respostas quase instantâneas' }
@@ -272,6 +274,7 @@ function AgentConfigContent() {
   const [loading, setLoading] = useState(true)
   const [subscription, setSubscription] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [showKnowledgeModal, setShowKnowledgeModal] = useState(false)
   const [errors, setErrors] = useState({})
 
   // Controle do Modal de Sucesso
@@ -333,6 +336,12 @@ function AgentConfigContent() {
     productUrls: [],
     responseMode: 'single',  // 'single' | 'humanized'
     typingSpeed: 'normal',   // 'slow' | 'normal' | 'fast'
+    // RAG Configuration
+    ragEnabled: false,
+    // Media Response Controls
+    respondToText: true,
+    respondToAudio: true,
+    respondToImage: true,
   })
 
   useEffect(() => {
@@ -459,6 +468,12 @@ function AgentConfigContent() {
           productUrls: Array.isArray(data.product_urls) ? data.product_urls : (data.product_url ? [data.product_url] : []),
           responseMode: data.response_mode || 'single',
           typingSpeed: data.typing_speed || 'normal',
+          // RAG Configuration
+          ragEnabled: data.rag_enabled || false,
+          // Media Response Controls
+          respondToText: data.respond_to_text !== false,
+          respondToAudio: data.respond_to_audio !== false,
+          respondToImage: data.respond_to_image !== false,
         })
       }
     } catch (error) {
@@ -678,6 +693,12 @@ function AgentConfigContent() {
         product_urls: formData.productUrls.filter(url => url.trim()),
         response_mode: formData.responseMode,
         typing_speed: formData.typingSpeed,
+        // RAG Configuration
+        rag_enabled: formData.ragEnabled,
+        // Media Response Controls
+        respond_to_text: formData.respondToText,
+        respond_to_audio: formData.respondToAudio,
+        respond_to_image: formData.respondToImage,
         is_active: true
       }
 
@@ -1273,6 +1294,63 @@ function AgentConfigContent() {
                   </button>
                 </div>
 
+                {/* Toggles: Responder a tipos de mídia */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Toggle: Responder Texto */}
+                  <div className="bg-[#181818] p-4 rounded-2xl flex items-center justify-between group hover:bg-[#1a1a1a] transition-all">
+                    <div>
+                      <h4 className="text-white font-medium text-sm mb-1 flex items-center gap-2">
+                        <span className="text-lg">💬</span>
+                        Responder Texto
+                      </h4>
+                      <p className="text-gray-500 text-xs">Mensagens de texto</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, respondToText: !prev.respondToText }))}
+                      className={`relative w-12 h-6 rounded-full transition-all duration-300 ease-in-out focus:outline-none flex-shrink-0 ml-4 ${formData.respondToText ? 'bg-[#00FF99] shadow-[0_0_10px_rgba(0,255,153,0.3)]' : 'bg-gray-700'}`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 bg-white w-5 h-5 rounded-full shadow-md transition-transform duration-300 ease-in-out ${formData.respondToText ? 'translate-x-6' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+
+                  {/* Toggle: Responder Áudio */}
+                  <div className="bg-[#181818] p-4 rounded-2xl flex items-center justify-between group hover:bg-[#1a1a1a] transition-all">
+                    <div>
+                      <h4 className="text-white font-medium text-sm mb-1 flex items-center gap-2">
+                        <span className="text-lg">🎤</span>
+                        Responder Áudio
+                      </h4>
+                      <p className="text-gray-500 text-xs">Mensagens de voz</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, respondToAudio: !prev.respondToAudio }))}
+                      className={`relative w-12 h-6 rounded-full transition-all duration-300 ease-in-out focus:outline-none flex-shrink-0 ml-4 ${formData.respondToAudio ? 'bg-[#00FF99] shadow-[0_0_10px_rgba(0,255,153,0.3)]' : 'bg-gray-700'}`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 bg-white w-5 h-5 rounded-full shadow-md transition-transform duration-300 ease-in-out ${formData.respondToAudio ? 'translate-x-6' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+
+                  {/* Toggle: Responder Imagem */}
+                  <div className="bg-[#181818] p-4 rounded-2xl flex items-center justify-between group hover:bg-[#1a1a1a] transition-all">
+                    <div>
+                      <h4 className="text-white font-medium text-sm mb-1 flex items-center gap-2">
+                        <span className="text-lg">📷</span>
+                        Responder Imagem
+                      </h4>
+                      <p className="text-gray-500 text-xs">Fotos e imagens</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, respondToImage: !prev.respondToImage }))}
+                      className={`relative w-12 h-6 rounded-full transition-all duration-300 ease-in-out focus:outline-none flex-shrink-0 ml-4 ${formData.respondToImage ? 'bg-[#00FF99] shadow-[0_0_10px_rgba(0,255,153,0.3)]' : 'bg-gray-700'}`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 bg-white w-5 h-5 rounded-full shadow-md transition-transform duration-300 ease-in-out ${formData.respondToImage ? 'translate-x-6' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+                </div>
+
                 <div className="bg-[#1E1E1E] rounded-3xl p-6">
                   <div className="flex gap-3 mb-4">
                     <input
@@ -1364,6 +1442,47 @@ function AgentConfigContent() {
                   />
                 </div>
               </div>
+
+              <hr className="border-white/5" />
+
+              {/* SEÇÃO: BASE DE CONHECIMENTO (RAG) */}
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-2xl font-bold text-white flex items-center gap-2">
+                    <svg className="w-6 h-6 text-[#00FF99]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                    Manual do Agente (RAG)
+                  </h3>
+
+                  {/* Toggle RAG */}
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, ragEnabled: !prev.ragEnabled }))}
+                    className={`relative w-12 h-6 rounded-full transition-all duration-300 ease-in-out focus:outline-none flex-shrink-0 ${formData.ragEnabled ? 'bg-[#00FF99] shadow-[0_0_10px_rgba(0,255,153,0.3)]' : 'bg-gray-700'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 bg-white w-5 h-5 rounded-full shadow-md transition-transform duration-300 ease-in-out ${formData.ragEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+                <p className="text-gray-500 text-sm -mt-2">
+                  Adicione documentos e informações para o agente consultar durante as conversas.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => setShowKnowledgeModal(true)}
+                  className="w-full py-4 bg-[#181818] hover:bg-[#1E1E1E] border border-gray-700 hover:border-[#00FF99] rounded-2xl text-white font-medium transition-all flex items-center justify-center gap-3"
+                >
+                  <span className="text-xl">📚</span>
+                  Gerenciar Manual do Agente
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                </button>
+              </div>
+
+              {/* Modal de Knowledge Base */}
+              <KnowledgeBaseManager
+                agentId={agentId}
+                isOpen={showKnowledgeModal}
+                onClose={() => setShowKnowledgeModal(false)}
+              />
 
               <div className="flex justify-end gap-4 pt-8 border-t border-white/10">
                 <button type="button" onClick={() => router.push('/dashboard')} className="px-8 py-4 bg-[#1E1E1E] hover:bg-[#2A2A2A] text-white rounded-3xl font-medium transition-all">

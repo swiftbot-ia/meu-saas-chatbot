@@ -87,6 +87,14 @@ export async function POST(request) {
         // Status
         is_active: data.is_active || false,
 
+        // RAG Configuration
+        rag_enabled: data.rag_enabled || false,
+        rag_threshold: data.rag_threshold || 0.7,
+        rag_max_results: data.rag_max_results || 5,
+
+        // Agent ID (for RAG queries)
+        agent_id: data.id,
+
         // Timestamps
         created_at: data.created_at,
         updated_at: data.updated_at
