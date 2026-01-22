@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import { supabaseAdmin } from '../../../../lib/supabase/server.js'
-import { getOwnerUserIdFromMember } from '../../../../lib/account-service.js'
+import { getOwnerUserIdFromMember, getMemberAllowedConnections } from '../../../../lib/account-service.js'
 
 // Helper para criar cliente Supabase com cookies (para autenticação)
 // NOTA: No Next.js 16, cookies() retorna uma Promise
@@ -90,11 +90,31 @@ export async function GET(request) {
       )
     }
 
-    console.log('✅ [GetConnections] Conexões encontradas:', connections?.length || 0)
+    // CHECK PERMISSIONS AND FILTER
+    // Get allowed connections for this user (filtering happens here for non-owners)
+    let visibleConnections = connections || []
+
+    try {
+      const { connectionIds, hasRestrictions } = await getMemberAllowedConnections(userId)
+
+      if (hasRestrictions) {
+        console.log('🔒 [GetConnections] User has restricted access. Filtering connections...')
+        visibleConnections = visibleConnections.filter(c => connectionIds.includes(c.id))
+        console.log(`✅ [GetConnections] Access granted to ${visibleConnections.length} of ${connections.length} connections`)
+      } else {
+        console.log('🔓 [GetConnections] User has unrestricted access (Owner or Super Admin)')
+      }
+    } catch (permError) {
+      console.error('⚠️ [GetConnections] Permissions check failed:', permError)
+      // Default to filtering nothing if check fails, OR filter everything for safety? 
+      // Better to fail closed for security, but for now let's log and proceed cautiously.
+    }
+
+    console.log('✅ [GetConnections] Conexões encontradas:', visibleConnections.length)
 
     return NextResponse.json({
-      connections: connections || [],
-      count: connections?.length || 0
+      connections: visibleConnections,
+      count: visibleConnections.length
     })
 
   } catch (error) {

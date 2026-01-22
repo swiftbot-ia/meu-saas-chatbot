@@ -3,7 +3,9 @@ import { Draggable } from '@hello-pangea/dnd';
 import { Mail, Phone, Calendar, User, Trophy, XCircle } from 'lucide-react';
 import Avatar from '@/app/components/Avatar';
 
-const LeadCard = ({ lead, index, onClick, currentStageId, currentDragDestination, allStages }) => {
+const LeadCard = ({ lead, index, onClick, currentStageId, currentDragDestination, allStages, teamMembers = [] }) => {
+    // Determine assignee
+    const assignee = lead.assigned_to ? teamMembers.find(m => m.userId === lead.assigned_to) : null;
     // Check if lead is won or lost
     const isWon = !!lead.won_at;
     const isLost = !!lead.lost_at;
@@ -114,6 +116,11 @@ const LeadCard = ({ lead, index, onClick, currentStageId, currentDragDestination
                                         </div>
                                     )}
                                     <div className="flex items-center gap-1 ml-auto">
+                                        {assignee && (
+                                            <div className="mr-2" title={`Responsável: ${assignee.fullName}`}>
+                                                <Avatar name={assignee.fullName} size={16} />
+                                            </div>
+                                        )}
                                         <Calendar size={9} className="sm:w-[10px] sm:h-[10px]" />
                                         <span>{new Date(lead.last_message_at || lead.created_at).toLocaleDateString('pt-BR', {
                                             day: '2-digit',

@@ -12,21 +12,37 @@ export default function TeamManagement() {
     const [members, setMembers] = useState([])
     const [account, setAccount] = useState(null)
     const [isOwner, setIsOwner] = useState(false)
+    const [canManageTeam, setCanManageTeam] = useState(false)
     const [currentUserId, setCurrentUserId] = useState(null)
 
     // Modal states
     const [showAddModal, setShowAddModal] = useState(false)
+    const [showEditModal, setShowEditModal] = useState(false)
     const [showConfirmModal, setShowConfirmModal] = useState(false)
     const [memberToRemove, setMemberToRemove] = useState(null)
+    const [memberToEdit, setMemberToEdit] = useState(null)
 
     // Form states
     const [formData, setFormData] = useState({
         fullName: '',
         email: '',
-        password: ''
+        password: '',
+        role: 'consultant',
+        canAssignSelf: true,
+        canAssignOthers: false
+    })
+    const [editFormData, setEditFormData] = useState({
+        role: 'consultant',
+        canAssignSelf: true,
+        canAssignOthers: false
     })
     const [formErrors, setFormErrors] = useState({})
     const [saving, setSaving] = useState(false)
+
+    // Connection states
+    const [availableConnections, setAvailableConnections] = useState([])
+    const [selectedConnections, setSelectedConnections] = useState([])
+    const [editSelectedConnections, setEditSelectedConnections] = useState([])
 
     // Result modal
     const [resultModal, setResultModal] = useState({
@@ -49,8 +65,19 @@ export default function TeamManagement() {
                 return
             }
 
+            // 1. Verify permissions explicitly
+            const res = await fetch('/api/account/member-permissions');
+            const permData = await res.json();
+            const role = permData.permissions?.role || permData.role;
+
+            if (permData.success && role && !['owner', 'manager'].includes(role)) {
+                router.push('/dashboard');
+                return; // Stop execution
+            }
+
             setUser(user)
             await loadTeamData()
+            await loadConnections()
         } catch (error) {
             console.error('Erro ao verificar usuário:', error)
             router.push('/login')
@@ -71,6 +98,7 @@ export default function TeamManagement() {
             setMembers(data.members || [])
             setAccount(data.account)
             setIsOwner(data.isOwner)
+            setCanManageTeam(data.canManageTeam)
             setCurrentUserId(data.currentUserId)
         } catch (error) {
             console.error('Erro ao carregar equipe:', error)
@@ -80,6 +108,35 @@ export default function TeamManagement() {
                 title: 'Erro ao Carregar',
                 message: 'Não foi possível carregar os dados da equipe.'
             })
+        }
+    }
+
+    const loadConnections = async () => {
+        try {
+            const response = await fetch('/api/account/connections')
+            const data = await response.json()
+
+            if (data.success) {
+                setAvailableConnections(data.connections || [])
+            }
+        } catch (error) {
+            console.error('Erro ao carregar conexões:', error)
+        }
+    }
+
+    const handleConnectionToggle = (connectionId, checked) => {
+        if (checked) {
+            setSelectedConnections(prev => [...prev, connectionId])
+        } else {
+            setSelectedConnections(prev => prev.filter(id => id !== connectionId))
+        }
+    }
+
+    const handleEditConnectionToggle = (connectionId, checked) => {
+        if (checked) {
+            setEditSelectedConnections(prev => [...prev, connectionId])
+        } else {
+            setEditSelectedConnections(prev => prev.filter(id => id !== connectionId))
         }
     }
 
@@ -119,7 +176,11 @@ export default function TeamManagement() {
                 body: JSON.stringify({
                     fullName: formData.fullName,
                     email: formData.email,
-                    password: formData.password
+                    password: formData.password,
+                    role: formData.role,
+                    canAssignSelf: formData.canAssignSelf,
+                    canAssignOthers: formData.canAssignOthers,
+                    connectionIds: formData.role === 'owner' ? [] : selectedConnections
                 })
             })
 
@@ -130,7 +191,8 @@ export default function TeamManagement() {
             }
 
             setShowAddModal(false)
-            setFormData({ fullName: '', email: '', password: '' })
+            setFormData({ fullName: '', email: '', password: '', role: 'consultant', canAssignSelf: true, canAssignOthers: false })
+            setSelectedConnections([])
             setFormErrors({})
             await loadTeamData()
 
@@ -200,6 +262,110 @@ export default function TeamManagement() {
         setResultModal(prev => ({ ...prev, show: false }))
     }
 
+    const openEditModal = async (member) => {
+        setMemberToEdit(member)
+        setEditFormData({
+            role: member.role,
+            canAssignSelf: member.canAssignSelf ?? true,
+            canAssignOthers: member.canAssignOthers ?? false
+        })
+
+        // Load member's connections
+        try {
+            const response = await fetch(`/api/account/team/${member.id}/connections`)
+            const data = await response.json()
+            if (data.success) {
+                setEditSelectedConnections(data.connectionIds || [])
+            }
+        } catch (error) {
+            console.error('Erro ao carregar conexões do membro:', error)
+            setEditSelectedConnections([])
+        }
+
+        setShowEditModal(true)
+    }
+
+    const handleEditMember = async () => {
+        if (!memberToEdit) return
+
+        setSaving(true)
+        const updateData = {
+            canAssignSelf: editFormData.canAssignSelf,
+            canAssignOthers: editFormData.canAssignOthers
+        }
+
+        // Only send role if it's not owner (owners cannot have their role changed here)
+        if (editFormData.role !== 'owner') {
+            updateData.role = editFormData.role
+        }
+
+        try {
+            const response = await fetch(`/api/account/team/${memberToEdit.userId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updateData)
+            })
+
+            const data = await response.json()
+
+            if (!data.success) {
+                throw new Error(data.error)
+            }
+
+            // Update connections separately
+            if (editFormData.role !== 'owner') {
+                const connResponse = await fetch(`/api/account/team/${memberToEdit.id}/connections`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        connectionIds: editSelectedConnections
+                    })
+                })
+
+                const connData = await connResponse.json()
+                if (!connData.success) {
+                    console.error('Erro ao atualizar conexões:', connData.error)
+                }
+            }
+
+            setShowEditModal(false)
+            setMemberToEdit(null)
+            setEditSelectedConnections([])
+            await loadTeamData()
+
+            setResultModal({
+                show: true,
+                type: 'success',
+                title: 'Membro Atualizado',
+                message: `As configurações de ${memberToEdit.fullName} foram atualizadas.`
+            })
+        } catch (error) {
+            console.error('Erro ao editar membro:', error)
+            setResultModal({
+                show: true,
+                type: 'error',
+                title: 'Erro ao Editar',
+                message: error.message || 'Não foi possível editar o membro.'
+            })
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    // Helper function to get role badge
+    const getRoleBadge = (role) => {
+        switch (role) {
+            case 'owner':
+                return <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs rounded-full font-medium">👑 Proprietário</span>
+            case 'manager':
+                return <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded-full font-medium">⭐ Gestor</span>
+            case 'consultant':
+                return <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded-full font-medium">👤 Consultor</span>
+            default:
+                return <span className="px-2 py-0.5 bg-gray-500/20 text-gray-400 text-xs rounded-full font-medium">Membro</span>
+        }
+    }
+
     const canAddMoreMembers = account && members.length < account.maxMembers
 
     if (loading) {
@@ -244,8 +410,8 @@ export default function TeamManagement() {
                                         onClick={() => setShowAddModal(true)}
                                         disabled={!canAddMoreMembers}
                                         className={`px-6 py-3 rounded-xl font-bold transition-all duration-300 flex items-center gap-2 ${canAddMoreMembers
-                                                ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black hover:shadow-[0_0_30px_rgba(0,255,153,0.4)]'
-                                                : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                                            ? 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black hover:shadow-[0_0_30px_rgba(0,255,153,0.4)]'
+                                            : 'bg-gray-700 text-gray-400 cursor-not-allowed'
                                             }`}
                                     >
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -291,18 +457,14 @@ export default function TeamManagement() {
 
                                             {/* Info */}
                                             <div>
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-2 flex-wrap">
                                                     <p className="text-white font-medium">
                                                         {member.fullName}
                                                     </p>
                                                     {member.userId === currentUserId && (
                                                         <span className="text-xs text-gray-500">(você)</span>
                                                     )}
-                                                    {member.role === 'owner' && (
-                                                        <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs rounded-full font-medium">
-                                                            👑 Proprietário
-                                                        </span>
-                                                    )}
+                                                    {getRoleBadge(member.role)}
                                                 </div>
                                                 <p className="text-gray-500 text-sm">{member.email}</p>
                                                 {member.mustResetPassword && (
@@ -317,16 +479,27 @@ export default function TeamManagement() {
                                         </div>
 
                                         {/* Actions */}
-                                        {isOwner && member.role !== 'owner' && (
-                                            <button
-                                                onClick={() => openRemoveConfirmation(member)}
-                                                className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
-                                                title="Remover membro"
-                                            >
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                </svg>
-                                            </button>
+                                        {canManageTeam && member.role !== 'owner' && (
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => openEditModal(member)}
+                                                    className="p-2 text-gray-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all"
+                                                    title="Editar membro"
+                                                >
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                    </svg>
+                                                </button>
+                                                <button
+                                                    onClick={() => openRemoveConfirmation(member)}
+                                                    className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                                                    title="Remover membro"
+                                                >
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
                                 ))}
@@ -349,7 +522,7 @@ export default function TeamManagement() {
             {/* Add Member Modal */}
             {showAddModal && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-                    <div className="relative bg-[#111111] rounded-2xl p-8 max-w-md w-full shadow-2xl">
+                    <div className="relative bg-[#111111] rounded-2xl p-8 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto">
                         <div className="text-center mb-6">
                             <div className="w-16 h-16 bg-[#00FF99]/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
                                 <svg className="w-8 h-8 text-[#00FF99]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -405,6 +578,139 @@ export default function TeamManagement() {
                                 {formErrors.password && <p className="mt-1 text-red-400 text-sm">{formErrors.password}</p>}
                             </div>
 
+                            {/* Role Selector */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                    Perfil *
+                                </label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData({ ...formData, role: 'manager', canAssignOthers: true })}
+                                        className={`p-3 rounded-xl border-2 transition-all ${formData.role === 'manager'
+                                            ? 'border-blue-500 bg-blue-500/10'
+                                            : 'border-gray-700 hover:border-gray-600'
+                                            }`}
+                                    >
+                                        <div className="text-left">
+                                            <p className={`font-medium ${formData.role === 'manager' ? 'text-blue-400' : 'text-white'}`}>
+                                                ⭐ Gestor
+                                            </p>
+                                            <p className="text-xs text-gray-500 mt-1">Acesso total, como dono</p>
+                                        </div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData({ ...formData, role: 'consultant', canAssignOthers: false })}
+                                        className={`p-3 rounded-xl border-2 transition-all ${formData.role === 'consultant'
+                                            ? 'border-purple-500 bg-purple-500/10'
+                                            : 'border-gray-700 hover:border-gray-600'
+                                            }`}
+                                    >
+                                        <div className="text-left">
+                                            <p className={`font-medium ${formData.role === 'consultant' ? 'text-purple-400' : 'text-white'}`}>
+                                                👤 Consultor
+                                            </p>
+                                            <p className="text-xs text-gray-500 mt-1">Acesso restrito</p>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Permissions */}
+                            <div className="space-y-3">
+                                <label className="block text-sm font-medium text-gray-300">
+                                    Permissões de Atribuição
+                                </label>
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.canAssignSelf}
+                                        onChange={(e) => setFormData({ ...formData, canAssignSelf: e.target.checked })}
+                                        className="w-5 h-5 rounded bg-[#0A0A0A] border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
+                                    />
+                                    <span className="text-gray-300 text-sm">Pode atribuir leads para si mesmo</span>
+                                </label>
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.canAssignOthers}
+                                        onChange={(e) => setFormData({ ...formData, canAssignOthers: e.target.checked })}
+                                        className="w-5 h-5 rounded bg-[#0A0A0A] border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
+                                    />
+                                    <span className="text-gray-300 text-sm">Pode atribuir leads para outros membros</span>
+                                </label>
+                            </div>
+
+                            {/* Connections */}
+                            {formData.role !== 'owner' && (
+                                <div className="space-y-3">
+                                    <label className="block text-sm font-medium text-gray-300">
+                                        Conexões Permitidas
+                                    </label>
+                                    {availableConnections.length === 0 ? (
+                                        <p className="text-gray-500 text-sm">Nenhuma conexão disponível</p>
+                                    ) : (
+                                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                                            {availableConnections.map((conn, index) => {
+                                                const isSelected = selectedConnections.includes(conn.id)
+                                                const isConnected = conn.status === 'connected'
+                                                const displayName = conn.name || `Conexão ${index + 1}`
+                                                const phoneNumber = conn.phoneNumber || ''
+
+                                                return (
+                                                    <label
+                                                        key={conn.id}
+                                                        className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${isSelected
+                                                            ? 'border-[#00FF99] bg-[#00FF99]/10'
+                                                            : 'border-gray-700 hover:border-gray-600 hover:bg-[#1E1E1E]'
+                                                            }`}
+                                                    >
+                                                        {/* Checkbox */}
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isSelected}
+                                                            onChange={(e) => handleConnectionToggle(conn.id, e.target.checked)}
+                                                            className="w-5 h-5 rounded bg-[#0A0A0A] border-gray-600 text-[#00FF99] focus:ring-[#00FF99] flex-shrink-0"
+                                                        />
+
+                                                        {/* Avatar */}
+                                                        <div className="flex-shrink-0">
+                                                            <div className="w-10 h-10 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold">
+                                                                {displayName.charAt(0).toUpperCase()}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Info */}
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="text-white font-medium text-sm truncate">
+                                                                {displayName}
+                                                            </div>
+                                                            <div className="text-gray-400 text-xs truncate mt-0.5">
+                                                                {phoneNumber ? `+${phoneNumber}` : 'Sem número'}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Status Indicator */}
+                                                        <div className="flex-shrink-0">
+                                                            <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                                                        </div>
+                                                    </label>
+                                                )
+                                            })}
+                                        </div>
+                                    )}
+                                    {selectedConnections.length === 0 && (
+                                        <p className="text-yellow-400 text-xs flex items-center gap-1">
+                                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                            </svg>
+                                            Sem conexões selecionadas, o membro não poderá acessar nenhum dado
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
                             <div className="p-3 bg-yellow-500/10 rounded-lg">
                                 <p className="text-yellow-400 text-sm flex items-start gap-2">
                                     <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -419,7 +725,7 @@ export default function TeamManagement() {
                                     type="button"
                                     onClick={() => {
                                         setShowAddModal(false)
-                                        setFormData({ fullName: '', email: '', password: '' })
+                                        setFormData({ fullName: '', email: '', password: '', role: 'consultant', canAssignSelf: true, canAssignOthers: false })
                                         setFormErrors({})
                                     }}
                                     className="flex-1 bg-[#272727] hover:bg-[#333333] text-white py-3 px-4 rounded-xl font-medium transition-all"
@@ -491,13 +797,198 @@ export default function TeamManagement() {
                 </div>
             )}
 
+            {/* Edit Member Modal */}
+            {showEditModal && memberToEdit && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+                    <div className="bg-[#1E1E1E] p-8 rounded-3xl border border-[#00FF99]/20 shadow-[0_0_50px_rgba(0,255,153,0.15)] max-w-md w-full max-h-[90vh] overflow-y-auto">
+                        <h3 className="text-2xl font-bold text-white mb-6 text-center">
+                            Editar Membro
+                        </h3>
+
+                        <div className="mb-4 text-center">
+                            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#00FF99] to-[#00BFFF] flex items-center justify-center text-black font-bold text-xl mx-auto mb-2">
+                                {memberToEdit.fullName?.charAt(0)?.toUpperCase() || '?'}
+                            </div>
+                            <p className="text-white font-medium">{memberToEdit.fullName}</p>
+                            <p className="text-gray-500 text-sm">{memberToEdit.email}</p>
+                        </div>
+
+                        <div className="space-y-6">
+                            {/* Role Selector */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                    Perfil
+                                </label>
+                                {editFormData.role === 'owner' ? (
+                                    <div className="p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/10">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-2xl">👑</span>
+                                            <div>
+                                                <p className="font-bold text-yellow-500">Proprietário da Conta</p>
+                                                <p className="text-xs text-gray-400">O proprietário tem acesso total e não pode ter seu perfil alterado.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setEditFormData({ ...editFormData, role: 'manager', canAssignOthers: true })}
+                                            className={`p-3 rounded-xl border-2 transition-all ${editFormData.role === 'manager'
+                                                ? 'border-blue-500 bg-blue-500/10'
+                                                : 'border-gray-700 hover:border-gray-600'
+                                                }`}
+                                        >
+                                            <div className="text-left">
+                                                <p className={`font-medium ${editFormData.role === 'manager' ? 'text-blue-400' : 'text-white'}`}>
+                                                    ⭐ Gestor
+                                                </p>
+                                                <p className="text-xs text-gray-500 mt-1">Acesso total</p>
+                                            </div>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setEditFormData({ ...editFormData, role: 'consultant', canAssignOthers: false })}
+                                            className={`p-3 rounded-xl border-2 transition-all ${editFormData.role === 'consultant'
+                                                ? 'border-purple-500 bg-purple-500/10'
+                                                : 'border-gray-700 hover:border-gray-600'
+                                                }`}
+                                        >
+                                            <div className="text-left">
+                                                <p className={`font-medium ${editFormData.role === 'consultant' ? 'text-purple-400' : 'text-white'}`}>
+                                                    👤 Consultor
+                                                </p>
+                                                <p className="text-xs text-gray-500 mt-1">Acesso restrito</p>
+                                            </div>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Permissions */}
+                            <div className="space-y-3">
+                                <label className="block text-sm font-medium text-gray-300">
+                                    Permissões de Atribuição
+                                </label>
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={editFormData.canAssignSelf}
+                                        onChange={(e) => setEditFormData({ ...editFormData, canAssignSelf: e.target.checked })}
+                                        className="w-5 h-5 rounded bg-[#0A0A0A] border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
+                                    />
+                                    <span className="text-gray-300 text-sm">Pode atribuir leads para si mesmo</span>
+                                </label>
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={editFormData.canAssignOthers}
+                                        onChange={(e) => setEditFormData({ ...editFormData, canAssignOthers: e.target.checked })}
+                                        className="w-5 h-5 rounded bg-[#0A0A0A] border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
+                                    />
+                                    <span className="text-gray-300 text-sm">Pode atribuir leads para outros membros</span>
+                                </label>
+                            </div>
+
+                            {/* Connections */}
+                            {editFormData.role !== 'owner' && (
+                                <div className="space-y-3">
+                                    <label className="block text-sm font-medium text-gray-300">
+                                        Conexões Permitidas
+                                    </label>
+                                    {availableConnections.length === 0 ? (
+                                        <p className="text-gray-500 text-sm">Nenhuma conexão disponível</p>
+                                    ) : (
+                                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                                            {availableConnections.map((conn, index) => {
+                                                const isSelected = editSelectedConnections.includes(conn.id)
+                                                const isConnected = conn.status === 'connected'
+                                                const displayName = conn.name || `Conexão ${index + 1}`
+                                                const phoneNumber = conn.phoneNumber || ''
+
+                                                return (
+                                                    <label
+                                                        key={conn.id}
+                                                        className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${isSelected
+                                                            ? 'border-[#00FF99] bg-[#00FF99]/10'
+                                                            : 'border-gray-700 hover:border-gray-600 hover:bg-[#1E1E1E]'
+                                                            }`}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isSelected}
+                                                            onChange={(e) => handleEditConnectionToggle(conn.id, e.target.checked)}
+                                                            className="w-5 h-5 rounded bg-[#0A0A0A] border-gray-600 text-[#00FF99] focus:ring-[#00FF99] flex-shrink-0"
+                                                        />
+                                                        <div className="flex-shrink-0">
+                                                            <div className="w-10 h-10 rounded-full bg-[#00A884] flex items-center justify-center text-white font-semibold">
+                                                                {displayName.charAt(0).toUpperCase()}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="text-white font-medium text-sm truncate">
+                                                                {displayName}
+                                                            </div>
+                                                            <div className="text-gray-400 text-xs truncate mt-0.5">
+                                                                {phoneNumber ? `+${phoneNumber}` : 'Sem número'}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex-shrink-0">
+                                                            <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                                                        </div>
+                                                    </label>
+                                                )
+                                            })}
+                                        </div>
+                                    )}
+                                    {editSelectedConnections.length === 0 && (
+                                        <p className="text-yellow-400 text-xs flex items-center gap-1">
+                                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                            </svg>
+                                            Sem conexões selecionadas, o membro não poderá acessar nenhum dado
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={() => {
+                                    setShowEditModal(false)
+                                    setMemberToEdit(null)
+                                }}
+                                className="flex-1 bg-[#272727] hover:bg-[#333333] text-white py-3 px-4 rounded-xl font-medium transition-all"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleEditMember}
+                                disabled={saving}
+                                className="flex-1 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black py-3 px-4 rounded-xl font-bold transition-all disabled:opacity-50"
+                            >
+                                {saving ? (
+                                    <div className="flex items-center justify-center gap-2">
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black" />
+                                        Salvando...
+                                    </div>
+                                ) : (
+                                    'Salvar'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Result Modal */}
             {resultModal.show && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn">
                     <div
                         className={`bg-[#1E1E1E] p-8 rounded-3xl border shadow-[0_0_50px_rgba(0,0,0,0.5)] max-w-md w-full text-center ${resultModal.type === 'error'
-                                ? 'border-red-500/20'
-                                : 'border-[#00FF99]/20'
+                            ? 'border-red-500/20'
+                            : 'border-[#00FF99]/20'
                             }`}
                     >
                         <div
@@ -526,8 +1017,8 @@ export default function TeamManagement() {
                         <button
                             onClick={closeResultModal}
                             className={`w-full py-4 font-bold rounded-2xl transition-all ${resultModal.type === 'error'
-                                    ? 'bg-red-500 hover:bg-red-600 text-white'
-                                    : 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black'
+                                ? 'bg-red-500 hover:bg-red-600 text-white'
+                                : 'bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black'
                                 }`}
                         >
                             Entendido

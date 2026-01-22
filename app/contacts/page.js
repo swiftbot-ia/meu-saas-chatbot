@@ -31,8 +31,11 @@ import {
   FileText,
   Hash,
   Check,
-  ArrowLeft
+  ArrowLeft,
+  User,
+  AlertCircle
 } from 'lucide-react';
+import Avatar from '@/app/components/Avatar';
 import NoSubscription from '../components/NoSubscription'
 import NewOpportunityModal from '../crm/components/NewOpportunityModal'
 
@@ -99,6 +102,50 @@ export default function ContactsPage() {
   const [newFieldKey, setNewFieldKey] = useState('');
   const [newFieldValue, setNewFieldValue] = useState('');
   const [editingField, setEditingField] = useState(null);
+
+  // Assignment state
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [loadingTeam, setLoadingTeam] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const [currentUserPermissions, setCurrentUserPermissions] = useState(null);
+
+  // Load permissions on mount
+  useEffect(() => {
+    const fetchPermissions = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const res = await fetch('/api/account/team');
+        const data = await res.json();
+        if (data.success && data.members) {
+          const me = data.members.find(m => m.userId === user.id);
+          if (me) {
+            setCurrentUserPermissions({
+              role: me.role,
+              canAssignSelf: me.canAssignSelf,
+              canAssignOthers: me.canAssignOthers,
+              userId: user.id
+            });
+            // Set team members too
+            setTeamMembers(data.members);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching permissions:', error);
+      }
+    };
+    fetchPermissions();
+  }, []);
+
+  const isOwnerOrManager = !currentUserPermissions || ['owner', 'manager'].includes(currentUserPermissions.role);
+  const canAssignSelf = isOwnerOrManager || currentUserPermissions?.canAssignSelf;
+  const canAssignOthers = isOwnerOrManager || currentUserPermissions?.canAssignOthers;
+
 
   // Pagination state
   const [hasMore, setHasMore] = useState(true);
@@ -694,6 +741,64 @@ export default function ContactsPage() {
     }
   };
 
+
+
+  // Load team members
+  const loadTeam = async () => {
+    if (teamMembers.length > 0) return;
+    setLoadingTeam(true);
+    try {
+      const res = await fetch('/api/account/team');
+      const data = await res.json();
+      if (data.success) {
+        setTeamMembers(data.members || []);
+      }
+    } catch (e) {
+      console.error('Error loading team:', e);
+    } finally {
+      setLoadingTeam(false);
+    }
+  };
+
+  // Handle assignment
+  // Handle assignment
+  const handleAssign = async (userId) => {
+    if (!selectedContact?.conversation_id) {
+      setErrorMessage('Este contato não possui uma conversa ativa para atribuição.');
+      setShowErrorModal(true);
+      return;
+    }
+    setAssigning(true);
+    try {
+      const res = await fetch(`/api/chat/conversations/${selectedContact.conversation_id}/assign`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignedTo: userId })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setShowAssignModal(false);
+        setShowSuccessModal(true);
+
+        // Update local state
+        setSelectedContact(prev => ({ ...prev, assigned_to: userId }));
+        setContacts(prev => prev.map(c =>
+          c.id === selectedContact.id ? { ...c, assigned_to: userId } : c
+        ));
+      } else {
+        setErrorMessage('Erro ao atribuir: ' + (data.error || 'Erro desconhecido'));
+        setShowErrorModal(true);
+      }
+    } catch (e) {
+      console.error('Error assigning:', e);
+      setErrorMessage('Erro ao atribuir contato.');
+      setShowErrorModal(true);
+    } finally {
+      setAssigning(false);
+    }
+  };
+
   // Open chat with contact
   const handleOpenChat = () => {
     if (selectedContact?.conversation_id) {
@@ -1234,6 +1339,32 @@ export default function ContactsPage() {
                 </h3>
 
                 <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-[#B0B0B0] mb-1 flex items-center gap-1">
+                      <User size={14} />
+                      Responsável
+                    </p>
+                    <div className="flex items-center gap-2">
+                      {selectedContact.assigned_to ? (
+                        <div className="flex items-center gap-2">
+                          <Avatar name={teamMembers.find(m => m.userId === selectedContact.assigned_to)?.fullName || 'Consultor'} size={20} />
+                          <span className="text-white text-sm">
+                            {teamMembers.find(m => m.userId === selectedContact.assigned_to)?.fullName || 'Consultor'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-500 italic text-sm">Ninguém (Livre)</span>
+                      )}
+                      {(canAssignSelf || canAssignOthers) && (
+                        <button
+                          onClick={() => { setShowAssignModal(true); loadTeam(); }}
+                          className="text-[#00FF99] hover:text-white text-xs transition-colors ml-1"
+                        >
+                          Alterar
+                        </button>
+                      )}
+                    </div>
+                  </div>
                   <div>
                     <p className="text-sm text-[#B0B0B0] mb-1">Telefone</p>
                     <p className="text-white">{selectedContact.whatsapp_number || '-'}</p>
@@ -1850,6 +1981,107 @@ export default function ContactsPage() {
         instanceName={connections.find(c => c.id === selectedConnection)?.instance_name}
         origins={origins}
       />
+      {/* Assign Modal */}
+      {showAssignModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-[#1E1E1E] rounded-xl border border-white/10 w-full max-w-sm overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center shrink-0">
+              <h3 className="text-white font-semibold">Atribuir Contato</h3>
+              <button onClick={() => setShowAssignModal(false)}><X className="text-gray-400 hover:text-white" size={20} /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+              {loadingTeam ? (
+                <div className="flex justify-center p-8"><div className="w-6 h-6 border-2 border-[#00FF99] border-t-transparent rounded-full animate-spin"></div></div>
+              ) : (
+                <div className="space-y-1">
+                  {canAssignOthers && (
+                    <button
+                      onClick={() => handleAssign(null)}
+                      disabled={assigning}
+                      className="w-full flex items-center p-3 hover:bg-white/5 rounded-lg text-left text-gray-300 transition-colors group"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center mr-3 border border-white/5 group-hover:border-[#00FF99]/30 transition-colors">
+                        <User size={20} className="text-gray-400 group-hover:text-[#00FF99]" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-white group-hover:text-[#00FF99] transition-colors">Ninguém (Livre)</p>
+                        <p className="text-xs text-gray-500">Qualquer um pode ver</p>
+                      </div>
+                    </button>
+                  )}
+
+                  {teamMembers
+                    .filter(member => {
+                      if (isOwnerOrManager) return true;
+                      if (member.userId === currentUserPermissions?.userId) return canAssignSelf;
+                      return canAssignOthers;
+                    })
+                    .map(member => (
+                      <button
+                        key={member.id}
+                        onClick={() => handleAssign(member.userId)}
+                        disabled={assigning}
+                        className={`w-full flex items-center p-3 hover:bg-white/5 rounded-lg text-left text-gray-300 transition-colors ${selectedContact?.assigned_to === member.userId ? 'bg-white/5 border border-[#00FF99]/20' : ''}`}
+                      >
+                        <Avatar name={member.fullName} size={40} className="mr-3" />
+                        <div>
+                          <div className="flex items-center">
+                            <p className={`font-medium ${selectedContact?.assigned_to === member.userId ? 'text-[#00FF99]' : 'text-white'}`}>{member.fullName}</p>
+                            {selectedContact?.assigned_to === member.userId && <span className="ml-2 text-[10px] bg-[#00FF99]/10 text-[#00FF99] px-1.5 py-0.5 rounded">Atual</span>}
+                          </div>
+                          <p className="text-xs text-gray-500 capitalize">{member.role === 'owner' ? 'Proprietário' : (member.role === 'manager' ? 'Gestor' : 'Consultor')}</p>
+                        </div>
+                      </button>
+                    ))}
+
+                  {teamMembers.length === 0 && !loadingTeam && (
+                    <p className="text-center text-gray-500 py-8 text-sm">Nenhum membro encontrado na equipe.</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="bg-[#1E1E1E] rounded-xl border border-white/10 w-full max-w-sm p-6 text-center transform scale-100 animate-in zoom-in-95 duration-200 shadow-2xl">
+            <div className="w-16 h-16 bg-[#00FF99]/10 rounded-full flex items-center justify-center mx-auto mb-4 text-[#00FF99]">
+              <Check size={32} strokeWidth={3} />
+            </div>
+            <h3 className="text-white text-xl font-bold mb-2">Sucesso!</h3>
+            <p className="text-gray-400 mb-6">Atribuição atualizada com sucesso.</p>
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              className="w-full bg-[#00FF99] hover:bg-[#00CC7A] text-black font-semibold py-3 rounded-lg transition-colors"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Error Modal */}
+      {showErrorModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="bg-[#1E1E1E] rounded-xl border border-red-500/30 w-full max-w-sm p-6 text-center transform scale-100 animate-in zoom-in-95 duration-200 shadow-2xl">
+            <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
+              <AlertCircle size={32} />
+            </div>
+            <h3 className="text-white text-xl font-bold mb-2">Erro ao atribuir</h3>
+            <p className="text-gray-400 mb-6">{errorMessage}</p>
+            <button
+              onClick={() => setShowErrorModal(false)}
+              className="w-full bg-[#333] hover:bg-[#444] text-white font-semibold py-3 rounded-lg transition-colors"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

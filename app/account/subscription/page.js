@@ -47,6 +47,23 @@ export default function AccountSubscription() {
       return
     }
 
+    // Verificar permissões robustas via API
+    try {
+      const res = await fetch('/api/account/member-permissions');
+      const permData = await res.json();
+      const role = permData.permissions?.role || permData.role;
+
+      if (permData.success && role && !['owner', 'manager'].includes(role)) {
+        console.log('❌ Usuário não autorizado. Redirecionando...');
+        router.push('/dashboard');
+        return;
+      }
+    } catch (err) {
+      console.error('Erro verificação permissão', err);
+    }
+
+    /* 
+    Legacy check (kept for fallback but API check above is primary):
     // Verificar se é owner da conta
     try {
       const { data: member, error } = await supabase
@@ -54,23 +71,10 @@ export default function AccountSubscription() {
         .select('role')
         .eq('user_id', user.id)
         .single()
-
-      // Se tem registro e NÃO é owner, redirecionar
-      // Se não tem registro (usuário legado), permitir acesso (será tratado como owner)
-      if (member && member.role !== 'owner') {
-        console.log('❌ Usuário é member, não owner. Redirecionando...')
-        router.push('/dashboard')
-        return
-      }
-
-      // Se houve erro mas não é "PGRST116" (no rows), logar
-      if (error && error.code !== 'PGRST116') {
-        console.log('⚠️ Erro ao verificar role:', error.message)
-      }
-    } catch (err) {
-      // Se a tabela não existe ainda (antes da migração), permitir acesso normal
-      console.log('⚠️ Verificação de role ignorada (tabela pode não existir)')
-    }
+      
+      // ...
+    } catch (err) { ... }
+    */
 
     setUser(user)
     await loadUserProfile(user.id)

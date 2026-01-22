@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase/client'
@@ -41,6 +41,8 @@ export default function Sidebar() {
   const [isMobile, setIsMobile] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const [isHovering, setIsHovering] = useState(false)
+  const [userPermissions, setUserPermissions] = useState(null)
+  const [permissionsLoading, setPermissionsLoading] = useState(true)
 
   // ============================================================================
   // NAVEGAÇÃO PRIMÁRIA
@@ -84,10 +86,8 @@ export default function Sidebar() {
     }
   ]
 
-  // ============================================================================
-  // NAVEGAÇÃO DE CONTA
-  // ============================================================================
-  const accountMenuItems = [
+  // All account menu items (will be filtered based on role)
+  const allAccountMenuItems = [
     {
       icon: UserCog,
       label: 'Configurar Conta',
@@ -119,6 +119,45 @@ export default function Sidebar() {
       badge: null
     }
   ]
+
+  // ============================================================================
+  // USER PERMISSIONS
+  // ============================================================================
+  useEffect(() => {
+    const fetchPermissions = async () => {
+      try {
+        const response = await fetch('/api/account/member-permissions')
+        const data = await response.json()
+        if (data.success && data.permissions) {
+          setUserPermissions(data.permissions)
+        }
+      } catch (error) {
+        console.error('Erro ao buscar permissões:', error)
+      } finally {
+        setPermissionsLoading(false)
+      }
+    }
+    fetchPermissions()
+  }, [])
+
+  // Filter menu items based on user permissions
+  const filteredPrimaryMenuItems = useMemo(() => {
+    if (!userPermissions || !userPermissions.restrictedRoutes) {
+      return primaryMenuItems
+    }
+    return primaryMenuItems.filter(item =>
+      !userPermissions.restrictedRoutes.includes(item.href)
+    )
+  }, [userPermissions])
+
+  const accountMenuItems = useMemo(() => {
+    if (!userPermissions || !userPermissions.restrictedRoutes) {
+      return allAccountMenuItems
+    }
+    return allAccountMenuItems.filter(item =>
+      !userPermissions.restrictedRoutes.includes(item.href)
+    )
+  }, [userPermissions])
 
   // ============================================================================
   // MOBILE & EXPANDED STATE
@@ -335,7 +374,7 @@ export default function Sidebar() {
               Navegação
             </h3>
             <ul className="space-y-2">
-              {primaryMenuItems.map((item) => {
+              {filteredPrimaryMenuItems.map((item) => {
                 const Icon = item.icon
                 const active = isActive(item.href)
 

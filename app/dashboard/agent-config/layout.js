@@ -1,4 +1,5 @@
 import Sidebar from '../../components/Sidebar'
+import { requireRole } from '@/lib/permission-check'
 
 /**
  * Layout da Conta com Sidebar
@@ -6,7 +7,10 @@ import Sidebar from '../../components/Sidebar'
  * Este layout envolve todas as páginas dentro de /account/*
  * Fornece a sidebar expansível e o container principal, similar ao dashboard
  */
-export default function AccountLayout({ children }) {
+export default async function AccountLayout({ children }) {
+    // Restrict access to owner and manager only
+    await requireRole(['owner', 'manager']);
+
     return (
         <div className="min-h-screen bg-[#0A0A0A]">
             {/* Sidebar */}

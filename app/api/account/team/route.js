@@ -12,7 +12,9 @@ import {
     getAccountForUser,
     getAccountMembers,
     createMember,
-    isAccountOwner
+    isAccountOwner,
+    calculateMaxMembers,
+    canManageTeam
 } from '@/lib/account-service'
 
 // Force dynamic rendering
@@ -70,16 +72,24 @@ export async function GET() {
         // Get members
         const members = await getAccountMembers(account.id)
 
+        // Calculate dynamic max members (connections * 3)
+        const maxMembers = await calculateMaxMembers(account.owner_user_id)
+
+        // Check if current user can manage team (owner or manager)
+        const canManage = await canManageTeam(userId)
+
         return NextResponse.json({
             success: true,
             account: {
                 id: account.id,
                 name: account.name,
-                maxMembers: account.max_members
+                maxMembers: maxMembers
             },
             members,
             currentUserId: userId,
-            isOwner: account.userRole === 'owner'
+            currentUserRole: account.userRole,
+            isOwner: account.userRole === 'owner',
+            canManageTeam: canManage
         })
 
     } catch (error) {
@@ -108,18 +118,18 @@ export async function POST(request) {
 
         const userId = session.user.id
 
-        // Check if user is owner
-        const isOwner = await isAccountOwner(userId)
-        if (!isOwner) {
+        // Check if user can manage team (owner or manager)
+        const canManage = await canManageTeam(userId)
+        if (!canManage) {
             return NextResponse.json(
-                { success: false, error: 'Apenas o proprietário pode adicionar membros' },
+                { success: false, error: 'Apenas proprietários e gestores podem adicionar membros' },
                 { status: 403 }
             )
         }
 
         // Get request body
         const body = await request.json()
-        const { email, password, fullName } = body
+        const { email, password, fullName, role, canAssignSelf, canAssignOthers, connectionIds } = body
 
         // Validate required fields
         if (!email || !password || !fullName) {
@@ -155,13 +165,19 @@ export async function POST(request) {
             )
         }
 
-        // Create member
+        // Create member with role and permissions
         const result = await createMember(
             account.id,
             email,
             password,
             fullName,
-            userId
+            userId,
+            {
+                role: role || 'consultant',
+                canAssignSelf: canAssignSelf !== undefined ? canAssignSelf : true,
+                canAssignOthers: canAssignOthers !== undefined ? canAssignOthers : (role === 'manager'),
+                connectionIds: connectionIds || []
+            }
         )
 
         if (!result.success) {

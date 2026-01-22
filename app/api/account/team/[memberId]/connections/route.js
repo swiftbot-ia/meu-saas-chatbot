@@ -1,19 +1,21 @@
 // =============================================================================
-// API Route: /api/account/team/[memberId]
+// API Route: /api/account/team/[memberId]/connections
 // =============================================================================
-// PATCH - Update member role and permissions
-// DELETE - Remove a team member
+// GET - Get connections for a specific member
+// PATCH - Update connections for a member
 // =============================================================================
 
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import {
-    getAccountForUser,
-    removeMember,
-    updateMemberRole,
-    canManageTeam
+    canManageTeam,
+    getMemberConnections,
+    updateMemberConnections,
+    getAccountConnections,
+    getAccountForUser
 } from '@/lib/account-service'
+import { supabaseAdmin } from '@/lib/supabase/server.js'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -41,7 +43,73 @@ async function createAuthClient() {
 }
 
 // =============================================================================
-// PATCH - Update member role and permissions
+// GET - Get member's connections
+// =============================================================================
+export async function GET(request, { params }) {
+    try {
+        const supabase = await createAuthClient()
+        const { data: { session }, error: authError } = await supabase.auth.getSession()
+
+        if (authError || !session) {
+            return NextResponse.json(
+                { success: false, error: 'Não autenticado' },
+                { status: 401 }
+            )
+        }
+
+        const userId = session.user.id
+        const { memberId } = await params
+
+        if (!memberId) {
+            return NextResponse.json(
+                { success: false, error: 'ID do membro é obrigatório' },
+                { status: 400 }
+            )
+        }
+
+        // Check if user can manage team
+        const canManage = await canManageTeam(userId)
+        if (!canManage) {
+            return NextResponse.json(
+                { success: false, error: 'Sem permissão para ver conexões' },
+                { status: 403 }
+            )
+        }
+
+        // Get member info to get account_id
+        const { data: member } = await supabaseAdmin
+            .from('account_members')
+            .select('user_id, role')
+            .eq('id', memberId)
+            .single()
+
+        if (!member) {
+            return NextResponse.json(
+                { success: false, error: 'Membro não encontrado' },
+                { status: 404 }
+            )
+        }
+
+        // Get member's connection IDs
+        const connectionIds = await getMemberConnections(memberId)
+
+        return NextResponse.json({
+            success: true,
+            connectionIds,
+            role: member.role
+        })
+
+    } catch (error) {
+        console.error('❌ [API] Error getting member connections:', error)
+        return NextResponse.json(
+            { success: false, error: 'Erro interno do servidor' },
+            { status: 500 }
+        )
+    }
+}
+
+// =============================================================================
+// PATCH - Update member's connections
 // =============================================================================
 export async function PATCH(request, { params }) {
     try {
@@ -65,34 +133,28 @@ export async function PATCH(request, { params }) {
             )
         }
 
-        // Check if user can manage team (owner or manager)
+        // Check if user can manage team
         const canManage = await canManageTeam(userId)
         if (!canManage) {
             return NextResponse.json(
-                { success: false, error: 'Apenas proprietários e gestores podem editar membros' },
+                { success: false, error: 'Sem permissão para editar conexões' },
                 { status: 403 }
-            )
-        }
-
-        // Get user's account
-        const account = await getAccountForUser(userId)
-        if (!account) {
-            return NextResponse.json(
-                { success: false, error: 'Conta não encontrada' },
-                { status: 404 }
             )
         }
 
         // Get request body
         const body = await request.json()
-        const { role, canAssignSelf, canAssignOthers } = body
+        const { connectionIds } = body
 
-        // Update member role and permissions
-        const result = await updateMemberRole(account.id, memberId, {
-            role,
-            canAssignSelf,
-            canAssignOthers
-        })
+        if (!Array.isArray(connectionIds)) {
+            return NextResponse.json(
+                { success: false, error: 'connectionIds deve ser um array' },
+                { status: 400 }
+            )
+        }
+
+        // Update connections
+        const result = await updateMemberConnections(memberId, connectionIds)
 
         if (!result.success) {
             return NextResponse.json(
@@ -101,88 +163,18 @@ export async function PATCH(request, { params }) {
             )
         }
 
-        console.log('✅ [API] Team member updated:', memberId)
+        console.log('✅ [API] Member connections updated:', memberId)
 
         return NextResponse.json({
             success: true,
-            message: 'Membro atualizado com sucesso'
+            message: 'Conexões atualizadas com sucesso'
         })
 
     } catch (error) {
-        console.error('❌ [API] Error updating team member:', error)
+        console.error('❌ [API] Error updating member connections:', error)
         return NextResponse.json(
             { success: false, error: 'Erro interno do servidor' },
             { status: 500 }
         )
     }
 }
-
-// =============================================================================
-// DELETE - Remove team member
-// =============================================================================
-export async function DELETE(request, { params }) {
-    try {
-        const supabase = await createAuthClient()
-        const { data: { session }, error: authError } = await supabase.auth.getSession()
-
-        if (authError || !session) {
-            return NextResponse.json(
-                { success: false, error: 'Não autenticado' },
-                { status: 401 }
-            )
-        }
-
-        const userId = session.user.id
-        const { memberId } = await params
-
-        if (!memberId) {
-            return NextResponse.json(
-                { success: false, error: 'ID do membro é obrigatório' },
-                { status: 400 }
-            )
-        }
-
-        // Check if user can manage team (owner or manager)
-        const canManage = await canManageTeam(userId)
-        if (!canManage) {
-            return NextResponse.json(
-                { success: false, error: 'Apenas proprietários e gestores podem remover membros' },
-                { status: 403 }
-            )
-        }
-
-        // Get user's account
-        const account = await getAccountForUser(userId)
-        if (!account) {
-            return NextResponse.json(
-                { success: false, error: 'Conta não encontrada' },
-                { status: 404 }
-            )
-        }
-
-        // Remove member (memberId here is the user_id of the member to remove)
-        const result = await removeMember(account.id, memberId)
-
-        if (!result.success) {
-            return NextResponse.json(
-                { success: false, error: result.error },
-                { status: 400 }
-            )
-        }
-
-        console.log('✅ [API] Team member removed:', memberId)
-
-        return NextResponse.json({
-            success: true,
-            message: 'Membro removido com sucesso'
-        })
-
-    } catch (error) {
-        console.error('❌ [API] Error removing team member:', error)
-        return NextResponse.json(
-            { success: false, error: 'Erro interno do servidor' },
-            { status: 500 }
-        )
-    }
-}
-

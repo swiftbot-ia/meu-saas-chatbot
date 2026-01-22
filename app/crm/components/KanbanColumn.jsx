@@ -13,7 +13,8 @@ const KanbanColumn = ({
     allStages,
     onLoadMore,
     hasMore,
-    loading
+    loading,
+    teamMembers = []
 }) => {
     const { ref, inView } = useInView({
         threshold: 0,
@@ -74,6 +75,7 @@ const KanbanColumn = ({
                                         currentStageId={stageId}
                                         currentDragDestination={currentDragDestination}
                                         allStages={allStages}
+                                        teamMembers={teamMembers}
                                     />
                                 ))}
                                 {provided.placeholder}
