@@ -1218,6 +1218,43 @@
       ],
       "id": "c571db27-5a02-4dcd-84e4-36d7e18327cd",
       "name": "RAG Hybrid"
+<<<<<<< HEAD
+=======
+<<<<<<< Updated upstream
+=======
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "rag-check-condition",
+              "leftValue": "={{ $('Get AI agent').first().json.rag_enabled }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5080,
+        1120
+      ],
+      "id": "if-rag-enabled-001",
+      "name": "IF RAG Enabled"
+>>>>>>> main
     },
     {
       "parameters": {
@@ -1246,12 +1283,21 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
+<<<<<<< HEAD
         5200,
         1120
+=======
+        5280,
+        1040
+>>>>>>> main
       ],
       "id": "rag-search-001",
       "name": "RAG Search",
       "continueOnFail": true
+<<<<<<< HEAD
+=======
+>>>>>>> Stashed changes
+>>>>>>> main
     }
   ],
   "pinData": {
@@ -1755,10 +1801,36 @@
       "main": [
         [
           {
+<<<<<<< HEAD
+=======
+<<<<<<< Updated upstream
+=======
+            "node": "IF RAG Enabled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF RAG Enabled": {
+      "main": [
+        [
+          {
+>>>>>>> main
             "node": "RAG Search",
             "type": "main",
             "index": 0
           }
+<<<<<<< HEAD
+=======
+        ],
+        [
+          {
+            "node": "Variaveis",
+            "type": "main",
+            "index": 0
+          }
+>>>>>>> main
         ]
       ]
     },
@@ -1766,6 +1838,10 @@
       "main": [
         [
           {
+<<<<<<< HEAD
+=======
+>>>>>>> Stashed changes
+>>>>>>> main
             "node": "Variaveis",
             "type": "main",
             "index": 0
