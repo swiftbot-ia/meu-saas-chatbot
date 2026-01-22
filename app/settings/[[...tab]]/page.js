@@ -627,18 +627,23 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
   const [formName, setFormName] = useState('')
   const [formPhonePath, setFormPhonePath] = useState('$.phone')
   const [formNamePath, setFormNamePath] = useState('$.name')
+  const [formEmailPath, setFormEmailPath] = useState('$.email')
   const [formActions, setFormActions] = useState({
     createContact: true,
     addTag: false,
     subscribeSequence: false,
-    disableAgent: false
+    disableAgent: false,
+    setOrigin: false
   })
   const [formTagId, setFormTagId] = useState('')
   const [formSequenceId, setFormSequenceId] = useState('')
+  const [formOriginId, setFormOriginId] = useState('')
+  const [createdWebhook, setCreatedWebhook] = useState(null)
 
-  // Available tags and sequences
+  // Available tags, sequences and origins
   const [tags, setTags] = useState([])
   const [sequences, setSequences] = useState([])
+  const [origins, setOrigins] = useState([])
 
   const selectedConn = connections.find(c => c.connectionId === selectedConnection)
 
@@ -662,20 +667,25 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
     loadWebhooks()
   }, [selectedConnection])
 
-  // Load tags and sequences for the modal
+  // Load tags, sequences and origins for the modal
   useEffect(() => {
     const loadOptions = async () => {
       if (!selectedConn?.instanceName) return
       try {
-        // Load tags
-        const tagsRes = await fetch(`/api/contacts/tags?instanceName=${selectedConn.instanceName}`)
+        // Load tags - use instance_name (snake_case)
+        const tagsRes = await fetch(`/api/contacts/tags?instance_name=${selectedConn.instanceName}`)
         const tagsData = await tagsRes.json()
-        if (tagsData.success) setTags(tagsData.tags || [])
+        if (tagsData.tags) setTags(tagsData.tags || [])
 
         // Load sequences
         const seqRes = await fetch(`/api/automations/sequences?connectionId=${selectedConnection}`)
         const seqData = await seqRes.json()
         if (seqData.success) setSequences(seqData.sequences || [])
+
+        // Load origins
+        const originsRes = await fetch(`/api/contacts/origins?instance_name=${selectedConn.instanceName}`)
+        const originsData = await originsRes.json()
+        if (originsData.origins) setOrigins(originsData.origins || [])
       } catch (error) {
         console.error('Error loading options:', error)
       }
@@ -687,10 +697,13 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
     setFormName('')
     setFormPhonePath('$.phone')
     setFormNamePath('$.name')
-    setFormActions({ createContact: true, addTag: false, subscribeSequence: false, disableAgent: false })
+    setFormEmailPath('$.email')
+    setFormActions({ createContact: true, addTag: false, subscribeSequence: false, disableAgent: false, setOrigin: false })
     setFormTagId('')
     setFormSequenceId('')
+    setFormOriginId('')
     setEditingWebhook(null)
+    setCreatedWebhook(null)
   }
 
   const openModal = (webhook = null) => {
@@ -699,19 +712,23 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
       setFormName(webhook.name)
       setFormPhonePath(webhook.field_mapping?.phone || '$.phone')
       setFormNamePath(webhook.field_mapping?.name || '$.name')
+      setFormEmailPath(webhook.field_mapping?.email || '$.email')
 
       const actions = webhook.actions || []
       setFormActions({
         createContact: actions.some(a => a === 'create_contact' || a?.type === 'create_contact'),
         addTag: actions.some(a => a?.type === 'add_tag'),
         subscribeSequence: actions.some(a => a?.type === 'subscribe_sequence'),
-        disableAgent: actions.some(a => a?.type === 'set_agent' && a?.enabled === false)
+        disableAgent: actions.some(a => a?.type === 'set_agent' && a?.enabled === false),
+        setOrigin: actions.some(a => a?.type === 'set_origin')
       })
 
       const tagAction = actions.find(a => a?.type === 'add_tag')
       const seqAction = actions.find(a => a?.type === 'subscribe_sequence')
+      const originAction = actions.find(a => a?.type === 'set_origin')
       setFormTagId(tagAction?.tag_id || '')
       setFormSequenceId(seqAction?.sequence_id || '')
+      setFormOriginId(originAction?.origin_id || '')
     } else {
       resetForm()
     }
@@ -728,6 +745,7 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
       if (formActions.createContact) actions.push('create_contact')
       if (formActions.addTag && formTagId) actions.push({ type: 'add_tag', tag_id: formTagId })
       if (formActions.subscribeSequence && formSequenceId) actions.push({ type: 'subscribe_sequence', sequence_id: formSequenceId })
+      if (formActions.setOrigin && formOriginId) actions.push({ type: 'set_origin', origin_id: formOriginId })
       if (formActions.disableAgent) actions.push({ type: 'set_agent', enabled: false })
 
       const payload = {
@@ -735,7 +753,8 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
         name: formName.trim(),
         fieldMapping: {
           phone: formPhonePath,
-          name: formNamePath
+          name: formNamePath,
+          email: formEmailPath
         },
         actions
       }
@@ -966,6 +985,16 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
                       className="flex-1 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 font-mono"
                     />
                   </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-white text-sm w-20">Email:</span>
+                    <input
+                      type="text"
+                      value={formEmailPath}
+                      onChange={(e) => setFormEmailPath(e.target.value)}
+                      placeholder="$.buyer.email"
+                      className="flex-1 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 font-mono"
+                    />
+                  </div>
                   <p className="text-xs text-gray-500 mt-2">
                     Use notação JSONPath. Ex: $.buyer.phone para Hotmart, $.billing.phone para WooCommerce
                   </p>
@@ -1026,6 +1055,28 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
                       <option value="">Selecione uma sequência...</option>
                       {sequences.map(seq => (
                         <option key={seq.id} value={seq.id}>{seq.name}</option>
+                      ))}
+                    </select>
+                  )}
+
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formActions.setOrigin}
+                      onChange={(e) => setFormActions(prev => ({ ...prev, setOrigin: e.target.checked }))}
+                      className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
+                    />
+                    <span className="text-white text-sm">Definir origem</span>
+                  </label>
+                  {formActions.setOrigin && (
+                    <select
+                      value={formOriginId}
+                      onChange={(e) => setFormOriginId(e.target.value)}
+                      className="ml-7 bg-[#252525] border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+                    >
+                      <option value="">Selecione uma origem...</option>
+                      {origins.map(origin => (
+                        <option key={origin.id} value={origin.id}>{origin.name}</option>
                       ))}
                     </select>
                   )}
