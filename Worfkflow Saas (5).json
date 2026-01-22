@@ -1258,6 +1258,38 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "rag-check-condition",
+              "leftValue": "={{ $('Get AI agent').first().json.rag_enabled }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5080,
+        1120
+      ],
+      "id": "if-rag-enabled-001",
+      "name": "IF RAG Enabled"
+    },
+    {
+      "parameters": {
         "method": "POST",
         "url": "https://swiftbot.com.br/api/agent/documents/search",
         "sendHeaders": true,
@@ -1283,6 +1315,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
+<<<<<<< Updated upstream
 <<<<<<< HEAD
         5200,
         1120
@@ -1290,6 +1323,10 @@
         5280,
         1040
 >>>>>>> main
+=======
+        5280,
+        1040
+>>>>>>> Stashed changes
       ],
       "id": "rag-search-001",
       "name": "RAG Search",
@@ -1801,10 +1838,13 @@
       "main": [
         [
           {
+<<<<<<< Updated upstream
 <<<<<<< HEAD
 =======
 <<<<<<< Updated upstream
 =======
+=======
+>>>>>>> Stashed changes
             "node": "IF RAG Enabled",
             "type": "main",
             "index": 0
@@ -1816,13 +1856,19 @@
       "main": [
         [
           {
+<<<<<<< Updated upstream
 >>>>>>> main
+=======
+>>>>>>> Stashed changes
             "node": "RAG Search",
             "type": "main",
             "index": 0
           }
+<<<<<<< Updated upstream
 <<<<<<< HEAD
 =======
+=======
+>>>>>>> Stashed changes
         ],
         [
           {
@@ -1830,7 +1876,10 @@
             "type": "main",
             "index": 0
           }
+<<<<<<< Updated upstream
 >>>>>>> main
+=======
+>>>>>>> Stashed changes
         ]
       ]
     },
