@@ -626,9 +626,7 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
 
   // Form state
   const [formName, setFormName] = useState('')
-  const [formPhonePath, setFormPhonePath] = useState('$.phone')
-  const [formNamePath, setFormNamePath] = useState('$.name')
-  const [formEmailPath, setFormEmailPath] = useState('$.email')
+  const [formMappings, setFormMappings] = useState([])
   const [formActions, setFormActions] = useState({
     createContact: true,
     addTag: false,
@@ -639,7 +637,6 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
   const [formTagId, setFormTagId] = useState('')
   const [formSequenceId, setFormSequenceId] = useState('')
   const [formOriginId, setFormOriginId] = useState('')
-  const [formCustomMappings, setFormCustomMappings] = useState([])
   const [createdWebhook, setCreatedWebhook] = useState(null)
 
   // Available tags, sequences and origins
@@ -697,14 +694,15 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
 
   const resetForm = () => {
     setFormName('')
-    setFormPhonePath('$.phone')
-    setFormNamePath('$.name')
-    setFormEmailPath('$.email')
+    setFormMappings([
+      { key: 'phone', path: '$.phone' },
+      { key: 'name', path: '$.name' },
+      { key: 'email', path: '$.email' }
+    ])
     setFormActions({ createContact: true, addTag: false, subscribeSequence: false, disableAgent: false, setOrigin: false })
     setFormTagId('')
     setFormSequenceId('')
     setFormOriginId('')
-    setFormCustomMappings([])
     setEditingWebhook(null)
     setCreatedWebhook(null)
   }
@@ -713,19 +711,19 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
     if (webhook) {
       setEditingWebhook(webhook)
       setFormName(webhook.name)
-      setFormPhonePath(webhook.field_mapping?.phone || '$.phone')
-      setFormNamePath(webhook.field_mapping?.name || '$.name')
-      setFormEmailPath(webhook.field_mapping?.email || '$.email')
 
-      const custom = []
+      const mappings = []
       if (webhook.field_mapping) {
         Object.entries(webhook.field_mapping).forEach(([key, path]) => {
-          if (key !== 'phone' && key !== 'name' && key !== 'email') {
-            custom.push({ key, path })
-          }
+          mappings.push({ key, path })
         })
       }
-      setFormCustomMappings(custom)
+      // Ensure default fields exist if empty (though edited should have them)
+      if (!mappings.some(m => m.key === 'phone')) mappings.unshift({ key: 'phone', path: '$.phone' })
+      if (!mappings.some(m => m.key === 'name')) mappings.push({ key: 'name', path: '$.name' })
+      if (!mappings.some(m => m.key === 'email')) mappings.push({ key: 'email', path: '$.email' })
+
+      setFormMappings(mappings)
 
       const actions = webhook.actions || []
       setFormActions({
@@ -761,22 +759,20 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
       if (formActions.setOrigin && formOriginId) actions.push({ type: 'set_origin', origin_id: formOriginId })
       if (formActions.disableAgent) actions.push({ type: 'set_agent', enabled: false })
 
+      // Build field mapping from unified list
+      const fieldMapping = {}
+      formMappings.forEach(m => {
+        if (m.key && m.path) {
+          fieldMapping[m.key] = m.path
+        }
+      })
+
       const payload = {
         connectionId: selectedConnection,
         name: formName.trim(),
-        fieldMapping: {
-          phone: formPhonePath,
-          name: formNamePath,
-          email: formEmailPath
-        },
+        fieldMapping,
         actions
       }
-
-      formCustomMappings.forEach(m => {
-        if (m.key && m.path) {
-          payload.fieldMapping[m.key] = m.path
-        }
-      })
 
       let response
       if (editingWebhook) {
@@ -980,110 +976,72 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
                 />
               </div>
 
+              {/* Last Payload (Moved Up) */}
+              {editingWebhook?.last_payload && (
+                <div className="bg-[#252525] p-3 rounded-lg border border-white/5">
+                   <details className="group" open>
+                     <summary className="cursor-pointer text-xs text-[#00FF99] hover:underline flex items-center gap-2 font-medium">
+                       <Info size={14} />
+                       Ver último payload recebido
+                     </summary>
+                     <div className="mt-2 bg-[#000] p-3 rounded-lg overflow-x-auto">
+                       <pre className="text-xs text-green-400 font-mono">
+                         {JSON.stringify(editingWebhook.last_payload, null, 2)}
+                       </pre>
+                     </div>
+                   </details>
+                </div>
+              )}
+
               {/* Field Mapping */}
               <div>
                 <label className="block text-sm text-gray-400 mb-2">Mapeamento de Campos</label>
-                <div className="space-y-3 bg-[#252525] p-4 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <span className="text-white text-sm w-20">Telefone:</span>
-                    <input
-                      type="text"
-                      value={formPhonePath}
-                      onChange={(e) => setFormPhonePath(e.target.value)}
-                      placeholder="$.buyer.phone"
-                      className="flex-1 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 font-mono"
-                    />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-white text-sm w-20">Nome:</span>
-                    <input
-                      type="text"
-                      value={formNamePath}
-                      onChange={(e) => setFormNamePath(e.target.value)}
-                      placeholder="$.buyer.name"
-                      className="flex-1 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 font-mono"
-                    />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-white text-sm w-20">Email:</span>
-                    <input
-                      type="text"
-                      value={formEmailPath}
-                      onChange={(e) => setFormEmailPath(e.target.value)}
-                      placeholder="$.buyer.email"
-                      className="flex-1 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 font-mono"
-                    />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <p className="text-xs text-gray-500 mt-2">
-                      Use notação JSONPath. Ex: $.buyer.phone para Hotmart.
-                    </p>
-                  </div>
-
-                  {/* Custom Fields */}
-                  <div className="mt-4 pt-4 border-t border-white/10">
-                    <label className="block text-sm text-gray-400 mb-2">Campos Personalizados</label>
-                    <div className="space-y-2">
-                      {formCustomMappings.map((mapping, index) => (
-                        <div key={index} className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="Nome"
-                            value={mapping.key}
-                            onChange={(e) => {
-                              const newMappings = [...formCustomMappings]
-                              newMappings[index].key = e.target.value
-                              setFormCustomMappings(newMappings)
-                            }}
-                            className="w-1/3 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300"
-                          />
-                          <input
-                            type="text"
-                            placeholder="JSONPath"
-                            value={mapping.path}
-                            onChange={(e) => {
-                              const newMappings = [...formCustomMappings]
-                              newMappings[index].path = e.target.value
-                              setFormCustomMappings(newMappings)
-                            }}
-                            className="flex-1 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 font-mono"
-                          />
-                          <button
-                            onClick={() => {
-                              const newMappings = formCustomMappings.filter((_, i) => i !== index)
-                              setFormCustomMappings(newMappings)
-                            }}
-                            className="p-2 text-gray-500 hover:text-red-400"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      ))}
+                <p className="text-xs text-gray-500 mb-3">
+                  Use notação JSONPath (ex: $.buyer.phone). Campos obrigatórios: phone.
+                </p>
+                <div className="space-y-2 bg-[#252525] p-4 rounded-lg">
+                  {formMappings.map((mapping, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Nome do campo (ex: phone)"
+                        value={mapping.key}
+                        onChange={(e) => {
+                          const newMappings = [...formMappings]
+                          newMappings[index].key = e.target.value
+                          setFormMappings(newMappings)
+                        }}
+                        className="w-1/3 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 placeholder-gray-600"
+                      />
+                      <input
+                        type="text"
+                        placeholder="JSONPath (ex: $.custom.field)"
+                        value={mapping.path}
+                        onChange={(e) => {
+                          const newMappings = [...formMappings]
+                          newMappings[index].path = e.target.value
+                          setFormMappings(newMappings)
+                        }}
+                        className="flex-1 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 font-mono placeholder-gray-600"
+                      />
                       <button
-                        onClick={() => setFormCustomMappings([...formCustomMappings, { key: '', path: '' }])}
-                        className="text-xs text-[#00FF99] hover:underline flex items-center gap-1"
+                        onClick={() => {
+                          const newMappings = formMappings.filter((_, i) => i !== index)
+                          setFormMappings(newMappings)
+                        }}
+                        className="p-2 text-gray-500 hover:text-red-400"
+                        title="Remover"
                       >
-                        <Plus size={12} /> Adicionar campo personalizado
+                        <Trash2 size={16} />
                       </button>
                     </div>
-                  </div>
-
-                  {/* Last Payload (Simplified) */}
-                  {editingWebhook?.last_payload && (
-                    <div className="mt-4 pt-4 border-t border-white/10">
-                       <details className="group">
-                         <summary className="cursor-pointer text-xs text-gray-400 hover:text-white flex items-center gap-2">
-                           <Info size={14} />
-                           Ver último payload
-                         </summary>
-                         <div className="mt-2 bg-[#000] p-3 rounded-lg overflow-x-auto">
-                           <pre className="text-xs text-green-400 font-mono">
-                             {JSON.stringify(editingWebhook.last_payload, null, 2)}
-                           </pre>
-                         </div>
-                       </details>
-                    </div>
-                  )}
+                  ))}
+                  <button
+                    onClick={() => setFormMappings([...formMappings, { key: '', path: '' }])}
+                    className="text-xs text-[#00FF99] hover:underline flex items-center gap-1 mt-2"
+                  >
+                    <Plus size={12} /> Adicionar mapeamento
+                  </button>
                 </div>
               </div>
 
@@ -1202,7 +1160,6 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
     </div>
   )
 }
-
 // MAIN PAGE
 // ============================================================================
 import { useParams } from 'next/navigation'
