@@ -27,7 +27,8 @@ import {
   Download,
   Link,
   Edit3,
-  Power
+  Power,
+  Info
 } from 'lucide-react'
 
 // ============================================================================
@@ -638,6 +639,7 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
   const [formTagId, setFormTagId] = useState('')
   const [formSequenceId, setFormSequenceId] = useState('')
   const [formOriginId, setFormOriginId] = useState('')
+  const [formCustomMappings, setFormCustomMappings] = useState([])
   const [createdWebhook, setCreatedWebhook] = useState(null)
 
   // Available tags, sequences and origins
@@ -672,7 +674,7 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
     const loadOptions = async () => {
       if (!selectedConn?.instanceName) return
       try {
-        // Load tags - use instance_name (snake_case)
+        // Load tags
         const tagsRes = await fetch(`/api/contacts/tags?instance_name=${selectedConn.instanceName}`)
         const tagsData = await tagsRes.json()
         if (tagsData.tags) setTags(tagsData.tags || [])
@@ -702,6 +704,7 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
     setFormTagId('')
     setFormSequenceId('')
     setFormOriginId('')
+    setFormCustomMappings([])
     setEditingWebhook(null)
     setCreatedWebhook(null)
   }
@@ -713,6 +716,16 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
       setFormPhonePath(webhook.field_mapping?.phone || '$.phone')
       setFormNamePath(webhook.field_mapping?.name || '$.name')
       setFormEmailPath(webhook.field_mapping?.email || '$.email')
+
+      const custom = []
+      if (webhook.field_mapping) {
+        Object.entries(webhook.field_mapping).forEach(([key, path]) => {
+          if (key !== 'phone' && key !== 'name' && key !== 'email') {
+            custom.push({ key, path })
+          }
+        })
+      }
+      setFormCustomMappings(custom)
 
       const actions = webhook.actions || []
       setFormActions({
@@ -758,6 +771,12 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
         },
         actions
       }
+
+      formCustomMappings.forEach(m => {
+        if (m.key && m.path) {
+          payload.fieldMapping[m.key] = m.path
+        }
+      })
 
       let response
       if (editingWebhook) {
@@ -888,7 +907,7 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
 
                   <div className="flex items-center gap-2 bg-[#252525] px-3 py-2 rounded-lg mb-2">
                     <code className="text-xs text-gray-400 truncate flex-1">
-                      /api/webhooks/incoming/{webhook.id.slice(0, 8)}...
+                      {`/api/webhooks/incoming/${webhook.id.slice(0, 8)}...`}
                     </code>
                     <button
                       onClick={() => copyWebhookUrl(webhook)}
@@ -995,9 +1014,76 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
                       className="flex-1 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 font-mono"
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Use notação JSONPath. Ex: $.buyer.phone para Hotmart, $.billing.phone para WooCommerce
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-xs text-gray-500 mt-2">
+                      Use notação JSONPath. Ex: $.buyer.phone para Hotmart.
+                    </p>
+                  </div>
+
+                  {/* Custom Fields */}
+                  <div className="mt-4 pt-4 border-t border-white/10">
+                    <label className="block text-sm text-gray-400 mb-2">Campos Personalizados</label>
+                    <div className="space-y-2">
+                      {formCustomMappings.map((mapping, index) => (
+                        <div key={index} className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Nome"
+                            value={mapping.key}
+                            onChange={(e) => {
+                              const newMappings = [...formCustomMappings]
+                              newMappings[index].key = e.target.value
+                              setFormCustomMappings(newMappings)
+                            }}
+                            className="w-1/3 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300"
+                          />
+                          <input
+                            type="text"
+                            placeholder="JSONPath"
+                            value={mapping.path}
+                            onChange={(e) => {
+                              const newMappings = [...formCustomMappings]
+                              newMappings[index].path = e.target.value
+                              setFormCustomMappings(newMappings)
+                            }}
+                            className="flex-1 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 font-mono"
+                          />
+                          <button
+                            onClick={() => {
+                              const newMappings = formCustomMappings.filter((_, i) => i !== index)
+                              setFormCustomMappings(newMappings)
+                            }}
+                            className="p-2 text-gray-500 hover:text-red-400"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => setFormCustomMappings([...formCustomMappings, { key: '', path: '' }])}
+                        className="text-xs text-[#00FF99] hover:underline flex items-center gap-1"
+                      >
+                        <Plus size={12} /> Adicionar campo personalizado
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Last Payload (Simplified) */}
+                  {editingWebhook?.last_payload && (
+                    <div className="mt-4 pt-4 border-t border-white/10">
+                       <details className="group">
+                         <summary className="cursor-pointer text-xs text-gray-400 hover:text-white flex items-center gap-2">
+                           <Info size={14} />
+                           Ver último payload
+                         </summary>
+                         <div className="mt-2 bg-[#000] p-3 rounded-lg overflow-x-auto">
+                           <pre className="text-xs text-green-400 font-mono">
+                             {JSON.stringify(editingWebhook.last_payload, null, 2)}
+                           </pre>
+                         </div>
+                       </details>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1117,10 +1203,6 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
   )
 }
 
-// ============================================================================
-// MAIN PAGE
-// ============================================================================
-// ============================================================================
 // MAIN PAGE
 // ============================================================================
 import { useParams } from 'next/navigation'

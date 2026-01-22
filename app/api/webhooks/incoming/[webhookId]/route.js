@@ -116,6 +116,16 @@ export async function POST(request, { params }) {
 
         console.log(`📥 [Incoming Webhook] Received payload for "${webhook.name}":`, JSON.stringify(payload).slice(0, 500))
 
+        // Update stats and save payload immediately (so it's available for mapping even if processing fails)
+        await mainDb
+            .from('incoming_webhooks')
+            .update({
+                total_received: webhook.total_received + 1,
+                last_received_at: new Date().toISOString(),
+                last_payload: payload
+            })
+            .eq('id', webhookId)
+
         // Extract mapped fields
         const fieldMapping = webhook.field_mapping || {}
         const extractedData = {}
@@ -129,8 +139,18 @@ export async function POST(request, { params }) {
 
         console.log(`📥 [Incoming Webhook] Extracted data:`, extractedData)
 
+        // Separate standard fields from custom fields
+        const { phone, name, email, origin_id, ...customFields } = extractedData
+
+        // Prepare metadata: merge existing mapped metadata (if any) with other custom fields
+        // If the user mapped "campanha" -> $.campanha, it will be in customFields and go into metadata
+        const metadataToUpdate = {
+            ...(extractedData.metadata || {}),
+            ...customFields
+        }
+
         // Validate required phone field
-        if (!extractedData.phone) {
+        if (!phone) {
             return NextResponse.json(
                 { success: false, error: 'Phone field not found in payload. Check your field mapping.' },
                 { status: 400 }
@@ -138,7 +158,7 @@ export async function POST(request, { params }) {
         }
 
         // Normalize phone
-        const normalizedPhone = String(extractedData.phone).replace(/\D/g, '')
+        const normalizedPhone = String(phone).replace(/\D/g, '')
 
         if (!normalizedPhone || normalizedPhone.length < 10) {
             return NextResponse.json(
@@ -158,7 +178,7 @@ export async function POST(request, { params }) {
         let contact = null
         const { data: existingContact } = await chatDb
             .from('whatsapp_contacts')
-            .select('id, whatsapp_number, name')
+            .select('id, whatsapp_number, name, metadata, origin_id')
             .eq('whatsapp_number', normalizedPhone)
             .single()
 
@@ -166,12 +186,40 @@ export async function POST(request, { params }) {
             contact = existingContact
             results.contact = { id: contact.id, phone: contact.whatsapp_number, created: false }
 
+            // Determine updates
+            const updates = { updated_at: new Date().toISOString() }
+            let hasUpdates = false
+
             // Update name if provided and different
-            if (extractedData.name && extractedData.name !== contact.name) {
+            if (name && name !== contact.name) {
+                updates.name = name
+                hasUpdates = true
+            }
+
+            // Update email if provided
+            if (email) {
+                updates.email = email
+                hasUpdates = true
+            }
+
+            // Update origin if mapped directly
+            if (origin_id && origin_id !== contact.origin_id) {
+                updates.origin_id = origin_id
+                hasUpdates = true
+            }
+
+            // Update metadata (merge with existing)
+            if (Object.keys(metadataToUpdate).length > 0) {
+                updates.metadata = { ...(contact.metadata || {}), ...metadataToUpdate }
+                hasUpdates = true
+            }
+
+            if (hasUpdates) {
                 await chatDb
                     .from('whatsapp_contacts')
-                    .update({ name: extractedData.name, updated_at: new Date().toISOString() })
+                    .update(updates)
                     .eq('id', contact.id)
+                console.log(`📥 [Incoming Webhook] Updated contact info`)
             }
         } else {
             // Check if "create_contact" action is enabled
@@ -181,14 +229,20 @@ export async function POST(request, { params }) {
             )
 
             if (shouldCreateContact) {
+                // Prepare new contact data
+                const newContactData = {
+                    whatsapp_number: normalizedPhone,
+                    name: name || normalizedPhone,
+                    instance_name: auth.instanceName,
+                    metadata: metadataToUpdate || {} // Include custom fields
+                }
+
+                if (email) newContactData.email = email
+                if (origin_id) newContactData.origin_id = origin_id
+
                 const { data: newContact, error: createError } = await chatDb
                     .from('whatsapp_contacts')
-                    .insert({
-                        whatsapp_number: normalizedPhone,
-                        name: extractedData.name || normalizedPhone,
-                        instance_name: auth.instanceName,
-                        metadata: extractedData.metadata || {}
-                    })
+                    .insert(newContactData)
                     .select()
                     .single()
 
@@ -329,14 +383,7 @@ export async function POST(request, { params }) {
             }
         }
 
-        // Update webhook stats
-        await mainDb
-            .from('incoming_webhooks')
-            .update({
-                total_received: webhook.total_received + 1,
-                last_received_at: new Date().toISOString()
-            })
-            .eq('id', webhookId)
+
 
         const processingTime = Date.now() - startTime
         console.log(`📥 [Incoming Webhook] Completed in ${processingTime}ms. Actions: ${results.actionsExecuted.join(', ')}`)
