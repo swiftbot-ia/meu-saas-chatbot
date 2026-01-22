@@ -303,6 +303,27 @@ export async function POST(request, { params }) {
                     }
                     results.actionsExecuted.push(`set_agent:${action.enabled}`)
                 }
+
+                if (actionType === 'set_origin' && action.origin_id) {
+                    // Set contact origin
+                    const { data: origin } = await chatDb
+                        .from('contact_origins')
+                        .select('id, name')
+                        .eq('id', action.origin_id)
+                        .single()
+
+                    if (origin) {
+                        await chatDb
+                            .from('whatsapp_contacts')
+                            .update({
+                                origin_id: action.origin_id,
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('id', contact.id)
+                        results.actionsExecuted.push(`set_origin:${origin.name}`)
+                        console.log(`📥 [Incoming Webhook] Set origin "${origin.name}" for contact`)
+                    }
+                }
             } catch (actionError) {
                 console.error(`📥 [Incoming Webhook] Error executing action ${actionType}:`, actionError)
             }
