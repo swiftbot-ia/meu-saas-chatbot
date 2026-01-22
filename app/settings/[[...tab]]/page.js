@@ -632,6 +632,7 @@ const extractKeys = (obj, prefix = '$') => {
 
 const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
   const [webhooks, setWebhooks] = useState([])
+  const [existingFields, setExistingFields] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingWebhook, setEditingWebhook] = useState(null)
@@ -993,17 +994,17 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
               {/* Last Payload (Moved Up) */}
               {editingWebhook?.last_payload && (
                 <div className="bg-[#252525] p-3 rounded-lg border border-white/5">
-                   <details className="group" open>
-                     <summary className="cursor-pointer text-xs text-[#00FF99] hover:underline flex items-center gap-2 font-medium">
-                       <Info size={14} />
-                       Ver último payload recebido
-                     </summary>
-                     <div className="mt-2 bg-[#000] p-3 rounded-lg overflow-x-auto">
-                       <pre className="text-xs text-green-400 font-mono">
-                         {JSON.stringify(editingWebhook.last_payload, null, 2)}
-                       </pre>
-                     </div>
-                   </details>
+                  <details className="group" open>
+                    <summary className="cursor-pointer text-xs text-[#00FF99] hover:underline flex items-center gap-2 font-medium">
+                      <Info size={14} />
+                      Ver último payload recebido
+                    </summary>
+                    <div className="mt-2 bg-[#000] p-3 rounded-lg overflow-x-auto">
+                      <pre className="text-xs text-green-400 font-mono">
+                        {JSON.stringify(editingWebhook.last_payload, null, 2)}
+                      </pre>
+                    </div>
+                  </details>
                 </div>
               )}
 
@@ -1028,22 +1029,22 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
                           }}
                           className="w-full bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 placeholder-gray-600"
                         />
-                         {/* Existing Fields Dropdown */}
-                         <div className="absolute top-full left-0 w-full bg-[#252525] border border-white/10 rounded-lg shadow-xl z-20 hidden group-hover/key:block max-h-48 overflow-y-auto">
-                           {existingFields.length > 0 ? existingFields.map(f => (
-                             <button
-                               key={f.name}
-                               onClick={() => {
-                                 const newMappings = [...formMappings]
-                                 newMappings[index].key = f.name
-                                 setFormMappings(newMappings)
-                               }}
-                               className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-white hover:bg-white/5 truncate"
-                             >
-                               {f.name}
-                             </button>
-                           )) : <div className="p-2 text-xs text-gray-500">Sem campos globais</div>}
-                         </div>
+                        {/* Existing Fields Dropdown */}
+                        <div className="absolute top-full left-0 w-full bg-[#252525] border border-white/10 rounded-lg shadow-xl z-20 hidden group-hover/key:block max-h-48 overflow-y-auto">
+                          {existingFields.length > 0 ? existingFields.map(f => (
+                            <button
+                              key={f.name}
+                              onClick={() => {
+                                const newMappings = [...formMappings]
+                                newMappings[index].key = f.name
+                                setFormMappings(newMappings)
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-white hover:bg-white/5 truncate"
+                            >
+                              {f.name}
+                            </button>
+                          )) : <div className="p-2 text-xs text-gray-500">Sem campos globais</div>}
+                        </div>
                       </div>
 
                       <div className="flex-1 relative group/path">
@@ -1060,21 +1061,21 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
                         />
                         {/* JSON Keys Dropdown */}
                         {editingWebhook?.last_payload && (
-                           <div className="absolute top-full left-0 w-full bg-[#252525] border border-white/10 rounded-lg shadow-xl z-20 hidden group-hover/path:block max-h-48 overflow-y-auto">
-                             {extractKeys(editingWebhook.last_payload).map(k => (
-                               <button
-                                 key={k}
-                                 onClick={() => {
-                                   const newMappings = [...formMappings]
-                                   newMappings[index].path = k
-                                   setFormMappings(newMappings)
-                                 }}
-                                 className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-[#00FF99] hover:bg-white/5 truncate font-mono"
-                               >
-                                 {k}
-                               </button>
-                             ))}
-                           </div>
+                          <div className="absolute top-full left-0 w-full bg-[#252525] border border-white/10 rounded-lg shadow-xl z-20 hidden group-hover/path:block max-h-48 overflow-y-auto">
+                            {extractKeys(editingWebhook.last_payload).map(k => (
+                              <button
+                                key={k}
+                                onClick={() => {
+                                  const newMappings = [...formMappings]
+                                  newMappings[index].path = k
+                                  setFormMappings(newMappings)
+                                }}
+                                className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-[#00FF99] hover:bg-white/5 truncate font-mono"
+                              >
+                                {k}
+                              </button>
+                            ))}
+                          </div>
                         )}
                       </div>
                       <button
