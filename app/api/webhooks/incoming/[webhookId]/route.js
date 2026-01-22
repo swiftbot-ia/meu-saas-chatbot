@@ -151,9 +151,14 @@ export async function POST(request, { params }) {
 
         // Validate required phone field
         if (!phone) {
+            console.warn(`[Incoming Webhook] Phone field not found. Payload saved for debugging.`)
             return NextResponse.json(
-                { success: false, error: 'Phone field not found in payload. Check your field mapping.' },
-                { status: 400 }
+                {
+                    success: false,
+                    message: 'Payload received and saved. Processing skipped because "phone" field was not found. Please check your Field Mapping in Settings.',
+                    payload_saved: true
+                },
+                { status: 200 } // Return 200 to acknowledge receipt
             )
         }
 
@@ -162,8 +167,12 @@ export async function POST(request, { params }) {
 
         if (!normalizedPhone || normalizedPhone.length < 10) {
             return NextResponse.json(
-                { success: false, error: 'Invalid phone number extracted' },
-                { status: 400 }
+                {
+                    success: false,
+                    error: 'Invalid phone number extracted',
+                    payload_saved: true
+                },
+                { status: 200 } // Return 200 to acknowledge receipt
             )
         }
 
