@@ -299,39 +299,39 @@ const ApiDocumentation = () => {
     },
     {
       method: 'POST',
-      path: '/api/v1/contact/{contactId}/agent',
+      path: '/api/v1/contact/phone/{phone}/agent',
       description: 'Ativar/desativar agente IA',
-      example: `curl -X POST 'https://swiftbot.com.br/api/v1/contact/{contactId}/agent' \\
+      example: `curl -X POST 'https://swiftbot.com.br/api/v1/contact/phone/5511999999999/agent' \\
   -H 'X-API-KEY: sua-api-key' \\
   -H 'Content-Type: application/json' \\
   -d '{"enabled": false, "reason": "Atendimento manual"}'`
     },
     {
       method: 'POST',
-      path: '/api/v1/contact/{contactId}/sequences/{sequenceId}',
+      path: '/api/v1/contact/phone/{phone}/sequences/{sequenceId}',
       description: 'Inscrever em sequência',
-      example: `curl -X POST 'https://swiftbot.com.br/api/v1/contact/{contactId}/sequences/{sequenceId}' \\
+      example: `curl -X POST 'https://swiftbot.com.br/api/v1/contact/phone/5511999999999/sequences/{sequenceId}' \\
   -H 'X-API-KEY: sua-api-key'`
     },
     {
       method: 'DELETE',
-      path: '/api/v1/contact/{contactId}/sequences/{sequenceId}',
+      path: '/api/v1/contact/phone/{phone}/sequences/{sequenceId}',
       description: 'Remover de sequência',
-      example: `curl -X DELETE 'https://swiftbot.com.br/api/v1/contact/{contactId}/sequences/{sequenceId}' \\
+      example: `curl -X DELETE 'https://swiftbot.com.br/api/v1/contact/phone/5511999999999/sequences/{sequenceId}' \\
   -H 'X-API-KEY: sua-api-key'`
     },
     {
       method: 'POST',
-      path: '/api/v1/contact/{contactId}/tags/{tagId}',
+      path: '/api/v1/contact/phone/{phone}/tags/{tagId}',
       description: 'Adicionar tag',
-      example: `curl -X POST 'https://swiftbot.com.br/api/v1/contact/{contactId}/tags/{tagId}' \\
+      example: `curl -X POST 'https://swiftbot.com.br/api/v1/contact/phone/5511999999999/tags/{tagId}' \\
   -H 'X-API-KEY: sua-api-key'`
     },
     {
       method: 'DELETE',
-      path: '/api/v1/contact/{contactId}/tags/{tagId}',
+      path: '/api/v1/contact/phone/{phone}/tags/{tagId}',
       description: 'Remover tag',
-      example: `curl -X DELETE 'https://swiftbot.com.br/api/v1/contact/{contactId}/tags/{tagId}' \\
+      example: `curl -X DELETE 'https://swiftbot.com.br/api/v1/contact/phone/5511999999999/tags/{tagId}' \\
   -H 'X-API-KEY: sua-api-key'`
     }
   ]
