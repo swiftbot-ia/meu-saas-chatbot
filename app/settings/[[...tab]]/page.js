@@ -616,6 +616,20 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
 // ============================================================================
 // INCOMING WEBHOOKS TAB
 // ============================================================================
+
+// Helper to extract keys from object for dropdown
+const extractKeys = (obj, prefix = '$') => {
+  let keys = []
+  for (const key in obj) {
+    const path = `${prefix}.${key}`
+    keys.push(path)
+    if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+      keys = keys.concat(extractKeys(obj[key], path))
+    }
+  }
+  return keys
+}
+
 const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
   const [webhooks, setWebhooks] = useState([])
   const [loading, setLoading] = useState(true)
@@ -679,7 +693,7 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
         // Load sequences
         const seqRes = await fetch(`/api/automations/sequences?connectionId=${selectedConnection}`)
         const seqData = await seqRes.json()
-        if (seqData.success) setSequences(seqData.sequences || [])
+        if (seqData.sequences) setSequences(seqData.sequences || [])
 
         // Load origins
         const originsRes = await fetch(`/api/contacts/origins?instance_name=${selectedConn.instanceName}`)
@@ -1002,28 +1016,67 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
                 <div className="space-y-2 bg-[#252525] p-4 rounded-lg">
                   {formMappings.map((mapping, index) => (
                     <div key={index} className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Nome do campo (ex: phone)"
-                        value={mapping.key}
-                        onChange={(e) => {
-                          const newMappings = [...formMappings]
-                          newMappings[index].key = e.target.value
-                          setFormMappings(newMappings)
-                        }}
-                        className="w-1/3 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 placeholder-gray-600"
-                      />
-                      <input
-                        type="text"
-                        placeholder="JSONPath (ex: $.custom.field)"
-                        value={mapping.path}
-                        onChange={(e) => {
-                          const newMappings = [...formMappings]
-                          newMappings[index].path = e.target.value
-                          setFormMappings(newMappings)
-                        }}
-                        className="flex-1 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 font-mono placeholder-gray-600"
-                      />
+                      <div className="w-1/3 relative group/key">
+                        <input
+                          type="text"
+                          placeholder="Nome do campo"
+                          value={mapping.key}
+                          onChange={(e) => {
+                            const newMappings = [...formMappings]
+                            newMappings[index].key = e.target.value
+                            setFormMappings(newMappings)
+                          }}
+                          className="w-full bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 placeholder-gray-600"
+                        />
+                         {/* Existing Fields Dropdown */}
+                         <div className="absolute top-full left-0 w-full bg-[#252525] border border-white/10 rounded-lg shadow-xl z-20 hidden group-hover/key:block max-h-48 overflow-y-auto">
+                           {existingFields.length > 0 ? existingFields.map(f => (
+                             <button
+                               key={f.name}
+                               onClick={() => {
+                                 const newMappings = [...formMappings]
+                                 newMappings[index].key = f.name
+                                 setFormMappings(newMappings)
+                               }}
+                               className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-white hover:bg-white/5 truncate"
+                             >
+                               {f.name}
+                             </button>
+                           )) : <div className="p-2 text-xs text-gray-500">Sem campos globais</div>}
+                         </div>
+                      </div>
+
+                      <div className="flex-1 relative group/path">
+                        <input
+                          type="text"
+                          placeholder="JSONPath (ex: $.name)"
+                          value={mapping.path}
+                          onChange={(e) => {
+                            const newMappings = [...formMappings]
+                            newMappings[index].path = e.target.value
+                            setFormMappings(newMappings)
+                          }}
+                          className="w-full bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 font-mono placeholder-gray-600"
+                        />
+                        {/* JSON Keys Dropdown */}
+                        {editingWebhook?.last_payload && (
+                           <div className="absolute top-full left-0 w-full bg-[#252525] border border-white/10 rounded-lg shadow-xl z-20 hidden group-hover/path:block max-h-48 overflow-y-auto">
+                             {extractKeys(editingWebhook.last_payload).map(k => (
+                               <button
+                                 key={k}
+                                 onClick={() => {
+                                   const newMappings = [...formMappings]
+                                   newMappings[index].path = k
+                                   setFormMappings(newMappings)
+                                 }}
+                                 className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-[#00FF99] hover:bg-white/5 truncate font-mono"
+                               >
+                                 {k}
+                               </button>
+                             ))}
+                           </div>
+                        )}
+                      </div>
                       <button
                         onClick={() => {
                           const newMappings = formMappings.filter((_, i) => i !== index)
