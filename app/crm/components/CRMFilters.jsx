@@ -9,14 +9,18 @@ const CRMFilters = ({
     onFiltersChange,
     onClearFilters,
     origins = [],
-    tags = []
+    tags = [],
+    teamMembers = [],
+    currentUserRole
 }) => {
     const [isOpen, setIsOpen] = useState(false);
 
     const hasActiveFilters = filters.date_from || filters.date_to ||
         filters.won_from || filters.won_to ||
         filters.lost_from || filters.lost_to ||
+        filters.lost_from || filters.lost_to ||
         filters.origin_id || filters.tag_id ||
+        filters.assigned_to ||
         (filters.status && filters.status !== 'all');
 
     const handleFilterChange = (key, value) => {
@@ -222,6 +226,29 @@ const CRMFilters = ({
                                     ))}
                                 </select>
                             </div>
+
+                            {/* Assigned To (Only if team members exist and user is owner/manager) */}
+                            {teamMembers.length > 0 && ['owner', 'manager'].includes(currentUserRole) && (
+                                <div>
+                                    <label className="flex items-center gap-2 text-xs font-medium text-gray-400 mb-2">
+                                        <Users size={12} />
+                                        Responsável
+                                    </label>
+                                    <select
+                                        value={filters.assigned_to || ''}
+                                        onChange={(e) => handleFilterChange('assigned_to', e.target.value)}
+                                        className="w-full px-3 py-2 bg-[#2A2A2A] text-white text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00FF99]/50 appearance-none cursor-pointer"
+                                    >
+                                        <option value="">Todos</option>
+                                        <option value="unassigned">Sem Dono</option>
+                                        {teamMembers.map(member => (
+                                            <option key={member.id} value={member.userId}>
+                                                {member.fullName}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
 
                             {/* Include Manual */}
                             <div className="flex items-center justify-between py-2">

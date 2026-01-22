@@ -1,5 +1,7 @@
 'use client'
 
+
+
 import { useEffect, useState, createContext, useContext } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
@@ -63,7 +65,33 @@ const TabNavigation = () => {
 // LAYOUT PRINCIPAL
 // ============================================================================
 export default function AutomationsLayout({ children }) {
-    const router = useRouter()
+    const router = useRouter();
+
+    const [permissionLoading, setPermissionLoading] = useState(true);
+
+    // Client-side role check for restricted routes
+    useEffect(() => {
+        const checkAccess = async () => {
+            try {
+                const res = await fetch('/api/account/member-permissions');
+                const data = await res.json();
+
+                // Check nested permissions object if available, or flat properties (fallback)
+                const role = data.permissions?.role || data.role;
+
+                if (data.success && role && !['owner', 'manager'].includes(role)) {
+                    router.push('/dashboard');
+                } else {
+                    setPermissionLoading(false);
+                }
+            } catch (e) {
+                console.error('Error checking permissions', e);
+                router.push('/dashboard'); // Safe fallback
+            }
+        };
+        checkAccess();
+    }, [router]);
+
     const pathname = usePathname()
 
     const [loading, setLoading] = useState(true)
@@ -143,7 +171,7 @@ export default function AutomationsLayout({ children }) {
         }
     }, [pathname, loading, router])
 
-    if (loading) {
+    if (loading || permissionLoading) {
         return (
             <div className="min-h-screen bg-[#0A0A0A]">
                 <Sidebar />

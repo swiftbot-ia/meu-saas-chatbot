@@ -78,6 +78,9 @@ const SalesFunnelPage = () => {
     });
     const [origins, setOrigins] = useState([]);
     const [tags, setTags] = useState([]);
+    const [teamMembers, setTeamMembers] = useState([]);
+    const [currentUserRole, setCurrentUserRole] = useState(null);
+    const [currentUserPermissions, setCurrentUserPermissions] = useState(null);
     const [showNewOpportunityModal, setShowNewOpportunityModal] = useState(false);
 
     // Read active connection ID and fetch connection details
@@ -137,7 +140,34 @@ const SalesFunnelPage = () => {
             }
         };
 
+        const fetchTeam = async () => {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                const response = await axios.get('/api/account/team');
+                if (response.data.success) {
+                    setTeamMembers(response.data.members || []);
+                    // Identify current user role and permissions
+                    if (user) {
+                        const currentMember = response.data.members.find(m => m.userId === user.id);
+                        if (currentMember) {
+                            setCurrentUserRole(currentMember.role);
+                            setCurrentUserPermissions({
+                                role: currentMember.role,
+                                canAssignSelf: currentMember.canAssignSelf,
+                                canAssignOthers: currentMember.canAssignOthers,
+                                userId: user.id
+                            });
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching team:', error);
+                // Non-critical, maybe only consultant access
+            }
+        };
+
         fetchConnectionDetails();
+        fetchTeam();
     }, []);
     const loadSubscription = async (userId) => {
         try {
@@ -223,7 +253,9 @@ const SalesFunnelPage = () => {
             if (filters.lost_to) params.lost_to = filters.lost_to;
             if (filters.origin_id) params.origin_id = filters.origin_id;
             if (filters.tag_id) params.tag_id = filters.tag_id;
+            if (filters.tag_id) params.tag_id = filters.tag_id;
             if (filters.status && filters.status !== 'all') params.status = filters.status;
+            if (filters.assigned_to) params.assigned_to = filters.assigned_to;
 
             const response = await axios.get('/api/funnels/vendas', { params });
 
@@ -428,10 +460,13 @@ const SalesFunnelPage = () => {
                                 origin_id: '',
                                 tag_id: '',
                                 status: 'active',
-                                include_manual: false
+                                include_manual: false,
+                                assigned_to: ''
                             })}
                             origins={origins}
                             tags={tags}
+                            teamMembers={teamMembers}
+                            currentUserRole={currentUserRole}
                         />
                         <NotificationBell instanceName={selectedConnection?.instance_name} />
                         <div className="bg-[#00FF99]/10 text-[#00FF99] px-6 py-3 rounded-2xl text-sm font-bold whitespace-nowrap">
@@ -461,6 +496,7 @@ const SalesFunnelPage = () => {
                                     onLoadMore={loadMoreLeads}
                                     hasMore={pagination[stage.id]?.hasMore || false}
                                     loading={pagination[stage.id]?.loading || false}
+                                    teamMembers={teamMembers}
                                 />
                             ))}
                         </div>
@@ -475,8 +511,11 @@ const SalesFunnelPage = () => {
                     onClose={() => setSelectedLead(null)}
                     onConvert={handleConvert}
                     onUpdate={fetchLeads}
+
                     allStages={SALES_STAGES}
                     instanceName={selectedConnection?.instance_name}
+                    teamMembers={teamMembers}
+                    currentUserPermissions={currentUserPermissions}
                 />
             )}
 

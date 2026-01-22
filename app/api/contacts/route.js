@@ -8,7 +8,8 @@ import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { createChatSupabaseAdminClient } from '@/lib/supabase/chat-server';
-import { getOwnerUserIdFromMember } from '@/lib/account-service';
+
+import { getOwnerUserIdFromMember, getAccountForUser } from '@/lib/account-service';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -101,11 +102,25 @@ export async function GET(request) {
 
         // Query conversations with contacts - contacts are linked to instances via conversations
         // Note: whatsapp_contacts doesn't have instance_name, so we must query via conversations
+
+        // Prepare filtering for consultants
+        let assignedFilter = null;
+        try {
+            const account = await getAccountForUser(userId);
+            if (account && account.userRole === 'consultant') {
+                assignedFilter = `assigned_to.is.null,assigned_to.eq.${userId}`;
+                console.log('🔒 [Contacts API] Consultant filter applied:', assignedFilter);
+            }
+        } catch (err) {
+            console.error('Error checking permissions:', err);
+        }
+
         let query = chatSupabase
             .from('whatsapp_conversations')
             .select(`
                 id,
                 instance_name,
+                assigned_to,
                 contact_id,
                 funnel_stage,
                 funnel_position,
@@ -130,6 +145,10 @@ export async function GET(request) {
             .in('instance_name', instanceNames)
             .order('last_message_at', { ascending: false });
 
+        if (assignedFilter) {
+            query = query.or(assignedFilter);
+        }
+
         // Fetch all conversations in batches to bypass Supabase 1000 row limit
         let allConversations = [];
         const BATCH_SIZE = 1000;
@@ -137,11 +156,12 @@ export async function GET(request) {
         let batchHasMore = true;
 
         while (batchHasMore) {
-            const { data: batch, error: batchError } = await chatSupabase
+            let batchQuery = chatSupabase
                 .from('whatsapp_conversations')
                 .select(`
                     id,
                     instance_name,
+                    assigned_to,
                     contact_id,
                     funnel_stage,
                     funnel_position,
@@ -164,8 +184,13 @@ export async function GET(request) {
                 `)
                 .eq('user_id', ownerUserId)
                 .in('instance_name', instanceNames)
-                .order('last_message_at', { ascending: false })
-                .range(batchOffset, batchOffset + BATCH_SIZE - 1);
+                .order('last_message_at', { ascending: false });
+
+            if (assignedFilter) {
+                batchQuery = batchQuery.or(assignedFilter);
+            }
+
+            const { data: batch, error: batchError } = await batchQuery.range(batchOffset, batchOffset + BATCH_SIZE - 1);
 
             if (batchError) {
                 console.error('Erro ao buscar lote de contatos:', batchError);
@@ -296,7 +321,10 @@ export async function GET(request) {
                     funnel_position: conv.funnel_position,
                     metadata: conv.contact?.metadata,
                     origin: conv.contact?.origin || null,
-                    tags: contactTags
+                    metadata: conv.contact?.metadata,
+                    origin: conv.contact?.origin || null,
+                    tags: contactTags,
+                    assigned_to: conv.assigned_to // Map assigned_to field
                 };
             }) || [];
 

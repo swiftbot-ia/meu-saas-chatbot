@@ -1,6 +1,9 @@
 import Sidebar from '../components/Sidebar'
+import { requireRole } from '@/lib/permission-check'
 
-export default function SettingsLayout({ children }) {
+export default async function SettingsLayout({ children }) {
+    await requireRole(['owner', 'manager']);
+
     return (
         <div className="min-h-screen bg-[#0A0A0A]">
             <Sidebar />

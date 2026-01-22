@@ -396,16 +396,16 @@ function DashboardContent() {
 
   const loadConnections = async (userId) => {
     try {
-      const { data, error } = await supabase
-        .from('whatsapp_connections')
-        .select('*')
-        .eq('user_id', userId)
+      // Use API specifically to handle permission filtering (consultants see restricted list)
+      const response = await fetch('/api/whatsapp/connections')
+      const data = await response.json()
 
-      if (error) throw error
+      if (data.error) throw new Error(data.error)
 
-      setConnections(data || [])
+      const fetchedConnections = data.connections || []
+      setConnections(fetchedConnections)
 
-      if (data && data.length > 0) {
+      if (fetchedConnections.length > 0) {
         let selectedConnection = null
 
         // ✅ Check for saved connection ID in localStorage (client-side only)
@@ -414,19 +414,19 @@ function DashboardContent() {
 
           if (savedConnectionId) {
             // Try to find the saved connection in the current list
-            selectedConnection = data.find(c => c.id === savedConnectionId)
+            selectedConnection = fetchedConnections.find(c => c.id === savedConnectionId)
 
             if (selectedConnection) {
               console.log('✅ Restored saved connection from localStorage:', savedConnectionId)
             } else {
-              console.log('⚠️ Saved connection not found, using default')
+              console.log('⚠️ Saved connection not found (possibly restricted), using default')
             }
           }
         }
 
         // Fallback: use first connected connection or first in list
         if (!selectedConnection) {
-          selectedConnection = data.find(c => c.status === 'connected') || data[0]
+          selectedConnection = fetchedConnections.find(c => c.status === 'connected') || fetchedConnections[0]
         }
 
         setActiveConnection(selectedConnection)
@@ -436,6 +436,10 @@ function DashboardContent() {
           checkAgentConfig(selectedConnection.id)
           loadDashboardStats(selectedConnection)
         }
+      } else {
+        // No connections available/visible
+        setConnections([])
+        setActiveConnection(null)
       }
     } catch (error) {
       console.error('Erro ao carregar conexões:', error)
@@ -465,16 +469,13 @@ function DashboardContent() {
     try {
       console.log('🔄 [Dashboard] Atualizando dados das conexões...')
 
-      // 1. Buscar conexões atuais do Supabase
-      const { data: currentConnections, error: fetchError } = await supabase
-        .from('whatsapp_connections')
-        .select('*')
-        .eq('user_id', user.id)
-
-      if (fetchError) throw fetchError
+      // 1. Buscar conexões atuais via API (já filtrado por permissão)
+      const res1 = await fetch('/api/whatsapp/connections')
+      const data1 = await res1.json()
+      const currentConnections = data1.connections || []
 
       // 2. Para cada conexão conectada, chamar API de status para atualizar perfil
-      const connectedConnections = (currentConnections || []).filter(
+      const connectedConnections = currentConnections.filter(
         c => c.status === 'connected' || c.is_connected
       )
 
@@ -498,19 +499,16 @@ function DashboardContent() {
         }
       }
 
-      // 3. Buscar dados atualizados do Supabase
-      const { data: updatedConnections, error: refetchError } = await supabase
-        .from('whatsapp_connections')
-        .select('*')
-        .eq('user_id', user.id)
-
-      if (refetchError) throw refetchError
+      // 3. Buscar dados atualizados via API novamente
+      const res2 = await fetch('/api/whatsapp/connections')
+      const data2 = await res2.json()
+      const updatedConnections = data2.connections || []
 
       // 4. Atualizar lista de conexões
-      setConnections(updatedConnections || [])
+      setConnections(updatedConnections)
 
       // 5. Atualizar activeConnection se existir
-      if (activeConnection && updatedConnections) {
+      if (activeConnection && updatedConnections.length > 0) {
         const updatedActive = updatedConnections.find(c => c.id === activeConnection.id)
         if (updatedActive) {
           setActiveConnection(updatedActive)

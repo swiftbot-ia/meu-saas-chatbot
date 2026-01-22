@@ -1,5 +1,9 @@
 import { createChatSupabaseClient } from '@/lib/supabase/chat-client';
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { createServerClient } from '@supabase/ssr';
+import { getAccountForUser } from '@/lib/account-service';
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
@@ -56,11 +60,63 @@ function applyFilters(query, filters) {
         query = query.not('last_message_at', 'is', null);
     }
 
+    // Assignment filter
+    if (filters.assigned_to) {
+        if (filters.assigned_to === 'unassigned') {
+            query = query.is('assigned_to', null);
+        } else {
+            query = query.eq('assigned_to', filters.assigned_to);
+        }
+    }
+
     return query;
 }
 
+// Helper to create auth client
+async function createAuthClient() {
+    const cookieStore = await cookies();
+    return createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        {
+            cookies: {
+                get(name) {
+                    return cookieStore.get(name)?.value;
+                },
+                set(name, value, options) {
+                    cookieStore.set({ name, value, ...options });
+                },
+                remove(name, options) {
+                    cookieStore.set({ name, value: '', ...options });
+                },
+            },
+        }
+    );
+}
+
 export async function GET(request) {
-    const supabase = createChatSupabaseClient();
+    const chatSupabase = createChatSupabaseClient();
+    const supabase = await createAuthClient();
+
+    // Authenticate
+    const { data: { session }, error: authError } = await supabase.auth.getSession();
+    if (authError || !session) {
+        return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+    const userId = session.user.id;
+
+    // Check Role
+    let assignedToFilter = null;
+    try {
+        const account = await getAccountForUser(userId);
+        if (account && account.userRole === 'consultant') {
+            // Consultant: ONLY assigned leads
+            assignedToFilter = userId;
+            console.log('🔒 [CRM API] Consultant filter applied:', userId);
+        }
+    } catch (err) {
+        console.error('Error checking permissions:', err);
+    }
 
     try {
         // Get query parameters
@@ -81,8 +137,13 @@ export async function GET(request) {
             origin_id: searchParams.get('origin_id'),
             tag_id: searchParams.get('tag_id'),
             status: searchParams.get('status') || 'all',
-            include_manual: searchParams.get('include_manual') === 'true'
+            include_manual: searchParams.get('include_manual') === 'true',
+            assigned_to: assignedToFilter || searchParams.get('assigned_to') // Force filter if consultant, else use param
         };
+
+        // If consultant tries to bypass filter via param, it will be overridden by assignedToFilter above? 
+        // No, the line above prioritizes assignedToFilter if it exists.
+        // But if assignedToFilter is null (owner), it uses the param. Correct.
 
         if (!instanceName) {
             return NextResponse.json(
@@ -93,7 +154,7 @@ export async function GET(request) {
 
         // If specific stage requested (for load more)
         if (stage) {
-            let query = supabase
+            let query = chatSupabase
                 .from('whatsapp_conversations')
                 .select(`*, contact:whatsapp_contacts(*, origin:contact_origins(*))`)
                 .eq('instance_name', instanceName)
@@ -166,7 +227,8 @@ export async function GET(request) {
                 won_at: conv.won_at,
                 lost_at: conv.lost_at,
                 lost_reason: conv.lost_reason,
-                origin: conv.contact?.origin
+                origin: conv.contact?.origin,
+                assigned_to: conv.assigned_to
             }));
 
             return NextResponse.json({
@@ -191,7 +253,7 @@ export async function GET(request) {
 
         for (const stageKey of SALES_STAGES) {
             // Build count query with filters
-            let countQuery = supabase
+            let countQuery = chatSupabase
                 .from('whatsapp_conversations')
                 .select('*', { count: 'exact', head: true })
                 .eq('instance_name', instanceName)
@@ -201,7 +263,7 @@ export async function GET(request) {
             const { count: totalCount } = await countQuery;
 
             // Build main query
-            let query = supabase
+            let query = chatSupabase
                 .from('whatsapp_conversations')
                 .select(`*, contact:whatsapp_contacts(*, origin:contact_origins(*))`)
                 .eq('instance_name', instanceName)
@@ -260,8 +322,10 @@ export async function GET(request) {
                     created_at: conv.created_at,
                     won_at: conv.won_at,
                     lost_at: conv.lost_at,
+                    lost_at: conv.lost_at,
                     lost_reason: conv.lost_reason,
-                    origin: conv.contact?.origin
+                    origin: conv.contact?.origin,
+                    assigned_to: conv.assigned_to
                 })),
                 hasMore,
                 nextCursor,

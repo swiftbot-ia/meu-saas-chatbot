@@ -76,7 +76,9 @@ export async function GET(request) {
       connectionId,
       search,
       limit,
-      offset
+      limit,
+      offset,
+      currentUserId: userId
     });
 
     console.log(`📋 [Conversations] userId=${userId}, ownerUserId=${ownerUserId}, connectionId=${connectionId}, total=${result.total}`);

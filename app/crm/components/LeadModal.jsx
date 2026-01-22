@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Phone, Mail, Calendar, ArrowRight, CheckCircle, Clock, Activity, StickyNote, Info, XCircle, RotateCcw } from 'lucide-react';
+import { X, User, Phone, Mail, Calendar, ArrowRight, CheckCircle, Clock, Activity, StickyNote, Info, XCircle, RotateCcw, AlertCircle } from 'lucide-react';
 import axios from 'axios';
 import ActivitiesTab from './ActivitiesTab';
 import NotesTab from './NotesTab';
@@ -10,7 +10,7 @@ const TABS = {
     notes: { id: 'notes', label: 'Notas', icon: StickyNote }
 };
 
-const LeadModal = ({ lead, onClose, onConvert, onUpdate, allStages, instanceName }) => {
+const LeadModal = ({ lead, onClose, onConvert, onUpdate, allStages, instanceName, teamMembers = [], currentUserPermissions }) => {
     const [history, setHistory] = useState([]);
     const [loadingHistory, setLoadingHistory] = useState(true);
     const [converting, setConverting] = useState(false);
@@ -18,6 +18,55 @@ const LeadModal = ({ lead, onClose, onConvert, onUpdate, allStages, instanceName
     const [activeTab, setActiveTab] = useState('info');
     const [showLostModal, setShowLostModal] = useState(false);
     const [lostReason, setLostReason] = useState('');
+    const [showAssignModal, setShowAssignModal] = useState(false);
+    const [assigning, setAssigning] = useState(false);
+    // Error state
+    const [showErrorModal, setShowErrorModal] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
+
+    // Permission Logic
+    const isOwnerOrManager = !currentUserPermissions || ['owner', 'manager'].includes(currentUserPermissions.role);
+    const canAssignSelf = isOwnerOrManager || currentUserPermissions?.canAssignSelf;
+    const canAssignOthers = isOwnerOrManager || currentUserPermissions?.canAssignOthers;
+    const formatRole = (role) => {
+        if (role === 'owner') return 'Proprietário';
+        if (role === 'manager') return 'Gestor';
+        return 'Consultor';
+    };
+
+    // ... (rest of useEffects and handlers)
+
+    // I need to be careful with replace_file_content limits. I will do this in chunks if needed.
+    // The previous prompt showed line 1 to 112. Handlers are there.
+    // Let's replace the top part including imports and state first.
+
+
+
+    // ... fetchHistory ...
+
+    // ... handleConvert ...
+
+    // ... handleMarkLost ...
+
+    // ... handleReactivate ...
+
+
+
+    // ...
+
+    // I will use replace_file_content to inject the imports, state and update handleAssign.
+    // And I need to append the JSX at the end.
+
+    // Wait, the file is long. I can't replace the whole thing.
+    // I will replace top block first.
+
+
+    // ... (rest of useEffects and handlers)
+
+    // (Inside fetchHistory, handleConvert, handleMarkLost, handleReactivate, handleAssign - same as before)
+    // To save context, I will just replicate the updated return logic or minimal chunks if possible.
+    // Since I need to filter the map loop, I replace the whole modal content or just the AssignModal.
+    // Let's replace the top part first to get the prop and logic.
 
     useEffect(() => {
         if (lead) {
@@ -82,6 +131,30 @@ const LeadModal = ({ lead, onClose, onConvert, onUpdate, allStages, instanceName
         }
     };
 
+    const handleAssign = async (userId) => {
+        setAssigning(true);
+        try {
+            const res = await fetch(`/api/chat/conversations/${lead.id}/assign`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ assignedTo: userId })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                setShowAssignModal(false);
+                onUpdate?.(); // Refresh list to update card avatar
+            } else {
+                alert('Erro ao atribuir: ' + (data.error || 'Erro desconhecido'));
+            }
+        } catch (e) {
+            console.error('Error assigning:', e);
+            alert('Erro ao atribuir contato.');
+        } finally {
+            setAssigning(false);
+        }
+    };
+
     if (!lead) return null;
 
     const isLost = !!lead.lost_at;
@@ -117,10 +190,10 @@ const LeadModal = ({ lead, onClose, onConvert, onUpdate, allStages, instanceName
                         <div className="p-6 border-b border-white/5 flex justify-between items-start bg-[#2A2A2A]">
                             <div className="flex items-center gap-4">
                                 <div className={`w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold border-4 ${isLost
-                                        ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                                        : isWon
-                                            ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                                            : 'bg-[#00FF99]/10 text-[#00FF99] border-[#00FF99]/20'
+                                    ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                                    : isWon
+                                        ? 'bg-green-500/10 text-green-400 border-green-500/20'
+                                        : 'bg-[#00FF99]/10 text-[#00FF99] border-[#00FF99]/20'
                                     }`}>
                                     {lead.profile_pic_url ? (
                                         <img src={lead.profile_pic_url} alt={lead.name} referrerPolicy="no-referrer" className="w-full h-full rounded-full object-cover" />
@@ -160,8 +233,8 @@ const LeadModal = ({ lead, onClose, onConvert, onUpdate, allStages, instanceName
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
                                         className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-all ${isActive
-                                                ? 'text-[#00FF99] border-b-2 border-[#00FF99] bg-[#00FF99]/5'
-                                                : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                            ? 'text-[#00FF99] border-b-2 border-[#00FF99] bg-[#00FF99]/5'
+                                            : 'text-gray-400 hover:text-white hover:bg-white/5'
                                             }`}
                                     >
                                         <Icon size={16} />
@@ -178,6 +251,7 @@ const LeadModal = ({ lead, onClose, onConvert, onUpdate, allStages, instanceName
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     {/* Info Column */}
                                     <div className="space-y-6">
+                                        {/* Contact Info */}
                                         <div>
                                             <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
                                                 <User size={16} /> Informações de Contato
@@ -198,6 +272,49 @@ const LeadModal = ({ lead, onClose, onConvert, onUpdate, allStages, instanceName
                                             </div>
                                         </div>
 
+                                        {/* Assignment Section */}
+                                        <div>
+                                            <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                <User size={16} /> Responsável
+                                            </h3>
+                                            <div className="bg-[#2A2A2A] p-4 rounded-xl flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    {lead.assigned_to ? (
+                                                        <>
+                                                            <div className="w-8 h-8 rounded-full bg-[#1E1E1E] flex items-center justify-center text-[#00FF99] border border-[#00FF99]/20">
+                                                                <User size={16} />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-white text-sm font-medium">
+                                                                    {teamMembers.find(m => m.userId === lead.assigned_to)?.fullName || 'Consultor'}
+                                                                </p>
+                                                                <p className="text-xs text-gray-500">Atribuído</p>
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <div className="w-8 h-8 rounded-full bg-[#1E1E1E] flex items-center justify-center text-gray-500 border border-white/10">
+                                                                <User size={16} />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-white text-sm font-medium">Ninguém</p>
+                                                                <p className="text-xs text-gray-500">Livre para todos</p>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                {(canAssignSelf || canAssignOthers) && (
+                                                    <button
+                                                        onClick={() => setShowAssignModal(true)}
+                                                        className="px-3 py-1.5 bg-[#1E1E1E] hover:bg-[#333333] text-[#00FF99] text-xs font-bold rounded-lg transition-colors"
+                                                    >
+                                                        Alterar
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Actions */}
                                         <div>
                                             <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
                                                 <CheckCircle size={16} /> Ações
@@ -301,8 +418,8 @@ const LeadModal = ({ lead, onClose, onConvert, onUpdate, allStages, instanceName
                             )}
                         </div>
                     </div>
-                </div>
-            </div>
+                </div >
+            </div >
 
             {/* Lost Reason Modal */}
             {showLostModal && (
@@ -346,6 +463,81 @@ const LeadModal = ({ lead, onClose, onConvert, onUpdate, allStages, instanceName
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Assign Modal */}
+            {showAssignModal && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+                    <div className="bg-[#1E1E1E] rounded-xl border border-white/10 w-full max-w-sm overflow-hidden flex flex-col max-h-[80vh] animate-in fade-in zoom-in duration-200">
+                        <div className="p-4 border-b border-white/10 flex justify-between items-center shrink-0">
+                            <h3 className="text-white font-semibold">Atribuir Oportunidade</h3>
+                            <button onClick={() => setShowAssignModal(false)}><X className="text-gray-400 hover:text-white" size={20} /></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+                            <div className="space-y-1">
+                                {canAssignOthers && (
+                                    <button
+                                        onClick={() => handleAssign(null)}
+                                        disabled={assigning}
+                                        className="w-full flex items-center p-3 hover:bg-white/5 rounded-lg text-left text-gray-300 transition-colors group"
+                                    >
+                                        <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center mr-3 border border-white/5 group-hover:border-[#00FF99]/30 transition-colors">
+                                            <User size={20} className="text-gray-400 group-hover:text-[#00FF99]" />
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-white group-hover:text-[#00FF99] transition-colors">Ninguém (Livre)</p>
+                                            <p className="text-xs text-gray-500">Qualquer consultor pode ver</p>
+                                        </div>
+                                    </button>
+                                )}
+
+                                {teamMembers
+                                    .filter(member => {
+                                        if (isOwnerOrManager) return true;
+                                        if (member.userId === currentUserPermissions?.userId) return canAssignSelf;
+                                        return canAssignOthers;
+                                    })
+                                    .map(member => (
+                                        <button
+                                            key={member.id}
+                                            onClick={() => handleAssign(member.userId)}
+                                            disabled={assigning}
+                                            className={`w-full flex items-center p-3 hover:bg-white/5 rounded-lg text-left text-gray-300 transition-colors ${lead.assigned_to === member.userId ? 'bg-white/5 border border-[#00FF99]/20' : ''}`}
+                                        >
+                                            <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center mr-3 border border-white/5 text-white font-bold">
+                                                {member.fullName.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center">
+                                                    <p className={`font-medium ${lead.assigned_to === member.userId ? 'text-[#00FF99]' : 'text-white'}`}>{member.fullName}</p>
+                                                    {lead.assigned_to === member.userId && <span className="ml-2 text-[10px] bg-[#00FF99]/10 text-[#00FF99] px-1.5 py-0.5 rounded">Atual</span>}
+                                                </div>
+                                                <p className="text-xs text-gray-500 capitalize">{formatRole(member.role)}</p>
+                                            </div>
+                                        </button>
+                                    ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Error Modal */}
+            {showErrorModal && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-[#1E1E1E] rounded-xl border border-red-500/30 w-full max-w-sm p-6 text-center shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
+                            <AlertCircle size={32} />
+                        </div>
+                        <h3 className="text-white text-xl font-bold mb-2">Erro ao atribuir</h3>
+                        <p className="text-gray-400 mb-6">{errorMessage}</p>
+                        <button
+                            onClick={() => setShowErrorModal(false)}
+                            className="w-full bg-[#333] hover:bg-[#444] text-white font-semibold py-3 rounded-lg transition-colors"
+                        >
+                            OK
+                        </button>
                     </div>
                 </div>
             )}
