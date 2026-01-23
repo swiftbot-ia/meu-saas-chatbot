@@ -183,6 +183,19 @@ export async function POST(request, { params }) {
             actionsExecuted: []
         }
 
+        // Initialize origin_id with extracted value
+        let targetOriginId = extractedData.origin_id
+
+        // If no mapped origin, check for "set_origin" action
+        const setOriginAction = actions.find(a =>
+            a === 'set_origin' ||
+            (typeof a === 'object' && a.type === 'set_origin')
+        )
+
+        if (!targetOriginId && setOriginAction && setOriginAction.origin_id) {
+            targetOriginId = setOriginAction.origin_id
+        }
+
         // 1. Find or create contact
         let contact = null
         const { data: existingContact } = await chatDb
@@ -211,9 +224,9 @@ export async function POST(request, { params }) {
                 hasUpdates = true
             }
 
-            // Update origin if mapped directly
-            if (origin_id && origin_id !== contact.origin_id) {
-                updates.origin_id = origin_id
+            // Update origin if we have a target and it's different
+            if (targetOriginId && targetOriginId !== contact.origin_id) {
+                updates.origin_id = targetOriginId
                 hasUpdates = true
             }
 
@@ -243,11 +256,11 @@ export async function POST(request, { params }) {
                     whatsapp_number: normalizedPhone,
                     name: name || normalizedPhone,
                     instance_name: auth.instanceName,
-                    metadata: metadataToUpdate || {} // Include custom fields
+                    metadata: metadataToUpdate || {}
                 }
 
                 if (email) newContactData.email = email
-                if (origin_id) newContactData.origin_id = origin_id
+                if (targetOriginId) newContactData.origin_id = targetOriginId
 
                 const { data: newContact, error: createError } = await chatDb
                     .from('whatsapp_contacts')
@@ -275,6 +288,8 @@ export async function POST(request, { params }) {
 
             // Skip create_contact as it's already handled
             if (actionType === 'create_contact') continue
+            // Skip set_origin as it's handled above (unless we want to force re-verify, but we shouldn't need to)
+            if (actionType === 'set_origin') continue
 
             try {
                 if (actionType === 'add_tag' && action.tag_id) {
@@ -367,26 +382,6 @@ export async function POST(request, { params }) {
                     results.actionsExecuted.push(`set_agent:${action.enabled}`)
                 }
 
-                if (actionType === 'set_origin' && action.origin_id) {
-                    // Set contact origin
-                    const { data: origin } = await chatDb
-                        .from('contact_origins')
-                        .select('id, name')
-                        .eq('id', action.origin_id)
-                        .single()
-
-                    if (origin) {
-                        await chatDb
-                            .from('whatsapp_contacts')
-                            .update({
-                                origin_id: action.origin_id,
-                                updated_at: new Date().toISOString()
-                            })
-                            .eq('id', contact.id)
-                        results.actionsExecuted.push(`set_origin:${origin.name}`)
-                        console.log(`📥 [Incoming Webhook] Set origin "${origin.name}" for contact`)
-                    }
-                }
             } catch (actionError) {
                 console.error(`📥 [Incoming Webhook] Error executing action ${actionType}:`, actionError)
             }
