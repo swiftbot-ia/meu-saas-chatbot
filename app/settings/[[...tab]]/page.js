@@ -26,10 +26,13 @@ import {
   AlertCircle,
   Download,
   Link,
+  Edit,
   Edit3,
   Power,
   Info
 } from 'lucide-react'
+import TriggersTab from './TriggersTab'
+import { generateCurl, generateN8n, generateMake } from './IntegrationHelpers'
 
 // ============================================================================
 // TAB NAVIGATION
@@ -40,7 +43,7 @@ const TabNavigation = ({ activeTab, onTabChange }) => {
     { id: 'incoming-webhooks', label: 'Webhook Entrada', icon: Download, soon: false },
     { id: 'custom-fields', label: 'Campos', icon: FileText, soon: false },
     { id: 'cadencia', label: 'Cadência', icon: Clock, soon: true },
-    { id: 'gatilhos', label: 'Gatilhos', icon: Zap, soon: true }
+    { id: 'gatilhos', label: 'Gatilhos', icon: Zap, soon: false }
   ]
 
   return (
@@ -413,6 +416,9 @@ const ApiDocumentation = () => {
 // ============================================================================
 // CUSTOM FIELDS TAB - Global Custom Fields Management
 // ============================================================================
+// ============================================================================
+// CUSTOM FIELDS TAB - Global Custom Fields Management
+// ============================================================================
 const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }) => {
   const [fieldName, setFieldName] = useState('')
   const [defaultValue, setDefaultValue] = useState('')
@@ -421,29 +427,34 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
   const [existingFields, setExistingFields] = useState([])
   const [loadingFields, setLoadingFields] = useState(false)
 
+  // Edit/Delete state
+  const [editingField, setEditingField] = useState(null) // { name, newName }
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [actionLoading, setActionLoading] = useState(false)
+
   const selectedConn = connections.find(c => c.connectionId === selectedConnection)
 
   // Load existing fields when connection changes
-  useEffect(() => {
-    const loadFields = async () => {
-      if (!selectedConn?.instanceName) return
+  const loadFields = useCallback(async () => {
+    if (!selectedConn?.instanceName) return
 
-      setLoadingFields(true)
-      try {
-        const response = await fetch(`/api/contacts/global-field?instanceName=${selectedConn.instanceName}`)
-        const data = await response.json()
-        if (data.success) {
-          setExistingFields(data.fields || [])
-        }
-      } catch (error) {
-        console.error('Error loading fields:', error)
-      } finally {
-        setLoadingFields(false)
+    setLoadingFields(true)
+    try {
+      const response = await fetch(`/api/contacts/global-field?instanceName=${selectedConn.instanceName}`)
+      const data = await response.json()
+      if (data.success) {
+        setExistingFields(data.fields || [])
       }
+    } catch (error) {
+      console.error('Error loading fields:', error)
+    } finally {
+      setLoadingFields(false)
     }
-
-    loadFields()
   }, [selectedConn?.instanceName])
+
+  useEffect(() => {
+    loadFields()
+  }, [loadFields])
 
   const handleCreateField = async () => {
     if (!fieldName.trim()) {
@@ -454,6 +465,13 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
     if (!selectedConnection) {
       setResult({ type: 'error', message: 'Selecione uma conexão' })
       return
+    }
+
+    // Check if exists locally to warn user (though backend handles it)
+    if (existingFields.some(f => f.name === fieldName.trim())) {
+      if (!confirm(`O campo "${fieldName.trim()}" já existe. Deseja sobrescrever/atualizar o valor em todos os contatos?`)) {
+        return
+      }
     }
 
     setLoading(true)
@@ -481,15 +499,11 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
       if (data.success) {
         setResult({
           type: 'success',
-          message: `Campo "${fieldName}" criado em ${data.updatedCount} contatos!`
+          message: `Campo "${fieldName}" criado/atualizado em ${data.updatedCount} contatos!`
         })
         setFieldName('')
         setDefaultValue('')
-        // Reload existing fields
-        setExistingFields(prev => [
-          ...prev.filter(f => f.name !== fieldName),
-          { name: fieldName, sampleValue: defaultValue || '', contactCount: data.updatedCount }
-        ])
+        loadFields() // Reload to be safe
       } else {
         setResult({ type: 'error', message: data.error || 'Erro ao criar campo' })
       }
@@ -498,6 +512,71 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
       setResult({ type: 'error', message: 'Erro ao criar campo global' })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDeleteField = async (fieldToDelete) => {
+    if (!confirm(`Tem certeza que deseja excluir o campo "${fieldToDelete.name}" de TODOS os contatos? Esta ação não pode ser desfeita.`)) {
+      return
+    }
+
+    setActionLoading(true)
+    try {
+      const response = await fetch(`/api/contacts/global-field?connectionId=${selectedConnection}&instanceName=${selectedConn.instanceName}&fieldName=${fieldToDelete.name}`, {
+        method: 'DELETE'
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        setResult({ type: 'success', message: `Campo "${fieldToDelete.name}" removido de ${data.updatedCount} contatos.` })
+        loadFields()
+      } else {
+        setResult({ type: 'error', message: data.error || 'Erro ao excluir campo' })
+      }
+    } catch (error) {
+      setResult({ type: 'error', message: 'Erro ao processar exclusão' })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const openEditModal = (field) => {
+    setEditingField({ name: field.name, newName: field.name })
+    setShowEditModal(true)
+    setResult(null)
+  }
+
+  const handleRenameField = async () => {
+    if (!editingField || !editingField.newName.trim() || editingField.name === editingField.newName) {
+      setShowEditModal(false)
+      return
+    }
+
+    setActionLoading(true)
+    try {
+      const response = await fetch('/api/contacts/global-field', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          connectionId: selectedConnection,
+          instanceName: selectedConn.instanceName,
+          oldFieldName: editingField.name,
+          newFieldName: editingField.newName.trim()
+        })
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        setResult({ type: 'success', message: `Campo renomeado com sucesso!` })
+        loadFields()
+        setShowEditModal(false)
+      } else {
+        alert(data.error || 'Erro ao renomear campo')
+      }
+    } catch (error) {
+      alert('Erro ao processar renomeação')
+    } finally {
+      setActionLoading(false)
     }
   }
 
@@ -517,8 +596,6 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
         </div>
       </div>
 
-      {/* Seletor de conexão removido - agora está no header global */}
-
       {/* Existing Fields List */}
       <div className="bg-[#1A1A1A] rounded-xl p-6 border border-white/5">
         <h3 className="text-white font-medium mb-4 flex items-center gap-2">
@@ -534,18 +611,84 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {existingFields.map((field, idx) => (
-              <div key={idx} className="bg-[#252525] rounded-lg px-4 py-3 border border-white/5">
-                <div className="font-mono text-[#00FF99] text-sm">{field.name}</div>
-                {field.contactCount && (
-                  <div className="text-xs text-gray-500 mt-1">
-                    {field.contactCount} contatos
-                  </div>
-                )}
+              <div key={idx} className="bg-[#252525] rounded-lg px-4 py-3 border border-white/5 flex items-center justify-between group">
+                <div>
+                  <div className="font-mono text-[#00FF99] text-sm">{field.name}</div>
+                  {field.contactCount !== null && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      {field.contactCount} contatos
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => openEditModal(field)}
+                    disabled={actionLoading}
+                    className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
+                    title="Renomear"
+                  >
+                    <Edit size={14} />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteField(field)}
+                    disabled={actionLoading}
+                    className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                    title="Excluir"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1A1A1A] border border-white/10 rounded-xl p-6 max-w-md w-full shadow-2xl">
+            <h3 className="text-lg font-semibold text-white mb-4">Renomear Campo</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Nome Atual</label>
+                <input
+                  type="text"
+                  value={editingField?.name}
+                  disabled
+                  className="w-full bg-[#252525] border border-white/10 rounded px-3 py-2 text-gray-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Novo Nome</label>
+                <input
+                  type="text"
+                  value={editingField?.newName}
+                  onChange={(e) => setEditingField(prev => ({ ...prev, newName: e.target.value }))}
+                  placeholder="Novo nome do campo"
+                  className="w-full bg-[#252525] border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-[#00FF99]"
+                />
+              </div>
+              <div className="flex gap-2 justify-end mt-4">
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 text-gray-400 hover:text-white"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleRenameField}
+                  disabled={actionLoading}
+                  className="px-4 py-2 bg-[#00FF99] text-black font-semibold rounded hover:bg-[#00E88C] disabled:opacity-50 flex items-center gap-2"
+                >
+                  {actionLoading && <Loader2 size={14} className="animate-spin" />}
+                  Salvar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create Field Form */}
       <div className="bg-[#1A1A1A] rounded-xl p-6 border border-white/5">
@@ -937,12 +1080,61 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
                     <code className="text-xs text-gray-400 truncate flex-1">
                       {`/api/webhooks/incoming/${webhook.id.slice(0, 8)}...`}
                     </code>
-                    <button
-                      onClick={() => copyWebhookUrl(webhook)}
-                      className="p-1 text-gray-400 hover:text-[#00FF99] transition-colors"
-                    >
-                      {copied === webhook.id ? <Check size={14} className="text-[#00FF99]" /> : <Copy size={14} />}
-                    </button>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => copyWebhookUrl(webhook)}
+                        className="p-1 text-gray-400 hover:text-[#00FF99] transition-colors"
+                        title="Copiar URL"
+                      >
+                        {copied === webhook.id ? <Check size={14} className="text-[#00FF99]" /> : <Copy size={14} />}
+                      </button>
+
+                      {/* Integration Button */}
+                      <div className="relative group/integration">
+                        <button className="p-1 text-gray-400 hover:text-blue-400 transition-colors">
+                          <Code size={14} />
+                        </button>
+                        <div className="absolute right-0 top-full mt-2 hidden group-hover/integration:block z-10 w-48 bg-[#252525] border border-white/10 rounded-xl shadow-xl p-1">
+                          <div className="text-[10px] text-gray-500 font-semibold px-2 py-1 uppercase">Copiar Integração</div>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              const connection = connections.find(c => c.connectionId === selectedConnection)
+                              const apiKey = connection?.fullApiKey || 'YOUR_API_KEY'
+                              navigator.clipboard.writeText(generateCurl(webhook, apiKey))
+                              alert('cURL copiado!')
+                            }}
+                            className="w-full text-left px-2 py-1.5 text-xs text-gray-300 hover:bg-white/5 rounded flex items-center gap-2"
+                          >
+                            <div className="w-1.5 h-1.5 rounded-full bg-white/50"></div> cURL
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              const connection = connections.find(c => c.connectionId === selectedConnection)
+                              const apiKey = connection?.fullApiKey || 'YOUR_API_KEY'
+                              navigator.clipboard.writeText(generateN8n(webhook, apiKey))
+                              alert('Node n8n copiado!')
+                            }}
+                            className="w-full text-left px-2 py-1.5 text-xs text-gray-300 hover:bg-white/5 rounded flex items-center gap-2"
+                          >
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#EA4B71]"></div> n8n Node
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              const connection = connections.find(c => c.connectionId === selectedConnection)
+                              const apiKey = connection?.fullApiKey || 'YOUR_API_KEY'
+                              navigator.clipboard.writeText(generateMake(webhook, apiKey))
+                              alert('Módulo Make copiado!')
+                            }}
+                            className="w-full text-left px-2 py-1.5 text-xs text-gray-300 hover:bg-white/5 rounded flex items-center gap-2"
+                          >
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#6E00B3]"></div> Make JSON
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap gap-2 text-xs text-gray-500">
@@ -1523,6 +1715,13 @@ export default function SettingsPage() {
                 setSelectedConnection(connId)
                 localStorage.setItem('activeConnectionId', connId)
               }}
+            />
+          )}
+
+          {activeTab === 'gatilhos' && (
+            <TriggersTab
+              connections={connections}
+              selectedConnection={selectedConnection}
             />
           )}
         </div>

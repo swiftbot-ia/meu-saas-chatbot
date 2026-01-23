@@ -9,6 +9,7 @@
 import { NextResponse } from 'next/server'
 import { validateApiKey } from '@/lib/api-auth'
 import { createClient } from '@supabase/supabase-js'
+import TriggerEngine from '@/lib/TriggerEngine'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -242,6 +243,18 @@ export async function POST(request, { params }) {
                     .update(updates)
                     .eq('id', contact.id)
                 console.log(`📥 [Incoming Webhook] Updated contact info`)
+
+                // Fire Trigger: custom_field_changed (for updated fields)
+                if (Object.keys(metadataToUpdate).length > 0) {
+                    for (const [key, value] of Object.entries(metadataToUpdate)) {
+                        await TriggerEngine.processEvent('custom_field_changed', {
+                            fieldKey: key,
+                            newValue: value,
+                            contact,
+                            connection: { id: auth.connectionId }
+                        }, auth.connectionId)
+                    }
+                }
             }
         } else {
             // Check if "create_contact" action is enabled
@@ -273,6 +286,24 @@ export async function POST(request, { params }) {
                     results.contact = { id: contact.id, phone: contact.whatsapp_number, created: true }
                     results.actionsExecuted.push('create_contact')
                     console.log(`📥 [Incoming Webhook] Created contact: ${normalizedPhone}`)
+
+                    // Fire Trigger: contact_created
+                    await TriggerEngine.processEvent('contact_created', {
+                        contact,
+                        connection: { id: auth.connectionId }
+                    }, auth.connectionId)
+
+                    // Fire Trigger: custom_field_changed (for new fields)
+                    if (Object.keys(metadataToUpdate).length > 0) {
+                        for (const [key, value] of Object.entries(metadataToUpdate)) {
+                            await TriggerEngine.processEvent('custom_field_changed', {
+                                fieldKey: key,
+                                newValue: value,
+                                contact,
+                                connection: { id: auth.connectionId }
+                            }, auth.connectionId)
+                        }
+                    }
                 }
             } else {
                 return NextResponse.json(
@@ -319,6 +350,13 @@ export async function POST(request, { params }) {
                                 })
                             results.actionsExecuted.push(`add_tag:${tag.name}`)
                             console.log(`📥 [Incoming Webhook] Added tag "${tag.name}" to contact`)
+
+                            // Fire Trigger: tag_added
+                            await TriggerEngine.processEvent('tag_added', {
+                                tagId: action.tag_id,
+                                contact,
+                                connection: { id: auth.connectionId }
+                            }, auth.connectionId)
                         }
                     }
                 }

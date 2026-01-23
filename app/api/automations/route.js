@@ -153,6 +153,7 @@ export async function POST(request) {
                 description: description?.trim() || null,
                 type,
                 trigger_type: triggerType || 'message_contains',
+                trigger_config: body.triggerConfig || {},
                 folder_id: folderId || null,
                 is_active: true
             })

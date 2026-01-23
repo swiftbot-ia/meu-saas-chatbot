@@ -57,6 +57,7 @@ export async function PUT(request, { params }) {
             name,
             description,
             triggerType,
+            triggerConfig,
             isActive,
             folderId,
             keywords,
@@ -85,6 +86,7 @@ export async function PUT(request, { params }) {
         if (name !== undefined) updateData.name = name.trim()
         if (description !== undefined) updateData.description = description?.trim() || null
         if (triggerType !== undefined) updateData.trigger_type = triggerType
+        if (triggerConfig !== undefined) updateData.trigger_config = triggerConfig
         if (isActive !== undefined) updateData.is_active = isActive
         if (folderId !== undefined) updateData.folder_id = folderId || null
 
