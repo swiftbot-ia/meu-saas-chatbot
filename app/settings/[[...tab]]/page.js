@@ -1027,10 +1027,27 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
                             newMappings[index].key = e.target.value
                             setFormMappings(newMappings)
                           }}
-                          className="w-full bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 placeholder-gray-600"
+                          className="w-full bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-[#00FF99]/50"
                         />
-                        {/* Existing Fields Dropdown */}
-                        <div className="absolute top-full left-0 w-full bg-[#252525] border border-white/10 rounded-lg shadow-xl z-20 hidden group-hover/key:block max-h-48 overflow-y-auto">
+                        {/* Field Suggestions Dropdown */}
+                        <div className="absolute top-full left-0 w-full bg-[#252525] border border-white/10 rounded-lg shadow-xl z-20 hidden group-hover/key:block max-h-56 overflow-y-auto">
+                          <div className="p-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Sistema</div>
+                          {['phone', 'name', 'email'].map(field => (
+                            <button
+                              key={field}
+                              onClick={() => {
+                                const newMappings = [...formMappings]
+                                newMappings[index].key = field
+                                setFormMappings(newMappings)
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 truncate flex items-center gap-2"
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#00FF99]"></span>
+                              {field}
+                            </button>
+                          ))}
+
+                          <div className="p-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-t border-white/5 mt-1">Personalizados</div>
                           {existingFields.length > 0 ? existingFields.map(f => (
                             <button
                               key={f.name}
@@ -1039,11 +1056,16 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
                                 newMappings[index].key = f.name
                                 setFormMappings(newMappings)
                               }}
-                              className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-white hover:bg-white/5 truncate"
+                              className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 truncate flex items-center gap-2"
                             >
+                              <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
                               {f.name}
                             </button>
-                          )) : <div className="p-2 text-xs text-gray-500">Sem campos globais</div>}
+                          )) : (
+                            <div className="px-3 py-2 text-xs text-gray-500 italic">
+                              Sem campos globais criados
+                            </div>
+                          )}
                         </div>
                       </div>
 
