@@ -436,11 +436,11 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
 
   // Load existing fields when connection changes
   const loadFields = useCallback(async () => {
-    if (!selectedConn?.instanceName) return
+    if (!selectedConnection) return
 
     setLoadingFields(true)
     try {
-      const response = await fetch(`/api/contacts/global-field?instanceName=${selectedConn.instanceName}`)
+      const response = await fetch(`/api/contacts/global-field?connectionId=${selectedConnection}`)
       const data = await response.json()
       if (data.success) {
         setExistingFields(data.fields || [])
@@ -450,7 +450,7 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
     } finally {
       setLoadingFields(false)
     }
-  }, [selectedConn?.instanceName])
+  }, [selectedConnection])
 
   useEffect(() => {
     loadFields()
@@ -478,18 +478,12 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
     setResult(null)
 
     try {
-      const conn = connections.find(c => c.connectionId === selectedConnection)
-      if (!conn?.instanceName) {
-        throw new Error('Conexão não encontrada')
-      }
-
       const response = await fetch('/api/contacts/global-field', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           connectionId: selectedConnection,
-          instanceName: conn.instanceName,
-          fieldName: fieldName.trim(),
+          name: fieldName.trim(),
           defaultValue: defaultValue.trim() || ''
         })
       })
@@ -499,11 +493,11 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
       if (data.success) {
         setResult({
           type: 'success',
-          message: `Campo "${fieldName}" criado/atualizado em ${data.updatedCount} contatos!`
+          message: `Campo "${fieldName}" criado com sucesso!`
         })
         setFieldName('')
         setDefaultValue('')
-        loadFields() // Reload to be safe
+        loadFields()
       } else {
         setResult({ type: 'error', message: data.error || 'Erro ao criar campo' })
       }
@@ -516,19 +510,19 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
   }
 
   const handleDeleteField = async (fieldToDelete) => {
-    if (!confirm(`Tem certeza que deseja excluir o campo "${fieldToDelete.name}" de TODOS os contatos? Esta ação não pode ser desfeita.`)) {
+    if (!confirm(`Tem certeza que deseja excluir o campo "${fieldToDelete.name}"? Esta ação não pode ser desfeita.`)) {
       return
     }
 
     setActionLoading(true)
     try {
-      const response = await fetch(`/api/contacts/global-field?connectionId=${selectedConnection}&instanceName=${selectedConn.instanceName}&fieldName=${fieldToDelete.name}`, {
+      const response = await fetch(`/api/contacts/global-field?connectionId=${selectedConnection}&fieldName=${fieldToDelete.name}`, {
         method: 'DELETE'
       })
       const data = await response.json()
 
       if (data.success) {
-        setResult({ type: 'success', message: `Campo "${fieldToDelete.name}" removido de ${data.updatedCount} contatos.` })
+        setResult({ type: 'success', message: `Campo "${fieldToDelete.name}" excluído com sucesso.` })
         loadFields()
       } else {
         setResult({ type: 'error', message: data.error || 'Erro ao excluir campo' })
@@ -559,7 +553,6 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           connectionId: selectedConnection,
-          instanceName: selectedConn.instanceName,
           oldFieldName: editingField.name,
           newFieldName: editingField.newName.trim()
         })
