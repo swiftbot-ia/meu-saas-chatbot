@@ -262,3 +262,221 @@ export async function POST(request) {
         }, { status: 500 })
     }
 }
+
+/**
+ * PUT /api/contacts/global-field
+ * Rename a custom field for all contacts
+ */
+export async function PUT(request) {
+    try {
+        const auth = await getAuthAndOwner()
+        if (auth.error) {
+            return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+        }
+
+        const { connectionId, instanceName, oldFieldName, newFieldName } = await request.json()
+
+        if (!connectionId || !instanceName || !oldFieldName || !newFieldName) {
+            return NextResponse.json({
+                success: false,
+                error: 'connectionId, instanceName, oldFieldName e newFieldName são obrigatórios'
+            }, { status: 400 })
+        }
+
+        // Validate new field name
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(newFieldName)) {
+            return NextResponse.json({
+                success: false,
+                error: 'Nome do novo campo inválido. Use apenas letras, números e underscore.'
+            }, { status: 400 })
+        }
+
+        const chatSupabase = createChatSupabaseAdminClient()
+        console.log(`📝 [Global Field] Renaming "${oldFieldName}" to "${newFieldName}" for ${instanceName}...`)
+
+        // 1. Try RPC for rename (faster)
+        const { data: rpcResult, error: rpcError } = await chatSupabase.rpc('rename_global_metadata_field', {
+            p_instance_name: instanceName,
+            p_user_id: auth.ownerUserId,
+            p_old_field_name: oldFieldName,
+            p_new_field_name: newFieldName
+        })
+
+        if (!rpcError && rpcResult) {
+            const result = rpcResult[0] || rpcResult
+            return NextResponse.json({
+                success: true,
+                message: `Campo renomeado com sucesso em ${result.updated_count || 0} contatos`,
+                updatedCount: result.updated_count
+            })
+        }
+
+        // 2. Fallback: SQL Update
+        // Update: SET metadata = (metadata - 'old') || jsonb_build_object('new', metadata->'old')
+        // We use raw SQL via rpc execution or direct update if possible. 
+        // Since we don't have a direct "execute_sql" RPC exposed usually, we do batch updates similar to POST.
+
+        console.log(`⚠️ [Global Field] RPC rename not available or failed (${rpcError?.message}), using batch fallback...`)
+
+        // Fetch contacts that have the old field
+        // Note: Supabase JS filter for JSONB key existence: .not('metadata->' + oldFieldName, 'is', null) 
+        // But the syntax is tricky. Better to fetch metadata and filter in JS if dataset is small, or use .like comparison on text cast if possible.
+        // Or simply iterate all contacts for this instance (up to a limit).
+
+        let updatedCount = 0
+        const BATCH = 200
+
+        // Get all contacts IDs for this instance
+        const { data: convs } = await chatSupabase
+            .from('whatsapp_conversations')
+            .select('contact_id')
+            .eq('instance_name', instanceName)
+            .eq('user_id', auth.ownerUserId)
+            .not('contact_id', 'is', null)
+            .limit(5000)
+
+        const contactIds = [...new Set(convs?.map(c => c.contact_id) || [])]
+
+        if (contactIds.length === 0) {
+            return NextResponse.json({ success: true, message: 'Nenhum contato para atualizar', updatedCount: 0 })
+        }
+
+        for (let i = 0; i < contactIds.length; i += BATCH) {
+            const batch = contactIds.slice(i, i + BATCH)
+            const { data: contacts } = await chatSupabase
+                .from('whatsapp_contacts')
+                .select('id, metadata')
+                .in('id', batch)
+
+            const updates = []
+            for (const c of (contacts || [])) {
+                const meta = c.metadata || {}
+                if (oldFieldName in meta) {
+                    const val = meta[oldFieldName]
+                    const newMeta = { ...meta }
+                    delete newMeta[oldFieldName]
+                    newMeta[newFieldName] = val
+                    updates.push({ id: c.id, metadata: newMeta })
+                }
+            }
+
+            if (updates.length > 0) {
+                for (const upd of updates) {
+                    await chatSupabase
+                        .from('whatsapp_contacts')
+                        .update({ metadata: upd.metadata })
+                        .eq('id', upd.id)
+                    updatedCount++
+                }
+            }
+        }
+
+        return NextResponse.json({
+            success: true,
+            message: `Campo renomeado em ${updatedCount} contatos (fallback)`,
+            updatedCount
+        })
+
+    } catch (error) {
+        console.error('Error in global-field PUT:', error)
+        return NextResponse.json({ success: false, error: 'Erro interno do servidor' }, { status: 500 })
+    }
+}
+
+/**
+ * DELETE /api/contacts/global-field
+ * Delete a custom field from all contacts
+ */
+export async function DELETE(request) {
+    try {
+        const auth = await getAuthAndOwner()
+        if (auth.error) {
+            return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+        }
+
+        const { searchParams } = new URL(request.url)
+        const connectionId = searchParams.get('connectionId')
+        const instanceName = searchParams.get('instanceName')
+        const fieldName = searchParams.get('fieldName')
+
+        if (!connectionId || !instanceName || !fieldName) {
+            return NextResponse.json({
+                success: false,
+                error: 'connectionId, instanceName e fieldName são obrigatórios'
+            }, { status: 400 })
+        }
+
+        const chatSupabase = createChatSupabaseAdminClient()
+        console.log(`📝 [Global Field] Deleting "${fieldName}" for ${instanceName}...`)
+
+        // 1. Try RPC
+        const { data: rpcResult, error: rpcError } = await chatSupabase.rpc('delete_global_metadata_field', {
+            p_instance_name: instanceName,
+            p_user_id: auth.ownerUserId,
+            p_field_name: fieldName
+        })
+
+        if (!rpcError && rpcResult) {
+            const result = rpcResult[0] || rpcResult
+            return NextResponse.json({
+                success: true,
+                message: `Campo removido de ${result.updated_count || 0} contatos`,
+                updatedCount: result.updated_count
+            })
+        }
+
+        // 2. Fallback Batch Update
+        console.log(`⚠️ [Global Field] RPC delete failed (${rpcError?.message}), using fallback...`)
+
+        let updatedCount = 0
+        const BATCH = 200
+
+        const { data: convs } = await chatSupabase
+            .from('whatsapp_conversations')
+            .select('contact_id')
+            .eq('instance_name', instanceName)
+            .eq('user_id', auth.ownerUserId)
+            .not('contact_id', 'is', null)
+            .limit(5000)
+
+        const contactIds = [...new Set(convs?.map(c => c.contact_id) || [])]
+
+        for (let i = 0; i < contactIds.length; i += BATCH) {
+            const batch = contactIds.slice(i, i + BATCH)
+            const { data: contacts } = await chatSupabase
+                .from('whatsapp_contacts')
+                .select('id, metadata')
+                .in('id', batch)
+
+            const updates = []
+            for (const c of (contacts || [])) {
+                const meta = c.metadata || {}
+                if (fieldName in meta) {
+                    const newMeta = { ...meta }
+                    delete newMeta[fieldName]
+                    updates.push({ id: c.id, metadata: newMeta })
+                }
+            }
+
+            if (updates.length > 0) {
+                for (const upd of updates) {
+                    await chatSupabase
+                        .from('whatsapp_contacts')
+                        .update({ metadata: upd.metadata })
+                        .eq('id', upd.id)
+                    updatedCount++
+                }
+            }
+        }
+
+        return NextResponse.json({
+            success: true,
+            message: `Campo removido de ${updatedCount} contatos (fallback)`,
+            updatedCount
+        })
+
+    } catch (error) {
+        console.error('Error in global-field DELETE:', error)
+        return NextResponse.json({ success: false, error: 'Erro interno do servidor' }, { status: 500 })
+    }
+}
