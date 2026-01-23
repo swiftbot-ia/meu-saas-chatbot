@@ -1018,29 +1018,55 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
                   {formMappings.map((mapping, index) => (
                     <div key={index} className="flex gap-2">
                       <div className="w-1/3 relative group/key">
-                        <select
+                        <input
+                          type="text"
+                          placeholder="Nome do campo"
                           value={mapping.key}
                           onChange={(e) => {
                             const newMappings = [...formMappings]
                             newMappings[index].key = e.target.value
                             setFormMappings(newMappings)
                           }}
-                          className="w-full bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 focus:outline-none focus:ring-1 focus:ring-[#00FF99]/50"
-                        >
-                          <option value="">Selecione o campo...</option>
-                          <optgroup label="Sistema">
-                            <option value="phone">Telefone (phone)</option>
-                            <option value="name">Nome (name)</option>
-                            <option value="email">Email (email)</option>
-                          </optgroup>
-                          {existingFields.length > 0 && (
-                            <optgroup label="Campos Personalizados">
-                              {existingFields.map(f => (
-                                <option key={f.name} value={f.name}>{f.name}</option>
-                              ))}
-                            </optgroup>
+                          className="w-full bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-[#00FF99]/50"
+                        />
+                        {/* Field Suggestions Dropdown */}
+                        <div className="absolute top-full left-0 w-full bg-[#252525] border border-white/10 rounded-lg shadow-xl z-20 hidden group-hover/key:block max-h-56 overflow-y-auto">
+                          <div className="p-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Sistema</div>
+                          {['phone', 'name', 'email'].map(field => (
+                            <button
+                              key={field}
+                              onClick={() => {
+                                const newMappings = [...formMappings]
+                                newMappings[index].key = field
+                                setFormMappings(newMappings)
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 truncate flex items-center gap-2"
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#00FF99]"></span>
+                              {field}
+                            </button>
+                          ))}
+
+                          <div className="p-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-t border-white/5 mt-1">Personalizados</div>
+                          {existingFields.length > 0 ? existingFields.map(f => (
+                            <button
+                              key={f.name}
+                              onClick={() => {
+                                const newMappings = [...formMappings]
+                                newMappings[index].key = f.name
+                                setFormMappings(newMappings)
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 truncate flex items-center gap-2"
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                              {f.name}
+                            </button>
+                          )) : (
+                            <div className="px-3 py-2 text-xs text-gray-500 italic">
+                              Sem campos globais criados
+                            </div>
                           )}
-                        </select>
+                        </div>
                       </div>
 
                       <div className="flex-1 relative group/path">
