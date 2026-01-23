@@ -31,6 +31,7 @@ import {
   Power,
   Info
 } from 'lucide-react'
+import TriggersTab from './TriggersTab'
 
 // ============================================================================
 // TAB NAVIGATION
@@ -41,7 +42,7 @@ const TabNavigation = ({ activeTab, onTabChange }) => {
     { id: 'incoming-webhooks', label: 'Webhook Entrada', icon: Download, soon: false },
     { id: 'custom-fields', label: 'Campos', icon: FileText, soon: false },
     { id: 'cadencia', label: 'Cadência', icon: Clock, soon: true },
-    { id: 'gatilhos', label: 'Gatilhos', icon: Zap, soon: true }
+    { id: 'gatilhos', label: 'Gatilhos', icon: Zap, soon: false }
   ]
 
   return (
@@ -1664,6 +1665,13 @@ export default function SettingsPage() {
                 setSelectedConnection(connId)
                 localStorage.setItem('activeConnectionId', connId)
               }}
+            />
+          )}
+
+          {activeTab === 'gatilhos' && (
+            <TriggersTab
+              connections={connections}
+              selectedConnection={selectedConnection}
             />
           )}
         </div>
