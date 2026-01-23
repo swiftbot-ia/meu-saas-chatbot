@@ -1059,13 +1059,13 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
                               }}
                               className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 truncate flex items-center gap-2"
                             >
-                              <span className="w-1.5 h-1.5 rounded-full bg-[#00FF99]"></span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#00FF99] flex-shrink-0"></span>
                               {field}
                             </button>
                           ))}
 
                           <div className="p-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-t border-white/5 mt-1">Personalizados</div>
-                          {existingFields.length > 0 ? existingFields.map(f => (
+                          {existingFields.length > 0 ? existingFields.sort((a, b) => a.name.localeCompare(b.name)).map(f => (
                             <button
                               key={f.name}
                               onClick={() => {
@@ -1075,7 +1075,7 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
                               }}
                               className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 truncate flex items-center gap-2"
                             >
-                              <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0"></span>
                               {f.name}
                             </button>
                           )) : (
