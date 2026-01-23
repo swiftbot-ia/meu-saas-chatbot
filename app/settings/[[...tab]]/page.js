@@ -795,6 +795,11 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
   const [sequences, setSequences] = useState([])
   const [origins, setOrigins] = useState([])
 
+  // New field state
+  const [showNewFieldModal, setShowNewFieldModal] = useState(false)
+  const [newFieldName, setNewFieldName] = useState('')
+  const [currentMappingIndex, setCurrentMappingIndex] = useState(null)
+
   const selectedConn = connections.find(c => c.connectionId === selectedConnection)
 
   // Load existing global fields
@@ -1012,6 +1017,44 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
     setTimeout(() => setCopied(null), 2000)
   }
 
+  const handleCreateNewField = async () => {
+    if (!newFieldName.trim() || currentMappingIndex === null) return
+
+    try {
+      const response = await fetch('/api/contacts/global-field', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          connectionId: selectedConnection,
+          name: newFieldName.trim(),
+          defaultValue: ''
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Update existing fields list
+        setExistingFields(prev => [...prev, data.field || { name: newFieldName.trim() }])
+
+        // Select the new field in the mapping
+        const newMappings = [...formMappings]
+        newMappings[currentMappingIndex].key = newFieldName.trim()
+        setFormMappings(newMappings)
+
+        // Reset state
+        setShowNewFieldModal(false)
+        setNewFieldName('')
+        setCurrentMappingIndex(null)
+      } else {
+        alert(data.error || 'Erro ao criar campo')
+      }
+    } catch (error) {
+      console.error('Error creating field:', error)
+      alert('Erro ao criar campo')
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Info Banner */}
@@ -1170,7 +1213,43 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
         </div>
       )}
 
-      {/* Create/Edit Modal */}
+      {/* Mini Modal for New Field */}
+      {showNewFieldModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4">
+          <div className="bg-[#1A1A1A] rounded-xl p-6 w-full max-w-sm border border-white/10 shadow-2xl">
+            <h3 className="text-lg font-semibold text-white mb-4">Novo Campo Personalizado</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Nome do Campo</label>
+                <input
+                  type="text"
+                  value={newFieldName}
+                  onChange={(e) => setNewFieldName(e.target.value)}
+                  placeholder="Ex: id_transacao"
+                  className="w-full bg-[#252525] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => { setShowNewFieldModal(false); setNewFieldName(''); setCurrentMappingIndex(null) }}
+                  className="px-3 py-2 text-gray-400 hover:text-white"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleCreateNewField}
+                  disabled={!newFieldName.trim()}
+                  className="px-4 py-2 bg-[#00FF99] text-black font-semibold rounded-lg hover:bg-[#00E88C] disabled:opacity-50"
+                >
+                  Criar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-[#1A1A1A] rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -1268,6 +1347,18 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
                               Sem campos globais criados
                             </div>
                           )}
+                          <div className="border-t border-white/5 mt-1 pt-1">
+                            <button
+                              onClick={() => {
+                                setNewFieldName('')
+                                setCurrentMappingIndex(index)
+                                setShowNewFieldModal(true)
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs text-[#00FF99] hover:bg-white/5 flex items-center gap-2"
+                            >
+                              <Plus size={12} /> Criar novo campo...
+                            </button>
+                          </div>
                         </div>
                       </div>
 
