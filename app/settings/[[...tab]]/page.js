@@ -32,6 +32,7 @@ import {
   Info
 } from 'lucide-react'
 import TriggersTab from './TriggersTab'
+import { generateCurl, generateN8n, generateMake } from './IntegrationHelpers'
 
 // ============================================================================
 // TAB NAVIGATION
@@ -1079,12 +1080,61 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
                     <code className="text-xs text-gray-400 truncate flex-1">
                       {`/api/webhooks/incoming/${webhook.id.slice(0, 8)}...`}
                     </code>
-                    <button
-                      onClick={() => copyWebhookUrl(webhook)}
-                      className="p-1 text-gray-400 hover:text-[#00FF99] transition-colors"
-                    >
-                      {copied === webhook.id ? <Check size={14} className="text-[#00FF99]" /> : <Copy size={14} />}
-                    </button>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => copyWebhookUrl(webhook)}
+                        className="p-1 text-gray-400 hover:text-[#00FF99] transition-colors"
+                        title="Copiar URL"
+                      >
+                        {copied === webhook.id ? <Check size={14} className="text-[#00FF99]" /> : <Copy size={14} />}
+                      </button>
+
+                      {/* Integration Button */}
+                      <div className="relative group/integration">
+                        <button className="p-1 text-gray-400 hover:text-blue-400 transition-colors">
+                          <Code size={14} />
+                        </button>
+                        <div className="absolute right-0 top-full mt-2 hidden group-hover/integration:block z-10 w-48 bg-[#252525] border border-white/10 rounded-xl shadow-xl p-1">
+                          <div className="text-[10px] text-gray-500 font-semibold px-2 py-1 uppercase">Copiar Integração</div>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              const connection = connections.find(c => c.connectionId === selectedConnection)
+                              const apiKey = connection?.fullApiKey || 'YOUR_API_KEY'
+                              navigator.clipboard.writeText(generateCurl(webhook, apiKey))
+                              alert('cURL copiado!')
+                            }}
+                            className="w-full text-left px-2 py-1.5 text-xs text-gray-300 hover:bg-white/5 rounded flex items-center gap-2"
+                          >
+                            <div className="w-1.5 h-1.5 rounded-full bg-white/50"></div> cURL
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              const connection = connections.find(c => c.connectionId === selectedConnection)
+                              const apiKey = connection?.fullApiKey || 'YOUR_API_KEY'
+                              navigator.clipboard.writeText(generateN8n(webhook, apiKey))
+                              alert('Node n8n copiado!')
+                            }}
+                            className="w-full text-left px-2 py-1.5 text-xs text-gray-300 hover:bg-white/5 rounded flex items-center gap-2"
+                          >
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#EA4B71]"></div> n8n Node
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              const connection = connections.find(c => c.connectionId === selectedConnection)
+                              const apiKey = connection?.fullApiKey || 'YOUR_API_KEY'
+                              navigator.clipboard.writeText(generateMake(webhook, apiKey))
+                              alert('Módulo Make copiado!')
+                            }}
+                            className="w-full text-left px-2 py-1.5 text-xs text-gray-300 hover:bg-white/5 rounded flex items-center gap-2"
+                          >
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#6E00B3]"></div> Make JSON
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap gap-2 text-xs text-gray-500">
