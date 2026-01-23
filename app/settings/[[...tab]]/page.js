@@ -1272,239 +1272,281 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
                 />
               </div>
 
-              {/* Last Payload (Moved Up) */}
-              {editingWebhook?.last_payload && (
-                <div className="bg-[#252525] p-3 rounded-lg border border-white/5">
-                  <details className="group" open>
-                    <summary className="cursor-pointer text-xs text-[#00FF99] hover:underline flex items-center gap-2 font-medium">
-                      <Info size={14} />
-                      Ver último payload recebido
-                    </summary>
-                    <div className="mt-2 bg-[#000] p-3 rounded-lg overflow-x-auto">
-                      <pre className="text-xs text-green-400 font-mono">
-                        {JSON.stringify(editingWebhook.last_payload, null, 2)}
-                      </pre>
+              {/* NEW WEBHOOK INFO - Only show URL after creation if it's new or no payload */}
+              {editingWebhook && !editingWebhook.last_payload && (
+                <div className="bg-[#252525] rounded-xl p-5 border border-white/5 text-center space-y-4">
+                  <div className="mx-auto w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center mb-2">
+                    <Loader2 className="text-blue-400 animate-spin" size={24} />
+                  </div>
+                  <div>
+                    <h4 className="text-white font-medium mb-1">Aguardando primeiro evento...</h4>
+                    <p className="text-gray-400 text-sm mb-4">
+                      Envie uma requisição POST para a URL abaixo para desbloquear o mapeamento de campos.
+                    </p>
+
+                    <div className="flex items-center gap-2 bg-[#111] p-3 rounded-lg border border-white/10">
+                      <code className="text-xs text-blue-300 flex-1 truncate font-mono text-left">
+                        {`https://swiftbot.com.br/api/webhooks/incoming/${editingWebhook.id}`}
+                      </code>
+                      <button
+                        onClick={() => copyWebhookUrl(editingWebhook)}
+                        className="p-1.5 hover:bg-white/10 rounded text-gray-400 hover:text-white"
+                      >
+                        {copied === editingWebhook.id ? <Check size={14} className="text-[#00FF99]" /> : <Copy size={14} />}
+                      </button>
                     </div>
-                  </details>
+                  </div>
+                  <div className="pt-2">
+                    <button
+                      onClick={() => window.location.reload()} // Simple reload to check payload
+                      className="text-xs text-[#00FF99] hover:underline"
+                    >
+                      Já enviei, verificar novamente
+                    </button>
+                  </div>
                 </div>
               )}
 
-              {/* Field Mapping */}
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">Mapeamento de Campos</label>
-                <p className="text-xs text-gray-500 mb-3">
-                  Use notação JSONPath (ex: $.buyer.phone). Campos obrigatórios: phone.
-                </p>
-                <div className="space-y-2 bg-[#252525] p-4 rounded-lg">
-                  {formMappings.map((mapping, index) => (
-                    <div key={index} className="flex gap-2">
-                      <div className="w-1/3 relative group/key">
-                        <input
-                          type="text"
-                          placeholder="Nome do campo"
-                          value={mapping.key}
-                          onChange={(e) => {
-                            const newMappings = [...formMappings]
-                            newMappings[index].key = e.target.value
-                            setFormMappings(newMappings)
-                          }}
-                          className="w-full bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-[#00FF99]/50"
-                        />
-                        {/* Field Suggestions Dropdown */}
-                        <div className="absolute top-full left-0 w-full bg-[#252525] border border-white/10 rounded-lg shadow-xl z-20 hidden group-hover/key:block max-h-56 overflow-y-auto">
-                          <div className="p-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Sistema</div>
-                          {['phone', 'name', 'email'].map(field => (
-                            <button
-                              key={field}
-                              onClick={() => {
-                                const newMappings = [...formMappings]
-                                newMappings[index].key = field
-                                setFormMappings(newMappings)
-                              }}
-                              className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 truncate flex items-center gap-2"
-                            >
-                              <span className="w-1.5 h-1.5 rounded-full bg-[#00FF99] flex-shrink-0"></span>
-                              {field}
-                            </button>
-                          ))}
+              {/* Only show Mapping and Actions if we have a payload OR if user explicitly wants to configure manually */}
 
-                          <div className="p-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-t border-white/5 mt-1">Personalizados</div>
-                          {existingFields.length > 0 ? existingFields.sort((a, b) => a.name.localeCompare(b.name)).map(f => (
-                            <button
-                              key={f.name}
-                              onClick={() => {
-                                const newMappings = [...formMappings]
-                                newMappings[index].key = f.name
-                                setFormMappings(newMappings)
-                              }}
-                              className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 truncate flex items-center gap-2"
-                            >
-                              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0"></span>
-                              {f.name}
-                            </button>
-                          )) : (
-                            <div className="px-3 py-2 text-xs text-gray-500 italic">
-                              Sem campos globais criados
-                            </div>
-                          )}
-                          <div className="border-t border-white/5 mt-1 pt-1">
-                            <button
-                              onClick={() => {
-                                setNewFieldName('')
-                                setCurrentMappingIndex(index)
-                                setShowNewFieldModal(true)
-                              }}
-                              className="w-full text-left px-3 py-2 text-xs text-[#00FF99] hover:bg-white/5 flex items-center gap-2"
-                            >
-                              <Plus size={12} /> Criar novo campo...
-                            </button>
-                          </div>
+              {/* Only show Mapping and Actions if we have a payload OR if user explicitly wants to configure manually */}
+              {(editingWebhook?.last_payload || !editingWebhook) && (
+                <>
+                  {/* Last Payload (Moved Up) */}
+                  {editingWebhook?.last_payload && (
+                    <div className="bg-[#252525] p-3 rounded-lg border border-white/5">
+                      <details className="group" open>
+                        <summary className="cursor-pointer text-xs text-[#00FF99] hover:underline flex items-center gap-2 font-medium">
+                          <Info size={14} />
+                          Ver último payload recebido
+                        </summary>
+                        <div className="mt-2 bg-[#000] p-3 rounded-lg overflow-x-auto">
+                          <pre className="text-xs text-green-400 font-mono">
+                            {JSON.stringify(editingWebhook.last_payload, null, 2)}
+                          </pre>
                         </div>
-                      </div>
+                      </details>
+                    </div>
+                  )}
 
-                      <div className="flex-1 relative group/path">
-                        <input
-                          type="text"
-                          placeholder="JSONPath (ex: $.name)"
-                          value={mapping.path}
-                          onChange={(e) => {
-                            const newMappings = [...formMappings]
-                            newMappings[index].path = e.target.value
-                            setFormMappings(newMappings)
-                          }}
-                          className="w-full bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 font-mono placeholder-gray-600"
-                        />
-                        {/* JSON Keys Dropdown */}
-                        {editingWebhook?.last_payload && (
-                          <div className="absolute top-full left-0 w-full bg-[#252525] border border-white/10 rounded-lg shadow-xl z-20 hidden group-hover/path:block max-h-48 overflow-y-auto">
-                            {extractKeys(editingWebhook.last_payload).map(k => (
-                              <button
-                                key={k}
-                                onClick={() => {
-                                  const newMappings = [...formMappings]
-                                  newMappings[index].path = k
-                                  setFormMappings(newMappings)
-                                }}
-                                className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-[#00FF99] hover:bg-white/5 truncate font-mono"
-                              >
-                                {k}
-                              </button>
-                            ))}
+                  {/* Field Mapping */}
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Mapeamento de Campos</label>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Use notação JSONPath (ex: $.buyer.phone). Campos obrigatórios: phone.
+                    </p>
+                    <div className="space-y-2 bg-[#252525] p-4 rounded-lg">
+                      {formMappings.map((mapping, index) => (
+                        <div key={index} className="flex gap-2">
+                          <div className="w-1/3 relative group/key">
+                            <input
+                              type="text"
+                              placeholder="Nome do campo"
+                              value={mapping.key}
+                              onChange={(e) => {
+                                const newMappings = [...formMappings]
+                                newMappings[index].key = e.target.value
+                                setFormMappings(newMappings)
+                              }}
+                              className="w-full bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-[#00FF99]/50"
+                            />
+                            {/* Field Suggestions Dropdown */}
+                            <div className="absolute top-full left-0 w-full bg-[#252525] border border-white/10 rounded-lg shadow-xl z-20 hidden group-hover/key:block max-h-56 overflow-y-auto">
+                              <div className="p-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Sistema</div>
+                              {['phone', 'name', 'email'].map(field => (
+                                <button
+                                  key={field}
+                                  onClick={() => {
+                                    const newMappings = [...formMappings]
+                                    newMappings[index].key = field
+                                    setFormMappings(newMappings)
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 truncate flex items-center gap-2"
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#00FF99] flex-shrink-0"></span>
+                                  {field}
+                                </button>
+                              ))}
+
+                              <div className="p-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-t border-white/5 mt-1">Personalizados</div>
+                              {existingFields.length > 0 ? existingFields.sort((a, b) => a.name.localeCompare(b.name)).map(f => (
+                                <button
+                                  key={f.name}
+                                  onClick={() => {
+                                    const newMappings = [...formMappings]
+                                    newMappings[index].key = f.name
+                                    setFormMappings(newMappings)
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 truncate flex items-center gap-2"
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0"></span>
+                                  {f.name}
+                                </button>
+                              )) : (
+                                <div className="px-3 py-2 text-xs text-gray-500 italic">
+                                  Sem campos globais criados
+                                </div>
+                              )}
+                              <div className="border-t border-white/5 mt-1 pt-1">
+                                <button
+                                  onClick={() => {
+                                    setNewFieldName('')
+                                    setCurrentMappingIndex(index)
+                                    setShowNewFieldModal(true)
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-xs text-[#00FF99] hover:bg-white/5 flex items-center gap-2"
+                                >
+                                  <Plus size={12} /> Criar novo campo...
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                        )}
-                      </div>
+
+                          <div className="flex-1 relative group/path">
+                            <input
+                              type="text"
+                              placeholder="JSONPath (ex: $.name)"
+                              value={mapping.path}
+                              onChange={(e) => {
+                                const newMappings = [...formMappings]
+                                newMappings[index].path = e.target.value
+                                setFormMappings(newMappings)
+                              }}
+                              className="w-full bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 font-mono placeholder-gray-600"
+                            />
+                            {/* JSON Keys Dropdown */}
+                            {editingWebhook?.last_payload && (
+                              <div className="absolute top-full left-0 w-full bg-[#252525] border border-white/10 rounded-lg shadow-xl z-20 hidden group-hover/path:block max-h-48 overflow-y-auto">
+                                {extractKeys(editingWebhook.last_payload).map(k => (
+                                  <button
+                                    key={k}
+                                    onClick={() => {
+                                      const newMappings = [...formMappings]
+                                      newMappings[index].path = k
+                                      setFormMappings(newMappings)
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-[#00FF99] hover:bg-white/5 truncate font-mono"
+                                  >
+                                    {k}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => {
+                              const newMappings = formMappings.filter((_, i) => i !== index)
+                              setFormMappings(newMappings)
+                            }}
+                            className="p-2 text-gray-500 hover:text-red-400"
+                            title="Remover"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ))}
                       <button
-                        onClick={() => {
-                          const newMappings = formMappings.filter((_, i) => i !== index)
-                          setFormMappings(newMappings)
-                        }}
-                        className="p-2 text-gray-500 hover:text-red-400"
-                        title="Remover"
+                        onClick={() => setFormMappings([...formMappings, { key: '', path: '' }])}
+                        className="text-xs text-[#00FF99] hover:underline flex items-center gap-1 mt-2"
                       >
-                        <Trash2 size={16} />
+                        <Plus size={12} /> Adicionar mapeamento
                       </button>
                     </div>
-                  ))}
-                  <button
-                    onClick={() => setFormMappings([...formMappings, { key: '', path: '' }])}
-                    className="text-xs text-[#00FF99] hover:underline flex items-center gap-1 mt-2"
-                  >
-                    <Plus size={12} /> Adicionar mapeamento
-                  </button>
-                </div>
-              </div>
+                  </div>
 
-              {/* Actions */}
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">Ações a Executar</label>
-                <div className="space-y-3">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formActions.createContact}
-                      onChange={(e) => setFormActions(prev => ({ ...prev, createContact: e.target.checked }))}
-                      className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
-                    />
-                    <span className="text-white text-sm">Criar contato se não existir</span>
-                  </label>
+                  {/* Actions */}
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Ações a Executar</label>
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formActions.createContact}
+                          onChange={(e) => setFormActions(prev => ({ ...prev, createContact: e.target.checked }))}
+                          className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
+                        />
+                        <span className="text-white text-sm">Criar contato se não existir</span>
+                      </label>
 
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formActions.addTag}
-                      onChange={(e) => setFormActions(prev => ({ ...prev, addTag: e.target.checked }))}
-                      className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
-                    />
-                    <span className="text-white text-sm">Adicionar tag</span>
-                  </label>
-                  {formActions.addTag && (
-                    <select
-                      value={formTagId}
-                      onChange={(e) => setFormTagId(e.target.value)}
-                      className="ml-7 bg-[#252525] border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-                    >
-                      <option value="">Selecione uma tag...</option>
-                      {tags.map(tag => (
-                        <option key={tag.id} value={tag.id}>{tag.name}</option>
-                      ))}
-                    </select>
-                  )}
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formActions.addTag}
+                          onChange={(e) => setFormActions(prev => ({ ...prev, addTag: e.target.checked }))}
+                          className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
+                        />
+                        <span className="text-white text-sm">Adicionar tag</span>
+                      </label>
+                      {formActions.addTag && (
+                        <select
+                          value={formTagId}
+                          onChange={(e) => setFormTagId(e.target.value)}
+                          className="ml-7 bg-[#252525] border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+                        >
+                          <option value="">Selecione uma tag...</option>
+                          {tags.map(tag => (
+                            <option key={tag.id} value={tag.id}>{tag.name}</option>
+                          ))}
+                        </select>
+                      )}
 
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formActions.subscribeSequence}
-                      onChange={(e) => setFormActions(prev => ({ ...prev, subscribeSequence: e.target.checked }))}
-                      className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
-                    />
-                    <span className="text-white text-sm">Inscrever em sequência</span>
-                  </label>
-                  {formActions.subscribeSequence && (
-                    <select
-                      value={formSequenceId}
-                      onChange={(e) => setFormSequenceId(e.target.value)}
-                      className="ml-7 bg-[#252525] border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-                    >
-                      <option value="">Selecione uma sequência...</option>
-                      {sequences.map(seq => (
-                        <option key={seq.id} value={seq.id}>{seq.name}</option>
-                      ))}
-                    </select>
-                  )}
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formActions.subscribeSequence}
+                          onChange={(e) => setFormActions(prev => ({ ...prev, subscribeSequence: e.target.checked }))}
+                          className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
+                        />
+                        <span className="text-white text-sm">Inscrever em sequência</span>
+                      </label>
+                      {formActions.subscribeSequence && (
+                        <select
+                          value={formSequenceId}
+                          onChange={(e) => setFormSequenceId(e.target.value)}
+                          className="ml-7 bg-[#252525] border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+                        >
+                          <option value="">Selecione uma sequência...</option>
+                          {sequences.map(seq => (
+                            <option key={seq.id} value={seq.id}>{seq.name}</option>
+                          ))}
+                        </select>
+                      )}
 
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formActions.setOrigin}
-                      onChange={(e) => setFormActions(prev => ({ ...prev, setOrigin: e.target.checked }))}
-                      className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
-                    />
-                    <span className="text-white text-sm">Definir origem</span>
-                  </label>
-                  {formActions.setOrigin && (
-                    <select
-                      value={formOriginId}
-                      onChange={(e) => setFormOriginId(e.target.value)}
-                      className="ml-7 bg-[#252525] border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-                    >
-                      <option value="">Selecione uma origem...</option>
-                      {origins.map(origin => (
-                        <option key={origin.id} value={origin.id}>{origin.name}</option>
-                      ))}
-                    </select>
-                  )}
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formActions.setOrigin}
+                          onChange={(e) => setFormActions(prev => ({ ...prev, setOrigin: e.target.checked }))}
+                          className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
+                        />
+                        <span className="text-white text-sm">Definir origem</span>
+                      </label>
+                      {formActions.setOrigin && (
+                        <select
+                          value={formOriginId}
+                          onChange={(e) => setFormOriginId(e.target.value)}
+                          className="ml-7 bg-[#252525] border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+                        >
+                          <option value="">Selecione uma origem...</option>
+                          {origins.map(origin => (
+                            <option key={origin.id} value={origin.id}>{origin.name}</option>
+                          ))}
+                        </select>
+                      )}
 
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formActions.disableAgent}
-                      onChange={(e) => setFormActions(prev => ({ ...prev, disableAgent: e.target.checked }))}
-                      className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
-                    />
-                    <span className="text-white text-sm">Desativar agente IA</span>
-                  </label>
-                </div>
-              </div>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formActions.disableAgent}
+                          onChange={(e) => setFormActions(prev => ({ ...prev, disableAgent: e.target.checked }))}
+                          className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
+                        />
+                        <span className="text-white text-sm">Desativar agente IA</span>
+                      </label>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="p-6 border-t border-white/10 flex gap-3 justify-end">
@@ -1524,9 +1566,9 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
               </button>
             </div>
           </div>
-        </div>
+        </div >
       )}
-    </div>
+    </div >
   )
 }
 // MAIN PAGE
