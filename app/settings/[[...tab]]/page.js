@@ -1307,10 +1307,8 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
                 </div>
               )}
 
-              {/* Only show Mapping and Actions if we have a payload OR if user explicitly wants to configure manually */}
-
-              {/* Only show Mapping and Actions if we have a payload OR if user explicitly wants to configure manually */}
-              {(editingWebhook?.last_payload || !editingWebhook) && (
+              {/* Only show Mapping and Actions if we have a payload */}
+              {(editingWebhook?.last_payload) && (
                 <>
                   {/* Last Payload (Moved Up) */}
                   {editingWebhook?.last_payload && (
