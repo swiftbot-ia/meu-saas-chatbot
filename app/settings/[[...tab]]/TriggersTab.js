@@ -7,17 +7,15 @@ import {
     MoreVertical,
     Trash2,
     Edit3,
-    Copy,
     ToggleLeft,
     ToggleRight,
     Loader2,
     X,
-    Filter,
-    Check,
     Tag,
     Hash,
     List,
-    UserPlus
+    UserPlus,
+    ChevronDown
 } from 'lucide-react'
 
 // ============================================================================
@@ -39,11 +37,13 @@ const TriggerCard = ({ automation, onToggle, onEdit, onDelete }) => {
     const getTriggerDescription = () => {
         const config = automation.trigger_config || {}
         switch (automation.trigger_type) {
-            case 'contact_created': return 'Quando um contato é criado';
-            case 'tag_added': return `Quando a tag (ID: ${config.tag_id}) é adicionada`;
-            case 'funnel_stage_changed': return `Mudança de etapa no funil`; // Could resolve names if available
-            case 'custom_field_changed': return `Campo "${config.field_key}" ${config.operator} "${config.value}"`;
-            default: return 'Gatilho desconhecido';
+            case 'contact_created': return 'Quando um contato é criado'
+            case 'tag_added': return `Quando tag "${config.tag_name || config.tag_id}" é adicionada`
+            case 'funnel_stage_changed': return `Mudança de etapa no funil`
+            case 'custom_field_changed':
+                const op = config.operator === 'equals' ? '=' : config.operator === 'contains' ? 'contém' : config.operator
+                return `Campo "${config.field_key}" ${op} "${config.value}"`
+            default: return 'Gatilho desconhecido'
         }
     }
 
@@ -114,10 +114,9 @@ const TriggerCard = ({ automation, onToggle, onEdit, onDelete }) => {
 // ============================================================================
 // EDIT TRIGGER MODAL
 // ============================================================================
-const EditTriggerModal = ({ isOpen, onClose, automation, onSave, loading, connections, selectedConnection }) => {
+const EditTriggerModal = ({ isOpen, onClose, automation, onSave, loading, selectedConnection }) => {
     const [name, setName] = useState('')
     const [triggerType, setTriggerType] = useState('contact_created')
-    const [triggerConfig, setTriggerConfig] = useState({})
 
     // Config specific states
     const [fieldKey, setFieldKey] = useState('')
@@ -125,16 +124,20 @@ const EditTriggerModal = ({ isOpen, onClose, automation, onSave, loading, connec
     const [fieldValue, setFieldValue] = useState('')
     const [tagId, setTagId] = useState('')
 
-    // Available data (should technically fetch these)
+    // Available data
     const [availableTags, setAvailableTags] = useState([])
+    const [availableFields, setAvailableFields] = useState([])
     const [loadingData, setLoadingData] = useState(false)
+
+    // New field creation
+    const [showNewField, setShowNewField] = useState(false)
+    const [newFieldName, setNewFieldName] = useState('')
 
     useEffect(() => {
         if (isOpen) {
             if (automation) {
                 setName(automation.name)
                 setTriggerType(automation.trigger_type)
-                setTriggerConfig(automation.trigger_config || {})
                 // Hydrate local states
                 const conf = automation.trigger_config || {}
                 setFieldKey(conf.field_key || '')
@@ -145,33 +148,52 @@ const EditTriggerModal = ({ isOpen, onClose, automation, onSave, loading, connec
                 // New
                 setName('')
                 setTriggerType('contact_created')
-                setTriggerConfig({})
                 setFieldKey('')
                 setFieldOperator('equals')
                 setFieldValue('')
                 setTagId('')
             }
-            fetchTags()
+            fetchData()
         }
     }, [isOpen, automation])
 
-    const fetchTags = async () => {
-        // Mock or fetch logic for tags if needed. 
-        // For now we assume user knows ID or we implement a fetcher prop.
-        // Real implementation would fetch tags from API.
+    const fetchData = async () => {
         setLoadingData(true)
         try {
-            // Reusing the page's connection logic if passed
             if (selectedConnection) {
-                const conn = connections.find(c => c.connectionId === selectedConnection)
-                if (conn) {
-                    const res = await fetch(`/api/contacts?connectionId=${selectedConnection}`)
-                    const data = await res.json()
-                    if (data.tags) setAvailableTags(data.tags)
-                }
+                // Fetch tags
+                const contactsRes = await fetch(`/api/contacts?connectionId=${selectedConnection}`)
+                const contactsData = await contactsRes.json()
+                if (contactsData.tags) setAvailableTags(contactsData.tags)
+
+                // Fetch global fields
+                const fieldsRes = await fetch(`/api/contacts/global-field?connectionId=${selectedConnection}`)
+                const fieldsData = await fieldsRes.json()
+                if (fieldsData.fields) setAvailableFields(fieldsData.fields)
             }
         } catch (e) { console.error(e) }
         finally { setLoadingData(false) }
+    }
+
+    const handleCreateField = async () => {
+        if (!newFieldName.trim()) return
+        try {
+            const res = await fetch('/api/contacts/global-field', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    connectionId: selectedConnection,
+                    name: newFieldName.trim(),
+                    defaultValue: ''
+                })
+            })
+            if (res.ok) {
+                setFieldKey(newFieldName.trim())
+                setShowNewField(false)
+                setNewFieldName('')
+                fetchData() // Refresh fields list
+            }
+        } catch (e) { console.error(e) }
     }
 
     const handleSubmit = () => {
@@ -182,6 +204,9 @@ const EditTriggerModal = ({ isOpen, onClose, automation, onSave, loading, connec
             config.value = fieldValue
         } else if (triggerType === 'tag_added') {
             config.tag_id = tagId
+            // Also store tag name for display purposes
+            const tag = availableTags.find(t => t.id === tagId)
+            if (tag) config.tag_name = tag.name
         }
 
         onSave({
@@ -231,16 +256,17 @@ const EditTriggerModal = ({ isOpen, onClose, automation, onSave, loading, connec
                         </select>
                     </div>
 
-                    {/* CONFIGURATION FIELDS */}
+                    {/* TAG ADDED CONFIG */}
                     {triggerType === 'tag_added' && (
                         <div>
                             <label className="block text-sm text-gray-400 mb-2">Selecione a Tag</label>
                             <select
                                 value={tagId}
                                 onChange={(e) => setTagId(e.target.value)}
-                                className="w-full bg-[#252525] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+                                disabled={loadingData}
+                                className="w-full bg-[#252525] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30 disabled:opacity-50"
                             >
-                                <option value="">Selecione...</option>
+                                <option value="">{loadingData ? 'Carregando...' : 'Selecione uma tag...'}</option>
                                 {availableTags.map(t => (
                                     <option key={t.id} value={t.id}>{t.name}</option>
                                 ))}
@@ -248,18 +274,58 @@ const EditTriggerModal = ({ isOpen, onClose, automation, onSave, loading, connec
                         </div>
                     )}
 
+                    {/* CUSTOM FIELD CHANGED CONFIG */}
                     {triggerType === 'custom_field_changed' && (
                         <div className="space-y-3 p-4 bg-[#252525] rounded-lg border border-white/5">
                             <div>
-                                <label className="block text-xs text-gray-400 mb-1">Campo (Key)</label>
-                                <input
-                                    type="text"
-                                    value={fieldKey}
-                                    onChange={(e) => setFieldKey(e.target.value)}
-                                    className="w-full bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-white text-sm"
-                                    placeholder="Ex: anuncio_id"
-                                />
+                                <label className="block text-xs text-gray-400 mb-1">Campo</label>
+                                {!showNewField ? (
+                                    <div className="flex gap-2">
+                                        <select
+                                            value={fieldKey}
+                                            onChange={(e) => {
+                                                if (e.target.value === '__NEW__') {
+                                                    setShowNewField(true)
+                                                    setFieldKey('')
+                                                } else {
+                                                    setFieldKey(e.target.value)
+                                                }
+                                            }}
+                                            disabled={loadingData}
+                                            className="flex-1 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-white text-sm disabled:opacity-50"
+                                        >
+                                            <option value="">{loadingData ? 'Carregando...' : 'Selecione um campo...'}</option>
+                                            {availableFields.map(f => (
+                                                <option key={f.name} value={f.name}>{f.name}</option>
+                                            ))}
+                                            <option value="__NEW__">+ Criar novo campo...</option>
+                                        </select>
+                                    </div>
+                                ) : (
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={newFieldName}
+                                            onChange={(e) => setNewFieldName(e.target.value)}
+                                            placeholder="Nome do novo campo"
+                                            className="flex-1 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-white text-sm"
+                                        />
+                                        <button
+                                            onClick={handleCreateField}
+                                            className="px-3 py-2 bg-[#00FF99] text-black rounded text-sm font-medium hover:bg-[#00E88C]"
+                                        >
+                                            Criar
+                                        </button>
+                                        <button
+                                            onClick={() => { setShowNewField(false); setNewFieldName('') }}
+                                            className="px-3 py-2 bg-white/5 text-white rounded text-sm hover:bg-white/10"
+                                        >
+                                            Cancelar
+                                        </button>
+                                    </div>
+                                )}
                             </div>
+
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
                                     <label className="block text-xs text-gray-400 mb-1">Operador</label>
@@ -291,7 +357,7 @@ const EditTriggerModal = ({ isOpen, onClose, automation, onSave, loading, connec
                     )}
 
                     {triggerType === 'funnel_stage_changed' && (
-                        <div className="text-sm text-gray-500 italic">
+                        <div className="text-sm text-gray-500 italic p-4 bg-[#252525] rounded-lg">
                             Configuração de funil em desenvolvimento.
                         </div>
                     )}
@@ -330,14 +396,13 @@ export default function TriggersTab({ connections, selectedConnection }) {
     }, [selectedConnection])
 
     const fetchTriggers = async () => {
-        if (!selectedConnection) return;
+        if (!selectedConnection) return
         setLoading(true)
         try {
             const res = await fetch(`/api/automations?connectionId=${selectedConnection}`)
             const data = await res.json()
             if (data.automations) {
-                // Filter only trigger types (exclude keyword/flow/sequence types if mixed)
-                // Assuming 'type' column distinguishes or we filter by trigger_type not starting with 'message_'
+                // Filter only trigger types
                 const triggerList = data.automations.filter(a =>
                     ['contact_created', 'tag_added', 'custom_field_changed', 'funnel_stage_changed'].includes(a.trigger_type)
                 )
@@ -353,7 +418,7 @@ export default function TriggersTab({ connections, selectedConnection }) {
             const payload = {
                 ...data,
                 connectionId: selectedConnection,
-                type: 'trigger' // Explicit type for automations table
+                type: 'trigger'
             }
 
             let url = '/api/automations'
@@ -372,6 +437,7 @@ export default function TriggersTab({ connections, selectedConnection }) {
 
             if (res.ok) {
                 setShowModal(false)
+                setEditingTrigger(null)
                 fetchTriggers()
             }
         } catch (e) { console.error(e) }
@@ -391,7 +457,7 @@ export default function TriggersTab({ connections, selectedConnection }) {
     }
 
     const handleDelete = async (id) => {
-        if (!confirm('Tem certeza?')) return;
+        if (!confirm('Tem certeza que deseja excluir este gatilho?')) return
         try {
             await fetch(`/api/automations/${id}`, { method: 'DELETE' })
             fetchTriggers()
@@ -447,11 +513,10 @@ export default function TriggersTab({ connections, selectedConnection }) {
 
             <EditTriggerModal
                 isOpen={showModal}
-                onClose={() => setShowModal(false)}
+                onClose={() => { setShowModal(false); setEditingTrigger(null) }}
                 automation={editingTrigger}
                 onSave={handleSave}
                 loading={actionLoading}
-                connections={connections}
                 selectedConnection={selectedConnection}
             />
         </div>
