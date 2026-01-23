@@ -37,7 +37,7 @@ import {
 const TabNavigation = ({ activeTab, onTabChange }) => {
   const tabs = [
     { id: 'webhook', label: 'Webhook', icon: Webhook, soon: false },
-    { id: 'webhook-entrada', label: 'Webhook Entrada', icon: Download, soon: false },
+    { id: 'incoming-webhooks', label: 'Webhook Entrada', icon: Download, soon: false },
     { id: 'custom-fields', label: 'Campos', icon: FileText, soon: false },
     { id: 'cadencia', label: 'Cadência', icon: Clock, soon: true },
     { id: 'gatilhos', label: 'Gatilhos', icon: Zap, soon: true }
@@ -660,6 +660,23 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
   const [origins, setOrigins] = useState([])
 
   const selectedConn = connections.find(c => c.connectionId === selectedConnection)
+
+  // Load existing global fields
+  useEffect(() => {
+    const loadFields = async () => {
+      if (!selectedConn?.instanceName) return
+      try {
+        const response = await fetch(`/api/contacts/global-field?instanceName=${selectedConn.instanceName}`)
+        const data = await response.json()
+        if (data.success) {
+          setExistingFields(data.fields || [])
+        }
+      } catch (error) {
+        console.error('Error loading fields:', error)
+      }
+    }
+    loadFields()
+  }, [selectedConn?.instanceName])
 
   // Load webhooks
   useEffect(() => {
@@ -1491,7 +1508,7 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {activeTab === 'webhook-entrada' && (
+          {activeTab === 'incoming-webhooks' && (
             <IncomingWebhooksTab
               connections={connections}
               selectedConnection={selectedConnection}
