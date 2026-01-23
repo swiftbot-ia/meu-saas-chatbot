@@ -129,12 +129,24 @@ export async function POST(request) {
     // REGRA DE EXCEÇÃO:
     // Se estiver em TRIAL ou PAST_DUE (pagamento pendente),
     // qualquer mudança (mesmo downgrade) deve ser IMEDIATA para corrigir a fatura/trial.
-    const isTrialOrPastDue = ['trialing', 'trial', 'past_due', 'expired', 'unpaid', 'incomplete'].includes(subscription.status)
+    const isTrial = subscription.status === 'trialing' || (subscription.trial_end && new Date(subscription.trial_end) > new Date());
+    const isPastDue = ['past_due', 'expired', 'unpaid', 'incomplete'].includes(subscription.status);
 
-    if (changeType === 'upgrade' || isTrialOrPastDue || changeType === 'same_value') {
+    if (changeType === 'upgrade' || isTrial || isPastDue || changeType === 'same_value') {
       // 🚀 MUDANÇA IMEDIATA
       console.log(`🚀 Processando mudança IMEDIATA (${changeType}) - Status: ${subscription.status}`)
-      result = await processUpgrade(subscription.stripe_subscription_id, newPlan)
+
+      let trialEnd = null;
+      if (isTrial && subscription.trial_end) {
+        // Preservar trial original se estivermos em trial
+        const trialEndDate = new Date(subscription.trial_end);
+        if (trialEndDate > new Date()) {
+          trialEnd = Math.floor(trialEndDate.getTime() / 1000);
+          console.log('⏳ Preservando trial_end:', trialEnd, `(${trialEndDate.toISOString()})`);
+        }
+      }
+
+      result = await processUpgrade(subscription.stripe_subscription_id, newPlan, trialEnd)
       actionTaken = 'immediate_update'
 
     } else {
