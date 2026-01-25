@@ -232,7 +232,8 @@ export async function POST(request, { params }) {
             .from('whatsapp_contacts')
             .select('id, whatsapp_number, name, metadata, origin_id')
             .eq('whatsapp_number', normalizedPhone)
-            .single()
+            .limit(1)
+            .maybeSingle()
 
         if (existingContact) {
             contact = existingContact
@@ -311,10 +312,25 @@ export async function POST(request, { params }) {
                     .single()
 
                 if (createError) {
-                    console.error(`❌ [Incoming Webhook v2] Error creating contact:`, createError)
-                }
+                    console.error(`❌ [Incoming Webhook v2] Error creating contact:`, JSON.stringify(createError))
 
-                if (!createError && newContact) {
+                    // Handle unique constraint violation (race condition or soft deleted)
+                    if (createError.code === '23505') {
+                        console.log(`⚠️ [Incoming Webhook v2] Contact already exists (race condition), fetching existing...`)
+                        const { data: recoveredContact } = await chatDb
+                            .from('whatsapp_contacts')
+                            .select('*')
+                            .eq('whatsapp_number', normalizedPhone)
+                            .limit(1)
+                            .maybeSingle()
+
+                        if (recoveredContact) {
+                            contact = recoveredContact
+                            results.contact = { id: contact.id, phone: contact.whatsapp_number, created: false }
+                            console.log(`✅ [Incoming Webhook v2] Recovered existing contact: ${contact.id}`)
+                        }
+                    }
+                } else if (newContact) {
                     contact = newContact
                     results.contact = { id: contact.id, phone: contact.whatsapp_number, created: true }
                     results.actionsExecuted.push('create_contact')
