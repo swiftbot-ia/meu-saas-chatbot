@@ -310,6 +310,10 @@ export async function POST(request, { params }) {
                     .select()
                     .single()
 
+                if (createError) {
+                    console.error(`❌ [Incoming Webhook v2] Error creating contact:`, createError)
+                }
+
                 if (!createError && newContact) {
                     contact = newContact
                     results.contact = { id: contact.id, phone: contact.whatsapp_number, created: true }
@@ -343,121 +347,127 @@ export async function POST(request, { params }) {
         }
 
         // 2. Execute other actions
-        for (const action of actions) {
-            const actionType = typeof action === 'string' ? action : action.type
+        if (!contact) {
+            console.error(`❌ [Incoming Webhook v2] Cannot execute actions because contact is null (creation failed or not found)`)
+        } else {
+            console.log(`📥 [Incoming Webhook v2] Executing actions for contact ID: ${contact.id}`)
+            for (const action of actions) {
+                const actionType = typeof action === 'string' ? action : action.type
 
-            // Skip create_contact as it's already handled
-            if (actionType === 'create_contact') continue
-            // Skip set_origin as it's handled above (unless we want to force re-verify, but we shouldn't need to)
-            if (actionType === 'set_origin') continue
+                // Skip create_contact as it's already handled
+                if (actionType === 'create_contact') continue
+                // Skip set_origin as it's handled above (unless we want to force re-verify, but we shouldn't need to)
+                if (actionType === 'set_origin') continue
 
-            try {
-                if (actionType === 'add_tag' && action.tag_id) {
-                    // Add tag
-                    const { data: tag } = await chatDb
-                        .from('contact_tags')
-                        .select('id, name')
-                        .eq('id', action.tag_id)
-                        .single()
-
-                    if (tag) {
-                        // Check if already has tag
-                        const { data: existingTag } = await chatDb
-                            .from('contact_tag_assignments')
-                            .select('id')
-                            .eq('contact_id', contact.id)
-                            .eq('tag_id', action.tag_id)
+                try {
+                    if (actionType === 'add_tag' && action.tag_id) {
+                        // Add tag
+                        const { data: tag } = await chatDb
+                            .from('contact_tags')
+                            .select('id, name')
+                            .eq('id', action.tag_id)
                             .single()
 
-                        if (!existingTag) {
-                            await chatDb
+                        if (tag) {
+                            // Check if already has tag
+                            const { data: existingTag } = await chatDb
                                 .from('contact_tag_assignments')
+                                .select('id')
+                                .eq('contact_id', contact.id)
+                                .eq('tag_id', action.tag_id)
+                                .single()
+
+                            if (!existingTag) {
+                                await chatDb
+                                    .from('contact_tag_assignments')
+                                    .insert({
+                                        contact_id: contact.id,
+                                        tag_id: action.tag_id,
+                                        assigned_by: auth.userId
+                                    })
+                                results.actionsExecuted.push(`add_tag:${tag.name}`)
+                                console.log(`📥 [Incoming Webhook] Added tag "${tag.name}" to contact`)
+
+                                // Fire Trigger: tag_added
+                                await TriggerEngine.processEvent('tag_added', {
+                                    tagId: action.tag_id,
+                                    contact,
+                                    connection: { id: auth.connectionId }
+                                }, auth.connectionId)
+                            }
+                        }
+                    }
+
+                    if (actionType === 'subscribe_sequence' && action.sequence_id) {
+                        // Subscribe to sequence
+                        const { data: sequence } = await mainDb
+                            .from('automation_sequences')
+                            .select('id, name, is_active')
+                            .eq('id', action.sequence_id)
+                            .eq('connection_id', auth.connectionId)
+                            .single()
+
+                        if (sequence && sequence.is_active) {
+                            // Dynamic import to avoid circular dependencies
+                            const { default: SequenceService } = await import('@/lib/SequenceService')
+                            const enrollResult = await SequenceService.enrollContact(
+                                action.sequence_id,
+                                contact.id,
+                                auth.connectionId
+                            )
+
+                            if (enrollResult.success) {
+                                results.actionsExecuted.push(`subscribe_sequence:${sequence.name}`)
+                                console.log(`📥 [Incoming Webhook] Enrolled contact in sequence "${sequence.name}"`)
+                            }
+                        }
+                    }
+
+                    if (actionType === 'set_agent' && typeof action.enabled === 'boolean') {
+                        // Enable/disable agent
+                        const { data: existingSettings } = await mainDb
+                            .from('contact_agent_settings')
+                            .select('id')
+                            .eq('contact_id', contact.id)
+                            .eq('instance_name', auth.instanceName)
+                            .single()
+
+                        if (existingSettings) {
+                            await mainDb
+                                .from('contact_agent_settings')
+                                .update({
+                                    agent_enabled: action.enabled,
+                                    disabled_at: action.enabled ? null : new Date().toISOString(),
+                                    disabled_reason: action.enabled ? null : 'Disabled via incoming webhook',
+                                    updated_at: new Date().toISOString()
+                                })
+                                .eq('id', existingSettings.id)
+                        } else {
+                            await mainDb
+                                .from('contact_agent_settings')
                                 .insert({
                                     contact_id: contact.id,
-                                    tag_id: action.tag_id,
-                                    assigned_by: auth.userId
+                                    instance_name: auth.instanceName,
+                                    user_id: auth.userId,
+                                    agent_enabled: action.enabled,
+                                    disabled_at: action.enabled ? null : new Date().toISOString(),
+                                    disabled_reason: action.enabled ? null : 'Disabled via incoming webhook'
                                 })
-                            results.actionsExecuted.push(`add_tag:${tag.name}`)
-                            console.log(`📥 [Incoming Webhook] Added tag "${tag.name}" to contact`)
-
-                            // Fire Trigger: tag_added
-                            await TriggerEngine.processEvent('tag_added', {
-                                tagId: action.tag_id,
-                                contact,
-                                connection: { id: auth.connectionId }
-                            }, auth.connectionId)
                         }
+                        results.actionsExecuted.push(`set_agent:${action.enabled}`)
                     }
+
+                } catch (actionError) {
+                    console.error(`📥 [Incoming Webhook] Error executing action ${actionType}:`, actionError)
                 }
-
-                if (actionType === 'subscribe_sequence' && action.sequence_id) {
-                    // Subscribe to sequence
-                    const { data: sequence } = await mainDb
-                        .from('automation_sequences')
-                        .select('id, name, is_active')
-                        .eq('id', action.sequence_id)
-                        .eq('connection_id', auth.connectionId)
-                        .single()
-
-                    if (sequence && sequence.is_active) {
-                        // Dynamic import to avoid circular dependencies
-                        const { default: SequenceService } = await import('@/lib/SequenceService')
-                        const enrollResult = await SequenceService.enrollContact(
-                            action.sequence_id,
-                            contact.id,
-                            auth.connectionId
-                        )
-
-                        if (enrollResult.success) {
-                            results.actionsExecuted.push(`subscribe_sequence:${sequence.name}`)
-                            console.log(`📥 [Incoming Webhook] Enrolled contact in sequence "${sequence.name}"`)
-                        }
-                    }
-                }
-
-                if (actionType === 'set_agent' && typeof action.enabled === 'boolean') {
-                    // Enable/disable agent
-                    const { data: existingSettings } = await mainDb
-                        .from('contact_agent_settings')
-                        .select('id')
-                        .eq('contact_id', contact.id)
-                        .eq('instance_name', auth.instanceName)
-                        .single()
-
-                    if (existingSettings) {
-                        await mainDb
-                            .from('contact_agent_settings')
-                            .update({
-                                agent_enabled: action.enabled,
-                                disabled_at: action.enabled ? null : new Date().toISOString(),
-                                disabled_reason: action.enabled ? null : 'Disabled via incoming webhook',
-                                updated_at: new Date().toISOString()
-                            })
-                            .eq('id', existingSettings.id)
-                    } else {
-                        await mainDb
-                            .from('contact_agent_settings')
-                            .insert({
-                                contact_id: contact.id,
-                                instance_name: auth.instanceName,
-                                user_id: auth.userId,
-                                agent_enabled: action.enabled,
-                                disabled_at: action.enabled ? null : new Date().toISOString(),
-                                disabled_reason: action.enabled ? null : 'Disabled via incoming webhook'
-                            })
-                    }
-                    results.actionsExecuted.push(`set_agent:${action.enabled}`)
-                }
-
-            } catch (actionError) {
-                console.error(`📥 [Incoming Webhook] Error executing action ${actionType}:`, actionError)
             }
+
+
+
         }
 
-
-
         const processingTime = Date.now() - startTime
-        console.log(`📥 [Incoming Webhook] Completed in ${processingTime}ms. Actions: ${results.actionsExecuted.join(', ')}`)
+        console.log(`📥 [Incoming Webhook v2] Completed in ${processingTime}ms. Actions: ${results.actionsExecuted.join(', ')}`)
 
         return NextResponse.json({
             success: true,
