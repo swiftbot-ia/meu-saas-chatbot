@@ -61,15 +61,17 @@ function extractValue(obj, path) {
         }
 
         // If first item is an object, try common field names
-        const commonFields = ['number', 'value', 'address', 'email', 'phone', 'name', 'text', 'id']
+        // Added PT-BR fields: valor, celular, telefone, email
+        const commonFields = ['number', 'value', 'valor', 'address', 'email', 'phone', 'celular', 'telefone', 'name', 'nome', 'text', 'id']
         for (const field of commonFields) {
             if (firstItem[field] !== undefined && firstItem[field] !== null) {
-                console.log(`📥 [Incoming Webhook] Auto-extracted "${field}" from array: ${firstItem[field]}`)
+                console.log(`📥 [Incoming Webhook v2] Auto-extracted "${field}" from array: ${firstItem[field]}`)
                 return firstItem[field]
             }
         }
 
         // Fallback: return the first item itself
+        console.log(`📥 [Incoming Webhook v2] Could not auto-extract field from array, returning first item`)
         return firstItem
     }
 
@@ -162,7 +164,7 @@ export async function POST(request, { params }) {
             }
         }
 
-        console.log(`📥 [Incoming Webhook] Extracted data:`, extractedData)
+        console.log(`📥 [Incoming Webhook v2] Extracted data:`, extractedData)
 
         // Separate standard fields from custom fields
         const { phone, name, email, origin_id, ...customFields } = extractedData
@@ -176,7 +178,8 @@ export async function POST(request, { params }) {
 
         // Validate required phone field
         if (!phone) {
-            console.warn(`[Incoming Webhook] Phone field not found. Payload saved for debugging.`)
+            console.warn(`[Incoming Webhook v2] Phone field not found. Payload saved for debugging.`)
+            console.log(`[Incoming Webhook v2] Full payload keys:`, Object.keys(payload))
             return NextResponse.json(
                 {
                     success: false,
@@ -194,12 +197,14 @@ export async function POST(request, { params }) {
             return NextResponse.json(
                 {
                     success: false,
-                    error: 'Invalid phone number extracted',
+                    error: `Invalid phone number extracted from ${phone}`,
                     payload_saved: true
                 },
                 { status: 200 } // Return 200 to acknowledge receipt
             )
         }
+
+        console.log(`📥 [Incoming Webhook v2] Phone validated: ${normalizedPhone}`)
 
         // Execute actions
         const actions = webhook.actions || []
@@ -309,7 +314,7 @@ export async function POST(request, { params }) {
                     contact = newContact
                     results.contact = { id: contact.id, phone: contact.whatsapp_number, created: true }
                     results.actionsExecuted.push('create_contact')
-                    console.log(`📥 [Incoming Webhook] Created contact: ${normalizedPhone}`)
+                    console.log(`📥 [Incoming Webhook v2] Created contact: ${normalizedPhone} (ID: ${contact.id})`)
 
                     // Fire Trigger: contact_created
                     await TriggerEngine.processEvent('contact_created', {
