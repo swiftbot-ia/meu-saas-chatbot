@@ -1260,6 +1260,10 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
             </div>
 
             <div className="p-6 space-y-5">
+              {/* DEBUG INFO */}
+              <div className="bg-red-900/50 p-2 text-xs font-mono text-red-200">
+                DEBUG: editingWebhook: {editingWebhook ? 'OBJECT' : 'NULL'} | last_payload: {editingWebhook?.last_payload ? 'YES' : 'NO'}
+              </div>
               {/* Name */}
               <div>
                 <label className="block text-sm text-gray-400 mb-2">Nome do Webhook *</label>
