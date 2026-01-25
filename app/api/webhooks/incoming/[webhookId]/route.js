@@ -34,6 +34,7 @@ function getMainDb() {
 /**
  * Extract value from object using dot notation path
  * Supports: $.field, $.nested.field, $.array[0].field
+ * Smart array handling: if result is an array, tries to extract first element
  */
 function extractValue(obj, path) {
     if (!path || typeof path !== 'string') return null
@@ -50,8 +51,31 @@ function extractValue(obj, path) {
         current = current[part]
     }
 
+    // Smart array handling: if result is an array, try to extract useful value
+    if (Array.isArray(current) && current.length > 0) {
+        const firstItem = current[0]
+
+        // If first item is a primitive, return it
+        if (typeof firstItem !== 'object') {
+            return firstItem
+        }
+
+        // If first item is an object, try common field names
+        const commonFields = ['number', 'value', 'address', 'email', 'phone', 'name', 'text', 'id']
+        for (const field of commonFields) {
+            if (firstItem[field] !== undefined && firstItem[field] !== null) {
+                console.log(`📥 [Incoming Webhook] Auto-extracted "${field}" from array: ${firstItem[field]}`)
+                return firstItem[field]
+            }
+        }
+
+        // Fallback: return the first item itself
+        return firstItem
+    }
+
     return current
 }
+
 
 /**
  * POST /api/webhooks/incoming/{webhookId}
