@@ -632,7 +632,7 @@ export default function AccountSubscription() {
                     </div>
                     <div className="text-gray-400 mb-4">Você não possui nenhuma assinatura ativa.</div>
                     <button
-                      onClick={() => router.push('/dashboard')}
+                      onClick={() => router.push('/dashboard?open_plans=true')}
                       className="inline-flex items-center gap-2 bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black font-bold px-8 py-4 rounded-xl hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] transition-all duration-300"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
@@ -715,7 +715,7 @@ export default function AccountSubscription() {
                     {subscriptionStatus === 'expired' || subscriptionStatus === 'canceled' ? (
                       // ASSINATURA EXPIRADA/CANCELADA → REATIVAR
                       <button
-                        onClick={() => router.push('/dashboard')}
+                        onClick={() => router.push('/dashboard?open_plans=true')}
                         className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black py-3 px-4 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] flex items-center justify-center"
                       >
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -779,7 +779,7 @@ export default function AccountSubscription() {
 
                   <div className="space-y-3">
                     <button
-                      onClick={() => router.push('/dashboard')}
+                      onClick={() => router.push('/dashboard?open_plans=true')}
                       className="w-full bg-gradient-to-r from-[#00FF99] to-[#00E88C] text-black py-3 px-4 rounded-xl font-bold transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,255,153,0.4)] flex items-center justify-center"
                     >
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

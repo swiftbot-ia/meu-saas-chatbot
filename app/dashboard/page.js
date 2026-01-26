@@ -1370,10 +1370,22 @@ function DashboardContent() {
 
   // 'hasUsedTrial' é necessária para 'shouldShowTrial'
   const hasUsedTrial = () => {
+    // Se o backend já disse que usou trial antes, retorna true
+    if (hasUsedTrialBefore) return true
+
     if (!subscription) return false
 
-    // Usamos o 'subscriptionStatus' do estado do código 1
-    return subscriptionStatus === 'expired' || subscriptionStatus === 'past_due'
+    // Se já teve uma assinatura que foi cancelada ou expirada
+    if (subscriptionStatus === 'canceled' || subscriptionStatus === 'cancelled' || subscriptionStatus === 'expired' || subscriptionStatus === 'past_due') {
+      return true
+    }
+
+    // Se a assinatura atual já tem uma data de início de trial (mesmo que antiga)
+    if (subscription.trial_start_date) {
+      return true
+    }
+
+    return false
   }
 
   const shouldShowTrial = () => {
