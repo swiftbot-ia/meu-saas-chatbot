@@ -376,6 +376,7 @@ export async function POST(request) {
       success: true,
       message: successMessage,
       subscription: subscription,
+      stripe_subscription: stripeSubscription, // ✅ Necessário para o frontend confirmar o pagamento (3DS)
       trial_end_date: trialEndDate ? trialEndDate.toISOString() : null,
       next_billing_date: nextBillingDate.toISOString(),
       is_trial: isTrialEligible,
