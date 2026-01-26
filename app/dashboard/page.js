@@ -348,6 +348,20 @@ function DashboardContent() {
       if (data && data.trial_start_date) {
         console.log('🔒 Usuário já usou trial anteriormente')
         setHasUsedTrialBefore(true)
+      } else {
+        // Se a assinatura atual não tem trial, verificar histórico
+        const { data: historyData } = await supabase
+          .from('user_subscriptions')
+          .select('trial_start_date')
+          .eq('user_id', userId)
+          .not('trial_start_date', 'is', null)
+          .limit(1)
+          .single()
+
+        if (historyData) {
+          console.log('🔒 Usuário já usou trial no passado (histórico)')
+          setHasUsedTrialBefore(true)
+        }
       }
 
       console.log('📊 Assinatura carregada:', data)
@@ -1269,8 +1283,9 @@ function DashboardContent() {
 
       // ✅ [NOVO] VERIFICAR SE PRECISA CONFIRMAR O PAGAMENTO FINAL (SCA/3DS)
       // Se o status for 'incomplete', significa que a fatura foi criada mas precisa de confirmação
-      const subStatus = subscriptionData.subscription?.status
-      const paymentIntent = subscriptionData.subscription?.latest_invoice?.payment_intent
+      // IMPORTANTE: Usar stripe_subscription que contém latest_invoice expandido
+      const subStatus = subscriptionData.stripe_subscription?.status
+      const paymentIntent = subscriptionData.stripe_subscription?.latest_invoice?.payment_intent
 
       if (subStatus === 'incomplete' && paymentIntent?.client_secret) {
         console.log('💳 [STEP 2C] Confirmando pagamento final (3DS/SCA)...')
