@@ -9,6 +9,7 @@
 import { NextResponse } from 'next/server'
 import { validateApiKey } from '@/lib/api-auth'
 import { createClient } from '@supabase/supabase-js'
+import TriggerEngine from '@/lib/TriggerEngine'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -33,6 +34,7 @@ function getMainDb() {
 /**
  * Extract value from object using dot notation path
  * Supports: $.field, $.nested.field, $.array[0].field
+ * Smart array handling: if result is an array, tries to extract first element
  */
 function extractValue(obj, path) {
     if (!path || typeof path !== 'string') return null
@@ -49,8 +51,33 @@ function extractValue(obj, path) {
         current = current[part]
     }
 
+    // Smart array handling: if result is an array, try to extract useful value
+    if (Array.isArray(current) && current.length > 0) {
+        const firstItem = current[0]
+
+        // If first item is a primitive, return it
+        if (typeof firstItem !== 'object') {
+            return firstItem
+        }
+
+        // If first item is an object, try common field names
+        // Added PT-BR fields: valor, celular, telefone, email
+        const commonFields = ['number', 'value', 'valor', 'address', 'email', 'phone', 'celular', 'telefone', 'name', 'nome', 'text', 'id']
+        for (const field of commonFields) {
+            if (firstItem[field] !== undefined && firstItem[field] !== null) {
+                console.log(`📥 [Incoming Webhook v2] Auto-extracted "${field}" from array: ${firstItem[field]}`)
+                return firstItem[field]
+            }
+        }
+
+        // Fallback: return the first item itself
+        console.log(`📥 [Incoming Webhook v2] Could not auto-extract field from array, returning first item`)
+        return firstItem
+    }
+
     return current
 }
+
 
 /**
  * POST /api/webhooks/incoming/{webhookId}
@@ -137,7 +164,7 @@ export async function POST(request, { params }) {
             }
         }
 
-        console.log(`📥 [Incoming Webhook] Extracted data:`, extractedData)
+        console.log(`📥 [Incoming Webhook v2] Extracted data:`, extractedData)
 
         // Separate standard fields from custom fields
         const { phone, name, email, origin_id, ...customFields } = extractedData
@@ -151,7 +178,8 @@ export async function POST(request, { params }) {
 
         // Validate required phone field
         if (!phone) {
-            console.warn(`[Incoming Webhook] Phone field not found. Payload saved for debugging.`)
+            console.warn(`[Incoming Webhook v2] Phone field not found. Payload saved for debugging.`)
+            console.log(`[Incoming Webhook v2] Full payload keys:`, Object.keys(payload))
             return NextResponse.json(
                 {
                     success: false,
@@ -169,12 +197,14 @@ export async function POST(request, { params }) {
             return NextResponse.json(
                 {
                     success: false,
-                    error: 'Invalid phone number extracted',
+                    error: `Invalid phone number extracted from ${phone}`,
                     payload_saved: true
                 },
                 { status: 200 } // Return 200 to acknowledge receipt
             )
         }
+
+        console.log(`📥 [Incoming Webhook v2] Phone validated: ${normalizedPhone}`)
 
         // Execute actions
         const actions = webhook.actions || []
@@ -183,13 +213,27 @@ export async function POST(request, { params }) {
             actionsExecuted: []
         }
 
+        // Initialize origin_id with extracted value
+        let targetOriginId = extractedData.origin_id
+
+        // If no mapped origin, check for "set_origin" action
+        const setOriginAction = actions.find(a =>
+            a === 'set_origin' ||
+            (typeof a === 'object' && a.type === 'set_origin')
+        )
+
+        if (!targetOriginId && setOriginAction && setOriginAction.origin_id) {
+            targetOriginId = setOriginAction.origin_id
+        }
+
         // 1. Find or create contact
         let contact = null
         const { data: existingContact } = await chatDb
             .from('whatsapp_contacts')
             .select('id, whatsapp_number, name, metadata, origin_id')
             .eq('whatsapp_number', normalizedPhone)
-            .single()
+            .limit(1)
+            .maybeSingle()
 
         if (existingContact) {
             contact = existingContact
@@ -211,9 +255,9 @@ export async function POST(request, { params }) {
                 hasUpdates = true
             }
 
-            // Update origin if mapped directly
-            if (origin_id && origin_id !== contact.origin_id) {
-                updates.origin_id = origin_id
+            // Update origin if we have a target and it's different
+            if (targetOriginId && targetOriginId !== contact.origin_id) {
+                updates.origin_id = targetOriginId
                 hasUpdates = true
             }
 
@@ -229,6 +273,18 @@ export async function POST(request, { params }) {
                     .update(updates)
                     .eq('id', contact.id)
                 console.log(`📥 [Incoming Webhook] Updated contact info`)
+
+                // Fire Trigger: custom_field_changed (for updated fields)
+                if (Object.keys(metadataToUpdate).length > 0) {
+                    for (const [key, value] of Object.entries(metadataToUpdate)) {
+                        await TriggerEngine.processEvent('custom_field_changed', {
+                            fieldKey: key,
+                            newValue: value,
+                            contact,
+                            connection: { id: auth.connectionId }
+                        }, auth.connectionId)
+                    }
+                }
             }
         } else {
             // Check if "create_contact" action is enabled
@@ -243,11 +299,11 @@ export async function POST(request, { params }) {
                     whatsapp_number: normalizedPhone,
                     name: name || normalizedPhone,
                     instance_name: auth.instanceName,
-                    metadata: metadataToUpdate || {} // Include custom fields
+                    metadata: metadataToUpdate || {}
                 }
 
                 if (email) newContactData.email = email
-                if (origin_id) newContactData.origin_id = origin_id
+                if (targetOriginId) newContactData.origin_id = targetOriginId
 
                 const { data: newContact, error: createError } = await chatDb
                     .from('whatsapp_contacts')
@@ -255,11 +311,48 @@ export async function POST(request, { params }) {
                     .select()
                     .single()
 
-                if (!createError && newContact) {
+                if (createError) {
+                    console.error(`❌ [Incoming Webhook v2] Error creating contact:`, JSON.stringify(createError))
+
+                    // Handle unique constraint violation (race condition or soft deleted)
+                    if (createError.code === '23505') {
+                        console.log(`⚠️ [Incoming Webhook v2] Contact already exists (race condition), fetching existing...`)
+                        const { data: recoveredContact } = await chatDb
+                            .from('whatsapp_contacts')
+                            .select('*')
+                            .eq('whatsapp_number', normalizedPhone)
+                            .limit(1)
+                            .maybeSingle()
+
+                        if (recoveredContact) {
+                            contact = recoveredContact
+                            results.contact = { id: contact.id, phone: contact.whatsapp_number, created: false }
+                            console.log(`✅ [Incoming Webhook v2] Recovered existing contact: ${contact.id}`)
+                        }
+                    }
+                } else if (newContact) {
                     contact = newContact
                     results.contact = { id: contact.id, phone: contact.whatsapp_number, created: true }
                     results.actionsExecuted.push('create_contact')
-                    console.log(`📥 [Incoming Webhook] Created contact: ${normalizedPhone}`)
+                    console.log(`📥 [Incoming Webhook v2] Created contact: ${normalizedPhone} (ID: ${contact.id})`)
+
+                    // Fire Trigger: contact_created
+                    await TriggerEngine.processEvent('contact_created', {
+                        contact,
+                        connection: { id: auth.connectionId }
+                    }, auth.connectionId)
+
+                    // Fire Trigger: custom_field_changed (for new fields)
+                    if (Object.keys(metadataToUpdate).length > 0) {
+                        for (const [key, value] of Object.entries(metadataToUpdate)) {
+                            await TriggerEngine.processEvent('custom_field_changed', {
+                                fieldKey: key,
+                                newValue: value,
+                                contact,
+                                connection: { id: auth.connectionId }
+                            }, auth.connectionId)
+                        }
+                    }
                 }
             } else {
                 return NextResponse.json(
@@ -270,132 +363,127 @@ export async function POST(request, { params }) {
         }
 
         // 2. Execute other actions
-        for (const action of actions) {
-            const actionType = typeof action === 'string' ? action : action.type
+        if (!contact) {
+            console.error(`❌ [Incoming Webhook v2] Cannot execute actions because contact is null (creation failed or not found)`)
+        } else {
+            console.log(`📥 [Incoming Webhook v2] Executing actions for contact ID: ${contact.id}`)
+            for (const action of actions) {
+                const actionType = typeof action === 'string' ? action : action.type
 
-            // Skip create_contact as it's already handled
-            if (actionType === 'create_contact') continue
+                // Skip create_contact as it's already handled
+                if (actionType === 'create_contact') continue
+                // Skip set_origin as it's handled above (unless we want to force re-verify, but we shouldn't need to)
+                if (actionType === 'set_origin') continue
 
-            try {
-                if (actionType === 'add_tag' && action.tag_id) {
-                    // Add tag
-                    const { data: tag } = await chatDb
-                        .from('contact_tags')
-                        .select('id, name')
-                        .eq('id', action.tag_id)
-                        .single()
-
-                    if (tag) {
-                        // Check if already has tag
-                        const { data: existingTag } = await chatDb
-                            .from('contact_tag_assignments')
-                            .select('id')
-                            .eq('contact_id', contact.id)
-                            .eq('tag_id', action.tag_id)
+                try {
+                    if (actionType === 'add_tag' && action.tag_id) {
+                        // Add tag
+                        const { data: tag } = await chatDb
+                            .from('contact_tags')
+                            .select('id, name')
+                            .eq('id', action.tag_id)
                             .single()
 
-                        if (!existingTag) {
-                            await chatDb
+                        if (tag) {
+                            // Check if already has tag
+                            const { data: existingTag } = await chatDb
                                 .from('contact_tag_assignments')
+                                .select('id')
+                                .eq('contact_id', contact.id)
+                                .eq('tag_id', action.tag_id)
+                                .single()
+
+                            if (!existingTag) {
+                                await chatDb
+                                    .from('contact_tag_assignments')
+                                    .insert({
+                                        contact_id: contact.id,
+                                        tag_id: action.tag_id,
+                                        assigned_by: auth.userId
+                                    })
+                                results.actionsExecuted.push(`add_tag:${tag.name}`)
+                                console.log(`📥 [Incoming Webhook] Added tag "${tag.name}" to contact`)
+
+                                // Fire Trigger: tag_added
+                                await TriggerEngine.processEvent('tag_added', {
+                                    tagId: action.tag_id,
+                                    contact,
+                                    connection: { id: auth.connectionId }
+                                }, auth.connectionId)
+                            }
+                        }
+                    }
+
+                    if (actionType === 'subscribe_sequence' && action.sequence_id) {
+                        // Subscribe to sequence
+                        const { data: sequence } = await mainDb
+                            .from('automation_sequences')
+                            .select('id, name, is_active')
+                            .eq('id', action.sequence_id)
+                            .eq('connection_id', auth.connectionId)
+                            .single()
+
+                        if (sequence && sequence.is_active) {
+                            // Dynamic import to avoid circular dependencies
+                            const { default: SequenceService } = await import('@/lib/SequenceService')
+                            const enrollResult = await SequenceService.enrollContact(
+                                action.sequence_id,
+                                contact.id,
+                                auth.connectionId
+                            )
+
+                            if (enrollResult.success) {
+                                results.actionsExecuted.push(`subscribe_sequence:${sequence.name}`)
+                                console.log(`📥 [Incoming Webhook] Enrolled contact in sequence "${sequence.name}"`)
+                            }
+                        }
+                    }
+
+                    if (actionType === 'set_agent' && typeof action.enabled === 'boolean') {
+                        // Enable/disable agent
+                        const { data: existingSettings } = await mainDb
+                            .from('contact_agent_settings')
+                            .select('id')
+                            .eq('contact_id', contact.id)
+                            .eq('instance_name', auth.instanceName)
+                            .single()
+
+                        if (existingSettings) {
+                            await mainDb
+                                .from('contact_agent_settings')
+                                .update({
+                                    agent_enabled: action.enabled,
+                                    disabled_at: action.enabled ? null : new Date().toISOString(),
+                                    disabled_reason: action.enabled ? null : 'Disabled via incoming webhook',
+                                    updated_at: new Date().toISOString()
+                                })
+                                .eq('id', existingSettings.id)
+                        } else {
+                            await mainDb
+                                .from('contact_agent_settings')
                                 .insert({
                                     contact_id: contact.id,
-                                    tag_id: action.tag_id,
-                                    assigned_by: auth.userId
+                                    instance_name: auth.instanceName,
+                                    user_id: auth.userId,
+                                    agent_enabled: action.enabled,
+                                    disabled_at: action.enabled ? null : new Date().toISOString(),
+                                    disabled_reason: action.enabled ? null : 'Disabled via incoming webhook'
                                 })
-                            results.actionsExecuted.push(`add_tag:${tag.name}`)
-                            console.log(`📥 [Incoming Webhook] Added tag "${tag.name}" to contact`)
                         }
+                        results.actionsExecuted.push(`set_agent:${action.enabled}`)
                     }
+
+                } catch (actionError) {
+                    console.error(`📥 [Incoming Webhook] Error executing action ${actionType}:`, actionError)
                 }
-
-                if (actionType === 'subscribe_sequence' && action.sequence_id) {
-                    // Subscribe to sequence
-                    const { data: sequence } = await mainDb
-                        .from('automation_sequences')
-                        .select('id, name, is_active')
-                        .eq('id', action.sequence_id)
-                        .eq('connection_id', auth.connectionId)
-                        .single()
-
-                    if (sequence && sequence.is_active) {
-                        // Dynamic import to avoid circular dependencies
-                        const { default: SequenceService } = await import('@/lib/SequenceService')
-                        const enrollResult = await SequenceService.enrollContact(
-                            action.sequence_id,
-                            contact.id,
-                            auth.connectionId
-                        )
-
-                        if (enrollResult.success) {
-                            results.actionsExecuted.push(`subscribe_sequence:${sequence.name}`)
-                            console.log(`📥 [Incoming Webhook] Enrolled contact in sequence "${sequence.name}"`)
-                        }
-                    }
-                }
-
-                if (actionType === 'set_agent' && typeof action.enabled === 'boolean') {
-                    // Enable/disable agent
-                    const { data: existingSettings } = await mainDb
-                        .from('contact_agent_settings')
-                        .select('id')
-                        .eq('contact_id', contact.id)
-                        .eq('instance_name', auth.instanceName)
-                        .single()
-
-                    if (existingSettings) {
-                        await mainDb
-                            .from('contact_agent_settings')
-                            .update({
-                                agent_enabled: action.enabled,
-                                disabled_at: action.enabled ? null : new Date().toISOString(),
-                                disabled_reason: action.enabled ? null : 'Disabled via incoming webhook',
-                                updated_at: new Date().toISOString()
-                            })
-                            .eq('id', existingSettings.id)
-                    } else {
-                        await mainDb
-                            .from('contact_agent_settings')
-                            .insert({
-                                contact_id: contact.id,
-                                instance_name: auth.instanceName,
-                                user_id: auth.userId,
-                                agent_enabled: action.enabled,
-                                disabled_at: action.enabled ? null : new Date().toISOString(),
-                                disabled_reason: action.enabled ? null : 'Disabled via incoming webhook'
-                            })
-                    }
-                    results.actionsExecuted.push(`set_agent:${action.enabled}`)
-                }
-
-                if (actionType === 'set_origin' && action.origin_id) {
-                    // Set contact origin
-                    const { data: origin } = await chatDb
-                        .from('contact_origins')
-                        .select('id, name')
-                        .eq('id', action.origin_id)
-                        .single()
-
-                    if (origin) {
-                        await chatDb
-                            .from('whatsapp_contacts')
-                            .update({
-                                origin_id: action.origin_id,
-                                updated_at: new Date().toISOString()
-                            })
-                            .eq('id', contact.id)
-                        results.actionsExecuted.push(`set_origin:${origin.name}`)
-                        console.log(`📥 [Incoming Webhook] Set origin "${origin.name}" for contact`)
-                    }
-                }
-            } catch (actionError) {
-                console.error(`📥 [Incoming Webhook] Error executing action ${actionType}:`, actionError)
             }
+
+
+
         }
 
-
-
         const processingTime = Date.now() - startTime
-        console.log(`📥 [Incoming Webhook] Completed in ${processingTime}ms. Actions: ${results.actionsExecuted.join(', ')}`)
+        console.log(`📥 [Incoming Webhook v2] Completed in ${processingTime}ms. Actions: ${results.actionsExecuted.join(', ')}`)
 
         return NextResponse.json({
             success: true,

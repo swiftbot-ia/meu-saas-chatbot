@@ -26,10 +26,13 @@ import {
   AlertCircle,
   Download,
   Link,
+  Edit,
   Edit3,
   Power,
   Info
 } from 'lucide-react'
+import TriggersTab from './TriggersTab'
+import { generateCurl, generateN8n, generateMake } from './IntegrationHelpers'
 
 // ============================================================================
 // TAB NAVIGATION
@@ -37,10 +40,10 @@ import {
 const TabNavigation = ({ activeTab, onTabChange }) => {
   const tabs = [
     { id: 'webhook', label: 'Webhook', icon: Webhook, soon: false },
-    { id: 'webhook-entrada', label: 'Webhook Entrada', icon: Download, soon: false },
+    { id: 'incoming-webhooks', label: 'Webhook Entrada', icon: Download, soon: false },
     { id: 'custom-fields', label: 'Campos', icon: FileText, soon: false },
     { id: 'cadencia', label: 'Cadência', icon: Clock, soon: true },
-    { id: 'gatilhos', label: 'Gatilhos', icon: Zap, soon: true }
+    { id: 'gatilhos', label: 'Gatilhos', icon: Zap, soon: false }
   ]
 
   return (
@@ -413,6 +416,9 @@ const ApiDocumentation = () => {
 // ============================================================================
 // CUSTOM FIELDS TAB - Global Custom Fields Management
 // ============================================================================
+// ============================================================================
+// CUSTOM FIELDS TAB - Global Custom Fields Management
+// ============================================================================
 const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }) => {
   const [fieldName, setFieldName] = useState('')
   const [defaultValue, setDefaultValue] = useState('')
@@ -421,29 +427,34 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
   const [existingFields, setExistingFields] = useState([])
   const [loadingFields, setLoadingFields] = useState(false)
 
+  // Edit/Delete state
+  const [editingField, setEditingField] = useState(null) // { name, newName }
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [actionLoading, setActionLoading] = useState(false)
+
   const selectedConn = connections.find(c => c.connectionId === selectedConnection)
 
   // Load existing fields when connection changes
-  useEffect(() => {
-    const loadFields = async () => {
-      if (!selectedConn?.instanceName) return
+  const loadFields = useCallback(async () => {
+    if (!selectedConnection) return
 
-      setLoadingFields(true)
-      try {
-        const response = await fetch(`/api/contacts/global-field?instanceName=${selectedConn.instanceName}`)
-        const data = await response.json()
-        if (data.success) {
-          setExistingFields(data.fields || [])
-        }
-      } catch (error) {
-        console.error('Error loading fields:', error)
-      } finally {
-        setLoadingFields(false)
+    setLoadingFields(true)
+    try {
+      const response = await fetch(`/api/contacts/global-field?connectionId=${selectedConnection}`)
+      const data = await response.json()
+      if (data.success) {
+        setExistingFields(data.fields || [])
       }
+    } catch (error) {
+      console.error('Error loading fields:', error)
+    } finally {
+      setLoadingFields(false)
     }
+  }, [selectedConnection])
 
+  useEffect(() => {
     loadFields()
-  }, [selectedConn?.instanceName])
+  }, [loadFields])
 
   const handleCreateField = async () => {
     if (!fieldName.trim()) {
@@ -456,22 +467,23 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
       return
     }
 
+    // Check if exists locally to warn user (though backend handles it)
+    if (existingFields.some(f => f.name === fieldName.trim())) {
+      if (!confirm(`O campo "${fieldName.trim()}" já existe. Deseja sobrescrever/atualizar o valor em todos os contatos?`)) {
+        return
+      }
+    }
+
     setLoading(true)
     setResult(null)
 
     try {
-      const conn = connections.find(c => c.connectionId === selectedConnection)
-      if (!conn?.instanceName) {
-        throw new Error('Conexão não encontrada')
-      }
-
       const response = await fetch('/api/contacts/global-field', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           connectionId: selectedConnection,
-          instanceName: conn.instanceName,
-          fieldName: fieldName.trim(),
+          name: fieldName.trim(),
           defaultValue: defaultValue.trim() || ''
         })
       })
@@ -481,15 +493,11 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
       if (data.success) {
         setResult({
           type: 'success',
-          message: `Campo "${fieldName}" criado em ${data.updatedCount} contatos!`
+          message: `Campo "${fieldName}" criado com sucesso!`
         })
         setFieldName('')
         setDefaultValue('')
-        // Reload existing fields
-        setExistingFields(prev => [
-          ...prev.filter(f => f.name !== fieldName),
-          { name: fieldName, sampleValue: defaultValue || '', contactCount: data.updatedCount }
-        ])
+        loadFields()
       } else {
         setResult({ type: 'error', message: data.error || 'Erro ao criar campo' })
       }
@@ -498,6 +506,70 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
       setResult({ type: 'error', message: 'Erro ao criar campo global' })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDeleteField = async (fieldToDelete) => {
+    if (!confirm(`Tem certeza que deseja excluir o campo "${fieldToDelete.name}"? Esta ação não pode ser desfeita.`)) {
+      return
+    }
+
+    setActionLoading(true)
+    try {
+      const response = await fetch(`/api/contacts/global-field?connectionId=${selectedConnection}&fieldName=${fieldToDelete.name}`, {
+        method: 'DELETE'
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        setResult({ type: 'success', message: `Campo "${fieldToDelete.name}" excluído com sucesso.` })
+        loadFields()
+      } else {
+        setResult({ type: 'error', message: data.error || 'Erro ao excluir campo' })
+      }
+    } catch (error) {
+      setResult({ type: 'error', message: 'Erro ao processar exclusão' })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const openEditModal = (field) => {
+    setEditingField({ name: field.name, newName: field.name })
+    setShowEditModal(true)
+    setResult(null)
+  }
+
+  const handleRenameField = async () => {
+    if (!editingField || !editingField.newName.trim() || editingField.name === editingField.newName) {
+      setShowEditModal(false)
+      return
+    }
+
+    setActionLoading(true)
+    try {
+      const response = await fetch('/api/contacts/global-field', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          connectionId: selectedConnection,
+          oldFieldName: editingField.name,
+          newFieldName: editingField.newName.trim()
+        })
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        setResult({ type: 'success', message: `Campo renomeado com sucesso!` })
+        loadFields()
+        setShowEditModal(false)
+      } else {
+        alert(data.error || 'Erro ao renomear campo')
+      }
+    } catch (error) {
+      alert('Erro ao processar renomeação')
+    } finally {
+      setActionLoading(false)
     }
   }
 
@@ -517,8 +589,6 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
         </div>
       </div>
 
-      {/* Seletor de conexão removido - agora está no header global */}
-
       {/* Existing Fields List */}
       <div className="bg-[#1A1A1A] rounded-xl p-6 border border-white/5">
         <h3 className="text-white font-medium mb-4 flex items-center gap-2">
@@ -534,18 +604,84 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {existingFields.map((field, idx) => (
-              <div key={idx} className="bg-[#252525] rounded-lg px-4 py-3 border border-white/5">
-                <div className="font-mono text-[#00FF99] text-sm">{field.name}</div>
-                {field.contactCount && (
-                  <div className="text-xs text-gray-500 mt-1">
-                    {field.contactCount} contatos
-                  </div>
-                )}
+              <div key={idx} className="bg-[#252525] rounded-lg px-4 py-3 border border-white/5 flex items-center justify-between group">
+                <div>
+                  <div className="font-mono text-[#00FF99] text-sm">{field.name}</div>
+                  {field.contactCount !== null && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      {field.contactCount} contatos
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => openEditModal(field)}
+                    disabled={actionLoading}
+                    className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
+                    title="Renomear"
+                  >
+                    <Edit size={14} />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteField(field)}
+                    disabled={actionLoading}
+                    className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                    title="Excluir"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1A1A1A] border border-white/10 rounded-xl p-6 max-w-md w-full shadow-2xl">
+            <h3 className="text-lg font-semibold text-white mb-4">Renomear Campo</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Nome Atual</label>
+                <input
+                  type="text"
+                  value={editingField?.name}
+                  disabled
+                  className="w-full bg-[#252525] border border-white/10 rounded px-3 py-2 text-gray-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Novo Nome</label>
+                <input
+                  type="text"
+                  value={editingField?.newName}
+                  onChange={(e) => setEditingField(prev => ({ ...prev, newName: e.target.value }))}
+                  placeholder="Novo nome do campo"
+                  className="w-full bg-[#252525] border border-white/10 rounded px-3 py-2 text-white focus:outline-none focus:border-[#00FF99]"
+                />
+              </div>
+              <div className="flex gap-2 justify-end mt-4">
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 text-gray-400 hover:text-white"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleRenameField}
+                  disabled={actionLoading}
+                  className="px-4 py-2 bg-[#00FF99] text-black font-semibold rounded hover:bg-[#00E88C] disabled:opacity-50 flex items-center gap-2"
+                >
+                  {actionLoading && <Loader2 size={14} className="animate-spin" />}
+                  Salvar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create Field Form */}
       <div className="bg-[#1A1A1A] rounded-xl p-6 border border-white/5">
@@ -616,8 +752,23 @@ const CustomFieldsTab = ({ connections, selectedConnection, onSelectConnection }
 // ============================================================================
 // INCOMING WEBHOOKS TAB
 // ============================================================================
+
+// Helper to extract keys from object for dropdown
+const extractKeys = (obj, prefix = '$') => {
+  let keys = []
+  for (const key in obj) {
+    const path = `${prefix}.${key}`
+    keys.push(path)
+    if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+      keys = keys.concat(extractKeys(obj[key], path))
+    }
+  }
+  return keys
+}
+
 const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
   const [webhooks, setWebhooks] = useState([])
+  const [existingFields, setExistingFields] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingWebhook, setEditingWebhook] = useState(null)
@@ -626,9 +777,7 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
 
   // Form state
   const [formName, setFormName] = useState('')
-  const [formPhonePath, setFormPhonePath] = useState('$.phone')
-  const [formNamePath, setFormNamePath] = useState('$.name')
-  const [formEmailPath, setFormEmailPath] = useState('$.email')
+  const [formMappings, setFormMappings] = useState([])
   const [formActions, setFormActions] = useState({
     createContact: true,
     addTag: false,
@@ -639,7 +788,6 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
   const [formTagId, setFormTagId] = useState('')
   const [formSequenceId, setFormSequenceId] = useState('')
   const [formOriginId, setFormOriginId] = useState('')
-  const [formCustomMappings, setFormCustomMappings] = useState([])
   const [createdWebhook, setCreatedWebhook] = useState(null)
 
   // Available tags, sequences and origins
@@ -647,7 +795,29 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
   const [sequences, setSequences] = useState([])
   const [origins, setOrigins] = useState([])
 
+  // New field state
+  const [showNewFieldModal, setShowNewFieldModal] = useState(false)
+  const [newFieldName, setNewFieldName] = useState('')
+  const [currentMappingIndex, setCurrentMappingIndex] = useState(null)
+
   const selectedConn = connections.find(c => c.connectionId === selectedConnection)
+
+  // Load existing global fields
+  useEffect(() => {
+    const loadFields = async () => {
+      if (!selectedConn?.instanceName) return
+      try {
+        const response = await fetch(`/api/contacts/global-field?instanceName=${selectedConn.instanceName}`)
+        const data = await response.json()
+        if (data.success) {
+          setExistingFields(data.fields || [])
+        }
+      } catch (error) {
+        console.error('Error loading fields:', error)
+      }
+    }
+    loadFields()
+  }, [selectedConn?.instanceName])
 
   // Load webhooks
   useEffect(() => {
@@ -682,7 +852,7 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
         // Load sequences
         const seqRes = await fetch(`/api/automations/sequences?connectionId=${selectedConnection}`)
         const seqData = await seqRes.json()
-        if (seqData.success) setSequences(seqData.sequences || [])
+        if (seqData.sequences) setSequences(seqData.sequences || [])
 
         // Load origins
         const originsRes = await fetch(`/api/contacts/origins?instance_name=${selectedConn.instanceName}`)
@@ -697,14 +867,15 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
 
   const resetForm = () => {
     setFormName('')
-    setFormPhonePath('$.phone')
-    setFormNamePath('$.name')
-    setFormEmailPath('$.email')
+    setFormMappings([
+      { key: 'phone', path: '$.phone' },
+      { key: 'name', path: '$.name' },
+      { key: 'email', path: '$.email' }
+    ])
     setFormActions({ createContact: true, addTag: false, subscribeSequence: false, disableAgent: false, setOrigin: false })
     setFormTagId('')
     setFormSequenceId('')
     setFormOriginId('')
-    setFormCustomMappings([])
     setEditingWebhook(null)
     setCreatedWebhook(null)
   }
@@ -713,19 +884,19 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
     if (webhook) {
       setEditingWebhook(webhook)
       setFormName(webhook.name)
-      setFormPhonePath(webhook.field_mapping?.phone || '$.phone')
-      setFormNamePath(webhook.field_mapping?.name || '$.name')
-      setFormEmailPath(webhook.field_mapping?.email || '$.email')
 
-      const custom = []
+      const mappings = []
       if (webhook.field_mapping) {
         Object.entries(webhook.field_mapping).forEach(([key, path]) => {
-          if (key !== 'phone' && key !== 'name' && key !== 'email') {
-            custom.push({ key, path })
-          }
+          mappings.push({ key, path })
         })
       }
-      setFormCustomMappings(custom)
+      // Ensure default fields exist if empty (though edited should have them)
+      if (!mappings.some(m => m.key === 'phone')) mappings.unshift({ key: 'phone', path: '$.phone' })
+      if (!mappings.some(m => m.key === 'name')) mappings.push({ key: 'name', path: '$.name' })
+      if (!mappings.some(m => m.key === 'email')) mappings.push({ key: 'email', path: '$.email' })
+
+      setFormMappings(mappings)
 
       const actions = webhook.actions || []
       setFormActions({
@@ -761,22 +932,20 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
       if (formActions.setOrigin && formOriginId) actions.push({ type: 'set_origin', origin_id: formOriginId })
       if (formActions.disableAgent) actions.push({ type: 'set_agent', enabled: false })
 
+      // Build field mapping from unified list
+      const fieldMapping = {}
+      formMappings.forEach(m => {
+        if (m.key && m.path) {
+          fieldMapping[m.key] = m.path
+        }
+      })
+
       const payload = {
         connectionId: selectedConnection,
         name: formName.trim(),
-        fieldMapping: {
-          phone: formPhonePath,
-          name: formNamePath,
-          email: formEmailPath
-        },
+        fieldMapping,
         actions
       }
-
-      formCustomMappings.forEach(m => {
-        if (m.key && m.path) {
-          payload.fieldMapping[m.key] = m.path
-        }
-      })
 
       let response
       if (editingWebhook) {
@@ -848,6 +1017,44 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
     setTimeout(() => setCopied(null), 2000)
   }
 
+  const handleCreateNewField = async () => {
+    if (!newFieldName.trim() || currentMappingIndex === null) return
+
+    try {
+      const response = await fetch('/api/contacts/global-field', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          connectionId: selectedConnection,
+          name: newFieldName.trim(),
+          defaultValue: ''
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Update existing fields list
+        setExistingFields(prev => [...prev, data.field || { name: newFieldName.trim() }])
+
+        // Select the new field in the mapping
+        const newMappings = [...formMappings]
+        newMappings[currentMappingIndex].key = newFieldName.trim()
+        setFormMappings(newMappings)
+
+        // Reset state
+        setShowNewFieldModal(false)
+        setNewFieldName('')
+        setCurrentMappingIndex(null)
+      } else {
+        alert(data.error || 'Erro ao criar campo')
+      }
+    } catch (error) {
+      console.error('Error creating field:', error)
+      alert('Erro ao criar campo')
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Info Banner */}
@@ -909,12 +1116,61 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
                     <code className="text-xs text-gray-400 truncate flex-1">
                       {`/api/webhooks/incoming/${webhook.id.slice(0, 8)}...`}
                     </code>
-                    <button
-                      onClick={() => copyWebhookUrl(webhook)}
-                      className="p-1 text-gray-400 hover:text-[#00FF99] transition-colors"
-                    >
-                      {copied === webhook.id ? <Check size={14} className="text-[#00FF99]" /> : <Copy size={14} />}
-                    </button>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => copyWebhookUrl(webhook)}
+                        className="p-1 text-gray-400 hover:text-[#00FF99] transition-colors"
+                        title="Copiar URL"
+                      >
+                        {copied === webhook.id ? <Check size={14} className="text-[#00FF99]" /> : <Copy size={14} />}
+                      </button>
+
+                      {/* Integration Button */}
+                      <div className="relative group/integration">
+                        <button className="p-1 text-gray-400 hover:text-blue-400 transition-colors">
+                          <Code size={14} />
+                        </button>
+                        <div className="absolute right-0 top-full mt-2 hidden group-hover/integration:block z-10 w-48 bg-[#252525] border border-white/10 rounded-xl shadow-xl p-1">
+                          <div className="text-[10px] text-gray-500 font-semibold px-2 py-1 uppercase">Copiar Integração</div>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              const connection = connections.find(c => c.connectionId === selectedConnection)
+                              const apiKey = connection?.fullApiKey || 'YOUR_API_KEY'
+                              navigator.clipboard.writeText(generateCurl(webhook, apiKey))
+                              alert('cURL copiado!')
+                            }}
+                            className="w-full text-left px-2 py-1.5 text-xs text-gray-300 hover:bg-white/5 rounded flex items-center gap-2"
+                          >
+                            <div className="w-1.5 h-1.5 rounded-full bg-white/50"></div> cURL
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              const connection = connections.find(c => c.connectionId === selectedConnection)
+                              const apiKey = connection?.fullApiKey || 'YOUR_API_KEY'
+                              navigator.clipboard.writeText(generateN8n(webhook, apiKey))
+                              alert('Node n8n copiado!')
+                            }}
+                            className="w-full text-left px-2 py-1.5 text-xs text-gray-300 hover:bg-white/5 rounded flex items-center gap-2"
+                          >
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#EA4B71]"></div> n8n Node
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              const connection = connections.find(c => c.connectionId === selectedConnection)
+                              const apiKey = connection?.fullApiKey || 'YOUR_API_KEY'
+                              navigator.clipboard.writeText(generateMake(webhook, apiKey))
+                              alert('Módulo Make copiado!')
+                            }}
+                            className="w-full text-left px-2 py-1.5 text-xs text-gray-300 hover:bg-white/5 rounded flex items-center gap-2"
+                          >
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#6E00B3]"></div> Make JSON
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap gap-2 text-xs text-gray-500">
@@ -957,7 +1213,43 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
         </div>
       )}
 
-      {/* Create/Edit Modal */}
+      {/* Mini Modal for New Field */}
+      {showNewFieldModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4">
+          <div className="bg-[#1A1A1A] rounded-xl p-6 w-full max-w-sm border border-white/10 shadow-2xl">
+            <h3 className="text-lg font-semibold text-white mb-4">Novo Campo Personalizado</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Nome do Campo</label>
+                <input
+                  type="text"
+                  value={newFieldName}
+                  onChange={(e) => setNewFieldName(e.target.value)}
+                  placeholder="Ex: id_transacao"
+                  className="w-full bg-[#252525] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-[#00FF99]/30"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => { setShowNewFieldModal(false); setNewFieldName(''); setCurrentMappingIndex(null) }}
+                  className="px-3 py-2 text-gray-400 hover:text-white"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleCreateNewField}
+                  disabled={!newFieldName.trim()}
+                  className="px-4 py-2 bg-[#00FF99] text-black font-semibold rounded-lg hover:bg-[#00E88C] disabled:opacity-50"
+                >
+                  Criar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-[#1A1A1A] rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -968,6 +1260,10 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
             </div>
 
             <div className="p-6 space-y-5">
+              {/* DEBUG INFO */}
+              <div className="bg-red-900/50 p-2 text-xs font-mono text-red-200">
+                DEBUG: editingWebhook: {editingWebhook ? 'OBJECT' : 'NULL'} | last_payload: {editingWebhook?.last_payload ? 'YES' : 'NO'}
+              </div>
               {/* Name */}
               <div>
                 <label className="block text-sm text-gray-400 mb-2">Nome do Webhook *</label>
@@ -980,204 +1276,279 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
                 />
               </div>
 
-              {/* Field Mapping */}
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">Mapeamento de Campos</label>
-                <div className="space-y-3 bg-[#252525] p-4 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <span className="text-white text-sm w-20">Telefone:</span>
-                    <input
-                      type="text"
-                      value={formPhonePath}
-                      onChange={(e) => setFormPhonePath(e.target.value)}
-                      placeholder="$.buyer.phone"
-                      className="flex-1 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 font-mono"
-                    />
+              {/* NEW WEBHOOK INFO - Only show URL after creation if it's new or no payload */}
+              {editingWebhook && !editingWebhook.last_payload && (
+                <div className="bg-[#252525] rounded-xl p-5 border border-white/5 text-center space-y-4">
+                  <div className="mx-auto w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center mb-2">
+                    <Loader2 className="text-blue-400 animate-spin" size={24} />
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-white text-sm w-20">Nome:</span>
-                    <input
-                      type="text"
-                      value={formNamePath}
-                      onChange={(e) => setFormNamePath(e.target.value)}
-                      placeholder="$.buyer.name"
-                      className="flex-1 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 font-mono"
-                    />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-white text-sm w-20">Email:</span>
-                    <input
-                      type="text"
-                      value={formEmailPath}
-                      onChange={(e) => setFormEmailPath(e.target.value)}
-                      placeholder="$.buyer.email"
-                      className="flex-1 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 font-mono"
-                    />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <p className="text-xs text-gray-500 mt-2">
-                      Use notação JSONPath. Ex: $.buyer.phone para Hotmart.
+                  <div>
+                    <h4 className="text-white font-medium mb-1">Aguardando primeiro evento...</h4>
+                    <p className="text-gray-400 text-sm mb-4">
+                      Envie uma requisição POST para a URL abaixo para desbloquear o mapeamento de campos.
                     </p>
-                  </div>
 
-                  {/* Custom Fields */}
-                  <div className="mt-4 pt-4 border-t border-white/10">
-                    <label className="block text-sm text-gray-400 mb-2">Campos Personalizados</label>
-                    <div className="space-y-2">
-                      {formCustomMappings.map((mapping, index) => (
+                    <div className="flex items-center gap-2 bg-[#111] p-3 rounded-lg border border-white/10">
+                      <code className="text-xs text-blue-300 flex-1 truncate font-mono text-left">
+                        {`https://swiftbot.com.br/api/webhooks/incoming/${editingWebhook.id}`}
+                      </code>
+                      <button
+                        onClick={() => copyWebhookUrl(editingWebhook)}
+                        className="p-1.5 hover:bg-white/10 rounded text-gray-400 hover:text-white"
+                      >
+                        {copied === editingWebhook.id ? <Check size={14} className="text-[#00FF99]" /> : <Copy size={14} />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="pt-2">
+                    <button
+                      onClick={() => window.location.reload()} // Simple reload to check payload
+                      className="text-xs text-[#00FF99] hover:underline"
+                    >
+                      Já enviei, verificar novamente
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Only show Mapping and Actions if we have a payload */}
+              {(editingWebhook?.last_payload) && (
+                <>
+                  {/* Last Payload (Moved Up) */}
+                  {editingWebhook?.last_payload && (
+                    <div className="bg-[#252525] p-3 rounded-lg border border-white/5">
+                      <details className="group" open>
+                        <summary className="cursor-pointer text-xs text-[#00FF99] hover:underline flex items-center gap-2 font-medium">
+                          <Info size={14} />
+                          Ver último payload recebido
+                        </summary>
+                        <div className="mt-2 bg-[#000] p-3 rounded-lg overflow-x-auto">
+                          <pre className="text-xs text-green-400 font-mono">
+                            {JSON.stringify(editingWebhook.last_payload, null, 2)}
+                          </pre>
+                        </div>
+                      </details>
+                    </div>
+                  )}
+
+                  {/* Field Mapping */}
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Mapeamento de Campos</label>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Use notação JSONPath (ex: $.buyer.phone). Campos obrigatórios: phone.
+                    </p>
+                    <div className="space-y-2 bg-[#252525] p-4 rounded-lg">
+                      {formMappings.map((mapping, index) => (
                         <div key={index} className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="Nome"
-                            value={mapping.key}
-                            onChange={(e) => {
-                              const newMappings = [...formCustomMappings]
-                              newMappings[index].key = e.target.value
-                              setFormCustomMappings(newMappings)
-                            }}
-                            className="w-1/3 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300"
-                          />
-                          <input
-                            type="text"
-                            placeholder="JSONPath"
-                            value={mapping.path}
-                            onChange={(e) => {
-                              const newMappings = [...formCustomMappings]
-                              newMappings[index].path = e.target.value
-                              setFormCustomMappings(newMappings)
-                            }}
-                            className="flex-1 bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 font-mono"
-                          />
+                          <div className="w-1/3 relative group/key">
+                            <input
+                              type="text"
+                              placeholder="Nome do campo"
+                              value={mapping.key}
+                              onChange={(e) => {
+                                const newMappings = [...formMappings]
+                                newMappings[index].key = e.target.value
+                                setFormMappings(newMappings)
+                              }}
+                              className="w-full bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-[#00FF99]/50"
+                            />
+                            {/* Field Suggestions Dropdown */}
+                            <div className="absolute top-full left-0 w-full bg-[#252525] border border-white/10 rounded-lg shadow-xl z-20 hidden group-hover/key:block max-h-56 overflow-y-auto">
+                              <div className="p-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Sistema</div>
+                              {['phone', 'name', 'email'].map(field => (
+                                <button
+                                  key={field}
+                                  onClick={() => {
+                                    const newMappings = [...formMappings]
+                                    newMappings[index].key = field
+                                    setFormMappings(newMappings)
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 truncate flex items-center gap-2"
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#00FF99] flex-shrink-0"></span>
+                                  {field}
+                                </button>
+                              ))}
+
+                              <div className="p-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-t border-white/5 mt-1">Personalizados</div>
+                              {existingFields.length > 0 ? existingFields.sort((a, b) => a.name.localeCompare(b.name)).map(f => (
+                                <button
+                                  key={f.name}
+                                  onClick={() => {
+                                    const newMappings = [...formMappings]
+                                    newMappings[index].key = f.name
+                                    setFormMappings(newMappings)
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 truncate flex items-center gap-2"
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0"></span>
+                                  {f.name}
+                                </button>
+                              )) : (
+                                <div className="px-3 py-2 text-xs text-gray-500 italic">
+                                  Sem campos globais criados
+                                </div>
+                              )}
+                              <div className="border-t border-white/5 mt-1 pt-1">
+                                <button
+                                  onClick={() => {
+                                    setNewFieldName('')
+                                    setCurrentMappingIndex(index)
+                                    setShowNewFieldModal(true)
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-xs text-[#00FF99] hover:bg-white/5 flex items-center gap-2"
+                                >
+                                  <Plus size={12} /> Criar novo campo...
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex-1 relative group/path">
+                            <input
+                              type="text"
+                              placeholder="JSONPath (ex: $.name)"
+                              value={mapping.path}
+                              onChange={(e) => {
+                                const newMappings = [...formMappings]
+                                newMappings[index].path = e.target.value
+                                setFormMappings(newMappings)
+                              }}
+                              className="w-full bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-sm text-gray-300 font-mono placeholder-gray-600"
+                            />
+                            {/* JSON Keys Dropdown */}
+                            {editingWebhook?.last_payload && (
+                              <div className="absolute top-full left-0 w-full bg-[#252525] border border-white/10 rounded-lg shadow-xl z-20 hidden group-hover/path:block max-h-48 overflow-y-auto">
+                                {extractKeys(editingWebhook.last_payload).map(k => (
+                                  <button
+                                    key={k}
+                                    onClick={() => {
+                                      const newMappings = [...formMappings]
+                                      newMappings[index].path = k
+                                      setFormMappings(newMappings)
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-[#00FF99] hover:bg-white/5 truncate font-mono"
+                                  >
+                                    {k}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                           <button
                             onClick={() => {
-                              const newMappings = formCustomMappings.filter((_, i) => i !== index)
-                              setFormCustomMappings(newMappings)
+                              const newMappings = formMappings.filter((_, i) => i !== index)
+                              setFormMappings(newMappings)
                             }}
                             className="p-2 text-gray-500 hover:text-red-400"
+                            title="Remover"
                           >
                             <Trash2 size={16} />
                           </button>
                         </div>
                       ))}
                       <button
-                        onClick={() => setFormCustomMappings([...formCustomMappings, { key: '', path: '' }])}
-                        className="text-xs text-[#00FF99] hover:underline flex items-center gap-1"
+                        onClick={() => setFormMappings([...formMappings, { key: '', path: '' }])}
+                        className="text-xs text-[#00FF99] hover:underline flex items-center gap-1 mt-2"
                       >
-                        <Plus size={12} /> Adicionar campo personalizado
+                        <Plus size={12} /> Adicionar mapeamento
                       </button>
                     </div>
                   </div>
 
-                  {/* Last Payload (Simplified) */}
-                  {editingWebhook?.last_payload && (
-                    <div className="mt-4 pt-4 border-t border-white/10">
-                       <details className="group">
-                         <summary className="cursor-pointer text-xs text-gray-400 hover:text-white flex items-center gap-2">
-                           <Info size={14} />
-                           Ver último payload
-                         </summary>
-                         <div className="mt-2 bg-[#000] p-3 rounded-lg overflow-x-auto">
-                           <pre className="text-xs text-green-400 font-mono">
-                             {JSON.stringify(editingWebhook.last_payload, null, 2)}
-                           </pre>
-                         </div>
-                       </details>
+                  {/* Actions */}
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">Ações a Executar</label>
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formActions.createContact}
+                          onChange={(e) => setFormActions(prev => ({ ...prev, createContact: e.target.checked }))}
+                          className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
+                        />
+                        <span className="text-white text-sm">Criar contato se não existir</span>
+                      </label>
+
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formActions.addTag}
+                          onChange={(e) => setFormActions(prev => ({ ...prev, addTag: e.target.checked }))}
+                          className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
+                        />
+                        <span className="text-white text-sm">Adicionar tag</span>
+                      </label>
+                      {formActions.addTag && (
+                        <select
+                          value={formTagId}
+                          onChange={(e) => setFormTagId(e.target.value)}
+                          className="ml-7 bg-[#252525] border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+                        >
+                          <option value="">Selecione uma tag...</option>
+                          {tags.map(tag => (
+                            <option key={tag.id} value={tag.id}>{tag.name}</option>
+                          ))}
+                        </select>
+                      )}
+
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formActions.subscribeSequence}
+                          onChange={(e) => setFormActions(prev => ({ ...prev, subscribeSequence: e.target.checked }))}
+                          className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
+                        />
+                        <span className="text-white text-sm">Inscrever em sequência</span>
+                      </label>
+                      {formActions.subscribeSequence && (
+                        <select
+                          value={formSequenceId}
+                          onChange={(e) => setFormSequenceId(e.target.value)}
+                          className="ml-7 bg-[#252525] border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+                        >
+                          <option value="">Selecione uma sequência...</option>
+                          {sequences.map(seq => (
+                            <option key={seq.id} value={seq.id}>{seq.name}</option>
+                          ))}
+                        </select>
+                      )}
+
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formActions.setOrigin}
+                          onChange={(e) => setFormActions(prev => ({ ...prev, setOrigin: e.target.checked }))}
+                          className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
+                        />
+                        <span className="text-white text-sm">Definir origem</span>
+                      </label>
+                      {formActions.setOrigin && (
+                        <select
+                          value={formOriginId}
+                          onChange={(e) => setFormOriginId(e.target.value)}
+                          className="ml-7 bg-[#252525] border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+                        >
+                          <option value="">Selecione uma origem...</option>
+                          {origins.map(origin => (
+                            <option key={origin.id} value={origin.id}>{origin.name}</option>
+                          ))}
+                        </select>
+                      )}
+
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formActions.disableAgent}
+                          onChange={(e) => setFormActions(prev => ({ ...prev, disableAgent: e.target.checked }))}
+                          className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
+                        />
+                        <span className="text-white text-sm">Desativar agente IA</span>
+                      </label>
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">Ações a Executar</label>
-                <div className="space-y-3">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formActions.createContact}
-                      onChange={(e) => setFormActions(prev => ({ ...prev, createContact: e.target.checked }))}
-                      className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
-                    />
-                    <span className="text-white text-sm">Criar contato se não existir</span>
-                  </label>
-
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formActions.addTag}
-                      onChange={(e) => setFormActions(prev => ({ ...prev, addTag: e.target.checked }))}
-                      className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
-                    />
-                    <span className="text-white text-sm">Adicionar tag</span>
-                  </label>
-                  {formActions.addTag && (
-                    <select
-                      value={formTagId}
-                      onChange={(e) => setFormTagId(e.target.value)}
-                      className="ml-7 bg-[#252525] border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-                    >
-                      <option value="">Selecione uma tag...</option>
-                      {tags.map(tag => (
-                        <option key={tag.id} value={tag.id}>{tag.name}</option>
-                      ))}
-                    </select>
-                  )}
-
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formActions.subscribeSequence}
-                      onChange={(e) => setFormActions(prev => ({ ...prev, subscribeSequence: e.target.checked }))}
-                      className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
-                    />
-                    <span className="text-white text-sm">Inscrever em sequência</span>
-                  </label>
-                  {formActions.subscribeSequence && (
-                    <select
-                      value={formSequenceId}
-                      onChange={(e) => setFormSequenceId(e.target.value)}
-                      className="ml-7 bg-[#252525] border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-                    >
-                      <option value="">Selecione uma sequência...</option>
-                      {sequences.map(seq => (
-                        <option key={seq.id} value={seq.id}>{seq.name}</option>
-                      ))}
-                    </select>
-                  )}
-
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formActions.setOrigin}
-                      onChange={(e) => setFormActions(prev => ({ ...prev, setOrigin: e.target.checked }))}
-                      className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
-                    />
-                    <span className="text-white text-sm">Definir origem</span>
-                  </label>
-                  {formActions.setOrigin && (
-                    <select
-                      value={formOriginId}
-                      onChange={(e) => setFormOriginId(e.target.value)}
-                      className="ml-7 bg-[#252525] border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
-                    >
-                      <option value="">Selecione uma origem...</option>
-                      {origins.map(origin => (
-                        <option key={origin.id} value={origin.id}>{origin.name}</option>
-                      ))}
-                    </select>
-                  )}
-
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formActions.disableAgent}
-                      onChange={(e) => setFormActions(prev => ({ ...prev, disableAgent: e.target.checked }))}
-                      className="w-4 h-4 rounded border-gray-600 text-[#00FF99] focus:ring-[#00FF99]"
-                    />
-                    <span className="text-white text-sm">Desativar agente IA</span>
-                  </label>
-                </div>
-              </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="p-6 border-t border-white/10 flex gap-3 justify-end">
@@ -1197,12 +1568,11 @@ const IncomingWebhooksTab = ({ connections, selectedConnection }) => {
               </button>
             </div>
           </div>
-        </div>
+        </div >
       )}
-    </div>
+    </div >
   )
 }
-
 // MAIN PAGE
 // ============================================================================
 import { useParams } from 'next/navigation'
@@ -1458,7 +1828,7 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {activeTab === 'webhook-entrada' && (
+          {activeTab === 'incoming-webhooks' && (
             <IncomingWebhooksTab
               connections={connections}
               selectedConnection={selectedConnection}
@@ -1473,6 +1843,13 @@ export default function SettingsPage() {
                 setSelectedConnection(connId)
                 localStorage.setItem('activeConnectionId', connId)
               }}
+            />
+          )}
+
+          {activeTab === 'gatilhos' && (
+            <TriggersTab
+              connections={connections}
+              selectedConnection={selectedConnection}
             />
           )}
         </div>
