@@ -1287,23 +1287,29 @@ function DashboardContent() {
       const subStatus = subscriptionData.stripe_subscription?.status
       const paymentIntent = subscriptionData.stripe_subscription?.latest_invoice?.payment_intent
 
-      if (subStatus === 'incomplete' && paymentIntent?.client_secret) {
-        console.log('💳 [STEP 2C] Confirmando pagamento final (3DS/SCA)...')
+      if (subStatus === 'incomplete') {
+        if (paymentIntent?.client_secret) {
+          console.log('💳 [STEP 2C] Confirmando pagamento final (3DS/SCA)...')
 
-        const { error: finalPayError, paymentIntent: finalPI } = await window.stripeInstance.confirmCardPayment(
-          paymentIntent.client_secret
-        )
+          const { error: finalPayError, paymentIntent: finalPI } = await window.stripeInstance.confirmCardPayment(
+            paymentIntent.client_secret
+          )
 
-        if (finalPayError) {
-          console.error('❌ Erro na confirmação final:', finalPayError)
-          throw new Error(finalPayError.message || 'Falha na confirmação do pagamento.')
+          if (finalPayError) {
+            console.error('❌ Erro na confirmação final:', finalPayError)
+            throw new Error(finalPayError.message || 'Falha na confirmação do pagamento.')
+          }
+
+          if (finalPI.status !== 'succeeded') {
+            throw new Error(`Pagamento não completado. Status: ${finalPI.status}`)
+          }
+
+          console.log('✅ Pagamento final confirmado com sucesso!')
+        } else {
+          // Se está incomplete mas não temos client_secret, algo deu errado na expansão ou na Stripe
+          console.error('❌ Status incomplete mas sem client_secret para 3DS. Dump:', subscriptionData.stripe_subscription)
+          throw new Error('O pagamento requer confirmação, mas houve um erro técnico (client_secret missing). Tente novamente ou contate o suporte.')
         }
-
-        if (finalPI.status !== 'succeeded') {
-          throw new Error(`Pagamento não completado. Status: ${finalPI.status}`)
-        }
-
-        console.log('✅ Pagamento final confirmado com sucesso!')
       }
 
       console.log('✅ Subscription criada e ativa!')
