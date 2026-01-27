@@ -78,6 +78,7 @@ NOTES.md
 .env.production
 .env.local
 .env
+.env.example
 
 # Temporary files
 *.log

@@ -3,8 +3,9 @@
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import confetti from 'canvas-confetti'
+import Image from 'next/image'
 
-export default function ConfirmacaoAFR() {
+export default function ConfirmacaoTreeSmart() {
     const router = useRouter()
 
     useEffect(() => {
@@ -42,27 +43,31 @@ export default function ConfirmacaoAFR() {
         <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
             <div className="max-w-md w-full text-center space-y-8 animate-fade-in-up">
 
-                <div className="w-24 h-24 bg-[#00FF99]/20 rounded-full flex items-center justify-center mx-auto mb-8">
-                    <svg className="w-12 h-12 text-[#00FF99]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
+                <div className="w-24 h-24 bg-[#00FF99]/20 rounded-full flex items-center justify-center mx-auto mb-8 relative overflow-hidden">
+                    <Image
+                        src="/logo-tech-tree.webp"
+                        alt="Tree Smart Logo"
+                        width={64}
+                        height={64}
+                        className="object-cover w-full h-full rounded-full opacity-80"
+                    />
                 </div>
 
                 <h1 className="text-4xl font-bold">Solicitação Recebida!</h1>
 
                 <p className="text-gray-400 text-lg leading-relaxed">
-                    Obrigado por confiar no nosso trabalho. <br />
+                    Obrigado por confiar na <strong className="text-white">Tree Smart</strong>. <br />
                     Eu, <strong>Cleiton Calixto</strong>, já recebi seus dados e estou analisando seu perfil.
                 </p>
 
-                <div className="bg-[#111] p-6 rounded-2xl border border-white/10">
+                <div className="bg-[#111] p-6 rounded-3xl border border-white/10">
                     <p className="text-sm text-gray-300 mb-2">O que acontece agora?</p>
                     <p className="text-[#00FF99] font-medium">Entrarei em contato pelo WhatsApp fornecido em breve para agendarmos nossa conversa.</p>
                 </div>
 
                 <div className="pt-8">
                     <button
-                        onClick={() => router.push('/lp/AFR')}
+                        onClick={() => router.push('/lp/tree-smart')}
                         className="text-gray-500 hover:text-white transition-colors text-sm underline underline-offset-4"
                     >
                         Voltar para a página inicial
