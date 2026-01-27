@@ -8,8 +8,6 @@ import { getAccountForUser } from '@/lib/account-service';
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
 
-const SALES_STAGES = ['novo', 'apresentacao', 'negociacao', 'fechamento'];
-
 // Helper to apply filters to a query
 function applyFilters(query, filters) {
     const {
@@ -126,6 +124,34 @@ export async function GET(request) {
         const stage = searchParams.get('stage'); // optional: specific stage
         const cursor = searchParams.get('cursor'); // optional: pagination cursor
 
+        if (!instanceName) {
+            return NextResponse.json(
+                { error: 'instance_name parameter is required' },
+                { status: 400 }
+            );
+        }
+
+        // Fetch dynamic stages for this connection
+        const { data: connectionData } = await supabase
+            .from('whatsapp_connections')
+            .select('id')
+            .eq('instance_name', instanceName)
+            .single();
+
+        let salesStages = ['novo', 'apresentacao', 'negociacao', 'fechamento']; // Fallback
+
+        if (connectionData) {
+            const { data: stagesData } = await supabase
+                .from('crm_stages')
+                .select('stage_key')
+                .eq('connection_id', connectionData.id)
+                .order('position');
+
+            if (stagesData && stagesData.length > 0) {
+                salesStages = stagesData.map(s => s.stage_key);
+            }
+        }
+
         // Filter parameters
         const filters = {
             date_from: searchParams.get('date_from'),
@@ -144,13 +170,6 @@ export async function GET(request) {
         // If consultant tries to bypass filter via param, it will be overridden by assignedToFilter above? 
         // No, the line above prioritizes assignedToFilter if it exists.
         // But if assignedToFilter is null (owner), it uses the param. Correct.
-
-        if (!instanceName) {
-            return NextResponse.json(
-                { error: 'instance_name parameter is required' },
-                { status: 400 }
-            );
-        }
 
         // If specific stage requested (for load more)
         if (stage) {
@@ -251,7 +270,7 @@ export async function GET(request) {
             contactIdsWithTag = new Set(tagAssignments?.map(a => a.contact_id) || []);
         }
 
-        for (const stageKey of SALES_STAGES) {
+        for (const stageKey of salesStages) {
             // Build count query with filters
             let countQuery = chatSupabase
                 .from('whatsapp_conversations')
