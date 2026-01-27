@@ -201,6 +201,24 @@ export async function POST(request) {
         }
       }
 
+      // ✅ [RE-FETCH] GARANTIR EXPANSÃO (Workaround para falha na criação)
+      // Se status incomplete e não temos payment_intent, buscamos novamente com SDK oficial
+      if (stripeSubscription.status === 'incomplete' &&
+        (!stripeSubscription.latest_invoice ||
+          typeof stripeSubscription.latest_invoice === 'string' ||
+          !stripeSubscription.latest_invoice.payment_intent)) {
+
+        console.log('🔄 [Stripe] Re-buscando assinatura para garantir expansão...');
+        const refreshedSub = await stripe.subscriptions.retrieve(stripeSubscription.id, {
+          expand: ['latest_invoice.payment_intent']
+        });
+
+        if (refreshedSub) {
+          console.log('✅ Assinatura atualizada com expansão.');
+          stripeSubscription = refreshedSub;
+        }
+      }
+
     } catch (stripeError) {
       console.error('❌ Erro na Stripe:', stripeError)
 
