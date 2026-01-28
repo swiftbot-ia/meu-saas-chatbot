@@ -15,14 +15,25 @@ export default function MessageBubble({ message, isOwn, contact, connectionAvata
   const [showMediaModal, setShowMediaModal] = useState(false);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [currentFeedback, setCurrentFeedback] = useState(message.feedback_rating || null);
+  const [showCorrectionInput, setShowCorrectionInput] = useState(false);
+  const [correctionText, setCorrectionText] = useState('');
+
+  const handleCorrectionSubmit = async () => {
+    if (!correctionText.trim()) return;
+
+    // Envia o dislike junto com a correção
+    await handleFeedback('dislike', correctionText);
+    setShowCorrectionInput(false);
+    setCorrectionText('');
+  };
 
   // Handle feedback (like/dislike)
-  const handleFeedback = async (rating) => {
+  const handleFeedback = async (rating, correctResponse = null) => {
     if (feedbackLoading) return;
 
     setFeedbackLoading(true);
     try {
-      const isRemovingFeedback = currentFeedback === rating;
+      const isRemovingFeedback = currentFeedback === rating && !correctResponse;
 
       if (isRemovingFeedback) {
         // Remove feedback
@@ -35,10 +46,15 @@ export default function MessageBubble({ message, isOwn, contact, connectionAvata
         }
       } else {
         // Add/update feedback
+        const body = { rating };
+        if (correctResponse) {
+          body.correct_response = correctResponse;
+        }
+
         const response = await fetch(`/api/chat/messages/${message.id}/feedback`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rating }),
+          body: JSON.stringify(body),
         });
         if (response.ok) {
           setCurrentFeedback(rating);
@@ -280,29 +296,69 @@ export default function MessageBubble({ message, isOwn, contact, connectionAvata
 
           {/* Feedback buttons - Only for outbound (agent) messages */}
           {isOwn && (
-            <div className="flex items-center justify-end mt-2 space-x-2 opacity-60 hover:opacity-100 transition-opacity">
-              <button
-                onClick={() => handleFeedback('like')}
-                disabled={feedbackLoading}
-                className={`p-1.5 rounded-full transition-all ${currentFeedback === 'like'
+            <div className="flex flex-col items-end mt-2">
+              <div className="flex items-center space-x-2 opacity-60 hover:opacity-100 transition-opacity">
+                <button
+                  onClick={() => handleFeedback('like')}
+                  disabled={feedbackLoading}
+                  className={`p-1.5 rounded-full transition-all ${currentFeedback === 'like'
                     ? 'bg-green-500/20 text-green-400'
                     : 'hover:bg-white/10 text-gray-400 hover:text-green-400'
-                  }`}
-                title="Boa resposta"
-              >
-                <ThumbsUp size={14} className={currentFeedback === 'like' ? 'fill-current' : ''} />
-              </button>
-              <button
-                onClick={() => handleFeedback('dislike')}
-                disabled={feedbackLoading}
-                className={`p-1.5 rounded-full transition-all ${currentFeedback === 'dislike'
+                    }`}
+                  title="Boa resposta"
+                >
+                  <ThumbsUp size={14} className={currentFeedback === 'like' ? 'fill-current' : ''} />
+                </button>
+                <button
+                  onClick={() => {
+                    if (currentFeedback === 'dislike') {
+                      // Se já deu dislike, clicando de novo remove o feedback
+                      handleFeedback('dislike');
+                      setShowCorrectionInput(false);
+                    } else {
+                      // Se for novo dislike, abre input primeiro
+                      setShowCorrectionInput(true);
+                    }
+                  }}
+                  disabled={feedbackLoading}
+                  className={`p-1.5 rounded-full transition-all ${currentFeedback === 'dislike'
                     ? 'bg-red-500/20 text-red-400'
                     : 'hover:bg-white/10 text-gray-400 hover:text-red-400'
-                  }`}
-                title="Resposta ruim"
-              >
-                <ThumbsDown size={14} className={currentFeedback === 'dislike' ? 'fill-current' : ''} />
-              </button>
+                    }`}
+                  title="Resposta ruim"
+                >
+                  <ThumbsDown size={14} className={currentFeedback === 'dislike' ? 'fill-current' : ''} />
+                </button>
+              </div>
+
+              {/* Correction Input */}
+              {showCorrectionInput && (
+                <div className="mt-3 w-full min-w-[250px] bg-[#111] p-3 rounded-lg border border-white/10 animate-in fade-in slide-in-from-top-2">
+                  <p className="text-xs text-gray-400 mb-2">Qual seria a resposta ideal?</p>
+                  <textarea
+                    value={correctionText}
+                    onChange={(e) => setCorrectionText(e.target.value)}
+                    className="w-full bg-[#222] text-white text-sm p-2 rounded border border-white/5 focus:border-[#00FF99]/50 outline-none resize-none mb-2"
+                    rows={3}
+                    placeholder="Digite a resposta correta..."
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => setShowCorrectionInput(false)}
+                      className="text-xs px-3 py-1.5 text-gray-400 hover:text-white transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={() => handleCorrectionSubmit()}
+                      disabled={feedbackLoading || !correctionText.trim()}
+                      className="text-xs px-3 py-1.5 bg-[#00FF99] text-black font-medium rounded hover:bg-[#00E88C] transition-colors disabled:opacity-50"
+                    >
+                      Enviar Correção
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -162,7 +162,8 @@ export async function POST(request) {
                 user_id: user.id,
                 name,
                 field_mapping: fieldMapping || { phone: '$.phone', name: '$.name' },
-                actions: actions || ['create_contact']
+                actions: actions || ['create_contact'],
+                secret: crypto.randomUUID().replace(/-/g, '') // Generate random secret
             })
             .select()
             .single()
