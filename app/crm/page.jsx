@@ -585,6 +585,7 @@ const SalesFunnelPage = () => {
                 onSuccess={fetchLeads}
                 instanceName={selectedConnection?.instance_name}
                 origins={origins}
+                stages={columns} // [NEW] Pass dynamic stages
             />
 
             {/* [NEW] Config Modal */}
@@ -594,6 +595,7 @@ const SalesFunnelPage = () => {
                 onSuccess={handleConfigSuccess}
                 connectionId={selectedConnection?.id}
                 currentStages={columns}
+                stageCounts={stageCounts} // [NEW] Pass counts for safe delete check
             />
         </div>
     );

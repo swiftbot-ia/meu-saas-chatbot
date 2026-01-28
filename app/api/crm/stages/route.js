@@ -143,6 +143,12 @@ export async function POST(request) {
         const newStageIds = new Set(stages.map(s => s.id).filter(id => id && !id.toString().startsWith('temp-')));
         const stagesToDelete = existingStages?.filter(s => !newStageIds.has(s.id)) || [];
 
+        // [PROTECTION] Prevent deleting 'novo' stage
+        const protectedStage = stagesToDelete.find(s => s.stage_key === 'novo');
+        if (protectedStage) {
+            return NextResponse.json({ error: 'A etapa "Novo" (ou padrão) não pode ser excluída.' }, { status: 400 });
+        }
+
         const stagesToUpdate = [];
         const stagesToInsert = [];
 
