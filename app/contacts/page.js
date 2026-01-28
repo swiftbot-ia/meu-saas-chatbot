@@ -103,6 +103,51 @@ export default function ContactsPage() {
   const [newFieldValue, setNewFieldValue] = useState('');
   const [editingField, setEditingField] = useState(null);
 
+  // Global Fields State
+  const [globalFields, setGlobalFields] = useState([]);
+
+  // Load global fields
+  useEffect(() => {
+    const fetchGlobalFields = async () => {
+      if (!selectedConnection) return;
+      try {
+        const res = await fetch(`/api/contacts/global-field?connectionId=${selectedConnection}`);
+        const data = await res.json();
+        if (data.success) {
+          setGlobalFields(data.fields || []);
+        }
+      } catch (e) {
+        console.error('Error fetching global fields:', e);
+      }
+    };
+    fetchGlobalFields();
+  }, [selectedConnection]);
+
+  // Combine global fields with any extra ad-hoc fields in contact metadata
+  const displayFields = (() => {
+    const fields = [];
+    // 1. Add all global fields
+    globalFields.forEach(gf => {
+      fields.push({
+        key: gf.name,
+        value: customFields[gf.name] || '',
+        isGlobal: true
+      });
+    });
+    // 2. Add extra fields from metadata that represent ad-hoc fields
+    // FILTERED OUT - User only wants global fields
+    // Object.entries(customFields).forEach(([key, value]) => {
+    //   if (!globalFields.some(gf => gf.name === key)) {
+    //      fields.push({
+    //        key,
+    //        value,
+    //        isGlobal: false
+    //      });
+    //   }
+    // });
+    return fields;
+  })();
+
   // Assignment state
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -278,7 +323,18 @@ export default function ContactsPage() {
   }
   // Handle connection selection with localStorage sync
   const handleConnectionSelect = (connectionId) => {
+    if (selectedConnection === connectionId) return;
+
+    // Reset page states when switching connection
     setSelectedConnection(connectionId);
+    setSelectedContact(null);
+    setSearchTerm('');
+    setSelectedOrigin('');
+    setSelectedTag('');
+    setContacts([]);
+    setTotalContacts(0);
+    setOffset(0);
+    setHasMore(true);
 
     // ✅ Save to localStorage
     if (typeof window !== 'undefined') {
@@ -1493,6 +1549,7 @@ export default function ContactsPage() {
               </div>
 
               {/* Custom Fields */}
+
               <div className="bg-[#111111] rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-white flex items-center gap-2">
@@ -1513,32 +1570,42 @@ export default function ContactsPage() {
                   </button>
                 </div>
 
-                {Object.keys(customFields).length > 0 ? (
+                {displayFields.length > 0 ? (
                   <div className="space-y-2">
-                    {Object.entries(customFields).map(([key, value]) => (
+                    {displayFields.map((field) => (
                       <div
-                        key={key}
+                        key={field.key}
                         className="flex items-center justify-between bg-[#1E1E1E] rounded-xl px-4 py-3 group"
                       >
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs text-gray-400">{key}</p>
-                          <p className="text-white text-sm font-medium truncate">{value}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-gray-400">{field.key}</p>
+                            {field.isGlobal && <span className="text-[10px] bg-purple-500/10 text-purple-400 px-1.5 py-0.5 rounded">Global</span>}
+                          </div>
+                          {field.value ? (
+                            <p className="text-white text-sm font-medium truncate">{field.value}</p>
+                          ) : (
+                            <p className="text-gray-600 text-sm italic">Vazio</p>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => {
-                              setNewFieldKey(key);
-                              setNewFieldValue(value);
-                              setEditingField(key);
+                              setNewFieldKey(field.key);
+                              setNewFieldValue(field.value);
+                              setEditingField(field.key);
                               setShowCustomFieldModal(true);
                             }}
                             className="text-gray-400 hover:text-white p-1"
+                            title="Editar Valor"
                           >
                             <Edit3 size={14} />
                           </button>
+                          {/* Only allow deleting ad-hoc fields, or clearing value of global fields? For now keep delete button which clears metadata */}
                           <button
-                            onClick={() => handleDeleteCustomField(key)}
+                            onClick={() => handleDeleteCustomField(field.key)}
                             className="text-red-400 hover:text-red-300 p-1"
+                            title={field.isGlobal ? "Limpar Valor" : "Excluir Campo"}
                           >
                             <Trash2 size={14} />
                           </button>
@@ -1550,7 +1617,6 @@ export default function ContactsPage() {
                   <p className="text-gray-500 text-sm">Nenhum campo personalizado</p>
                 )}
               </div>
-
             </div>
           </>
         ) : (

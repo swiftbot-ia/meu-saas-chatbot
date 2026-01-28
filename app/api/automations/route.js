@@ -120,7 +120,12 @@ export async function POST(request) {
             triggerType,
             folderId,
             keywords = [],
-            responses = []
+            responses = [],
+            actionWebhookUrl,
+            actionWebhookEnabled,
+            actionAddTags,
+            actionSetOriginId,
+            actionCustomFields
         } = body
 
         // Validações
@@ -155,7 +160,12 @@ export async function POST(request) {
                 trigger_type: triggerType || 'message_contains',
                 trigger_config: body.triggerConfig || {},
                 folder_id: folderId || null,
-                is_active: true
+                is_active: true,
+                action_webhook_url: actionWebhookUrl || null,
+                action_webhook_enabled: actionWebhookEnabled || false,
+                action_add_tags: actionAddTags || [],
+                action_set_origin_id: actionSetOriginId || null,
+                action_custom_fields: actionCustomFields || {}
             })
             .select()
             .single()
