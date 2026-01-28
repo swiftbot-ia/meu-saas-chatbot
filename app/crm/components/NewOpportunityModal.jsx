@@ -6,25 +6,25 @@ import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import axios from 'axios';
 
-const FUNNEL_STAGES = [
-    { value: 'novo', label: 'Novo' },
-    { value: 'apresentacao', label: 'Apresentação' },
-    { value: 'negociacao', label: 'Negociação' },
-    { value: 'fechamento', label: 'Fechamento' }
-];
-
 const NewOpportunityModal = ({
     isOpen,
     onClose,
     onSuccess,
     instanceName,
-    origins = []
+    origins = [],
+    stages = {} // [NEW] Receive dynamic stages
 }) => {
+    // Convert stages object to sorted array
+    const availableStages = Object.values(stages).sort((a, b) => a.position - b.position);
+
+    // Default to 'novo' key if exists, else first stage
+    const defaultStage = availableStages.find(s => s.stage_key === 'novo')?.id || availableStages[0]?.id || 'novo';
+
     const [formData, setFormData] = useState({
         name: '',
         phone: '',
         origin_id: '',
-        funnel_stage: 'novo'
+        funnel_stage: defaultStage
     });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
@@ -36,11 +36,11 @@ const NewOpportunityModal = ({
                 name: '',
                 phone: '',
                 origin_id: '',
-                funnel_stage: 'novo'
+                funnel_stage: defaultStage
             });
             setError('');
         }
-    }, [isOpen]);
+    }, [isOpen, defaultStage]); // Add defaultStage dependency
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -63,7 +63,7 @@ const NewOpportunityModal = ({
                 name: formData.name.trim(),
                 phone: formData.phone,
                 origin_id: formData.origin_id || null,
-                funnel_stage: formData.funnel_stage,
+                funnel_stage: formData.funnel_stage, // Send ID
                 instance_name: instanceName
             });
 
@@ -159,23 +159,24 @@ const NewOpportunityModal = ({
                         </select>
                     </div>
 
-                    {/* Funnel Stage */}
+                    {/* Funnel Stage - DYNAMIC */}
                     <div>
                         <label className="block text-xs font-medium text-gray-400 mb-2">
                             Etapa Inicial
                         </label>
                         <div className="grid grid-cols-2 gap-2">
-                            {FUNNEL_STAGES.map(stage => (
+                            {availableStages.map(stage => (
                                 <button
-                                    key={stage.value}
+                                    key={stage.id}
                                     type="button"
-                                    onClick={() => setFormData({ ...formData, funnel_stage: stage.value })}
-                                    className={`px-3 py-2 text-sm rounded-xl transition-all ${formData.funnel_stage === stage.value
-                                            ? 'bg-[#00FF99]/20 text-[#00FF99]'
-                                            : 'bg-[#2A2A2A] text-gray-400 hover:text-white hover:bg-[#333333]'
+                                    onClick={() => setFormData({ ...formData, funnel_stage: stage.id })}
+                                    className={`px-3 py-2 text-sm rounded-xl transition-all truncate ${formData.funnel_stage === stage.id
+                                        ? 'bg-[#00FF99]/20 text-[#00FF99] ring-1 ring-[#00FF99]'
+                                        : 'bg-[#2A2A2A] text-gray-400 hover:text-white hover:bg-[#333333]'
                                         }`}
+                                    title={stage.name}
                                 >
-                                    {stage.label}
+                                    {stage.name}
                                 </button>
                             ))}
                         </div>
